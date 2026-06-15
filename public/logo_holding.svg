@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0080BD"/>
+      <stop offset="50%" style="stop-color:#7c3aed"/>
+      <stop offset="100%" style="stop-color:#ea580c"/>
+    </linearGradient>
+  </defs>
+  <!-- Hexagone stylisé — symbole de groupe/holding -->
+  <polygon points="50,8 86,28 86,72 50,92 14,72 14,28" 
+           fill="none" stroke="url(#grad)" stroke-width="6" stroke-linejoin="round"/>
+  <!-- Cercle central -->
+  <circle cx="50" cy="50" r="14" fill="url(#grad)" opacity="0.9"/>
+  <!-- 3 petits cercles aux sommets alternés — représente les 3 sociétés -->
+  <circle cx="50" cy="14" r="5" fill="#0080BD"/>
+  <circle cx="80" cy="67" r="5" fill="#ea580c"/>
+  <circle cx="20" cy="67" r="5" fill="#7c3aed"/>
+</svg>
