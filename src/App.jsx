@@ -4,9 +4,12 @@ import { AuthProvider, useAuth } from './lib/auth'
 import Login from './pages/Login'
 import AuthCallback from './pages/AuthCallback'
 import AccessDenied from './pages/AccessDenied'
-import Dashboard from './pages/Dashboard'
 import AdminUsers from './pages/AdminUsers'
-import DashboardGroupe from './pages/groupe/DashboardGroupe'
+
+import DashboardGroupe   from './pages/groupe/DashboardGroupe'
+import DashboardDynassur from './pages/dynassur/DashboardDynassur'
+import DashboardDtx      from './pages/dtx/DashboardDtx'
+import DashboardLode     from './pages/lode/DashboardLode'
 
 function ProtectedRoute({ children, requireAdmin = false }) {
   const { user, perms, loading } = useAuth()
@@ -24,26 +27,38 @@ function ProtectedRoute({ children, requireAdmin = false }) {
   return children
 }
 
+// Redirige vers le bon dashboard selon la société active
+function RootRedirect() {
+  const { activeSociete, loading } = useAuth()
+  if (loading) return null
+  const routes = { groupe: '/groupe', dynassur: '/dynassur', dtx: '/dtx', lode: '/lode' }
+  return <Navigate to={routes[activeSociete] || '/dynassur'} replace />
+}
+
 function AppRoutes() {
   return (
     <Routes>
       {/* Public */}
-      <Route path="/login" element={<Login />} />
-      <Route path="/auth/callback" element={<AuthCallback />} />
-      <Route path="/access-denied" element={<AccessDenied />} />
+      <Route path="/login"          element={<Login />} />
+      <Route path="/auth/callback"  element={<AuthCallback />} />
+      <Route path="/access-denied"  element={<AccessDenied />} />
 
-      {/* Groupe */}
-      <Route path="/groupe" element={<ProtectedRoute><DashboardGroupe /></ProtectedRoute>} />
+      {/* Dashboards par société */}
+      <Route path="/groupe"   element={<ProtectedRoute><DashboardGroupe /></ProtectedRoute>} />
+      <Route path="/dynassur" element={<ProtectedRoute><DashboardDynassur /></ProtectedRoute>} />
+      <Route path="/dtx"      element={<ProtectedRoute><DashboardDtx /></ProtectedRoute>} />
+      <Route path="/lode"     element={<ProtectedRoute><DashboardLode /></ProtectedRoute>} />
 
-      {/* Dynassur */}
-      <Route path="/dynassur" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-
-      {/* Racine → redirect selon société active */}
-      <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      {/* Sous-modules Dynassur — placeholder pour éviter 404 */}
+      <Route path="/dynassur/*" element={<ProtectedRoute><DashboardDynassur /></ProtectedRoute>} />
+      <Route path="/dtx/*"      element={<ProtectedRoute><DashboardDtx /></ProtectedRoute>} />
+      <Route path="/lode/*"     element={<ProtectedRoute><DashboardLode /></ProtectedRoute>} />
 
       {/* Admin */}
       <Route path="/admin/users" element={<ProtectedRoute requireAdmin><AdminUsers /></ProtectedRoute>} />
 
+      {/* Racine → redirect automatique vers la bonne société */}
+      <Route path="/" element={<ProtectedRoute><RootRedirect /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
