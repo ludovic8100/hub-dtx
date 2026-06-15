@@ -1,5 +1,6 @@
 import Header from './Header'
 import Sidebar from './Sidebar'
+import SocieteSelector from './SocieteSelector'
 
 export default function Layout({ children, currentPage }) {
   return (
@@ -11,7 +12,19 @@ export default function Layout({ children, currentPage }) {
     }}>
       <Header currentPage={currentPage} />
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        <Sidebar />
+        {/* Sidebar avec sélecteur société intégré en haut */}
+        <aside style={{
+          width: '232px',
+          minWidth: '232px',
+          display: 'flex',
+          flexDirection: 'column',
+          background: '#0f172a',
+          borderRight: '1px solid rgba(255,255,255,0.07)',
+          overflowY: 'auto'
+        }}>
+          <SocieteSelector />
+          <Sidebar />
+        </aside>
         <main style={{
           flex: 1,
           overflowY: 'auto',
