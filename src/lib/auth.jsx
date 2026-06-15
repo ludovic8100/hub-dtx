@@ -3,8 +3,17 @@ import { supabase } from './supabase'
 
 const AuthContext = createContext(null)
 
-// Couleurs officielles par société
 export const SOCIETES_CONFIG = {
+  groupe: {
+    key: 'groupe',
+    label: 'Groupe',
+    short: 'GRP',
+    color: '#7c3aed',
+    colorDark: '#3b1f6e',
+    colorLight: '#f5f3ff',
+    colorAccent: '#a78bfa',
+    acc_key: 'acc_holding',
+  },
   dynassur: {
     key: 'dynassur',
     label: 'Dynassur SRL',
@@ -19,10 +28,10 @@ export const SOCIETES_CONFIG = {
     key: 'dtx',
     label: 'DTX SRL',
     short: 'DTX',
-    color: '#475569',
-    colorDark: '#1e293b',
-    colorLight: '#f1f5f9',
-    colorAccent: '#94a3b8',
+    color: '#94a3b8',
+    colorDark: '#334155',
+    colorLight: '#f8fafc',
+    colorAccent: '#cbd5e1',
     acc_key: 'acc_dtx',
   },
   lode: {
@@ -30,20 +39,10 @@ export const SOCIETES_CONFIG = {
     label: 'LODE SRL',
     short: 'LODE',
     color: '#ea580c',
-    colorDark: '#9a3412',
+    colorDark: '#7c2d12',
     colorLight: '#fff7ed',
     colorAccent: '#fb923c',
     acc_key: 'acc_lode',
-  },
-  holding: {
-    key: 'holding',
-    label: 'Holding',
-    short: 'HOL',
-    color: '#7c3aed',
-    colorDark: '#4c1d95',
-    colorLight: '#f5f3ff',
-    colorAccent: '#a78bfa',
-    acc_key: 'acc_holding',
   },
 }
 
@@ -64,17 +63,22 @@ export function AuthProvider({ children }) {
     return data
   }
 
+  function getDefaultSociete(p, admin) {
+    if (!p) return null
+    if (admin || p.acc_holding) return 'groupe'
+    return Object.values(SOCIETES_CONFIG)
+      .filter(s => s.key !== 'groupe')
+      .find(s => p[s.acc_key])?.key || null
+  }
+
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user)
         const p = await loadPerms(session.user.email)
         setPerms(p)
-        // Auto-select première société accessible
-        if (p) {
-          const first = Object.values(SOCIETES_CONFIG).find(s => p[s.acc_key])
-          if (first) setActiveSociete(first.key)
-        }
+        const admin = p?.role === 'admin'
+        setActiveSociete(getDefaultSociete(p, admin))
       }
       setLoading(false)
     })
@@ -85,14 +89,10 @@ export function AuthProvider({ children }) {
           setUser(session.user)
           const p = await loadPerms(session.user.email)
           setPerms(p)
-          if (p) {
-            const first = Object.values(SOCIETES_CONFIG).find(s => p[s.acc_key])
-            if (first) setActiveSociete(first.key)
-          }
+          const admin = p?.role === 'admin'
+          setActiveSociete(getDefaultSociete(p, admin))
         } else {
-          setUser(null)
-          setPerms(null)
-          setActiveSociete(null)
+          setUser(null); setPerms(null); setActiveSociete(null)
         }
         setLoading(false)
       }
@@ -103,10 +103,7 @@ export function AuthProvider({ children }) {
   async function signInWithMicrosoft() {
     await supabase.auth.signInWithOAuth({
       provider: 'azure',
-      options: {
-        scopes: 'email profile openid',
-        redirectTo: `${window.location.origin}/auth/callback`,
-      }
+      options: { scopes: 'email profile openid', redirectTo: `${window.location.origin}/auth/callback` }
     })
   }
 
@@ -114,41 +111,32 @@ export function AuthProvider({ children }) {
     await supabase.auth.signOut()
     await supabase.auth.signInWithOAuth({
       provider: 'azure',
-      options: {
-        scopes: 'email profile openid',
-        redirectTo: `${window.location.origin}/auth/callback`,
-        queryParams: { prompt: 'select_account' }
-      }
+      options: { scopes: 'email profile openid', redirectTo: `${window.location.origin}/auth/callback`, queryParams: { prompt: 'select_account' } }
     })
   }
 
   async function signOut() {
     await supabase.auth.signOut()
-    setUser(null)
-    setPerms(null)
-    setActiveSociete(null)
+    setUser(null); setPerms(null); setActiveSociete(null)
   }
 
   const isAdmin = perms?.role === 'admin'
 
-  // Sociétés accessibles à cet utilisateur
-  const societesDispo = perms
-    ? Object.values(SOCIETES_CONFIG).filter(s => isAdmin || perms[s.acc_key])
-    : []
+  const societesDispo = perms ? [
+    (isAdmin || perms.acc_holding) && SOCIETES_CONFIG.groupe,
+    perms.acc_dynassur             && SOCIETES_CONFIG.dynassur,
+    perms.acc_dtx                  && SOCIETES_CONFIG.dtx,
+    perms.acc_lode                 && SOCIETES_CONFIG.lode,
+  ].filter(Boolean) : []
 
-  // Config de la société active
   const societeActive = activeSociete ? SOCIETES_CONFIG[activeSociete] : null
 
   return (
     <AuthContext.Provider value={{
-      user, perms, loading,
-      isAdmin,
+      user, perms, loading, isAdmin,
       activeSociete, setActiveSociete,
-      societesDispo,
-      societeActive,
-      signInWithMicrosoft,
-      switchUser,
-      signOut
+      societesDispo, societeActive,
+      signInWithMicrosoft, switchUser, signOut
     }}>
       {children}
     </AuthContext.Provider>

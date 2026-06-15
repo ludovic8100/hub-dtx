@@ -6,39 +6,21 @@ import AuthCallback from './pages/AuthCallback'
 import AccessDenied from './pages/AccessDenied'
 import Dashboard from './pages/Dashboard'
 import AdminUsers from './pages/AdminUsers'
+import DashboardGroupe from './pages/groupe/DashboardGroupe'
 
-// Route protégée — vérifie session + droits
 function ProtectedRoute({ children, requireAdmin = false }) {
   const { user, perms, loading } = useAuth()
 
-  if (loading) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: '#0D2F5E'
-      }}>
-        <div style={{
-          width: '40px', height: '40px',
-          border: '3px solid rgba(255,255,255,0.3)',
-          borderTopColor: '#fff',
-          borderRadius: '50%',
-          animation: 'spin 0.8s linear infinite'
-        }} />
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      </div>
-    )
-  }
+  if (loading) return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0D2F5E' }}>
+      <div style={{ width: '40px', height: '40px', border: '3px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  )
 
-  // Pas connecté → login
   if (!user) return <Navigate to="/login" replace />
-
-  // Connecté mais pas de droits actifs → accès refusé
   if (!perms) return <Navigate to="/access-denied" replace />
-
-  // Route admin demandée mais pas admin
   if (requireAdmin && perms.role !== 'admin') return <Navigate to="/" replace />
-
   return children
 }
 
@@ -50,20 +32,18 @@ function AppRoutes() {
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/access-denied" element={<AccessDenied />} />
 
+      {/* Groupe */}
+      <Route path="/groupe" element={<ProtectedRoute><DashboardGroupe /></ProtectedRoute>} />
+
       {/* Dynassur */}
-      <Route path="/" element={
-        <ProtectedRoute><Dashboard /></ProtectedRoute>
-      } />
-      <Route path="/dynassur" element={
-        <ProtectedRoute><Dashboard /></ProtectedRoute>
-      } />
+      <Route path="/dynassur" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+
+      {/* Racine → redirect selon société active */}
+      <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
 
       {/* Admin */}
-      <Route path="/admin/users" element={
-        <ProtectedRoute requireAdmin><AdminUsers /></ProtectedRoute>
-      } />
+      <Route path="/admin/users" element={<ProtectedRoute requireAdmin><AdminUsers /></ProtectedRoute>} />
 
-      {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
