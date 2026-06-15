@@ -1,9 +1,17 @@
 import { useAuth } from '../lib/auth'
 
+const SOCIETE_LABELS = {
+  dynassur: 'Dynassur',
+  dtx:      'DTX SRL',
+  lode:     'LODE SRL',
+  null:     'Groupe',
+}
+
 export default function Header({ currentPage }) {
-  const { user, perms, isAdmin, switchUser, signOut } = useAuth()
+  const { user, perms, isAdmin, activeSociete, switchUser, signOut } = useAuth()
 
   const displayName = perms?.nom || user?.user_metadata?.full_name || user?.email || ''
+  const societeLabel = activeSociete ? SOCIETE_LABELS[activeSociete] : null
 
   return (
     <header style={{
@@ -38,6 +46,27 @@ export default function Header({ currentPage }) {
         }}>
           Dynassur Hub
         </span>
+
+        {/* Société active */}
+        {societeLabel && (
+          <>
+            <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '16px' }}>/</span>
+            <span style={{
+              background: 'rgba(0,128,189,0.25)',
+              border: '1px solid rgba(0,128,189,0.4)',
+              color: '#5DC3E8',
+              fontSize: '12px',
+              fontWeight: '600',
+              padding: '3px 9px',
+              borderRadius: '5px',
+              letterSpacing: '0.03em'
+            }}>
+              {societeLabel}
+            </span>
+          </>
+        )}
+
+        {/* Page courante */}
         {currentPage && (
           <>
             <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '16px' }}>/</span>
@@ -49,7 +78,6 @@ export default function Header({ currentPage }) {
       {/* Zone droite */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
 
-        {/* Badge rôle admin */}
         {isAdmin && (
           <span style={{
             background: 'rgba(0,128,189,0.3)',
@@ -66,7 +94,6 @@ export default function Header({ currentPage }) {
           </span>
         )}
 
-        {/* Nom utilisateur */}
         <span style={{
           fontFamily: "'Source Sans Pro', sans-serif",
           fontSize: '14px',
@@ -75,7 +102,6 @@ export default function Header({ currentPage }) {
           {displayName}
         </span>
 
-        {/* Bouton changer d'utilisateur — ADMIN SEULEMENT */}
         {isAdmin && (
           <button
             onClick={switchUser}
@@ -108,7 +134,6 @@ export default function Header({ currentPage }) {
           </button>
         )}
 
-        {/* Déconnexion */}
         <button
           onClick={signOut}
           title="Se déconnecter"

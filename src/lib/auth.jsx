@@ -4,9 +4,10 @@ import { supabase } from './supabase'
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null)       // session O365
-  const [perms, setPerms] = useState(null)     // droits depuis user_permissions
+  const [user, setUser] = useState(null)
+  const [perms, setPerms] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [activeSociete, setActiveSociete] = useState(null) // 'dynassur' | 'dtx' | 'lode' | null (= all)
 
   async function loadPerms(email) {
     const { data, error } = await supabase
@@ -21,7 +22,6 @@ export function AuthProvider({ children }) {
   }
 
   useEffect(() => {
-    // Vérifier session existante au démarrage
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user)
@@ -31,7 +31,6 @@ export function AuthProvider({ children }) {
       setLoading(false)
     })
 
-    // Écouter les changements de session
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (session?.user) {
@@ -41,6 +40,7 @@ export function AuthProvider({ children }) {
         } else {
           setUser(null)
           setPerms(null)
+          setActiveSociete(null)
         }
         setLoading(false)
       }
@@ -49,7 +49,6 @@ export function AuthProvider({ children }) {
     return () => subscription.unsubscribe()
   }, [])
 
-  // Connexion Microsoft / O365
   async function signInWithMicrosoft() {
     await supabase.auth.signInWithOAuth({
       provider: 'azure',
@@ -60,7 +59,6 @@ export function AuthProvider({ children }) {
     })
   }
 
-  // Changer d'utilisateur — force le sélecteur de compte Microsoft
   async function switchUser() {
     await supabase.auth.signOut()
     await supabase.auth.signInWithOAuth({
@@ -68,9 +66,7 @@ export function AuthProvider({ children }) {
       options: {
         scopes: 'email profile openid',
         redirectTo: `${window.location.origin}/auth/callback`,
-        queryParams: {
-          prompt: 'select_account',
-        }
+        queryParams: { prompt: 'select_account' }
       }
     })
   }
@@ -79,14 +75,24 @@ export function AuthProvider({ children }) {
     await supabase.auth.signOut()
     setUser(null)
     setPerms(null)
+    setActiveSociete(null)
   }
 
   const isAdmin = perms?.role === 'admin'
+
+  // Sociétés accessibles à cet utilisateur
+  const societesDispo = perms ? [
+    perms.acc_dynassur && { key: 'dynassur', label: 'Dynassur', short: 'DYN', color: '#0080BD' },
+    perms.acc_dtx      && { key: 'dtx',      label: 'DTX SRL',  short: 'DTX', color: '#0D2F5E' },
+    perms.acc_lode     && { key: 'lode',      label: 'LODE SRL', short: 'LODE', color: '#1B5C8A' },
+  ].filter(Boolean) : []
 
   return (
     <AuthContext.Provider value={{
       user, perms, loading,
       isAdmin,
+      activeSociete, setActiveSociete,
+      societesDispo,
       signInWithMicrosoft,
       switchUser,
       signOut
