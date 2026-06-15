@@ -6,7 +6,7 @@ const AuthContext = createContext(null)
 export const SOCIETES_CONFIG = {
   groupe: {
     key: 'groupe',
-    label: 'Groupe',
+    label: 'Tableau de bord général',
     short: 'GRP',
     color: '#7c3aed',
     colorDark: '#3b1f6e',

@@ -67,7 +67,7 @@ export default function DashboardGroupe() {
   const f = { fontFamily: "'Source Sans Pro', sans-serif" }
 
   if (loading) return (
-    <Layout currentPage="Vue Groupe">
+    <Layout currentPage="Tableau de bord général">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px', color: '#94a3b8' }}>
         Chargement...
       </div>
@@ -75,13 +75,13 @@ export default function DashboardGroupe() {
   )
 
   return (
-    <Layout currentPage="Vue Groupe">
+    <Layout currentPage="Tableau de bord général">
       <div style={{ ...f, maxWidth: '1200px' }}>
 
         {/* Titre */}
         <div style={{ marginBottom: '28px' }}>
           <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#0f172a', margin: '0 0 4px' }}>
-            Vue consolidée du Groupe
+            Tableau de bord général
           </h1>
           <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>
             Finances et tâches — toutes entités confondues

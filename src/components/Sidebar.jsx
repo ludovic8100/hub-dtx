@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 
 const MODULES = {
   groupe: [
-    { key: 'acc_holding', label: 'Vue consolidée', icon: 'ti-layout-dashboard', path: '/groupe' },
+    { key: 'acc_holding', label: 'Tableau de bord général', icon: 'ti-layout-grid', path: '/groupe' },
   ],
   dynassur: [
     { key: 'dyn_dashboard',    label: 'Tableau de bord', icon: 'ti-layout-dashboard', path: '/dynassur' },
