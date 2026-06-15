@@ -31,6 +31,16 @@ const MODULES = {
     { key: 'lode_banque',       label: 'Banque',           icon: 'ti-credit-card',      path: '/lode/banque' },
     { key: 'lode_comptabilite', label: 'Comptabilité',     icon: 'ti-calculator',       path: '/lode/comptabilite' },
   ],
+  hexagroup: [
+    { key: 'hex_dashboard',      label: 'Tableau de bord', icon: 'ti-layout-dashboard', path: '/hexagroup' },
+    { key: 'hex_banque',         label: 'Banque',           icon: 'ti-credit-card',      path: '/hexagroup/banque' },
+    { key: 'hex_comptabilite',   label: 'Comptabilité',     icon: 'ti-calculator',       path: '/hexagroup/comptabilite' },
+  ],
+  prive: [
+    { key: 'prive_dashboard',    label: 'Tableau de bord', icon: 'ti-layout-dashboard', path: '/prive' },
+    { key: 'prive_banque',       label: 'Banque',           icon: 'ti-credit-card',      path: '/prive/banque' },
+    { key: 'prive_comptabilite', label: 'Comptabilité',     icon: 'ti-calculator',       path: '/prive/comptabilite' },
+  ],
 }
 
 const MODULES_ADMIN = [
@@ -41,14 +51,12 @@ export default function Sidebar() {
   const { perms, isAdmin, activeSociete } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-
   if (!perms) return null
 
   const cfg = activeSociete ? SOCIETES_CONFIG[activeSociete] : SOCIETES_CONFIG.groupe
   const accentColor = cfg.color
   const accentLight = cfg.colorAccent
 
-  // Modules de la société active uniquement — toujours contextuel
   const currentModules = activeSociete && MODULES[activeSociete]
     ? MODULES[activeSociete].filter(m => isAdmin || perms[m.key])
     : []
@@ -56,30 +64,19 @@ export default function Sidebar() {
   const NavItem = ({ item }) => {
     const active = location.pathname === item.path ||
       (item.path.length > 1 && location.pathname.startsWith(item.path + '/'))
-
     return (
-      <div
-        onClick={() => navigate(item.path)}
-        style={{
-          display: 'flex', alignItems: 'center', gap: '10px',
-          padding: '8px 12px', borderRadius: '7px', cursor: 'pointer',
-          background: active ? `${accentColor}20` : 'transparent',
-          borderLeft: active ? `3px solid ${accentColor}` : '3px solid transparent',
-          transition: 'all 0.15s', marginBottom: '1px'
-        }}
+      <div onClick={() => navigate(item.path)} style={{
+        display:'flex', alignItems:'center', gap:'10px',
+        padding:'8px 12px', borderRadius:'7px', cursor:'pointer',
+        background: active ? `${accentColor}20` : 'transparent',
+        borderLeft: active ? `3px solid ${accentColor}` : '3px solid transparent',
+        transition:'all 0.15s', marginBottom:'1px'
+      }}
         onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
         onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}
       >
-        <i className={`ti ${item.icon}`} style={{
-          fontSize: '16px',
-          color: active ? accentLight : 'rgba(255,255,255,0.45)',
-          width: '18px', flexShrink: 0
-        }} />
-        <span style={{
-          fontSize: '13.5px', fontFamily: "'Source Sans Pro', sans-serif",
-          color: active ? '#fff' : 'rgba(255,255,255,0.65)',
-          fontWeight: active ? '600' : '400'
-        }}>
+        <i className={`ti ${item.icon}`} style={{ fontSize:'16px', color: active ? accentLight : 'rgba(255,255,255,0.45)', width:'18px', flexShrink:0 }} />
+        <span style={{ fontSize:'13.5px', fontFamily:"'Source Sans Pro', sans-serif", color: active ? '#fff' : 'rgba(255,255,255,0.65)', fontWeight: active ? '600' : '400' }}>
           {item.label}
         </span>
       </div>
@@ -87,19 +84,11 @@ export default function Sidebar() {
   }
 
   return (
-    <nav style={{ flex: 1, padding: '8px 8px 16px', overflowY: 'auto' }}>
-
+    <nav style={{ flex:1, padding:'8px 8px 16px', overflowY:'auto' }}>
       {currentModules.map(m => <NavItem key={m.key} item={m} />)}
-
-      {/* Admin */}
       {isAdmin && (
-        <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-          <div style={{
-            fontSize: '10px', fontWeight: '700',
-            color: 'rgba(255,255,255,0.25)',
-            letterSpacing: '0.1em', textTransform: 'uppercase',
-            padding: '8px 12px 5px'
-          }}>
+        <div style={{ marginTop:'8px', paddingTop:'8px', borderTop:'1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ fontSize:'10px', fontWeight:'700', color:'rgba(255,255,255,0.25)', letterSpacing:'0.1em', textTransform:'uppercase', padding:'8px 12px 5px' }}>
             Administration
           </div>
           {MODULES_ADMIN.map(m => <NavItem key={m.key} item={m} />)}

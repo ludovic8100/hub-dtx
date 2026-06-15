@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="pr" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d9488"/>
+      <stop offset="100%" stop-color="#0f766e"/>
+    </linearGradient>
+  </defs>
+  <circle cx="50" cy="50" r="46" fill="url(#pr)"/>
+  <!-- Silhouette personne simple -->
+  <circle cx="50" cy="33" r="13" fill="white" opacity="0.95"/>
+  <ellipse cx="50" cy="72" rx="22" ry="17" fill="white" opacity="0.95"/>
+</svg>
