@@ -1,0 +1,93 @@
+{
+  "name": "Ponto - Sync Transactions",
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [{ "field": "hours", "hoursInterval": 6 }] } },
+      "id": "trigger", "name": "⏰ Toutes les 6h", "type": "n8n-nodes-base.scheduleTrigger", "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://tndwonqdbeszkcztkzqe.supabase.co/rest/v1/config_secrets?key=in.(ponto_access_token)&select=key,value",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuZHdvbnFkYmVzemtjenRrenFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MDg1MTcsImV4cCI6MjA5NjI4NDUxN30.jRrq7nV2Y6KSW_JwHbyOSm4lvckTLmVcAAROhq6sSuw" },
+          { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuZHdvbnFkYmVzemtjenRrenFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MDg1MTcsImV4cCI6MjA5NjI4NDUxN30.jRrq7nV2Y6KSW_JwHbyOSm4lvckTLmVcAAROhq6sSuw" }
+        ]}
+      },
+      "id": "lire_token", "name": "📦 Supabase - Lire token Ponto", "type": "n8n-nodes-base.httpRequest", "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst token = items[0].json.value;\nconst accounts = [\n  { id: '0ef4e354-3342-4c72-a9e3-a4b94702ea05', supabase_id: '9d866a0b-b0c4-41d4-bfee-e3f76dd2f91f' },\n  { id: '8a8fffae-4452-426d-bcfe-0f5e3f60466b', supabase_id: '2353e657-72b6-4529-ade7-749c7a675056' },\n  { id: '4d6f4eda-ff79-422b-8ac7-cca624d0df49', supabase_id: 'eeb333f7-8554-4085-8440-004bb76fcbff' },\n  { id: '5084add3-7817-45cb-a4b5-4d30bc97c4a4', supabase_id: '21f7d9b2-ed00-4001-b548-137a895fe1d7' }\n];\nreturn accounts.map(a => ({ json: { ponto_token: token, ponto_account_id: a.id, supabase_compte_id: a.supabase_id } }));"
+      },
+      "id": "prep_comptes", "name": "🔧 Préparer liste comptes", "type": "n8n-nodes-base.code", "position": [600, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.myponto.com/accounts/{{$json.ponto_account_id}}/transactions?page[limit]=50",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{$json.ponto_token}}" },
+          { "name": "Accept", "value": "application/json" }
+        ]}
+      },
+      "id": "get_transactions", "name": "🏦 Ponto - Get Transactions", "type": "n8n-nodes-base.httpRequest", "position": [800, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst results = [];\nfor (const item of items) {\n  const txList = item.json.data || [];\n  const compte_id = item.json.supabase_compte_id || $('🔧 Préparer liste comptes').item.json.supabase_compte_id;\n  for (const tx of txList) {\n    const a = tx.attributes;\n    results.push({ json: {\n      compte_id: compte_id,\n      ponto_transaction_id: tx.id,\n      date_valeur: a.valueDate || a.executionDate,\n      date_comptable: a.executionDate,\n      montant: parseFloat(a.amount),\n      libelle: a.description || '',\n      contrepartie_iban: a.counterpartReference || '',\n      contrepartie_nom: a.counterpartName || '',\n      rapproche: false\n    }});\n  }\n}\nreturn results.length ? results : [{ json: { skip: true } }];"
+      },
+      "id": "format_tx", "name": "🔧 Formater transactions", "type": "n8n-nodes-base.code", "position": [1000, 300]
+    },
+    {
+      "parameters": {
+        "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "conditions": [{ "id": "1", "leftValue": "={{$json.skip}}", "rightValue": true, "operator": { "type": "boolean", "operation": "notTrue" }}], "combinator": "and" }
+      },
+      "id": "filtre_skip", "name": "🔍 Filtrer vides", "type": "n8n-nodes-base.filter", "position": [1150, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://tndwonqdbeszkcztkzqe.supabase.co/rest/v1/transactions",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuZHdvbnFkYmVzemtjenRrenFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MDg1MTcsImV4cCI6MjA5NjI4NDUxN30.jRrq7nV2Y6KSW_JwHbyOSm4lvckTLmVcAAROhq6sSuw" },
+          { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuZHdvbnFkYmVzemtjenRrenFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MDg1MTcsImV4cCI6MjA5NjI4NDUxN30.jRrq7nV2Y6KSW_JwHbyOSm4lvckTLmVcAAROhq6sSuw" },
+          { "name": "Content-Type", "value": "application/json" },
+          { "name": "Prefer", "value": "resolution=ignore-duplicates,return=minimal" }
+        ]},
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ $json }}"
+      },
+      "id": "upsert_tx", "name": "💾 Supabase - Upsert Transaction", "type": "n8n-nodes-base.httpRequest", "position": [1320, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://tndwonqdbeszkcztkzqe.supabase.co/rest/v1/rpc/upsert_secret",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuZHdvbnFkYmVzemtjenRrenFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MDg1MTcsImV4cCI6MjA5NjI4NDUxN30.jRrq7nV2Y6KSW_JwHbyOSm4lvckTLmVcAAROhq6sSuw" },
+          { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuZHdvbnFkYmVzemtjenRrenFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MDg1MTcsImV4cCI6MjA5NjI4NDUxN30.jRrq7nV2Y6KSW_JwHbyOSm4lvckTLmVcAAROhq6sSuw" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={ \"p_key\": \"ponto_last_sync\", \"p_value\": \"{{ $now.toISO() }}\" }"
+      },
+      "id": "maj_sync", "name": "✅ Supabase - MAJ date synchro", "type": "n8n-nodes-base.httpRequest", "position": [1500, 300]
+    }
+  ],
+  "connections": {
+    "⏰ Toutes les 6h": { "main": [[{ "node": "📦 Supabase - Lire token Ponto", "type": "main", "index": 0 }]] },
+    "📦 Supabase - Lire token Ponto": { "main": [[{ "node": "🔧 Préparer liste comptes", "type": "main", "index": 0 }]] },
+    "🔧 Préparer liste comptes": { "main": [[{ "node": "🏦 Ponto - Get Transactions", "type": "main", "index": 0 }]] },
+    "🏦 Ponto - Get Transactions": { "main": [[{ "node": "🔧 Formater transactions", "type": "main", "index": 0 }]] },
+    "🔧 Formater transactions": { "main": [[{ "node": "🔍 Filtrer vides", "type": "main", "index": 0 }]] },
+    "🔍 Filtrer vides": { "main": [[{ "node": "💾 Supabase - Upsert Transaction", "type": "main", "index": 0 }]] },
+    "💾 Supabase - Upsert Transaction": { "main": [[{ "node": "✅ Supabase - MAJ date synchro", "type": "main", "index": 0 }]] }
+  }
+}
