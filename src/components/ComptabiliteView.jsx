@@ -173,6 +173,26 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const totalEntrees = txFiltrees.filter(t=>parseFloat(t.montant)>0).reduce((s,t)=>s+parseFloat(t.montant),0)
   const totalSorties = txFiltrees.filter(t=>parseFloat(t.montant)<0).reduce((s,t)=>s+parseFloat(t.montant),0)
 
+  // Synthèse par catégorie (sur transactions filtrées)
+  const parCategorie = {}
+  txFiltrees.forEach(t => {
+    const key = t.categorie_id || '_none'
+    if (!parCategorie[key]) parCategorie[key] = { recettes: 0, depenses: 0, nb: 0 }
+    const m = parseFloat(t.montant) || 0
+    if (m >= 0) parCategorie[key].recettes += m
+    else parCategorie[key].depenses += m
+    parCategorie[key].nb++
+  })
+  const syntheseRecettes = Object.entries(parCategorie)
+    .map(([id, v]) => ({ cat: categories.find(c=>c.id===id), ...v }))
+    .filter(x => x.recettes > 0)
+    .sort((a,b) => b.recettes - a.recettes)
+  const syntheseDepenses = Object.entries(parCategorie)
+    .map(([id, v]) => ({ cat: categories.find(c=>c.id===id), ...v }))
+    .filter(x => x.depenses < 0)
+    .sort((a,b) => a.depenses - b.depenses)
+  const nonCategorise = txFiltrees.filter(t => !t.categorie_id).length
+
   // Pagination
   const totalPages = Math.max(1, Math.ceil(txFiltrees.length / PAR_PAGE))
   const pageActuelle = Math.min(page, totalPages)
@@ -254,6 +274,78 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
           </div>
         )}
       </div>
+
+      {/* Synthèse par catégorie */}
+      {txFiltrees.length > 0 && (
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'14px', marginBottom:'14px' }}>
+          {/* Recettes par catégorie */}
+          <div style={{ background:'#fff', borderRadius:'12px', border:'1px solid #e2e8f0', overflow:'hidden' }}>
+            <div style={{ padding:'12px 16px', background:'#f0fdf4', borderBottom:'1px solid #dcfce7', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <span style={{ fontSize:'12px', fontWeight:'700', color:'#16a34a', textTransform:'uppercase', letterSpacing:'0.05em' }}>▲ Recettes par catégorie</span>
+              <span style={{ fontSize:'15px', fontWeight:'800', color:'#16a34a' }}>+{fmt(totalEntrees)}</span>
+            </div>
+            <div>
+              {syntheseRecettes.length === 0 ? (
+                <div style={{ padding:'20px 16px', fontSize:'13px', color:'#94a3b8', textAlign:'center' }}>Aucune recette</div>
+              ) : syntheseRecettes.map((x, i) => {
+                const pct = totalEntrees > 0 ? (x.recettes / totalEntrees * 100) : 0
+                const cat = x.cat
+                return (
+                  <div key={i} style={{ padding:'10px 16px', borderBottom: i<syntheseRecettes.length-1?'1px solid #f8fafc':'none' }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'5px' }}>
+                      <span style={{ display:'flex', alignItems:'center', gap:'7px' }}>
+                        <span style={{ width:'9px', height:'9px', borderRadius:'50%', background: cat?.couleur || '#94a3b8' }}></span>
+                        <span style={{ fontSize:'13px', fontWeight:'600', color:'#1e293b' }}>{cat?.nom || 'Non catégorisé'}</span>
+                        <span style={{ fontSize:'11px', color:'#cbd5e1' }}>({x.nb})</span>
+                      </span>
+                      <span style={{ fontSize:'13px', fontWeight:'700', color:'#16a34a' }}>+{fmt(x.recettes)}</span>
+                    </div>
+                    <div style={{ height:'5px', background:'#f1f5f9', borderRadius:'3px', overflow:'hidden' }}>
+                      <div style={{ height:'100%', width:`${pct}%`, background: cat?.couleur || '#94a3b8', borderRadius:'3px' }}></div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Dépenses par catégorie */}
+          <div style={{ background:'#fff', borderRadius:'12px', border:'1px solid #e2e8f0', overflow:'hidden' }}>
+            <div style={{ padding:'12px 16px', background:'#fef2f2', borderBottom:'1px solid #fee2e2', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <span style={{ fontSize:'12px', fontWeight:'700', color:'#dc2626', textTransform:'uppercase', letterSpacing:'0.05em' }}>▼ Dépenses par catégorie</span>
+              <span style={{ fontSize:'15px', fontWeight:'800', color:'#dc2626' }}>{fmt(totalSorties)}</span>
+            </div>
+            <div>
+              {syntheseDepenses.length === 0 ? (
+                <div style={{ padding:'20px 16px', fontSize:'13px', color:'#94a3b8', textAlign:'center' }}>Aucune dépense</div>
+              ) : syntheseDepenses.map((x, i) => {
+                const pct = totalSorties < 0 ? (x.depenses / totalSorties * 100) : 0
+                const cat = x.cat
+                return (
+                  <div key={i} style={{ padding:'10px 16px', borderBottom: i<syntheseDepenses.length-1?'1px solid #f8fafc':'none' }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'5px' }}>
+                      <span style={{ display:'flex', alignItems:'center', gap:'7px' }}>
+                        <span style={{ width:'9px', height:'9px', borderRadius:'50%', background: cat?.couleur || '#94a3b8' }}></span>
+                        <span style={{ fontSize:'13px', fontWeight:'600', color:'#1e293b' }}>{cat?.nom || 'Non catégorisé'}</span>
+                        <span style={{ fontSize:'11px', color:'#cbd5e1' }}>({x.nb})</span>
+                      </span>
+                      <span style={{ fontSize:'13px', fontWeight:'700', color:'#dc2626' }}>{fmt(x.depenses)}</span>
+                    </div>
+                    <div style={{ height:'5px', background:'#f1f5f9', borderRadius:'3px', overflow:'hidden' }}>
+                      <div style={{ height:'100%', width:`${pct}%`, background: cat?.couleur || '#94a3b8', borderRadius:'3px' }}></div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+      {nonCategorise > 0 && (
+        <div style={{ marginBottom:'14px', padding:'10px 16px', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'8px', fontSize:'13px', color:'#92400e' }}>
+          ⚠️ {nonCategorise} transaction{nonCategorise>1?'s':''} non catégorisée{nonCategorise>1?'s':''} — cliquez dessus pour leur attribuer une catégorie.
+        </div>
+      )}
 
       {/* Tableau transactions pleine largeur */}
       <div style={{ background:'#fff', borderRadius:'12px', border:'1px solid #e2e8f0', overflow:'hidden' }}>
