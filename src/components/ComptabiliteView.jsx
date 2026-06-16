@@ -74,6 +74,8 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const [loading, setLoading] = useState(true)
   const [loadingTx, setLoadingTx] = useState(false)
   const [filtre, setFiltre] = useState({ compte: 'tous', type: 'tous', libelle: '', annee: '' })
+  const [page, setPage] = useState(1)
+  const PAR_PAGE = 100
 
   const isConsolide = societeCodes.length > 1
 
@@ -98,12 +100,24 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
     if (isConsolide || !comptes.length) return
     setLoadingTx(true)
     const ids = comptes.map(c => c.id)
-    supabase.from('transactions').select('*, comptes_bancaires(banque, iban)')
+    supabase.from('transactions').select('*')
       .in('compte_id', ids)
       .order('date_valeur', { ascending: false })
-      .limit(500)
-      .then(({ data }) => { setTransactions(data || []); setLoadingTx(false) })
+      .limit(5000)
+      .then(({ data, error }) => {
+        if (error) console.error('Erreur transactions:', error)
+        // Enrichir avec les infos compte depuis comptes déjà chargés
+        const enriched = (data || []).map(t => ({
+          ...t,
+          comptes_bancaires: comptes.find(c => c.id === t.compte_id) || null
+        }))
+        setTransactions(enriched)
+        setLoadingTx(false)
+      })
   }, [comptes.map(c=>c.id).join(',')])
+
+  // Reset pagination quand les filtres changent
+  useEffect(() => { setPage(1) }, [filtre.compte, filtre.type, filtre.libelle, filtre.annee])
 
   if (loading) return <div style={{ padding:'60px', textAlign:'center', color:'#94a3b8', fontFamily:"'Source Sans Pro', sans-serif" }}>Chargement…</div>
   if (isConsolide) return <VueConsolidee comptes={comptes} />
@@ -123,6 +137,11 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   })
   const totalEntrees = txFiltrees.filter(t=>parseFloat(t.montant)>0).reduce((s,t)=>s+parseFloat(t.montant),0)
   const totalSorties = txFiltrees.filter(t=>parseFloat(t.montant)<0).reduce((s,t)=>s+parseFloat(t.montant),0)
+
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(txFiltrees.length / PAR_PAGE))
+  const pageActuelle = Math.min(page, totalPages)
+  const txPage = txFiltrees.slice((pageActuelle-1)*PAR_PAGE, pageActuelle*PAR_PAGE)
 
   // Années disponibles
   const anneesDispo = [...new Set(transactions.map(t => t.date_valeur?.substring(0,4)).filter(Boolean))].sort((a,b)=>b-a)
@@ -224,11 +243,11 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
           </div>
         ) : (
           <>
-            {txFiltrees.map((t, i) => (
+            {txPage.map((t, i) => (
               <div key={t.id} style={{
                 display:'grid', gridTemplateColumns:'110px 120px 1fr 200px 120px',
                 padding:'9px 16px', alignItems:'center',
-                borderBottom: i < txFiltrees.length-1 ? '1px solid #f8fafc' : 'none',
+                borderBottom: i < txPage.length-1 ? '1px solid #f8fafc' : 'none',
                 background: i%2===0 ? '#fff' : '#fafafa'
               }}>
                 <div style={{ fontSize:'12px', color:'#64748b' }}>{fmtDate(t.date_valeur)}</div>
@@ -255,6 +274,14 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                 <span style={{ color:'#dc2626' }}>{fmt(totalSorties)}</span>
               </div>
             </div>
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div style={{ display:'flex', justifyContent:'center', alignItems:'center', gap:'8px', padding:'14px 16px', borderTop:'1px solid #f1f5f9' }}>
+                <button onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={pageActuelle<=1} style={{ padding:'6px 14px', borderRadius:'6px', fontSize:'13px', fontWeight:'600', border:'1px solid #e2e8f0', background: pageActuelle<=1?'#f1f5f9':'#fff', color: pageActuelle<=1?'#cbd5e1':color, cursor: pageActuelle<=1?'default':'pointer' }}>← Précédent</button>
+                <span style={{ fontSize:'13px', color:'#64748b', fontWeight:'600', minWidth:'120px', textAlign:'center' }}>Page {pageActuelle} / {totalPages}</span>
+                <button onClick={()=>setPage(p=>Math.min(totalPages,p+1))} disabled={pageActuelle>=totalPages} style={{ padding:'6px 14px', borderRadius:'6px', fontSize:'13px', fontWeight:'600', border:'1px solid #e2e8f0', background: pageActuelle>=totalPages?'#f1f5f9':'#fff', color: pageActuelle>=totalPages?'#cbd5e1':color, cursor: pageActuelle>=totalPages?'default':'pointer' }}>Suivant →</button>
+              </div>
+            )}
           </>
         )}
       </div>
