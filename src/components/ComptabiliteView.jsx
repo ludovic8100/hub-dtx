@@ -116,7 +116,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
     if (filtre.type === 'sorties' && parseFloat(t.montant) >= 0) return false
     if (filtre.libelle) {
       const q = filtre.libelle.toLowerCase()
-      if (!t.libelle?.toLowerCase().includes(q) && !t.contrepartie_nom?.toLowerCase().includes(q)) return false
+      if (!t.information_paiement?.toLowerCase().includes(q) && !t.description?.toLowerCase().includes(q) && !t.contrepartie_nom?.toLowerCase().includes(q)) return false
     }
     if (filtre.annee && !t.date_valeur?.startsWith(filtre.annee)) return false
     return true
@@ -236,7 +236,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                   {t.comptes_bancaires?.banque || '—'}
                 </div>
                 <div style={{ fontSize:'13px', color:'#1e293b', fontWeight:'500', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', paddingRight:'12px' }}>
-                  {t.libelle || '—'}
+                  {t.information_paiement || t.description || '—'}
                 </div>
                 <div style={{ fontSize:'12px', color:'#64748b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                   {t.contrepartie_nom || '—'}
