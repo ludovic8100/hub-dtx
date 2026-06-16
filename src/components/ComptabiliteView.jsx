@@ -73,10 +73,12 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadingTx, setLoadingTx] = useState(false)
-  const [filtre, setFiltre] = useState({ compte: 'tous', type: 'tous', libelle: '', annee: '' })
+  const [filtre, setFiltre] = useState({ compte: 'tous', type: 'tous', libelle: '', annee: '', categorie: 'toutes' })
+  const [tri, setTri] = useState({ col: 'date', sens: 'desc' })
   const [page, setPage] = useState(1)
   const [categories, setCategories] = useState([])
   const [txSelection, setTxSelection] = useState(null)
+  const [catExpanded, setCatExpanded] = useState(null)
   const PAR_PAGE = 100
 
   const isConsolide = societeCodes.length > 1
@@ -122,7 +124,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   }, [comptes.map(c=>c.id).join(',')])
 
   // Reset pagination quand les filtres changent
-  useEffect(() => { setPage(1) }, [filtre.compte, filtre.type, filtre.libelle, filtre.annee])
+  useEffect(() => { setPage(1) }, [filtre.compte, filtre.type, filtre.libelle, filtre.annee, filtre.categorie])
 
   // Charger les catégories
   useEffect(() => {
@@ -168,7 +170,23 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       if (!t.information_paiement?.toLowerCase().includes(q) && !t.description?.toLowerCase().includes(q) && !t.contrepartie_nom?.toLowerCase().includes(q)) return false
     }
     if (filtre.annee && !(t._date || '').startsWith(filtre.annee)) return false
+    if (filtre.categorie === 'sans' && t.categorie_id) return false
+    if (filtre.categorie !== 'toutes' && filtre.categorie !== 'sans' && t.categorie_id !== filtre.categorie) return false
     return true
+  })
+  // Tri
+  txFiltrees.sort((a, b) => {
+    let va, vb
+    if (tri.col === 'montant') { va = parseFloat(a.montant)||0; vb = parseFloat(b.montant)||0 }
+    else if (tri.col === 'categorie') {
+      va = (categories.find(c=>c.id===a.categorie_id)?.nom || 'zzz').toLowerCase()
+      vb = (categories.find(c=>c.id===b.categorie_id)?.nom || 'zzz').toLowerCase()
+    }
+    else if (tri.col === 'contrepartie') { va = (a.contrepartie_nom||'zzz').toLowerCase(); vb = (b.contrepartie_nom||'zzz').toLowerCase() }
+    else { va = a._date || ''; vb = b._date || '' }
+    if (va < vb) return tri.sens === 'asc' ? -1 : 1
+    if (va > vb) return tri.sens === 'asc' ? 1 : -1
+    return 0
   })
   const totalEntrees = txFiltrees.filter(t=>parseFloat(t.montant)>0).reduce((s,t)=>s+parseFloat(t.montant),0)
   const totalSorties = txFiltrees.filter(t=>parseFloat(t.montant)<0).reduce((s,t)=>s+parseFloat(t.montant),0)
@@ -192,6 +210,25 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
     .filter(x => x.depenses < 0)
     .sort((a,b) => a.depenses - b.depenses)
   const nonCategorise = txFiltrees.filter(t => !t.categorie_id).length
+
+  // Détail par fournisseur/contrepartie pour une catégorie donnée
+  function detailFournisseurs(catId, sens) {
+    const map = {}
+    txFiltrees.forEach(t => {
+      const key = t.categorie_id || '_none'
+      if (key !== catId) return
+      const m = parseFloat(t.montant) || 0
+      if (sens === 'recette' && m < 0) return
+      if (sens === 'depense' && m >= 0) return
+      const nom = t.contrepartie_nom || '(sans contrepartie)'
+      if (!map[nom]) map[nom] = { total: 0, nb: 0 }
+      map[nom].total += m
+      map[nom].nb++
+    })
+    return Object.entries(map)
+      .map(([nom, v]) => ({ nom, ...v }))
+      .sort((a,b) => sens === 'recette' ? b.total - a.total : a.total - b.total)
+  }
 
   // Pagination
   const totalPages = Math.max(1, Math.ceil(txFiltrees.length / PAR_PAGE))
@@ -264,11 +301,21 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
           </select>
         </div>
 
+        {/* Filtre catégorie */}
+        <div style={{ display:'flex', flexDirection:'column', gap:'3px' }}>
+          <label style={{ fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em' }}>Catégorie</label>
+          <select value={filtre.categorie} onChange={e=>setFiltre(f=>({...f,categorie:e.target.value}))} style={{ padding:'7px 10px', border:'1px solid #e2e8f0', borderRadius:'6px', fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif", cursor:'pointer' }}>
+            <option value="toutes">Toutes</option>
+            <option value="sans">⚠️ Sans catégorie</option>
+            {categories.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
+          </select>
+        </div>
+
         {/* Reset */}
-        {(filtre.compte!=='tous'||filtre.type!=='tous'||filtre.libelle||filtre.annee) && (
+        {(filtre.compte!=='tous'||filtre.type!=='tous'||filtre.libelle||filtre.annee||filtre.categorie!=='toutes') && (
           <div style={{ display:'flex', flexDirection:'column', gap:'3px' }}>
             <label style={{ fontSize:'10px', color:'transparent' }}>.</label>
-            <button onClick={()=>setFiltre({compte:'tous',type:'tous',libelle:'',annee:''})} style={{ padding:'7px 12px', borderRadius:'6px', fontSize:'12px', fontWeight:'600', cursor:'pointer', border:'1px solid #e2e8f0', background:'#fff', color:'#64748b' }}>
+            <button onClick={()=>setFiltre({compte:'tous',type:'tous',libelle:'',annee:'',categorie:'toutes'})} style={{ padding:'7px 12px', borderRadius:'6px', fontSize:'12px', fontWeight:'600', cursor:'pointer', border:'1px solid #e2e8f0', background:'#fff', color:'#64748b' }}>
               ✕ Reset
             </button>
           </div>
@@ -290,19 +337,36 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
               ) : syntheseRecettes.map((x, i) => {
                 const pct = totalEntrees > 0 ? (x.recettes / totalEntrees * 100) : 0
                 const cat = x.cat
+                const catId = cat?.id || '_none'
+                const expKey = 'r_' + catId
+                const ouvert = catExpanded === expKey
+                const detail = ouvert ? detailFournisseurs(catId, 'recette') : []
                 return (
-                  <div key={i} style={{ padding:'10px 16px', borderBottom: i<syntheseRecettes.length-1?'1px solid #f8fafc':'none' }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'5px' }}>
-                      <span style={{ display:'flex', alignItems:'center', gap:'7px' }}>
-                        <span style={{ width:'9px', height:'9px', borderRadius:'50%', background: cat?.couleur || '#94a3b8' }}></span>
-                        <span style={{ fontSize:'13px', fontWeight:'600', color:'#1e293b' }}>{cat?.nom || 'Non catégorisé'}</span>
-                        <span style={{ fontSize:'11px', color:'#cbd5e1' }}>({x.nb})</span>
-                      </span>
-                      <span style={{ fontSize:'13px', fontWeight:'700', color:'#16a34a' }}>+{fmt(x.recettes)}</span>
+                  <div key={i} style={{ borderBottom: i<syntheseRecettes.length-1?'1px solid #f8fafc':'none' }}>
+                    <div onClick={()=>setCatExpanded(ouvert?null:expKey)} style={{ padding:'10px 16px', cursor:'pointer' }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'5px' }}>
+                        <span style={{ display:'flex', alignItems:'center', gap:'7px' }}>
+                          <span style={{ fontSize:'10px', color:'#cbd5e1' }}>{ouvert?'▼':'▶'}</span>
+                          <span style={{ width:'9px', height:'9px', borderRadius:'50%', background: cat?.couleur || '#94a3b8' }}></span>
+                          <span style={{ fontSize:'13px', fontWeight:'600', color:'#1e293b' }}>{cat?.nom || 'Non catégorisé'}</span>
+                          <span style={{ fontSize:'11px', color:'#cbd5e1' }}>({x.nb})</span>
+                        </span>
+                        <span style={{ fontSize:'13px', fontWeight:'700', color:'#16a34a' }}>+{fmt(x.recettes)}</span>
+                      </div>
+                      <div style={{ height:'5px', background:'#f1f5f9', borderRadius:'3px', overflow:'hidden' }}>
+                        <div style={{ height:'100%', width:`${pct}%`, background: cat?.couleur || '#94a3b8', borderRadius:'3px' }}></div>
+                      </div>
                     </div>
-                    <div style={{ height:'5px', background:'#f1f5f9', borderRadius:'3px', overflow:'hidden' }}>
-                      <div style={{ height:'100%', width:`${pct}%`, background: cat?.couleur || '#94a3b8', borderRadius:'3px' }}></div>
-                    </div>
+                    {ouvert && (
+                      <div style={{ background:'#fafafa', padding:'4px 16px 10px 32px' }}>
+                        {detail.map((d, j) => (
+                          <div key={j} style={{ display:'flex', justifyContent:'space-between', padding:'5px 0', borderBottom: j<detail.length-1?'1px solid #f1f5f9':'none' }}>
+                            <span style={{ fontSize:'12px', color:'#475569', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', paddingRight:'10px' }}>{d.nom} <span style={{ color:'#cbd5e1' }}>({d.nb})</span></span>
+                            <span style={{ fontSize:'12px', fontWeight:'600', color:'#16a34a', flexShrink:0 }}>+{fmt(d.total)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -321,19 +385,36 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
               ) : syntheseDepenses.map((x, i) => {
                 const pct = totalSorties < 0 ? (x.depenses / totalSorties * 100) : 0
                 const cat = x.cat
+                const catId = cat?.id || '_none'
+                const expKey = 'd_' + catId
+                const ouvert = catExpanded === expKey
+                const detail = ouvert ? detailFournisseurs(catId, 'depense') : []
                 return (
-                  <div key={i} style={{ padding:'10px 16px', borderBottom: i<syntheseDepenses.length-1?'1px solid #f8fafc':'none' }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'5px' }}>
-                      <span style={{ display:'flex', alignItems:'center', gap:'7px' }}>
-                        <span style={{ width:'9px', height:'9px', borderRadius:'50%', background: cat?.couleur || '#94a3b8' }}></span>
-                        <span style={{ fontSize:'13px', fontWeight:'600', color:'#1e293b' }}>{cat?.nom || 'Non catégorisé'}</span>
-                        <span style={{ fontSize:'11px', color:'#cbd5e1' }}>({x.nb})</span>
-                      </span>
-                      <span style={{ fontSize:'13px', fontWeight:'700', color:'#dc2626' }}>{fmt(x.depenses)}</span>
+                  <div key={i} style={{ borderBottom: i<syntheseDepenses.length-1?'1px solid #f8fafc':'none' }}>
+                    <div onClick={()=>setCatExpanded(ouvert?null:expKey)} style={{ padding:'10px 16px', cursor:'pointer' }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'5px' }}>
+                        <span style={{ display:'flex', alignItems:'center', gap:'7px' }}>
+                          <span style={{ fontSize:'10px', color:'#cbd5e1' }}>{ouvert?'▼':'▶'}</span>
+                          <span style={{ width:'9px', height:'9px', borderRadius:'50%', background: cat?.couleur || '#94a3b8' }}></span>
+                          <span style={{ fontSize:'13px', fontWeight:'600', color:'#1e293b' }}>{cat?.nom || 'Non catégorisé'}</span>
+                          <span style={{ fontSize:'11px', color:'#cbd5e1' }}>({x.nb})</span>
+                        </span>
+                        <span style={{ fontSize:'13px', fontWeight:'700', color:'#dc2626' }}>{fmt(x.depenses)}</span>
+                      </div>
+                      <div style={{ height:'5px', background:'#f1f5f9', borderRadius:'3px', overflow:'hidden' }}>
+                        <div style={{ height:'100%', width:`${pct}%`, background: cat?.couleur || '#94a3b8', borderRadius:'3px' }}></div>
+                      </div>
                     </div>
-                    <div style={{ height:'5px', background:'#f1f5f9', borderRadius:'3px', overflow:'hidden' }}>
-                      <div style={{ height:'100%', width:`${pct}%`, background: cat?.couleur || '#94a3b8', borderRadius:'3px' }}></div>
-                    </div>
+                    {ouvert && (
+                      <div style={{ background:'#fafafa', padding:'4px 16px 10px 32px' }}>
+                        {detail.map((d, j) => (
+                          <div key={j} style={{ display:'flex', justifyContent:'space-between', padding:'5px 0', borderBottom: j<detail.length-1?'1px solid #f1f5f9':'none' }}>
+                            <span style={{ fontSize:'12px', color:'#475569', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', paddingRight:'10px' }}>{d.nom} <span style={{ color:'#cbd5e1' }}>({d.nb})</span></span>
+                            <span style={{ fontSize:'12px', fontWeight:'600', color:'#dc2626', flexShrink:0 }}>{fmt(d.total)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -351,12 +432,21 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       <div style={{ background:'#fff', borderRadius:'12px', border:'1px solid #e2e8f0', overflow:'hidden' }}>
         {/* En-tête */}
         <div style={{ display:'grid', gridTemplateColumns:'100px 110px 1fr 170px 140px 110px', padding:'9px 16px', background:'#f8fafc', borderBottom:'1px solid #e2e8f0', fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.06em' }}>
-          <div>Date</div>
-          <div>Compte</div>
-          <div>Libellé</div>
-          <div>Contrepartie</div>
-          <div>Catégorie</div>
-          <div style={{ textAlign:'right' }}>Montant</div>
+          {(() => {
+            const trier = (col) => setTri(t => ({ col, sens: t.col === col && t.sens === 'desc' ? 'asc' : 'desc' }))
+            const fleche = (col) => tri.col === col ? (tri.sens === 'desc' ? ' ↓' : ' ↑') : ''
+            const Th = ({ col, children, align }) => (
+              <div onClick={()=>trier(col)} style={{ cursor:'pointer', textAlign:align||'left', color: tri.col===col?color:'#94a3b8', userSelect:'none' }}>{children}{fleche(col)}</div>
+            )
+            return <>
+              <Th col="date">Date</Th>
+              <div>Compte</div>
+              <div>Libellé</div>
+              <Th col="contrepartie">Contrepartie</Th>
+              <Th col="categorie">Catégorie</Th>
+              <Th col="montant" align="right">Montant</Th>
+            </>
+          })()}
         </div>
 
         {loadingTx ? (
