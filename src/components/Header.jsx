@@ -39,7 +39,7 @@ function GroupeLogoHeader({ size = 36 }) {
   )
 }
 
-export default function Header({ currentPage }) {
+export default function Header({ currentPage, onToggleMenu, menuOuvert }) {
   const { user, perms, isAdmin, switchUser, signOut, societeActive, activeSociete } = useAuth()
 
   const displayName = perms?.nom || user?.user_metadata?.full_name || user?.email || ''
@@ -63,11 +63,21 @@ export default function Header({ currentPage }) {
 
       {/* Logo + nom société */}
       <div style={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+        {/* Bouton menu (mobile) */}
+        {onToggleMenu && (
+          <button onClick={onToggleMenu} aria-label="Menu" style={{
+            background: 'transparent', border: 'none', color: '#fff',
+            fontSize: '22px', cursor: 'pointer', padding: '0 14px', height: '100%',
+            display: 'flex', alignItems: 'center'
+          }}>
+            {menuOuvert ? '✕' : '☰'}
+          </button>
+        )}
         <div style={{
-          width: '232px', height: '100%',
+          width: onToggleMenu ? 'auto' : '232px', height: '100%',
           display: 'flex', alignItems: 'center',
           padding: '0 16px', gap: '12px',
-          borderRight: '1px solid rgba(255,255,255,0.1)',
+          borderRight: onToggleMenu ? 'none' : '1px solid rgba(255,255,255,0.1)',
           flexShrink: 0,
         }}>
           {/* Logo */}
