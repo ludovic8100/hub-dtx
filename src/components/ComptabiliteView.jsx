@@ -75,6 +75,8 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const [loadingTx, setLoadingTx] = useState(false)
   const [filtre, setFiltre] = useState({ compte: 'tous', type: 'tous', libelle: '', annee: '' })
   const [page, setPage] = useState(1)
+  const [categories, setCategories] = useState([])
+  const [txSelection, setTxSelection] = useState(null)
   const PAR_PAGE = 100
 
   const isConsolide = societeCodes.length > 1
@@ -109,8 +111,11 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
         // Enrichir avec les infos compte depuis comptes déjà chargés
         const enriched = (data || []).map(t => ({
           ...t,
+          _date: t.date_valeur || t.date_execution || null,
           comptes_bancaires: comptes.find(c => c.id === t.compte_id) || null
         }))
+        // Tri par date unifiée décroissante
+        enriched.sort((a,b) => (b._date || '').localeCompare(a._date || ''))
         setTransactions(enriched)
         setLoadingTx(false)
       })
@@ -118,6 +123,18 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
 
   // Reset pagination quand les filtres changent
   useEffect(() => { setPage(1) }, [filtre.compte, filtre.type, filtre.libelle, filtre.annee])
+
+  // Charger les catégories
+  useEffect(() => {
+    supabase.from('categories').select('*').order('nom').then(({ data }) => setCategories(data || []))
+  }, [])
+
+  // Assigner une catégorie à une transaction
+  async function assignerCategorie(txId, categorieId) {
+    await supabase.from('transactions').update({ categorie_id: categorieId }).eq('id', txId)
+    setTransactions(prev => prev.map(t => t.id === txId ? { ...t, categorie_id: categorieId } : t))
+    setTxSelection(prev => prev ? { ...prev, categorie_id: categorieId } : prev)
+  }
 
   if (loading) return <div style={{ padding:'60px', textAlign:'center', color:'#94a3b8', fontFamily:"'Source Sans Pro', sans-serif" }}>Chargement…</div>
   if (isConsolide) return <VueConsolidee comptes={comptes} />
@@ -132,7 +149,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       const q = filtre.libelle.toLowerCase()
       if (!t.information_paiement?.toLowerCase().includes(q) && !t.description?.toLowerCase().includes(q) && !t.contrepartie_nom?.toLowerCase().includes(q)) return false
     }
-    if (filtre.annee && !t.date_valeur?.startsWith(filtre.annee)) return false
+    if (filtre.annee && !(t._date || '').startsWith(filtre.annee)) return false
     return true
   })
   const totalEntrees = txFiltrees.filter(t=>parseFloat(t.montant)>0).reduce((s,t)=>s+parseFloat(t.montant),0)
@@ -144,7 +161,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const txPage = txFiltrees.slice((pageActuelle-1)*PAR_PAGE, pageActuelle*PAR_PAGE)
 
   // Années disponibles
-  const anneesDispo = [...new Set(transactions.map(t => t.date_valeur?.substring(0,4)).filter(Boolean))].sort((a,b)=>b-a)
+  const anneesDispo = [...new Set(transactions.map(t => (t._date || '').substring(0,4)).filter(Boolean))].sort((a,b)=>b-a)
 
   return (
     <div style={{ fontFamily:"'Source Sans Pro', sans-serif" }}>
@@ -223,11 +240,12 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       {/* Tableau transactions pleine largeur */}
       <div style={{ background:'#fff', borderRadius:'12px', border:'1px solid #e2e8f0', overflow:'hidden' }}>
         {/* En-tête */}
-        <div style={{ display:'grid', gridTemplateColumns:'110px 120px 1fr 200px 120px', padding:'9px 16px', background:'#f8fafc', borderBottom:'1px solid #e2e8f0', fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.06em' }}>
+        <div style={{ display:'grid', gridTemplateColumns:'100px 110px 1fr 170px 140px 110px', padding:'9px 16px', background:'#f8fafc', borderBottom:'1px solid #e2e8f0', fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.06em' }}>
           <div>Date</div>
           <div>Compte</div>
           <div>Libellé</div>
           <div>Contrepartie</div>
+          <div>Catégorie</div>
           <div style={{ textAlign:'right' }}>Montant</div>
         </div>
 
@@ -243,14 +261,16 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
           </div>
         ) : (
           <>
-            {txPage.map((t, i) => (
-              <div key={t.id} style={{
-                display:'grid', gridTemplateColumns:'110px 120px 1fr 200px 120px',
-                padding:'9px 16px', alignItems:'center',
+            {txPage.map((t, i) => {
+              const cat = categories.find(c => c.id === t.categorie_id)
+              return (
+              <div key={t.id} onClick={() => setTxSelection(t)} style={{
+                display:'grid', gridTemplateColumns:'100px 110px 1fr 170px 140px 110px',
+                padding:'9px 16px', alignItems:'center', cursor:'pointer',
                 borderBottom: i < txPage.length-1 ? '1px solid #f8fafc' : 'none',
                 background: i%2===0 ? '#fff' : '#fafafa'
               }}>
-                <div style={{ fontSize:'12px', color:'#64748b' }}>{fmtDate(t.date_valeur)}</div>
+                <div style={{ fontSize:'12px', color:'#64748b' }}>{fmtDate(t._date)}</div>
                 <div style={{ fontSize:'11px', color:'#94a3b8', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                   {t.comptes_bancaires?.banque || '—'}
                 </div>
@@ -260,14 +280,21 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                 <div style={{ fontSize:'12px', color:'#64748b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                   {t.contrepartie_nom || '—'}
                 </div>
+                <div style={{ overflow:'hidden' }}>
+                  {cat ? (
+                    <span style={{ fontSize:'11px', fontWeight:'600', padding:'2px 8px', borderRadius:'10px', background:`${cat.couleur}18`, color:cat.couleur, whiteSpace:'nowrap' }}>{cat.nom}</span>
+                  ) : (
+                    <span style={{ fontSize:'11px', color:'#cbd5e1' }}>—</span>
+                  )}
+                </div>
                 <div style={{ textAlign:'right', fontSize:'14px', fontWeight:'700', color: parseFloat(t.montant)>=0?'#16a34a':'#dc2626' }}>
                   {parseFloat(t.montant)>=0?'+':''}{fmt(t.montant)}
                 </div>
               </div>
-            ))}
+            )})}
             {/* Footer totaux */}
-            <div style={{ display:'grid', gridTemplateColumns:'110px 120px 1fr 200px 120px', padding:'10px 16px', background:'#f8fafc', borderTop:'2px solid #e2e8f0', fontSize:'12px', fontWeight:'700' }}>
-              <div style={{ color:'#64748b', gridColumn:'1/5' }}>{txFiltrees.length} transaction{txFiltrees.length>1?'s':''}</div>
+            <div style={{ display:'grid', gridTemplateColumns:'100px 110px 1fr 170px 140px 110px', padding:'10px 16px', background:'#f8fafc', borderTop:'2px solid #e2e8f0', fontSize:'12px', fontWeight:'700' }}>
+              <div style={{ color:'#64748b', gridColumn:'1/6' }}>{txFiltrees.length} transaction{txFiltrees.length>1?'s':''}</div>
               <div style={{ textAlign:'right' }}>
                 <span style={{ color:'#16a34a' }}>+{fmt(totalEntrees)}</span>
                 <span style={{ color:'#94a3b8', margin:'0 4px' }}>·</span>
@@ -285,6 +312,56 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
           </>
         )}
       </div>
+
+      {/* Modal détail transaction */}
+      {txSelection && (() => {
+        const t = txSelection
+        const positif = parseFloat(t.montant) >= 0
+        const Row = ({ label, value }) => (
+          <div style={{ display:'flex', padding:'10px 0', borderBottom:'1px solid #f1f5f9' }}>
+            <div style={{ width:'160px', flexShrink:0, fontSize:'12px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.04em' }}>{label}</div>
+            <div style={{ fontSize:'14px', color:'#1e293b', wordBreak:'break-word' }}>{value || '—'}</div>
+          </div>
+        )
+        return (
+          <div onClick={()=>setTxSelection(null)} style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:'20px' }}>
+            <div onClick={e=>e.stopPropagation()} style={{ background:'#fff', borderRadius:'16px', maxWidth:'560px', width:'100%', maxHeight:'85vh', overflow:'auto', boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }}>
+              <div style={{ padding:'20px 24px', background:`linear-gradient(135deg, ${color}, ${colorDark||color})`, borderRadius:'16px 16px 0 0', display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+                <div>
+                  <div style={{ fontSize:'12px', color:'rgba(255,255,255,0.7)', fontWeight:'600' }}>{fmtDate(t._date)}</div>
+                  <div style={{ fontSize:'28px', fontWeight:'800', color:'#fff' }}>{positif?'+':''}{fmt(t.montant)}</div>
+                </div>
+                <button onClick={()=>setTxSelection(null)} style={{ background:'rgba(255,255,255,0.2)', border:'none', borderRadius:'8px', width:'32px', height:'32px', color:'#fff', fontSize:'18px', cursor:'pointer' }}>×</button>
+              </div>
+              <div style={{ padding:'20px 24px' }}>
+                {/* Sélecteur catégorie */}
+                <div style={{ marginBottom:'18px' }}>
+                  <div style={{ fontSize:'12px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'8px' }}>Catégorie</div>
+                  <select value={t.categorie_id || ''} onChange={e=>assignerCategorie(t.id, e.target.value || null)} style={{ width:'100%', padding:'10px 12px', border:'1px solid #e2e8f0', borderRadius:'8px', fontSize:'14px', fontFamily:"'Source Sans Pro', sans-serif", cursor:'pointer' }}>
+                    <option value="">— Non catégorisé —</option>
+                    <optgroup label="Recettes">
+                      {categories.filter(c=>c.type==='recette').map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
+                    </optgroup>
+                    <optgroup label="Dépenses">
+                      {categories.filter(c=>c.type==='depense').map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
+                    </optgroup>
+                  </select>
+                </div>
+                <Row label="Contrepartie" value={t.contrepartie_nom} />
+                <Row label="IBAN contrepartie" value={t.contrepartie_iban} />
+                <Row label="Communication" value={t.information_paiement} />
+                <Row label="Description" value={t.description} />
+                <Row label="Compte" value={`${t.comptes_bancaires?.banque || ''} ${t.comptes_bancaires?.iban || ''}`} />
+                <Row label="Date valeur" value={fmtDate(t.date_valeur)} />
+                <Row label="Date exécution" value={fmtDate(t.date_execution)} />
+                <Row label="Type" value={t.type_transaction} />
+                <Row label="Devise" value={t.devise} />
+                <Row label="ID Ponto" value={t.ponto_transaction_id} />
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
