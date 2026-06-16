@@ -78,6 +78,12 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const [page, setPage] = useState(1)
   const [categories, setCategories] = useState([])
   const [txSelection, setTxSelection] = useState(null)
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 768)
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
   const [catExpanded, setCatExpanded] = useState(null)
   const PAR_PAGE = 100
 
@@ -242,7 +248,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
     <div style={{ fontFamily:"'Source Sans Pro', sans-serif" }}>
 
       {/* KPIs */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:'14px', marginBottom:'24px' }}>
+      <div style={{ display:'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap:'14px', marginBottom:'24px' }}>
         {[
           { label:'Trésorerie totale', value: fmt(soldeTotal), color },
           { label:'Comptes actifs', value: `${comptes.length} (${comptes.filter(c=>c.ponto_account_id).length} Ponto)`, color },
@@ -324,7 +330,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
 
       {/* Synthèse par catégorie */}
       {txFiltrees.length > 0 && (
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'14px', marginBottom:'14px' }}>
+        <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap:'14px', marginBottom:'14px' }}>
           {/* Recettes par catégorie */}
           <div style={{ background:'#fff', borderRadius:'12px', border:'1px solid #e2e8f0', overflow:'hidden' }}>
             <div style={{ padding:'12px 16px', background:'#f0fdf4', borderBottom:'1px solid #dcfce7', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
@@ -430,7 +436,8 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
 
       {/* Tableau transactions pleine largeur */}
       <div style={{ background:'#fff', borderRadius:'12px', border:'1px solid #e2e8f0', overflow:'hidden' }}>
-        {/* En-tête */}
+        {/* En-tête (desktop) */}
+        {!isMobile && (
         <div style={{ display:'grid', gridTemplateColumns:'100px 110px 1fr 170px 140px 110px', padding:'9px 16px', background:'#f8fafc', borderBottom:'1px solid #e2e8f0', fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.06em' }}>
           {(() => {
             const trier = (col) => setTri(t => ({ col, sens: t.col === col && t.sens === 'desc' ? 'asc' : 'desc' }))
@@ -448,6 +455,17 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
             </>
           })()}
         </div>
+        )}
+        {/* Tri compact (mobile) */}
+        {isMobile && (
+          <div style={{ display:'flex', gap:'6px', padding:'10px 12px', background:'#f8fafc', borderBottom:'1px solid #e2e8f0', overflowX:'auto' }}>
+            {[['date','Date'],['montant','Montant'],['contrepartie','Tiers'],['categorie','Catégorie']].map(([col,lab]) => (
+              <button key={col} onClick={()=>setTri(t => ({ col, sens: t.col===col && t.sens==='desc' ? 'asc' : 'desc' }))} style={{ flexShrink:0, padding:'5px 10px', borderRadius:'6px', fontSize:'12px', fontWeight:'600', border:'1px solid #e2e8f0', background: tri.col===col?`${color}14`:'#fff', color: tri.col===col?color:'#64748b', cursor:'pointer' }}>
+                {lab}{tri.col===col?(tri.sens==='desc'?' ↓':' ↑'):''}
+              </button>
+            ))}
+          </div>
+        )}
 
         {loadingTx ? (
           <div style={{ padding:'60px', textAlign:'center', color:'#94a3b8' }}>Chargement des transactions…</div>
@@ -463,6 +481,37 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
           <>
             {txPage.map((t, i) => {
               const cat = categories.find(c => c.id === t.categorie_id)
+              const positif = parseFloat(t.montant) >= 0
+              if (isMobile) {
+                return (
+                  <div key={t.id} onClick={() => setTxSelection(t)} style={{
+                    padding:'12px 14px', cursor:'pointer',
+                    borderBottom: i < txPage.length-1 ? '1px solid #f1f5f9' : 'none',
+                    background:'#fff'
+                  }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:'10px' }}>
+                      <div style={{ minWidth:0, flex:1 }}>
+                        <div style={{ fontSize:'14px', fontWeight:'600', color:'#1e293b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                          {t.contrepartie_nom || t.information_paiement || t.description || '—'}
+                        </div>
+                        <div style={{ fontSize:'12px', color:'#94a3b8', marginTop:'2px' }}>
+                          {fmtDate(t._date)} · {t.comptes_bancaires?.banque || '—'}
+                        </div>
+                      </div>
+                      <div style={{ fontSize:'15px', fontWeight:'700', color: positif?'#16a34a':'#dc2626', flexShrink:0 }}>
+                        {positif?'+':''}{fmt(t.montant)}
+                      </div>
+                    </div>
+                    <div style={{ marginTop:'6px' }}>
+                      {cat ? (
+                        <span style={{ fontSize:'11px', fontWeight:'600', padding:'2px 8px', borderRadius:'10px', background:`${cat.couleur}18`, color:cat.couleur }}>{cat.nom}</span>
+                      ) : (
+                        <span style={{ fontSize:'11px', color:'#cbd5e1' }}>Sans catégorie</span>
+                      )}
+                    </div>
+                  </div>
+                )
+              }
               return (
               <div key={t.id} onClick={() => setTxSelection(t)} style={{
                 display:'grid', gridTemplateColumns:'100px 110px 1fr 170px 140px 110px',
@@ -493,8 +542,8 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
               </div>
             )})}
             {/* Footer totaux */}
-            <div style={{ display:'grid', gridTemplateColumns:'100px 110px 1fr 170px 140px 110px', padding:'10px 16px', background:'#f8fafc', borderTop:'2px solid #e2e8f0', fontSize:'12px', fontWeight:'700' }}>
-              <div style={{ color:'#64748b', gridColumn:'1/6' }}>{txFiltrees.length} transaction{txFiltrees.length>1?'s':''}</div>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:'10px', padding:'10px 16px', background:'#f8fafc', borderTop:'2px solid #e2e8f0', fontSize:'12px', fontWeight:'700' }}>
+              <div style={{ color:'#64748b' }}>{txFiltrees.length} transaction{txFiltrees.length>1?'s':''}</div>
               <div style={{ textAlign:'right' }}>
                 <span style={{ color:'#16a34a' }}>+{fmt(totalEntrees)}</span>
                 <span style={{ color:'#94a3b8', margin:'0 4px' }}>·</span>
