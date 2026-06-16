@@ -136,6 +136,24 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
     setTxSelection(prev => prev ? { ...prev, categorie_id: categorieId } : prev)
   }
 
+  // Appliquer une catégorie à TOUTES les transactions d'une contrepartie + créer une règle
+  async function appliquerParContrepartie(contrepartie, categorieId) {
+    if (!contrepartie || !categorieId) return
+    // 1. Mettre à jour toutes les transactions existantes de cette contrepartie
+    await supabase.from('transactions').update({ categorie_id: categorieId }).eq('contrepartie_nom', contrepartie)
+    // 2. Créer/mettre à jour la règle pour les futures
+    const { data: existante } = await supabase.from('categories_regles').select('id').eq('motif', contrepartie).maybeSingle()
+    if (existante) {
+      await supabase.from('categories_regles').update({ categorie_id: categorieId }).eq('id', existante.id)
+    } else {
+      await supabase.from('categories_regles').insert({ motif: contrepartie, categorie_id: categorieId })
+    }
+    // 3. Rafraîchir l'état local
+    setTransactions(prev => prev.map(t => t.contrepartie_nom === contrepartie ? { ...t, categorie_id: categorieId } : t))
+    const nb = transactions.filter(t => t.contrepartie_nom === contrepartie).length
+    alert(`✅ ${nb} transaction(s) de "${contrepartie}" catégorisées. Les futures le seront automatiquement.`)
+  }
+
   if (loading) return <div style={{ padding:'60px', textAlign:'center', color:'#94a3b8', fontFamily:"'Source Sans Pro', sans-serif" }}>Chargement…</div>
   if (isConsolide) return <VueConsolidee comptes={comptes} />
 
@@ -346,6 +364,11 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                       {categories.filter(c=>c.type==='depense').map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
                     </optgroup>
                   </select>
+                  {t.categorie_id && t.contrepartie_nom && (
+                    <button onClick={()=>appliquerParContrepartie(t.contrepartie_nom, t.categorie_id)} style={{ marginTop:'8px', width:'100%', padding:'9px 12px', borderRadius:'8px', fontSize:'13px', fontWeight:'600', border:`1px solid ${color}`, background:`${color}0d`, color, cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                      ⚡ Appliquer à toutes les transactions de « {t.contrepartie_nom} »
+                    </button>
+                  )}
                 </div>
                 <Row label="Contrepartie" value={t.contrepartie_nom} />
                 <Row label="IBAN contrepartie" value={t.contrepartie_iban} />
