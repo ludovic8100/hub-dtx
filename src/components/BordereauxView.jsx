@@ -25,6 +25,10 @@ export default function BordereauxView() {
   const [loading, setLoading] = useState(true)
   const [filterMois, setFilterMois] = useState(String(new Date().getMonth()+1))
   const [filterAnnee, setFilterAnnee] = useState("2026")
+  const [rRows, setRRows] = useState([])
+  const [reconErr, setReconErr] = useState(null)
+  const [filterType, setFilterType] = useState("tous")
+  const [filterStatut, setFilterStatut] = useState("tous")
 
   useEffect(() => {
     const load = async () => {
@@ -34,6 +38,9 @@ export default function BordereauxView() {
         setBRows(Array.isArray(b) ? b : [])
         const { data: q } = await supabase.from("quittances").select("compagnie,date_comptable,prime_totale,commission,commission_sa").limit(100000)
         setQRows(Array.isArray(q) ? q : [])
+        const { data: r, error: rErr } = await supabase.from("v_bordereaux_reconciliation").select("*")
+        if (rErr) { setReconErr(rErr.message); setRRows([]) }
+        else { setReconErr(null); setRRows(Array.isArray(r) ? r : []) }
       } catch (e) { console.error(e) }
       setLoading(false)
     }
@@ -84,13 +91,35 @@ export default function BordereauxView() {
 
   const fmt = (n) => Number(n).toLocaleString("fr-BE", { minimumFractionDigits:2 }) + " €"
 
+  // --- Réconciliation bancaire ---
+  const ST = {
+    complet:                 { l:"Complet",                  c:C.ok },
+    fichier_ok_non_encaisse: { l:"Non encaissé",             c:C.warn },
+    fichier_sans_chiffres:   { l:"Extraction à faire",       c:C.cyanB },
+    commission_sans_fichier: { l:"Commission sans fichier",  c:C.danger },
+    manquant:                { l:"Manquant",                 c:C.textL },
+  }
+  const recon = useMemo(() => {
+    let rows = rRows.filter(r => String(r.annee) === String(filterAnnee))
+    if (filterType !== "tous") rows = rows.filter(r => r.type === filterType)
+    if (filterStatut !== "tous") rows = rows.filter(r => r.statut_reconciliation === filterStatut)
+    return rows.sort((a,b) => String(b.mois||"").localeCompare(String(a.mois||"")) || String(a.compagnie||"").localeCompare(String(b.compagnie||"")))
+  }, [rRows, filterAnnee, filterType, filterStatut])
+  const reconKpi = useMemo(() => ({
+    total: recon.length,
+    complet: recon.filter(r=>r.statut_reconciliation==="complet").length,
+    alerte: recon.filter(r=>r.statut_reconciliation==="commission_sans_fichier").length,
+    acompleter: recon.filter(r=>["manquant","fichier_sans_chiffres"].includes(r.statut_reconciliation)).length,
+    encaisse: recon.reduce((s,r)=>s+(parseFloat(r.commission_bancaire)||0),0),
+  }), [recon])
+
   if (loading) return <div style={{ padding:40, textAlign:"center", color:C.textL, fontFamily:"'Source Sans Pro', sans-serif" }}>Chargement…</div>
 
   return (
     <div style={{ fontFamily:"'Source Sans Pro', sans-serif" }}>
       {/* Onglets */}
       <div style={{ display:"flex", gap:8, marginBottom:16, alignItems:"center", flexWrap:"wrap" }}>
-        {[["quittances","💰 Quittances réelles"],["matrice","📊 Matrice BQT/RCP"],["alertes",`⚠ Alertes (${alertes.length})`]].map(([k,l]) =>
+        {[["quittances","💰 Quittances réelles"],["matrice","📊 Matrice BQT/RCP"],["reconciliation","🔗 Réconciliation"],["alertes",`⚠ Alertes (${alertes.length})`]].map(([k,l]) =>
           <button key={k} style={D.btn(view===k?"primary":"ghost")} onClick={() => setView(k)}>{l}</button>)}
       </div>
 
@@ -192,6 +221,74 @@ export default function BordereauxView() {
             ))}
           </tbody></table>
         </div></div>
+      </div>}
+
+      {/* Réconciliation bancaire */}
+      {view === "reconciliation" && <div>
+        {reconErr ? (
+          <div style={D.alertBox("danger")}>
+            <span style={{ fontSize:15 }}>⛔</span>
+            <div style={{ flex:1 }}>
+              <strong>Vue de réconciliation absente.</strong> Crée la vue <code>v_bordereaux_reconciliation</code> dans Supabase pour activer cet onglet.
+              <div style={{ fontSize:11, color:C.textL, marginTop:4 }}>Détail : {reconErr}</div>
+            </div>
+          </div>
+        ) : <>
+          <div style={{ ...D.card, padding:"12px 18px", marginBottom:12 }}>
+            <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap" }}>
+              <span style={{ fontSize:13, fontWeight:600, color:C.navy }}>Filtres :</span>
+              <select style={{ ...D.input, width:"auto" }} value={filterAnnee} onChange={e => setFilterAnnee(e.target.value)}>
+                {["2026","2025","2024","2023","2022","2021","2020"].map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+              <select style={{ ...D.input, width:"auto" }} value={filterType} onChange={e => setFilterType(e.target.value)}>
+                <option value="tous">BQT + RCP</option><option value="BQT">BQT</option><option value="RCP">RCP</option>
+              </select>
+              <select style={{ ...D.input, width:"auto" }} value={filterStatut} onChange={e => setFilterStatut(e.target.value)}>
+                <option value="tous">Tous statuts</option>
+                {Object.entries(ST).map(([k,v]) => <option key={k} value={k}>{v.l}</option>)}
+              </select>
+              <div style={{ marginLeft:"auto", fontSize:12, color:C.textL }}>{recon.length} ligne(s)</div>
+            </div>
+          </div>
+
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))", gap:12, marginBottom:16 }}>
+            {[
+              { l:"Total", v:reconKpi.total, c:C.navy },
+              { l:"Complets ✅", v:reconKpi.complet, c:C.ok },
+              { l:"Commission sans fichier ⚠", v:reconKpi.alerte, c:C.danger },
+              { l:"À compléter 🔍", v:reconKpi.acompleter, c:C.cyanB },
+              { l:"Commissions encaissées", v:fmt(reconKpi.encaisse), c:C.cyanB, small:true },
+            ].map((k,i) => <div key={i} style={{ ...D.kpi, borderTop:`3px solid ${k.c}` }}>
+              <div style={{ fontSize:k.small?16:22, fontWeight:700, color:k.c }}>{k.v}</div>
+              <div style={{ fontSize:11, color:C.textL, marginTop:3 }}>{k.l}</div>
+            </div>)}
+          </div>
+
+          {recon.length === 0 ? (
+            <div style={{ ...D.card, textAlign:"center", padding:40, color:C.textL }}>Aucune ligne pour ces filtres</div>
+          ) : (
+            <div style={D.card}><div style={{ overflowX:"auto" }}>
+              <table style={D.table}><thead><tr style={{ background:C.bg }}>
+                {["Période","Type","Compagnie","N° Compte","Statut","Commission BDX","Encaissé banque","Fichier"].map((h,i) =>
+                  <th key={h} style={{ ...D.th, textAlign:i>=5&&i<=6?"right":"left" }}>{h}</th>)}
+              </tr></thead><tbody>
+                {recon.map((r,i) => {
+                  const st = ST[r.statut_reconciliation] || ST.manquant
+                  return <tr key={i} style={{ background:i%2?C.bg:"#fff" }}>
+                    <td style={{ ...D.td, fontWeight:600, color:C.navy, whiteSpace:"nowrap" }}>{MOIS_L[r.mois]||r.mois} {r.annee}</td>
+                    <td style={D.td}><span style={D.badge(r.type==="RCP"?C.navyMid:C.cyanB)}>{r.type}</span></td>
+                    <td style={{ ...D.td, fontWeight:600 }}>{r.compagnie||"—"}</td>
+                    <td style={{ ...D.td, fontSize:12, color:C.textL }}>{r.compte_producteur||"—"}</td>
+                    <td style={D.td}><span style={D.badge(st.c)}>{st.l}</span></td>
+                    <td style={{ ...D.td, textAlign:"right", fontVariantNumeric:"tabular-nums" }}>{r.commission!=null?fmt(r.commission):"—"}</td>
+                    <td style={{ ...D.td, textAlign:"right", fontWeight:r.commission_bancaire?600:400, color:r.commission_bancaire?C.ok:C.textL, fontVariantNumeric:"tabular-nums" }}>{r.commission_bancaire!=null?fmt(r.commission_bancaire):"—"}</td>
+                    <td style={D.td}>{r.url_sharepoint ? <a href={r.url_sharepoint} target="_blank" rel="noreferrer" style={{ color:C.cyanB, textDecoration:"none", fontSize:12 }}>📄 Ouvrir</a> : <span style={{ color:C.textL, fontSize:12 }}>—</span>}</td>
+                  </tr>
+                })}
+              </tbody></table>
+            </div></div>
+          )}
+        </>}
       </div>}
 
       {/* Alertes */}
