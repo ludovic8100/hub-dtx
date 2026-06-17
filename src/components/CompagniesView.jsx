@@ -168,10 +168,15 @@ export default function CompagniesView() {
     })
   }
 
-  const filtered = cies.filter(c =>
-    (c.nom||"").toLowerCase().includes(search.toLowerCase()) ||
-    (c.code||"").toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = cies.filter(c => {
+    const q = search.toLowerCase().trim()
+    if (!q) return true
+    if ((c.nom||"").toLowerCase().includes(q)) return true
+    if ((c.code||"").toLowerCase().includes(q)) return true
+    // Recherche sur les numéros de producteurs
+    if (comptesDe(c).some(p => (p.numero_producteur||"").toLowerCase().includes(q))) return true
+    return false
+  })
 
   if (loading) return <div style={{ padding:40, textAlign:"center", color:C.textL, fontFamily:"'Source Sans Pro', sans-serif" }}>Chargement…</div>
 
@@ -180,7 +185,7 @@ export default function CompagniesView() {
       <div style={{ ...D.card, padding:"14px 20px" }}>
         <div style={{ display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
           <div style={{ fontSize:13, fontWeight:600, color:C.navy }}>{cies.length} compagnie{cies.length>1?"s":""}</div>
-          <input style={{ ...D.input, flex:1, maxWidth:280 }} placeholder="🔍 Rechercher..." value={search} onChange={e => setSearch(e.target.value)} />
+          <input style={{ ...D.input, flex:1, maxWidth:280 }} placeholder="🔍 Compagnie, code ou n° producteur..." value={search} onChange={e => setSearch(e.target.value)} />
           <button style={{ ...D.btn("primary"), marginLeft:"auto" }} onClick={() => setModal({ ...EMPTY_CIE })}>➕ Nouvelle compagnie</button>
         </div>
       </div>
