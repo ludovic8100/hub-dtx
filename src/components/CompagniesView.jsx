@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
-const STORAGE_BASE = 'https://tndwonqdbeszkcztkzqe.supabase.co/storage/v1/object/public/logo/'
+const STORAGE_BASE = 'https://tndwonqdbeszkcztkzqe.supabase.co/storage/v1/object/public/logos/'
 
 const C = { navy:"#1A3A6B", navyMid:"#1E5799", cyan:"#29ABE2", cyanB:"#00AEEF", bg:"#F4F6F9", white:"#FFFFFF", border:"#DDE3ED", textD:"#1A3A6B", textM:"#4A5568", textL:"#8A9BBE", ok:"#27AE60", warn:"#F39C12", danger:"#E74C3C" }
 const D = {
@@ -150,19 +150,20 @@ export default function CompagniesView() {
     setCies(Array.isArray(data) ? data : [])
     const { data: prod } = await supabase.from("producteurs").select("*").order("compagnie_nom")
     setProducteurs(Array.isArray(prod) ? prod : [])
-    // Lister les fichiers du bucket logo
-    const { data: files } = await supabase.storage.from("logo").list("", { limit: 500 })
+    // Lister les fichiers du bucket logos
+    const { data: files } = await supabase.storage.from("logos").list("", { limit: 500 })
     setLogos(Array.isArray(files) ? files.map(f => f.name) : [])
     setLoading(false)
   }
 
-  // Trouve l'URL du logo pour une compagnie (fichier nommé d'après le code, ex: ag.png)
+  // Trouve l'URL du logo pour une compagnie (matching tolérant casse + suffixes type _JPG/_PNG)
   const logoUrl = (cie) => {
     if (cie.logo_url) return cie.logo_url
-    const code = (cie.code || "").toLowerCase()
+    const code = (cie.code || "").toUpperCase()
     if (!code) return null
-    // Cherche un fichier dont le nom (sans extension) == code
-    const f = logos.find(name => name.toLowerCase().replace(/\.[^.]+$/, "") === code)
+    // base du fichier sans extension, en majuscules, en retirant des suffixes _JPG/_PNG/_2024 etc.
+    const baseNom = (name) => name.toUpperCase().replace(/\.[^.]+$/, "").replace(/[_\s-]?(JPG|JPEG|PNG|BMP|SVG|GIF)\b/g, "").replace(/[_\s-]?\d{4}\b/g, "").replace(/\s*\(\d+\)\s*$/, "").replace(/[^A-Z0-9]/g, "")
+    const f = logos.find(name => baseNom(name) === code)
     return f ? STORAGE_BASE + encodeURIComponent(f) : null
   }
 
