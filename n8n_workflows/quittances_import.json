@@ -1,0 +1,128 @@
+{
+  "name": "Dynassur - Import Quittances (CSV SharePoint -> Supabase)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "cronExpression", "expression": "0 6 * * *" }
+          ]
+        }
+      },
+      "id": "node_trigger",
+      "name": "⏰ Tous les jours 6h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "https://tndwonqdbeszkcztkzqe.supabase.co/rest/v1/quittances?date_comptable=gte.2026-01-01&date_comptable=lte.2026-12-31",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "REMPLACE_PAR_TA_CLE_SERVICE_ROLE" },
+            { "name": "Authorization", "value": "Bearer REMPLACE_PAR_TA_CLE_SERVICE_ROLE" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node_purge",
+      "name": "🗑️ Supabase - Purge quittances 2026",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://graph.microsoft.com/v1.0/drives/b!s8-PQ_gQW0WDCB-DLU2ybfMoM6iRwklCj8QNH1cSEoznLVG9EIBnTrUMiFeCwXD8/root:/DOWNLOAD/QUITTANCE_2026.csv:/content",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "microsoftGraphOAuth2Api",
+        "options": {
+          "response": {
+            "response": { "responseFormat": "file" }
+          }
+        }
+      },
+      "id": "node_download",
+      "name": "📥 SharePoint - Download CSV",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300],
+      "credentials": {
+        "microsoftGraphOAuth2Api": {
+          "id": "REMPLACER_PAR_ID_CREDENTIAL_MSGRAPH",
+          "name": "N8N_MS_GRAPH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse QUITTANCE_2026.csv (séparateur ; , quotes, BOM, CRLF)\n// Colonnes utilisées (index 0-based) :\n//  [5]  Nom (compagnie)   [11] Prime totale   [12] Commission\n//  [13] Commission sous-agent   [14] Date comptable (JJ/MM/AAAA)\n\nconst buffer = await this.helpers.getBinaryDataBuffer(0, 'data');\nlet txt = buffer.toString('utf8');\n// enlève BOM\ntxt = txt.replace(/^\\uFEFF/, '');\nconst lines = txt.split(/\\r?\\n/);\n\nconst num = (s) => {\n  s = (s || '').toString().trim();\n  if (!s) return null;\n  s = s.replace(/\\s/g, '');\n  if (s.includes(',') && s.includes('.')) s = s.replace(/\\./g, '').replace(',', '.');\n  else s = s.replace(',', '.');\n  const n = parseFloat(s);\n  return isNaN(n) ? null : n;\n};\nconst toISO = (s) => {\n  s = (s || '').toString().trim();\n  const p = s.split('/');\n  if (p.length === 3) {\n    const dd = p[0].padStart(2, '0');\n    const mm = p[1].padStart(2, '0');\n    const yyyy = p[2];\n    if (yyyy.length === 4) return `${yyyy}-${mm}-${dd}`;\n  }\n  return null;\n};\nconst clean = (s) => (s || '').toString().trim().replace(/^\"|\"$/g, '');\n\nconst rows = [];\nfor (let i = 1; i < lines.length; i++) {\n  const line = lines[i];\n  if (!line || !line.trim()) continue;\n  const f = line.split(';');\n  if (f.length < 15) continue;\n  const compagnie = clean(f[5]);\n  const date_comptable = toISO(clean(f[14]));\n  // on ignore les lignes totalement vides de chiffres\n  const prime = num(clean(f[11]));\n  const commission = num(clean(f[12]));\n  const commission_sa = num(clean(f[13]));\n  if (!compagnie && prime === null && commission === null) continue;\n  rows.push({\n    compagnie,\n    prime_totale: prime,\n    commission,\n    commission_sa,\n    date_comptable\n  });\n}\n\n// découpe en lots de 1000 pour des INSERT REST raisonnables\nconst CHUNK = 1000;\nconst out = [];\nfor (let i = 0; i < rows.length; i += CHUNK) {\n  out.push({ json: { rows: rows.slice(i, i + CHUNK), total: rows.length } });\n}\nif (out.length === 0) out.push({ json: { rows: [], total: 0 } });\nreturn out;"
+      },
+      "id": "node_parse",
+      "name": "🔧 Parse CSV + lots de 1000",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://tndwonqdbeszkcztkzqe.supabase.co/rest/v1/quittances",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "REMPLACE_PAR_TA_CLE_SERVICE_ROLE" },
+            { "name": "Authorization", "value": "Bearer REMPLACE_PAR_TA_CLE_SERVICE_ROLE" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.rows) }}",
+        "options": { "batching": { "batch": { "batchSize": 1, "batchInterval": 200 } } }
+      },
+      "id": "node_insert",
+      "name": "💾 Supabase - Insert quittances",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const total = $('🔧 Parse CSV + lots de 1000').first().json.total;\nconsole.log(`=== IMPORT QUITTANCES 2026 ===`);\nconsole.log(`Lignes importées : ${total}`);\nreturn [{ json: { ok: true, total } }];"
+      },
+      "id": "node_log",
+      "name": "📊 Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 300]
+    }
+  ],
+  "connections": {
+    "⏰ Tous les jours 6h": {
+      "main": [[{ "node": "🗑️ Supabase - Purge quittances 2026", "type": "main", "index": 0 }]]
+    },
+    "🗑️ Supabase - Purge quittances 2026": {
+      "main": [[{ "node": "📥 SharePoint - Download CSV", "type": "main", "index": 0 }]]
+    },
+    "📥 SharePoint - Download CSV": {
+      "main": [[{ "node": "🔧 Parse CSV + lots de 1000", "type": "main", "index": 0 }]]
+    },
+    "🔧 Parse CSV + lots de 1000": {
+      "main": [[{ "node": "💾 Supabase - Insert quittances", "type": "main", "index": 0 }]]
+    },
+    "💾 Supabase - Insert quittances": {
+      "main": [[{ "node": "📊 Log", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "tags": ["dynassur", "quittances", "import", "sharepoint"]
+}
