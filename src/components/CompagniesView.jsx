@@ -5,12 +5,11 @@ const STORAGE_BASE = 'https://tndwonqdbeszkcztkzqe.supabase.co/storage/v1/object
 
 // Liste des fichiers présents dans le bucket logos (fallback si le listing Storage est bloqué)
 const LOGOS_CONNUS = [
-  "ARAG_PNG_2024.png","ARDENNE_JPG.jpg","ATHORA_JPG.jpg","AVIZA_PNG.png","AXA_JPG.jpg",
-  "BALOISE_JPG.jpg","bnp.bmp","CARDIF_JPG.jpg","DAS_JPG.jpg","DELA.jpg","DKV.jpg",
-  "DKV_JPG (2).jpg","dtx.png","Dynassur.jpg","DYNASSUR_bouclier_22.png","Dynassur_logo.png",
-  "EA.PSD","EA_NEW-Logo_Flat_RV.png","eb-lease.bmp","elantis.bmp","EUROMEX.jpg","GENERALI.png",
-  "JPG_AG.jpg","JPG_EUROMEX.jpg","lode.png","lode_PNG.png","Logo_blanc.png","logo_prive.svg",
-  "NN.png","TVM_JPG.jpg","VIVIUM_JPG.jpg","X_LOGO.png",
+  "ag.jpg","ARAG.png","ARDENNE.jpg","ATHORA.jpg","AVIZA.png","AXA.jpg","baloise.jpg",
+  "bnp.bmp","CARDIF.jpg","DAS.jpg","DELA.jpg","DKV.jpg","dtx.png","Dynassur.jpg",
+  "DYNASSUR_bouclier_22.png","Dynassur_logo.png","EA.PSD","eb-lease.bmp","elantis.bmp",
+  "EUROMEX.jpg","GENERALI.png","lode.png","Logo_blanc.png","logo_prive.svg","NN.png",
+  "TVM.jpg","VIVIUM.jpg","X_LOGO.png",
 ].sort((a,b)=>a.localeCompare(b))
 
 const C = { navy:"#1A3A6B", navyMid:"#1E5799", cyan:"#29ABE2", cyanB:"#00AEEF", bg:"#F4F6F9", white:"#FFFFFF", border:"#DDE3ED", textD:"#1A3A6B", textM:"#4A5568", textL:"#8A9BBE", ok:"#27AE60", warn:"#F39C12", danger:"#E74C3C" }
