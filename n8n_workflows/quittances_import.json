@@ -37,7 +37,7 @@
     },
     {
       "parameters": {
-        "url": "https://graph.microsoft.com/v1.0/drives/b!s8-PQ_gQW0WDCB-DLU2ybfMoM6iRwklCj8QNH1cSEoznLVG9EIBnTrUMiFeCwXD8/root:/DOWNLOAD/QUITTANCE_2026.csv:/content",
+        "url": "https://graph.microsoft.com/v1.0/drives/b!s8-PQ_gQW0WDCB-DLU2ybfMoM6iRwklCj8QNH1cSEoznLVG9EIBnTrUMiFeCwXD8/items/01XZEE24JJIT56P26UKJALQ3YLAZEHDHHO/content",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "microsoftGraphOAuth2Api",
         "options": {
@@ -60,7 +60,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Parse QUITTANCE_2026.csv (séparateur ; , quotes, BOM, CRLF)\n// Colonnes utilisées (index 0-based) :\n//  [5]  Nom (compagnie)   [11] Prime totale   [12] Commission\n//  [13] Commission sous-agent   [14] Date comptable (JJ/MM/AAAA)\n\nconst buffer = await this.helpers.getBinaryDataBuffer(0, 'data');\nlet txt = buffer.toString('utf8');\n// enlève BOM\ntxt = txt.replace(/^\\uFEFF/, '');\nconst lines = txt.split(/\\r?\\n/);\n\nconst num = (s) => {\n  s = (s || '').toString().trim();\n  if (!s) return null;\n  s = s.replace(/\\s/g, '');\n  if (s.includes(',') && s.includes('.')) s = s.replace(/\\./g, '').replace(',', '.');\n  else s = s.replace(',', '.');\n  const n = parseFloat(s);\n  return isNaN(n) ? null : n;\n};\nconst toISO = (s) => {\n  s = (s || '').toString().trim();\n  const p = s.split('/');\n  if (p.length === 3) {\n    const dd = p[0].padStart(2, '0');\n    const mm = p[1].padStart(2, '0');\n    const yyyy = p[2];\n    if (yyyy.length === 4) return `${yyyy}-${mm}-${dd}`;\n  }\n  return null;\n};\nconst clean = (s) => (s || '').toString().trim().replace(/^\"|\"$/g, '');\n\nconst rows = [];\nfor (let i = 1; i < lines.length; i++) {\n  const line = lines[i];\n  if (!line || !line.trim()) continue;\n  const f = line.split(';');\n  if (f.length < 15) continue;\n  const compagnie = clean(f[5]);\n  const date_comptable = toISO(clean(f[14]));\n  // on ignore les lignes totalement vides de chiffres\n  const prime = num(clean(f[11]));\n  const commission = num(clean(f[12]));\n  const commission_sa = num(clean(f[13]));\n  if (!compagnie && prime === null && commission === null) continue;\n  rows.push({\n    compagnie,\n    prime_totale: prime,\n    commission,\n    commission_sa,\n    date_comptable\n  });\n}\n\n// découpe en lots de 1000 pour des INSERT REST raisonnables\nconst CHUNK = 1000;\nconst out = [];\nfor (let i = 0; i < rows.length; i += CHUNK) {\n  out.push({ json: { rows: rows.slice(i, i + CHUNK), total: rows.length } });\n}\nif (out.length === 0) out.push({ json: { rows: [], total: 0 } });\nreturn out;"
+        "jsCode": "// Parse QUITTANCE_2026.csv (séparateur ; , quotes, BOM, CRLF)\n// Colonnes utilisées (index 0-based) :\n//  [5]  Nom (compagnie)   [11] Prime totale   [12] Commission\n//  [13] Commission sous-agent   [14] Date comptable (JJ/MM/AAAA)\n\n// Lecture binaire robuste (inline base64 OU filesystem, peu importe le nom de propriété)\nconst item = $input.first();\nif (!item.binary) throw new Error('Aucune donnée binaire reçue du noeud Download CSV');\nconst propName = item.binary.data ? 'data' : Object.keys(item.binary)[0];\nconst binMeta = item.binary[propName];\nlet buffer;\nif (binMeta && binMeta.data) {\n  buffer = Buffer.from(binMeta.data, 'base64');\n} else {\n  buffer = await this.helpers.getBinaryDataBuffer(0, propName);\n}\nlet txt = buffer.toString('utf8');\n// enlève BOM\ntxt = txt.replace(/^\\uFEFF/, '');\nconst lines = txt.split(/\\r?\\n/);\n\nconst num = (s) => {\n  s = (s || '').toString().trim();\n  if (!s) return null;\n  s = s.replace(/\\s/g, '');\n  if (s.includes(',') && s.includes('.')) s = s.replace(/\\./g, '').replace(',', '.');\n  else s = s.replace(',', '.');\n  const n = parseFloat(s);\n  return isNaN(n) ? null : n;\n};\nconst toISO = (s) => {\n  s = (s || '').toString().trim();\n  const p = s.split('/');\n  if (p.length === 3) {\n    const dd = p[0].padStart(2, '0');\n    const mm = p[1].padStart(2, '0');\n    const yyyy = p[2];\n    if (yyyy.length === 4) return `${yyyy}-${mm}-${dd}`;\n  }\n  return null;\n};\nconst clean = (s) => (s || '').toString().trim().replace(/^\"|\"$/g, '');\n\nconst rows = [];\nfor (let i = 1; i < lines.length; i++) {\n  const line = lines[i];\n  if (!line || !line.trim()) continue;\n  const f = line.split(';');\n  if (f.length < 15) continue;\n  const compagnie = clean(f[5]);\n  const date_comptable = toISO(clean(f[14]));\n  // on ignore les lignes totalement vides de chiffres\n  const prime = num(clean(f[11]));\n  const commission = num(clean(f[12]));\n  const commission_sa = num(clean(f[13]));\n  if (!compagnie && prime === null && commission === null) continue;\n  rows.push({\n    compagnie,\n    prime_totale: prime,\n    commission,\n    commission_sa,\n    date_comptable\n  });\n}\n\n// découpe en lots de 1000 pour des INSERT REST raisonnables\nconst CHUNK = 1000;\nconst out = [];\nfor (let i = 0; i < rows.length; i += CHUNK) {\n  out.push({ json: { rows: rows.slice(i, i + CHUNK), total: rows.length } });\n}\nif (out.length === 0) out.push({ json: { rows: [], total: 0 } });\nreturn out;"
       },
       "id": "node_parse",
       "name": "🔧 Parse CSV + lots de 1000",
@@ -82,8 +82,9 @@
           ]
         },
         "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify($json.rows) }}",
+        "specifyBody": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.rows) }}",
         "options": { "batching": { "batch": { "batchSize": 1, "batchInterval": 200 } } }
       },
       "id": "node_insert",
