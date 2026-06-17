@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
+const STORAGE_BASE = 'https://tndwonqdbeszkcztkzqe.supabase.co/storage/v1/object/public/logo/'
+
 const C = { navy:"#1A3A6B", navyMid:"#1E5799", cyan:"#29ABE2", cyanB:"#00AEEF", bg:"#F4F6F9", white:"#FFFFFF", border:"#DDE3ED", textD:"#1A3A6B", textM:"#4A5568", textL:"#8A9BBE", ok:"#27AE60", warn:"#F39C12", danger:"#E74C3C" }
 const D = {
   card:{ background:C.white, border:`1px solid ${C.border}`, borderRadius:10, padding:20, marginBottom:16, boxShadow:"0 1px 4px rgba(26,58,107,0.06)" },
@@ -135,6 +137,7 @@ function CieFormModal({ cie, comptes = [], onClose, onSave }) {
 export default function CompagniesView() {
   const [cies, setCies] = useState([])
   const [producteurs, setProducteurs] = useState([])
+  const [logos, setLogos] = useState([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null)
   const [search, setSearch] = useState("")
@@ -147,7 +150,20 @@ export default function CompagniesView() {
     setCies(Array.isArray(data) ? data : [])
     const { data: prod } = await supabase.from("producteurs").select("*").order("compagnie_nom")
     setProducteurs(Array.isArray(prod) ? prod : [])
+    // Lister les fichiers du bucket logo
+    const { data: files } = await supabase.storage.from("logo").list("", { limit: 500 })
+    setLogos(Array.isArray(files) ? files.map(f => f.name) : [])
     setLoading(false)
+  }
+
+  // Trouve l'URL du logo pour une compagnie (fichier nommé d'après le code, ex: ag.png)
+  const logoUrl = (cie) => {
+    if (cie.logo_url) return cie.logo_url
+    const code = (cie.code || "").toLowerCase()
+    if (!code) return null
+    // Cherche un fichier dont le nom (sans extension) == code
+    const f = logos.find(name => name.toLowerCase().replace(/\.[^.]+$/, "") === code)
+    return f ? STORAGE_BASE + encodeURIComponent(f) : null
   }
 
   // Normalise pour matcher compagnies.nom <-> producteurs.compagnie_nom
@@ -201,11 +217,13 @@ export default function CompagniesView() {
             onMouseOut={e => { e.currentTarget.style.transform=""; e.currentTarget.style.boxShadow="" }}>
             <div style={{ height:6, background:c.couleur||C.navy }} />
             <div style={{ padding:"16px 16px 12px" }}>
-              <div style={{ width:52, height:52, borderRadius:10, background:c.logo_url?"transparent":(c.couleur||C.navy)+"20", border:`2px solid ${c.couleur||C.border}`, display:"flex", alignItems:"center", justifyContent:"center", marginBottom:10, overflow:"hidden" }}>
-                {c.logo_url
-                  ? <img src={c.logo_url} style={{ width:"100%", height:"100%", objectFit:"contain" }} alt={c.code} />
+              {(() => { const lu = logoUrl(c); return (
+              <div style={{ width:52, height:52, borderRadius:10, background:lu?"#fff":(c.couleur||C.navy)+"20", border:`2px solid ${c.couleur||C.border}`, display:"flex", alignItems:"center", justifyContent:"center", marginBottom:10, overflow:"hidden" }}>
+                {lu
+                  ? <img src={lu} style={{ width:"100%", height:"100%", objectFit:"contain" }} alt={c.code} onError={e=>{ e.currentTarget.style.display='none'; e.currentTarget.parentNode.innerHTML='<span style="font-size:16px;font-weight:800;color:'+(c.couleur||C.navy)+'">'+((c.code||'?').slice(0,3))+'</span>' }} />
                   : <span style={{ fontSize:16, fontWeight:800, color:c.couleur||C.navy }}>{(c.code||"?").slice(0,3)}</span>}
               </div>
+              )})()}
               <div style={{ fontSize:13, fontWeight:700, color:C.navy, marginBottom:2 }}>{c.nom}</div>
               <div style={{ fontSize:11, color:C.textL, marginBottom:8 }}>{c.code}</div>
               {/* Comptes producteurs */}
