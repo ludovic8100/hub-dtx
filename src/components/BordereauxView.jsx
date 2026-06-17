@@ -34,7 +34,7 @@ export default function BordereauxView() {
     const load = async () => {
       setLoading(true)
       try {
-        const { data: b } = await supabase.from("bordereaux").select("*").order("annee").order("mois").order("compagnie")
+        const { data: b } = await supabase.from("bordereaux").select("*").order("annee", { ascending: false }).order("mois").order("compagnie").limit(100000)
         setBRows(Array.isArray(b) ? b : [])
         const { data: q } = await supabase.from("quittances").select("compagnie,date_comptable,prime_totale,commission,commission_sa").limit(100000)
         setQRows(Array.isArray(q) ? q : [])
