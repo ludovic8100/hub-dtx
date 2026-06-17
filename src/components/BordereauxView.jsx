@@ -61,12 +61,23 @@ export default function BordereauxView() {
   const totQ = useMemo(() => qAgg.reduce((s, [, v]) => ({ primes:s.primes+v.primes, commission:s.commission+v.commission, commission_sa:s.commission_sa+v.commission_sa }), { primes:0, commission:0, commission_sa:0 }), [qAgg])
 
   const CIE_TYPES = { AG:"BQT+RCP",AXA:"BQT+RCP",AEDES:"BQT+RCP",APRIL:"BQT+RCP",ASSUDIS:"BQT+RCP",BALOISE:"BQT+RCP",AMMA:"BQT+RCP",VIVIUM:"BQT+RCP",DKV:"BQT+RCP",DAS:"BQT+RCP",ATHORA:"BQT+RCP",TVM:"BQT",RECORD:"RCP",ALPHACREDIT:"RCP",BNP:"RCP",CARES:"RCP",DELA:"RCP",MONUMENT:"RCP" }
-  const idx = useMemo(() => { const m = {}; bRows.forEach(r => { m[`${r.compagnie}-${r.mois}-${r.type}`] = r }); return m }, [bRows])
+  // Normalise : majuscules, sans espaces ni accents (pour matcher "ALPHA CREDIT" -> "ALPHACREDIT")
+  const norm = (s) => (s || "").toString().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9]/g, "")
+  const normMois = (m) => String(parseInt(m, 10)).padStart(2, "0")
+  // Année sélectionnée pour la matrice (réutilise filterAnnee)
+  const idx = useMemo(() => {
+    const m = {}
+    bRows.forEach(r => {
+      if (String(r.annee) !== String(filterAnnee)) return
+      m[`${norm(r.compagnie)}-${normMois(r.mois)}-${norm(r.type)}`] = r
+    })
+    return m
+  }, [bRows, filterAnnee])
   const alertes = useMemo(() => {
     const a = []
     Object.entries(CIE_TYPES).forEach(([cie, type]) => {
-      if (type === "BQT+RCP" || type === "BQT") MOIS.slice(0,6).forEach(m => { if (!idx[`${cie}-${m}-BQT`]) a.push({ cie, mois:m, type:"BQT" }) })
-      if (type === "BQT+RCP" || type === "RCP") MOIS.slice(0,6).forEach(m => { if (idx[`${cie}-${m}-BQT`] && !idx[`${cie}-${m}-RCP`]) a.push({ cie, mois:m, type:"RCP" }) })
+      if (type === "BQT+RCP" || type === "BQT") MOIS.slice(0,6).forEach(m => { if (!idx[`${norm(cie)}-${m}-BQT`]) a.push({ cie, mois:m, type:"BQT" }) })
+      if (type === "BQT+RCP" || type === "RCP") MOIS.slice(0,6).forEach(m => { if (idx[`${norm(cie)}-${m}-BQT`] && !idx[`${norm(cie)}-${m}-RCP`]) a.push({ cie, mois:m, type:"RCP" }) })
     })
     return a
   }, [idx])
@@ -147,20 +158,26 @@ export default function BordereauxView() {
       {/* Matrice BQT/RCP */}
       {view === "matrice" && <div>
         <div style={{ ...D.card, marginBottom:8 }}>
-          <div style={{ fontSize:13, color:C.textM, marginBottom:4 }}>La matrice BQT/RCP suit les bordereaux manuels encodés.</div>
+          <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap", marginBottom:10 }}>
+            <span style={{ fontSize:13, fontWeight:600, color:C.navy }}>Année :</span>
+            <select style={{ ...D.input, width:"auto" }} value={filterAnnee} onChange={e => setFilterAnnee(e.target.value)}>
+              {["2026","2025","2024","2023","2022","2021","2020"].map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+            <div style={{ marginLeft:"auto", fontSize:12, color:C.textL }}>{Object.keys(idx).length} bordereau(x) trouvé(s) en {filterAnnee}</div>
+          </div>
           <div style={{ fontSize:11, color:C.textL }}>● BQT reçu · ○ BQT manquant · ▲ RCP reçu · △ RCP manquant</div>
         </div>
         <div style={D.card}><div style={{ overflowX:"auto" }}>
           <table style={D.table}><thead><tr style={{ background:C.bg }}>
             <th style={D.th}>Compagnie</th><th style={D.th}>Type attendu</th>
-            {MOIS.slice(0,6).map(m => <th key={m} style={{ ...D.th, textAlign:"center" }}>{MOIS_L[m]}</th>)}
+            {MOIS.map(m => <th key={m} style={{ ...D.th, textAlign:"center" }}>{MOIS_L[m]}</th>)}
           </tr></thead><tbody>
             {Object.entries(CIE_TYPES).map(([name, type]) => (
               <tr key={name}>
                 <td style={{ ...D.td, fontWeight:700, color:C.navy }}>{name}</td>
                 <td style={D.td}><span style={D.badge(type==="RCP"?C.navyMid:C.cyanB)}>{type}</span></td>
-                {MOIS.slice(0,6).map(m => {
-                  const bqt=idx[`${name}-${m}-BQT`]; const rcp=idx[`${name}-${m}-RCP`]
+                {MOIS.map(m => {
+                  const bqt=idx[`${norm(name)}-${m}-BQT`]; const rcp=idx[`${norm(name)}-${m}-RCP`]
                   const hasBQT=type==="BQT+RCP"||type==="BQT"; const hasRCP=type==="BQT+RCP"||type==="RCP"
                   const ok=(!hasBQT||!!bqt)&&(!hasRCP||!!rcp)
                   return <td key={m} style={{ ...D.td, textAlign:"center", background:ok?"#EAF7EC":"#FDECEA", padding:"6px 4px" }}>
