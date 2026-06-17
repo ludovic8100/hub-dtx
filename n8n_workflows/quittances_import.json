@@ -3,11 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "rule": {
-          "interval": [
-            { "field": "cronExpression", "expression": "0 6 * * *" }
-          ]
-        }
+        "rule": { "interval": [ { "field": "cronExpression", "expression": "0 6 * * *" } ] }
       },
       "id": "node_trigger",
       "name": "⏰ Tous les jours 6h",
@@ -40,11 +36,7 @@
         "url": "https://graph.microsoft.com/v1.0/drives/b!s8-PQ_gQW0WDCB-DLU2ybfMoM6iRwklCj8QNH1cSEoznLVG9EIBnTrUMiFeCwXD8/items/01XZEE24JJIT56P26UKJALQ3YLAZEHDHHO/content",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "microsoftGraphOAuth2Api",
-        "options": {
-          "response": {
-            "response": { "responseFormat": "file" }
-          }
-        }
+        "options": { "response": { "response": { "responseFormat": "file" } } }
       },
       "id": "node_download",
       "name": "📥 SharePoint - Download CSV",
@@ -52,21 +44,28 @@
       "typeVersion": 4.2,
       "position": [480, 300],
       "credentials": {
-        "microsoftGraphOAuth2Api": {
-          "id": "REMPLACER_PAR_ID_CREDENTIAL_MSGRAPH",
-          "name": "N8N_MS_GRAPH"
-        }
+        "microsoftGraphOAuth2Api": { "id": "REMPLACER_PAR_ID_CREDENTIAL_MSGRAPH", "name": "N8N_MS_GRAPH" }
       }
     },
     {
       "parameters": {
-        "jsCode": "// Parse QUITTANCE_2026.csv (séparateur ; , quotes, BOM, CRLF)\n// Colonnes utilisées (index 0-based) :\n//  [5]  Nom (compagnie)   [11] Prime totale   [12] Commission\n//  [13] Commission sous-agent   [14] Date comptable (JJ/MM/AAAA)\n\n// Lecture binaire robuste (inline base64 OU filesystem, peu importe le nom de propriété)\nconst item = $input.first();\nif (!item.binary) throw new Error('Aucune donnée binaire reçue du noeud Download CSV');\nconst propName = item.binary.data ? 'data' : Object.keys(item.binary)[0];\nconst binMeta = item.binary[propName];\nlet buffer;\nif (binMeta && binMeta.data) {\n  buffer = Buffer.from(binMeta.data, 'base64');\n} else {\n  buffer = await this.helpers.getBinaryDataBuffer(0, propName);\n}\nlet txt = buffer.toString('utf8');\n// enlève BOM\ntxt = txt.replace(/^\\uFEFF/, '');\nconst lines = txt.split(/\\r?\\n/);\n\nconst num = (s) => {\n  s = (s || '').toString().trim();\n  if (!s) return null;\n  s = s.replace(/\\s/g, '');\n  if (s.includes(',') && s.includes('.')) s = s.replace(/\\./g, '').replace(',', '.');\n  else s = s.replace(',', '.');\n  const n = parseFloat(s);\n  return isNaN(n) ? null : n;\n};\nconst toISO = (s) => {\n  s = (s || '').toString().trim();\n  const p = s.split('/');\n  if (p.length === 3) {\n    const dd = p[0].padStart(2, '0');\n    const mm = p[1].padStart(2, '0');\n    const yyyy = p[2];\n    if (yyyy.length === 4) return `${yyyy}-${mm}-${dd}`;\n  }\n  return null;\n};\nconst clean = (s) => (s || '').toString().trim().replace(/^\"|\"$/g, '');\n\nconst rows = [];\nfor (let i = 1; i < lines.length; i++) {\n  const line = lines[i];\n  if (!line || !line.trim()) continue;\n  const f = line.split(';');\n  if (f.length < 15) continue;\n  const compagnie = clean(f[5]);\n  const date_comptable = toISO(clean(f[14]));\n  // on ignore les lignes totalement vides de chiffres\n  const prime = num(clean(f[11]));\n  const commission = num(clean(f[12]));\n  const commission_sa = num(clean(f[13]));\n  if (!compagnie && prime === null && commission === null) continue;\n  rows.push({\n    compagnie,\n    prime_totale: prime,\n    commission,\n    commission_sa,\n    date_comptable\n  });\n}\n\n// découpe en lots de 1000 pour des INSERT REST raisonnables\nconst CHUNK = 1000;\nconst out = [];\nfor (let i = 0; i < rows.length; i += CHUNK) {\n  out.push({ json: { rows: rows.slice(i, i + CHUNK), total: rows.length } });\n}\nif (out.length === 0) out.push({ json: { rows: [], total: 0 } });\nreturn out;"
+        "jsCode": "// Parse QUITTANCE_2026.csv (séparateur ; , quotes, BOM, CRLF)\n//  [5] compagnie  [11] prime  [12] commission  [13] commission_sa  [14] date JJ/MM/AAAA\nconst item = $input.first();\nif (!item.binary) throw new Error('Aucune donnée binaire reçue du noeud Download CSV');\nconst propName = item.binary.data ? 'data' : Object.keys(item.binary)[0];\nconst binMeta = item.binary[propName];\nlet buffer;\nif (binMeta && binMeta.data) buffer = Buffer.from(binMeta.data, 'base64');\nelse buffer = await this.helpers.getBinaryDataBuffer(0, propName);\nlet txt = buffer.toString('utf8').replace(/^\\uFEFF/, '');\nconst lines = txt.split(/\\r?\\n/);\n\nconst num = (s) => {\n  s = (s || '').toString().trim();\n  if (!s) return null;\n  s = s.replace(/\\s/g, '');\n  if (s.includes(',') && s.includes('.')) s = s.replace(/\\./g, '').replace(',', '.');\n  else s = s.replace(',', '.');\n  const n = parseFloat(s);\n  return isNaN(n) ? null : n;\n};\nconst toISO = (s) => {\n  s = (s || '').toString().trim();\n  const p = s.split('/');\n  if (p.length === 3 && p[2].length === 4) return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;\n  return null;\n};\nconst clean = (s) => (s || '').toString().trim().replace(/^\"|\"$/g, '');\n\nconst rows = [];\nfor (let i = 1; i < lines.length; i++) {\n  const line = lines[i];\n  if (!line || !line.trim()) continue;\n  const f = line.split(';');\n  if (f.length < 15) continue;\n  const compagnie = clean(f[5]);\n  const prime = num(clean(f[11]));\n  const commission = num(clean(f[12]));\n  const commission_sa = num(clean(f[13]));\n  const date_comptable = toISO(clean(f[14]));\n  if (!compagnie && prime === null && commission === null) continue;\n  rows.push({ compagnie, prime_totale: prime, commission, commission_sa, date_comptable });\n}\n\nconst CHUNK = 5000;\nconst out = [];\nfor (let i = 0; i < rows.length; i += CHUNK) {\n  out.push({ json: { rows: rows.slice(i, i + CHUNK), total: rows.length } });\n}\nif (out.length === 0) out.push({ json: { rows: [], total: 0 } });\nreturn out;"
       },
       "id": "node_parse",
-      "name": "🔧 Parse CSV + lots de 1000",
+      "name": "🔧 Parse CSV + lots de 5000",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "node_loop",
+      "name": "🔁 Loop Over Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [960, 300]
     },
     {
       "parameters": {
@@ -85,45 +84,38 @@
         "specifyBody": "raw",
         "rawContentType": "application/json",
         "body": "={{ JSON.stringify($json.rows) }}",
-        "options": { "batching": { "batch": { "batchSize": 1, "batchInterval": 200 } } }
+        "options": {}
       },
       "id": "node_insert",
       "name": "💾 Supabase - Insert quittances",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [960, 300]
+      "position": [1200, 200]
     },
     {
       "parameters": {
-        "jsCode": "const total = $('🔧 Parse CSV + lots de 1000').first().json.total;\nconsole.log(`=== IMPORT QUITTANCES 2026 ===`);\nconsole.log(`Lignes importées : ${total}`);\nreturn [{ json: { ok: true, total } }];"
+        "jsCode": "const total = $('🔧 Parse CSV + lots de 5000').first().json.total;\nconsole.log(`=== IMPORT QUITTANCES 2026 : ${total} lignes ===`);\nreturn [{ json: { ok: true, total } }];"
       },
       "id": "node_log",
       "name": "📊 Log",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1200, 300]
+      "position": [1200, 420]
     }
   ],
   "connections": {
-    "⏰ Tous les jours 6h": {
-      "main": [[{ "node": "🗑️ Supabase - Purge quittances 2026", "type": "main", "index": 0 }]]
+    "⏰ Tous les jours 6h": { "main": [[{ "node": "🗑️ Supabase - Purge quittances 2026", "type": "main", "index": 0 }]] },
+    "🗑️ Supabase - Purge quittances 2026": { "main": [[{ "node": "📥 SharePoint - Download CSV", "type": "main", "index": 0 }]] },
+    "📥 SharePoint - Download CSV": { "main": [[{ "node": "🔧 Parse CSV + lots de 5000", "type": "main", "index": 0 }]] },
+    "🔧 Parse CSV + lots de 5000": { "main": [[{ "node": "🔁 Loop Over Items", "type": "main", "index": 0 }]] },
+    "🔁 Loop Over Items": {
+      "main": [
+        [{ "node": "📊 Log", "type": "main", "index": 0 }],
+        [{ "node": "💾 Supabase - Insert quittances", "type": "main", "index": 0 }]
+      ]
     },
-    "🗑️ Supabase - Purge quittances 2026": {
-      "main": [[{ "node": "📥 SharePoint - Download CSV", "type": "main", "index": 0 }]]
-    },
-    "📥 SharePoint - Download CSV": {
-      "main": [[{ "node": "🔧 Parse CSV + lots de 1000", "type": "main", "index": 0 }]]
-    },
-    "🔧 Parse CSV + lots de 1000": {
-      "main": [[{ "node": "💾 Supabase - Insert quittances", "type": "main", "index": 0 }]]
-    },
-    "💾 Supabase - Insert quittances": {
-      "main": [[{ "node": "📊 Log", "type": "main", "index": 0 }]]
-    }
+    "💾 Supabase - Insert quittances": { "main": [[{ "node": "🔁 Loop Over Items", "type": "main", "index": 0 }]] }
   },
-  "settings": {
-    "executionOrder": "v1",
-    "saveManualExecutions": true
-  },
+  "settings": { "executionOrder": "v1", "saveManualExecutions": true },
   "tags": ["dynassur", "quittances", "import", "sharepoint"]
 }
