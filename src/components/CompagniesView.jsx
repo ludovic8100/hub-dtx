@@ -10,7 +10,7 @@ const D = {
 }
 const EMPTY_CIE = { code:"", nom:"", nom_court:"", logo_url:"", couleur:"#1A3A6B", site_web:"", email_contact:"", telephone:"", actif:true, notes:"" }
 
-function CieFormModal({ cie, onClose, onSave }) {
+function CieFormModal({ cie, comptes = [], onClose, onSave }) {
   const isNew = !cie.id
   const [form, setForm] = useState({ ...cie })
   const [saving, setSaving] = useState(false)
@@ -54,6 +54,22 @@ function CieFormModal({ cie, onClose, onSave }) {
               <div style={{ fontSize:13, fontWeight:600, color:C.navy, marginBottom:6 }}>Logo de la compagnie</div>
               <input style={{ ...D.input, width:"100%" }} placeholder="URL du logo (https://…)" value={form.logo_url||""} onChange={e => set("logo_url", e.target.value)} />
             </div>
+          </div>
+
+          {/* Comptes producteurs */}
+          <div style={{ marginBottom:16, padding:"14px 16px", background:C.bg, borderRadius:10 }}>
+            <div style={{ fontSize:11, fontWeight:700, color:C.textL, textTransform:"uppercase", letterSpacing:.5, marginBottom:8 }}>
+              {comptes.length} compte{comptes.length>1?"s":""} producteur{comptes.length>1?"s":""}
+            </div>
+            {comptes.length === 0 ? (
+              <div style={{ fontSize:12, color:C.danger, fontWeight:600 }}>⚠ Aucun numéro de producteur — non ouvert chez cette compagnie</div>
+            ) : (
+              <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+                {comptes.map((p,j) => (
+                  <span key={j} style={{ fontSize:12, fontWeight:600, padding:"4px 10px", borderRadius:6, background:"#fff", border:`1px solid ${C.border}`, color:C.navy }} title={p.fsma?`FSMA ${p.fsma}`:""}>{p.numero_producteur}</span>
+                ))}
+              </div>
+            )}
           </div>
 
           <div style={{ display:"grid", gridTemplateColumns:"1fr 2fr", gap:10, marginBottom:12 }}>
@@ -118,6 +134,7 @@ function CieFormModal({ cie, onClose, onSave }) {
 
 export default function CompagniesView() {
   const [cies, setCies] = useState([])
+  const [producteurs, setProducteurs] = useState([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null)
   const [search, setSearch] = useState("")
@@ -128,7 +145,19 @@ export default function CompagniesView() {
     setLoading(true)
     const { data } = await supabase.from("compagnies").select("*").order("nom")
     setCies(Array.isArray(data) ? data : [])
+    const { data: prod } = await supabase.from("producteurs").select("*").order("compagnie_nom")
+    setProducteurs(Array.isArray(prod) ? prod : [])
     setLoading(false)
+  }
+
+  // Normalise pour matcher compagnies.nom <-> producteurs.compagnie_nom
+  const norm = (s) => (s || "").toString().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9]/g, "")
+  const comptesDe = (cie) => {
+    const cibles = [norm(cie.nom), norm(cie.nom_court), norm(cie.code)].filter(Boolean)
+    return producteurs.filter(p => {
+      const pn = norm(p.compagnie_nom)
+      return cibles.some(c => c && (pn === c || pn.startsWith(c) || c.startsWith(pn)))
+    })
   }
 
   const handleSave = (saved) => {
@@ -156,9 +185,12 @@ export default function CompagniesView() {
         </div>
       </div>
 
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(200px, 1fr))", gap:12 }}>
-        {filtered.map(c => (
-          <div key={c.id} style={{ ...D.card, marginBottom:0, padding:0, overflow:"hidden", opacity:c.actif?1:0.5, cursor:"pointer", transition:"transform 0.15s, box-shadow 0.15s" }}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(220px, 1fr))", gap:12 }}>
+        {filtered.map(c => {
+          const comptes = comptesDe(c)
+          const ouvert = comptes.length > 0
+          return (
+          <div key={c.id} style={{ ...D.card, marginBottom:0, padding:0, overflow:"hidden", opacity:c.actif?1:0.5, cursor:"pointer", transition:"transform 0.15s, box-shadow 0.15s", border: ouvert?`1px solid ${C.border}`:`1px solid #F5C6CB` }}
             onClick={() => setModal({ ...c })}
             onMouseOver={e => { e.currentTarget.style.transform="translateY(-2px)"; e.currentTarget.style.boxShadow="0 6px 20px rgba(0,0,0,0.12)" }}
             onMouseOut={e => { e.currentTarget.style.transform=""; e.currentTarget.style.boxShadow="" }}>
@@ -170,18 +202,31 @@ export default function CompagniesView() {
                   : <span style={{ fontSize:16, fontWeight:800, color:c.couleur||C.navy }}>{(c.code||"?").slice(0,3)}</span>}
               </div>
               <div style={{ fontSize:13, fontWeight:700, color:C.navy, marginBottom:2 }}>{c.nom}</div>
-              <div style={{ fontSize:11, color:C.textL }}>{c.code}</div>
-              {c.site_web && <div style={{ fontSize:10, color:C.cyanB, marginTop:4, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.site_web}</div>}
+              <div style={{ fontSize:11, color:C.textL, marginBottom:8 }}>{c.code}</div>
+              {/* Comptes producteurs */}
+              {ouvert ? (
+                <div>
+                  <div style={{ fontSize:10, fontWeight:700, color:C.textL, textTransform:"uppercase", letterSpacing:.5, marginBottom:4 }}>{comptes.length} compte{comptes.length>1?"s":""} producteur{comptes.length>1?"s":""}</div>
+                  <div style={{ display:"flex", flexWrap:"wrap", gap:4 }}>
+                    {comptes.slice(0,6).map((p,j) => (
+                      <span key={j} style={{ fontSize:10, fontWeight:600, padding:"2px 6px", borderRadius:5, background:(c.couleur||C.navy)+"14", color:c.couleur||C.navy }}>{p.numero_producteur}</span>
+                    ))}
+                    {comptes.length>6 && <span style={{ fontSize:10, color:C.textL, padding:"2px 4px" }}>+{comptes.length-6}</span>}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ fontSize:11, fontWeight:700, color:C.danger }}>⚠ Aucun n° producteur</div>
+              )}
             </div>
-            <div style={{ borderTop:`1px solid ${C.border}`, padding:"6px 16px", background:C.bg, fontSize:11, color:C.textL, display:"flex", justifyContent:"space-between" }}>
+            <div style={{ borderTop:`1px solid ${C.border}`, padding:"6px 16px", background: ouvert?C.bg:"#FDECEA", fontSize:11, color:C.textL, display:"flex", justifyContent:"space-between" }}>
               <span>{c.actif ? "✅ Active" : "🔴 Inactive"}</span>
               <span style={{ color:C.cyanB }}>✏️ Modifier</span>
             </div>
           </div>
-        ))}
+        )})}
       </div>
 
-      {modal && <CieFormModal cie={modal} onClose={() => setModal(null)} onSave={handleSave} />}
+      {modal && <CieFormModal cie={modal} comptes={comptesDe(modal)} onClose={() => setModal(null)} onSave={handleSave} />}
     </div>
   )
 }
