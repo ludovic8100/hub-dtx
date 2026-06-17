@@ -3,6 +3,16 @@ import { supabase } from '../lib/supabase'
 
 const STORAGE_BASE = 'https://tndwonqdbeszkcztkzqe.supabase.co/storage/v1/object/public/logos/'
 
+// Liste des fichiers présents dans le bucket logos (fallback si le listing Storage est bloqué)
+const LOGOS_CONNUS = [
+  "ARAG_PNG_2024.png","ARDENNE_JPG.jpg","ATHORA_JPG.jpg","AVIZA_PNG.png","AXA_JPG.jpg",
+  "BALOISE_JPG.jpg","bnp.bmp","CARDIF_JPG.jpg","DAS_JPG.jpg","DELA.jpg","DKV.jpg",
+  "DKV_JPG (2).jpg","dtx.png","Dynassur.jpg","DYNASSUR_bouclier_22.png","Dynassur_logo.png",
+  "EA.PSD","EA_NEW-Logo_Flat_RV.png","eb-lease.bmp","elantis.bmp","EUROMEX.jpg","GENERALI.png",
+  "JPG_AG.jpg","JPG_EUROMEX.jpg","lode.png","lode_PNG.png","Logo_blanc.png","logo_prive.svg",
+  "NN.png","TVM_JPG.jpg","VIVIUM_JPG.jpg","X_LOGO.png",
+].sort((a,b)=>a.localeCompare(b))
+
 const C = { navy:"#1A3A6B", navyMid:"#1E5799", cyan:"#29ABE2", cyanB:"#00AEEF", bg:"#F4F6F9", white:"#FFFFFF", border:"#DDE3ED", textD:"#1A3A6B", textM:"#4A5568", textL:"#8A9BBE", ok:"#27AE60", warn:"#F39C12", danger:"#E74C3C" }
 const D = {
   card:{ background:C.white, border:`1px solid ${C.border}`, borderRadius:10, padding:20, marginBottom:16, boxShadow:"0 1px 4px rgba(26,58,107,0.06)" },
@@ -160,9 +170,10 @@ export default function CompagniesView() {
     setCies(Array.isArray(data) ? data : [])
     const { data: prod } = await supabase.from("producteurs").select("*").order("compagnie_nom")
     setProducteurs(Array.isArray(prod) ? prod : [])
-    // Lister les fichiers du bucket logos
+    // Lister les fichiers du bucket logos (avec fallback en dur si le listing est bloqué)
     const { data: files } = await supabase.storage.from("logos").list("", { limit: 500 })
-    setLogos(Array.isArray(files) ? files.map(f => f.name) : [])
+    const listeBucket = Array.isArray(files) && files.length ? files.map(f => f.name) : LOGOS_CONNUS
+    setLogos(listeBucket)
     setLoading(false)
   }
 
