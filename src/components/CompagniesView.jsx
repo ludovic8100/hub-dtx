@@ -12,7 +12,7 @@ const D = {
 }
 const EMPTY_CIE = { code:"", nom:"", nom_court:"", logo_url:"", couleur:"#1A3A6B", site_web:"", email_contact:"", telephone:"", actif:true, notes:"" }
 
-function CieFormModal({ cie, comptes = [], onClose, onSave }) {
+function CieFormModal({ cie, comptes = [], logos = [], onClose, onSave }) {
   const isNew = !cie.id
   const [form, setForm] = useState({ ...cie })
   const [saving, setSaving] = useState(false)
@@ -47,14 +47,24 @@ function CieFormModal({ cie, comptes = [], onClose, onSave }) {
         </div>
         <div style={{ padding:"20px 24px" }}>
           <div style={{ display:"flex", alignItems:"center", gap:16, marginBottom:20, padding:"16px", background:C.bg, borderRadius:10 }}>
-            <div style={{ width:72, height:72, borderRadius:12, background:form.logo_url?"transparent":form.couleur+"30", border:`2px solid ${form.couleur||C.border}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, overflow:"hidden" }}>
-              {form.logo_url
-                ? <img src={form.logo_url} style={{ width:"100%", height:"100%", objectFit:"contain" }} alt={form.code} />
+            {(() => {
+              const apercu = form.logo_url ? (form.logo_url.startsWith("http") ? form.logo_url : STORAGE_BASE + encodeURIComponent(form.logo_url)) : null
+              return (
+            <div style={{ width:72, height:72, borderRadius:12, background:apercu?"#fff":form.couleur+"30", border:`2px solid ${form.couleur||C.border}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, overflow:"hidden" }}>
+              {apercu
+                ? <img src={apercu} style={{ width:"100%", height:"100%", objectFit:"contain" }} alt={form.code} />
                 : <span style={{ fontSize:22, fontWeight:800, color:form.couleur||C.navy }}>{(form.code||"?").slice(0,3)}</span>}
             </div>
+              )})()}
             <div style={{ flex:1 }}>
               <div style={{ fontSize:13, fontWeight:600, color:C.navy, marginBottom:6 }}>Logo de la compagnie</div>
-              <input style={{ ...D.input, width:"100%" }} placeholder="URL du logo (https://…)" value={form.logo_url||""} onChange={e => set("logo_url", e.target.value)} />
+              <select style={{ ...D.input, width:"100%" }} value={form.logo_url && !form.logo_url.startsWith("http") ? form.logo_url : ""} onChange={e => set("logo_url", e.target.value)}>
+                <option value="">— Choisir un fichier dans le bucket —</option>
+                {[...logos].sort((a,b)=>a.localeCompare(b)).map(name => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+              {form.logo_url && <button style={{ marginTop:6, fontSize:11, background:"none", border:"none", color:C.danger, cursor:"pointer", padding:0 }} onClick={() => set("logo_url", "")}>🗑 Retirer le logo</button>}
             </div>
           </div>
 
@@ -158,10 +168,12 @@ export default function CompagniesView() {
 
   // Trouve l'URL du logo pour une compagnie (matching tolérant casse + suffixes type _JPG/_PNG)
   const logoUrl = (cie) => {
-    if (cie.logo_url) return cie.logo_url
+    // logo_url peut être une URL complète OU un nom de fichier du bucket (choisi via le modal)
+    if (cie.logo_url) {
+      return cie.logo_url.startsWith("http") ? cie.logo_url : STORAGE_BASE + encodeURIComponent(cie.logo_url)
+    }
     const code = (cie.code || "").toUpperCase()
     if (!code) return null
-    // base du fichier sans extension, en majuscules, en retirant des suffixes _JPG/_PNG/_2024 etc.
     const baseNom = (name) => name.toUpperCase().replace(/\.[^.]+$/, "").replace(/[_\s-]?(JPG|JPEG|PNG|BMP|SVG|GIF)\b/g, "").replace(/[_\s-]?\d{4}\b/g, "").replace(/\s*\(\d+\)\s*$/, "").replace(/[^A-Z0-9]/g, "")
     const f = logos.find(name => baseNom(name) === code)
     return f ? STORAGE_BASE + encodeURIComponent(f) : null
@@ -250,7 +262,7 @@ export default function CompagniesView() {
         )})}
       </div>
 
-      {modal && <CieFormModal cie={modal} comptes={comptesDe(modal)} onClose={() => setModal(null)} onSave={handleSave} />}
+      {modal && <CieFormModal cie={modal} comptes={comptesDe(modal)} logos={logos} onClose={() => setModal(null)} onSave={handleSave} />}
     </div>
   )
 }
