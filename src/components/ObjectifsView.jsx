@@ -506,7 +506,7 @@ export default function ObjectifsView() {
   }, [])
 
   return (
-    <div style={{ fontFamily:"'Source Sans Pro', sans-serif", background:C.bg, minHeight:'100vh', padding:'24px' }}>
+    <div style={{ fontFamily:"'Source Sans Pro', sans-serif", padding: 0 }}>
 
       {/* Header */}
       <div style={{ marginBottom:24 }}>

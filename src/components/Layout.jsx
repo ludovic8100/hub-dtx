@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import Header from './Header'
 import Sidebar from './Sidebar'
-import SocieteSelector from './SocieteSelector'
 
 export default function Layout({ children, currentPage }) {
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 900)
@@ -17,7 +16,6 @@ export default function Layout({ children, currentPage }) {
     return () => window.removeEventListener('resize', onResize)
   }, [])
 
-  // Fermer le menu quand on change de page
   useEffect(() => { setMenuOuvert(false) }, [currentPage])
 
   const sidebarVisible = !isMobile || menuOuvert
@@ -30,7 +28,9 @@ export default function Layout({ children, currentPage }) {
       fontFamily: "'Source Sans Pro', sans-serif"
     }}>
       <Header currentPage={currentPage} onToggleMenu={isMobile ? () => setMenuOuvert(o => !o) : null} menuOuvert={menuOuvert} />
+
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
+
         {/* Overlay sombre derrière le menu sur mobile */}
         {isMobile && menuOuvert && (
           <div onClick={() => setMenuOuvert(false)} style={{
@@ -38,11 +38,11 @@ export default function Layout({ children, currentPage }) {
           }} />
         )}
 
-        {/* Sidebar */}
+        {/* Sidebar — modules uniquement, plus de SocieteSelector */}
         {sidebarVisible && (
           <aside style={{
-            width: '232px',
-            minWidth: '232px',
+            width: '220px',
+            minWidth: '220px',
             display: 'flex',
             flexDirection: 'column',
             background: '#0f172a',
@@ -55,7 +55,6 @@ export default function Layout({ children, currentPage }) {
               boxShadow: '4px 0 20px rgba(0,0,0,0.3)'
             } : {})
           }}>
-            <SocieteSelector />
             <Sidebar />
           </aside>
         )}
