@@ -60,9 +60,19 @@ function BlocBanque({ comptes, loading }) {
     setRevealed(r => ({ ...r, [id]: !r[id] }))
   }
 
-  // Solde total si tout révélé
-  const totalVisible = comptes.filter(c => revealed[c.id]).reduce((s,c) => s+(c.solde_actuel||0), 0)
+  // Grouper par société
+  const parSociete = {}
+  comptes.forEach(c => {
+    const code = c.societes?.code || 'AUTRE'
+    if (!parSociete[code]) parSociete[code] = { comptes:[], total:0, nom:c.societes?.nom || code }
+    parSociete[code].comptes.push(c)
+    parSociete[code].total += parseFloat(c.solde_actuel || 0)
+  })
+  const totalGroupe = comptes.reduce((s,c) => s + parseFloat(c.solde_actuel||0), 0)
   const allRevealed = comptes.length > 0 && comptes.every(c => revealed[c.id])
+
+  // Couleur par code société
+  const SOC_COLOR = { DYNASSUR:'#0080BD', DTX:'#94a3b8', LODE:'#ea580c', HEXAGROUP:'#dc2626', PRIVE:'#0d9488' }
 
   return (
     <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
@@ -74,12 +84,8 @@ function BlocBanque({ comptes, loading }) {
           <span style={{ fontSize:11, background:'#f1f5f9', color:'#64748b', padding:'2px 7px', borderRadius:10, fontWeight:600 }}>{comptes.length} comptes</span>
         </div>
         {comptes.length > 0 && (
-          <button onClick={() => {
-            const next = !allRevealed
-            const all = {}
-            comptes.forEach(c => { all[c.id] = next })
-            setRevealed(all)
-          }} style={{ fontSize:12, color:'#7c3aed', background:'#f5f3ff', border:'1px solid #ede9fe', borderRadius:6, padding:'4px 10px', cursor:'pointer', fontWeight:600 }}>
+          <button onClick={() => { const all={}; comptes.forEach(c=>{all[c.id]=!allRevealed}); setRevealed(all) }}
+            style={{ fontSize:12, color:'#7c3aed', background:'#f5f3ff', border:'1px solid #ede9fe', borderRadius:6, padding:'4px 10px', cursor:'pointer', fontWeight:600 }}>
             {allRevealed ? '🔒 Masquer tout' : '👁 Révéler tout'}
           </button>
         )}
@@ -90,81 +96,73 @@ function BlocBanque({ comptes, loading }) {
       ) : comptes.length === 0 ? (
         <div style={{ padding:30, textAlign:'center', color:'#94a3b8', fontSize:13 }}>
           <i className="ti ti-plug-off" style={{ fontSize:28, display:'block', marginBottom:8 }} />
-          Aucun compte connecté — synchronisation Ponto requise
+          Aucun compte — synchronisation Ponto requise
         </div>
       ) : (
         <>
-          <div style={{ padding:'8px 0' }}>
-            {comptes.map((c, i) => {
-              const soc = SOCIETES[c.societes?.code] || {}
-              const show = revealed[c.id]
-              const bal = c.solde_actuel || 0
-              const isNeg = bal < 0
-              return (
-                <div key={c.id} style={{
-                  display:'grid', gridTemplateColumns:'auto 1fr auto auto',
-                  alignItems:'center', gap:12,
-                  padding:'10px 18px',
-                  borderBottom: i < comptes.length-1 ? '1px solid #f8fafc' : 'none',
-                  background: i%2===0?'#fff':'#fafafe',
-                  transition:'background 0.1s'
-                }}
-                  onMouseEnter={e=>e.currentTarget.style.background='#f5f3ff20'}
-                  onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'#fff':'#fafafe'}
-                >
-                  {/* Pastille société */}
-                  <div style={{ width:8, height:8, borderRadius:'50%', background:soc.color||'#94a3b8', flexShrink:0 }} />
-
-                  {/* Nom + IBAN */}
-                  <div>
-                    <div style={{ fontSize:13, fontWeight:600, color:'#1e293b' }}>{c.banque || '—'}</div>
-                    <div style={{ fontSize:11, color:'#94a3b8' }}>
-                      <span style={{ background:soc.color+'18', color:soc.color, fontWeight:700, padding:'1px 5px', borderRadius:3, fontSize:10, marginRight:5 }}>{soc.short||'?'}</span>
-                      {c.iban ? `${c.iban.slice(0,4)} •• ${c.iban.slice(-4)}` : 'Compte courant'}
-                    </div>
+          {/* Par société */}
+          {Object.entries(parSociete).map(([code, data]) => {
+            const col = SOC_COLOR[code] || '#94a3b8'
+            const totalSocVisible = data.comptes.filter(c=>revealed[c.id]).reduce((s,c)=>s+parseFloat(c.solde_actuel||0),0)
+            const anySocRevealed = data.comptes.some(c=>revealed[c.id])
+            return (
+              <div key={code}>
+                {/* Ligne société */}
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 18px', background:col+'12', borderBottom:`1px solid ${col}30`, borderTop:'1px solid #f1f5f9' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <div style={{ width:10, height:10, borderRadius:'50%', background:col }} />
+                    <span style={{ fontSize:12, fontWeight:700, color:col }}>{data.nom || code}</span>
+                    <span style={{ fontSize:10, color:'#94a3b8' }}>{data.comptes.length} compte{data.comptes.length>1?'s':''}</span>
                   </div>
-
-                  {/* Solde masqué/révélé */}
-                  <div style={{ textAlign:'right', minWidth:110 }}>
-                    {show ? (
-                      <span style={{ fontSize:16, fontWeight:800, color: isNeg?'#dc2626':'#0f172a', letterSpacing:'.01em' }}>
-                        {fmt(bal)}
-                      </span>
-                    ) : (
-                      <span style={{ fontSize:16, fontWeight:800, color:'#e2e8f0', letterSpacing:'.05em', userSelect:'none' }}>
-                        ● ● ● ● ●
-                      </span>
-                    )}
-                    {c.solde_actuel_date && (
-                      <div style={{ fontSize:10, color:'#94a3b8', marginTop:1 }}>
-                        {show ? `Mis à jour ${fmtDate(c.solde_actuel_date)}` : ' '}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Bouton toggle */}
-                  <button onClick={() => toggle(c.id)} title={show?'Masquer':'Révéler'} style={{
-                    background: show?'#f0fdf4':'#f8fafc',
-                    border:`1px solid ${show?'#bbf7d0':'#e2e8f0'}`,
-                    borderRadius:6, padding:'5px 8px', cursor:'pointer',
-                    color: show?'#16a34a':'#94a3b8', fontSize:14, transition:'all 0.15s'
-                  }}>
-                    <i className={`ti ${show?'ti-eye-off':'ti-eye'}`} />
-                  </button>
+                  <span style={{ fontSize:13, fontWeight:800, color: anySocRevealed?(data.total<0?'#dc2626':col):'#cbd5e1' }}>
+                    {anySocRevealed ? fmt(totalSocVisible) : '● ● ●'}
+                  </span>
                 </div>
-              )
-            })}
+                {/* Comptes de cette société */}
+                {data.comptes.map((c, i) => {
+                  const show = revealed[c.id]
+                  const bal = parseFloat(c.solde_actuel || 0)
+                  return (
+                    <div key={c.id} style={{
+                      display:'grid', gridTemplateColumns:'1fr auto auto',
+                      alignItems:'center', gap:12, padding:'9px 18px 9px 32px',
+                      borderBottom: i<data.comptes.length-1?'1px solid #f8fafc':'none',
+                      background: i%2===0?'#fff':'#fafafe'
+                    }}>
+                      <div>
+                        <div style={{ fontSize:13, fontWeight:500, color:'#1e293b' }}>{c.banque}</div>
+                        <div style={{ fontSize:11, color:'#94a3b8', fontFamily:'monospace' }}>
+                          {c.iban ? `${c.iban.slice(0,4)} •• ${c.iban.slice(-4)}` : 'Compte courant'}
+                          {!c.ponto_account_id && <span style={{ marginLeft:6, background:'#fef3c7', color:'#92400e', padding:'1px 5px', borderRadius:3, fontSize:9, fontWeight:700 }}>Non Ponto</span>}
+                        </div>
+                      </div>
+                      <div style={{ textAlign:'right', minWidth:110 }}>
+                        {show ? (
+                          <span style={{ fontSize:15, fontWeight:800, color:bal<0?'#dc2626':col }}>{fmt(bal)}</span>
+                        ) : (
+                          <span style={{ fontSize:15, fontWeight:800, color:'#e2e8f0', letterSpacing:'.1em', userSelect:'none' }}>● ● ● ●</span>
+                        )}
+                      </div>
+                      <button onClick={() => toggle(c.id)} style={{
+                        background:show?'#f0fdf4':'#f8fafc', border:`1px solid ${show?'#bbf7d0':'#e2e8f0'}`,
+                        borderRadius:6, padding:'5px 8px', cursor:'pointer',
+                        color:show?'#16a34a':'#94a3b8', fontSize:14, transition:'all 0.15s'
+                      }}>
+                        <i className={`ti ${show?'ti-eye-off':'ti-eye'}`} />
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })}
+          {/* Total groupe */}
+          <div style={{ padding:'10px 18px', background:'#0f172a', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <span style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,0.5)', textTransform:'uppercase', letterSpacing:'.05em' }}>Total Groupe</span>
+            <span style={{ fontSize:17, fontWeight:800, color: allRevealed?(totalGroupe<0?'#f87171':'#86efac'):'#4b5563' }}>
+              {allRevealed ? fmt(totalGroupe) : '● ● ● ● ●'}
+            </span>
           </div>
-
-          {/* Total si au moins un compte révélé */}
-          {Object.values(revealed).some(Boolean) && (
-            <div style={{ padding:'10px 18px', background:'#f8fafc', borderTop:'2px solid #e2e8f0', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <span style={{ fontSize:12, fontWeight:700, color:'#64748b', textTransform:'uppercase', letterSpacing:'.05em' }}>
-                Total visible ({comptes.filter(c=>revealed[c.id]).length} comptes)
-              </span>
-              <span style={{ fontSize:18, fontWeight:800, color: totalVisible<0?'#dc2626':'#0f172a' }}>{fmt(totalVisible)}</span>
-            </div>
-          )}
         </>
       )}
     </div>
@@ -261,7 +259,7 @@ function BlocTresorerie({ comptes, transactions, loading }) {
 
   // Soldes par société
   const soldesParSoc = Object.entries(SOCIETES).map(([key, cfg]) => {
-    const total = comptes.filter(c=>c.societes?.code===key).reduce((s,c)=>s+(c.solde_actuel||0),0)
+    const total = comptes.filter(c=>(c.societes?.code||'').toUpperCase()===key.toUpperCase()).reduce((s,c)=>s+parseFloat(c.solde_actuel||0),0)
     return { key, ...cfg, total }
   }).filter(s => s.total !== 0)
 
@@ -344,17 +342,63 @@ function BlocTresorerie({ comptes, transactions, loading }) {
   )
 }
 
+// ── Carte objectif réutilisable ──
+function ObjCard({ obj, label, color }) {
+  return (
+    <div style={{ padding:'10px 14px', background:'#f8fafc', borderRadius:8, border:'1px solid #e2e8f0' }}>
+      <div style={{ fontSize:12, fontWeight:700, color, marginBottom:8 }}>{label}</div>
+      <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+        {obj.target_na > 0 && (
+          <div>
+            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:2 }}>
+              <span style={{ fontSize:11, color:'#64748b' }}>NA</span>
+              <span style={{ fontSize:11, fontWeight:700, color:'#0f172a' }}>{fmtN(obj.actual_na)} / {fmtN(obj.target_na)}</span>
+            </div>
+            <Bar pct={obj.pct_na} col={color} />
+          </div>
+        )}
+        {obj.target_primes > 0 && (
+          <div>
+            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:2 }}>
+              <span style={{ fontSize:11, color:'#64748b' }}>Primes</span>
+              <span style={{ fontSize:11, fontWeight:700, color:'#0f172a' }}>{fmt(obj.actual_primes)} / {fmt(obj.target_primes)}</span>
+            </div>
+            <Bar pct={obj.pct_primes} col={color} />
+          </div>
+        )}
+        {obj.target_commissions > 0 && (
+          <div>
+            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:2 }}>
+              <span style={{ fontSize:11, color:'#64748b' }}>Commissions</span>
+              <span style={{ fontSize:11, fontWeight:700, color:'#0f172a' }}>{fmt(obj.actual_commissions)} / {fmt(obj.target_commissions)}</span>
+            </div>
+            <Bar pct={obj.pct_commissions} col={color} />
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ══════════════════════════
 // BLOC 4 — Objectifs par société
 // ══════════════════════════
 function BlocObjectifs({ objectifs, loading }) {
   const navigate = useNavigate()
 
-  const SOCIETES_OBJ = [
-    { key:'dynassur', label:'Dynassur SRL', route:'/dynassur/objectifs' },
-  ]
+  const AGENT_NOMS = {
+    GGO:'Gregory Godfroid', TJA:'Thibault Japsenne', PFQ:'Priscilla Fernandez',
+    MTE:'Michelangelo Terrana', NGI:'Nadine Ginis', LDE:'Ludovic Detilloux',
+    JFS:'Jean-François Simonis', FMZ:'Fabrice Mammo', ICE:'Ingrid Cezar',
+    RCA:'Raphael Carrea', MVM:'Michael Van Muylder', VPE:'Vincent Pesser',
+    RDE:'Renaud Desclez', OBA:'Olivier Baudelet', LGM:'Luisa Gaen Munoz',
+    HML:'Homelinks', DCO:'Didier Coco',
+  }
 
   const global2026 = objectifs.filter(o => o.year===2026 && o.period_type==='year')
+  const objGlobal     = global2026.filter(o => o.scope==='global')
+  const objAgents     = global2026.filter(o => o.scope==='agent')
+  const objSousAgents = global2026.filter(o => o.scope==='sous_agent')
 
   return (
     <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
@@ -374,45 +418,32 @@ function BlocObjectifs({ objectifs, loading }) {
         ) : global2026.length === 0 ? (
           <div style={{ textAlign:'center', color:'#94a3b8', padding:20, fontSize:13 }}>Aucun objectif configuré</div>
         ) : (
-          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-            {global2026.map(obj => {
-              const soc = obj.scope==='global' ? { label:'Dynassur — Global', color:'#0080BD' }
-                : { label: obj.agent_code || 'Agent', color:'#64748b' }
-              return (
-                <div key={obj.id} style={{ padding:'12px 14px', background:'#f8fafc', borderRadius:8, border:'1px solid #e2e8f0' }}>
-                  <div style={{ fontSize:12, fontWeight:700, color:soc.color, marginBottom:10 }}>{soc.label}</div>
-                  <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                    {obj.target_na > 0 && (
-                      <div>
-                        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:3 }}>
-                          <span style={{ fontSize:11, color:'#64748b' }}>Nouvelles Affaires</span>
-                          <span style={{ fontSize:11, fontWeight:700, color:'#0f172a' }}>{fmtN(obj.actual_na)} / {fmtN(obj.target_na)}</span>
-                        </div>
-                        <Bar pct={obj.pct_na} col={soc.color} />
-                      </div>
-                    )}
-                    {obj.target_primes > 0 && (
-                      <div>
-                        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:3 }}>
-                          <span style={{ fontSize:11, color:'#64748b' }}>Primes</span>
-                          <span style={{ fontSize:11, fontWeight:700, color:'#0f172a' }}>{fmt(obj.actual_primes)} / {fmt(obj.target_primes)}</span>
-                        </div>
-                        <Bar pct={obj.pct_primes} col={soc.color} />
-                      </div>
-                    )}
-                    {obj.target_commissions > 0 && (
-                      <div>
-                        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:3 }}>
-                          <span style={{ fontSize:11, color:'#64748b' }}>Commissions</span>
-                          <span style={{ fontSize:11, fontWeight:700, color:'#0f172a' }}>{fmt(obj.actual_commissions)} / {fmt(obj.target_commissions)}</span>
-                        </div>
-                        <Bar pct={obj.pct_commissions} col={soc.color} />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+
+            {/* Global Dynassur */}
+            {objGlobal.map(obj => (
+              <ObjCard key={obj.id} obj={obj} label="Dynassur — Global" color="#0080BD" />
+            ))}
+
+            {/* Commerciaux */}
+            {objAgents.length > 0 && (
+              <div style={{ fontSize:10, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'.05em', marginTop:4 }}>Commerciaux</div>
+            )}
+            {objAgents.map(obj => (
+              <ObjCard key={obj.id} obj={obj} label={AGENT_NOMS[obj.agent_code] || obj.agent_code} color="#0080BD" />
+            ))}
+
+            {/* Sous-agents */}
+            {objSousAgents.length > 0 && (
+              <div style={{ fontSize:10, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'.05em', marginTop:4 }}>Sous-agents</div>
+            )}
+            {objSousAgents.map(obj => (
+              <ObjCard key={obj.id} obj={obj} label={AGENT_NOMS[obj.agent_code] || obj.agent_code} color="#7c3aed" />
+            ))}
+
+            {global2026.length === 0 && (
+              <div style={{ textAlign:'center', color:'#94a3b8', padding:20, fontSize:13 }}>Aucun objectif configuré</div>
+            )}
           </div>
         )}
       </div>
