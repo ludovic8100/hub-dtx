@@ -25,10 +25,6 @@ export default function BordereauxView() {
   const [loading, setLoading] = useState(true)
   const [filterMois, setFilterMois] = useState(String(new Date().getMonth()+1))
   const [filterAnnee, setFilterAnnee] = useState("2026")
-  const [rRows, setRRows] = useState([])
-  const [reconErr, setReconErr] = useState(null)
-  const [filterType, setFilterType] = useState("tous")
-  const [filterStatut, setFilterStatut] = useState("tous")
 
   useEffect(() => {
     const load = async () => {
@@ -36,11 +32,14 @@ export default function BordereauxView() {
       try {
         const { data: b } = await supabase.from("bordereaux").select("*").order("annee", { ascending: false }).order("mois").order("compagnie").limit(100000)
         setBRows(Array.isArray(b) ? b : [])
-        const { data: q } = await supabase.from("quittances").select("compagnie,date_comptable,prime_totale,commission,commission_sa").limit(100000)
-        setQRows(Array.isArray(q) ? q : [])
-        const { data: r, error: rErr } = await supabase.from("v_bordereaux_reconciliation").select("*")
-        if (rErr) { setReconErr(rErr.message); setRRows([]) }
-        else { setReconErr(null); setRRows(Array.isArray(r) ? r : []) }
+        const { data: q } = await supabase.from("quittances").select("compagnie,date_comptable,prime_totale,commission,commission_sa,sous_agent,compte_producteur").limit(100000)
+        const qq = Array.isArray(q) ? q : []
+        setQRows(qq)
+        // Défaut : dernier mois de l'année sélectionnée ayant des quittances (évite l'onglet vide)
+        const moisDispo = {}
+        qq.forEach(r => { if (r.date_comptable) { const d = new Date(r.date_comptable); if (String(d.getFullYear()) === filterAnnee) moisDispo[d.getMonth()+1] = true } })
+        const mois = Object.keys(moisDispo).map(Number).sort((a,b) => b-a)
+        if (mois.length) setFilterMois(String(mois[0]))
       } catch (e) { console.error(e) }
       setLoading(false)
     }
@@ -91,27 +90,67 @@ export default function BordereauxView() {
 
   const fmt = (n) => Number(n).toLocaleString("fr-BE", { minimumFractionDigits:2 }) + " €"
 
-  // --- Réconciliation bancaire ---
-  const ST = {
-    complet:                 { l:"Complet",                  c:C.ok },
-    fichier_ok_non_encaisse: { l:"Non encaissé",             c:C.warn },
-    fichier_sans_chiffres:   { l:"Extraction à faire",       c:C.cyanB },
-    commission_sans_fichier: { l:"Commission sans fichier",  c:C.danger },
-    manquant:                { l:"Manquant",                 c:C.textL },
+  // --- Réconciliation quittances ↔ bordereaux (par compagnie, mois sélectionné) ---
+  const RST = {
+    complet:     { l:"✅ Complet",          c:C.ok },
+    a_reclamer:  { l:"💰 Bordereau à réclamer", c:C.warn },
+    sans_quittance: { l:"📄 Bordereau sans quittance", c:C.cyanB },
   }
-  const recon = useMemo(() => {
-    let rows = rRows.filter(r => String(r.annee) === String(filterAnnee))
-    if (filterType !== "tous") rows = rows.filter(r => r.type === filterType)
-    if (filterStatut !== "tous") rows = rows.filter(r => r.statut_reconciliation === filterStatut)
-    return rows.sort((a,b) => String(b.mois||"").localeCompare(String(a.mois||"")) || String(a.compagnie||"").localeCompare(String(b.compagnie||"")))
-  }, [rRows, filterAnnee, filterType, filterStatut])
+  const reconcil = useMemo(() => {
+    const mm = normMois(filterMois)
+    // 1) Agréger les quittances du mois par compagnie
+    const byCie = {}
+    for (const r of qRows) {
+      if (!r.date_comptable) continue
+      const d = new Date(r.date_comptable)
+      if (String(d.getMonth()+1) !== filterMois || String(d.getFullYear()) !== filterAnnee) continue
+      const cie = r.compagnie || "Inconnu"
+      if (!byCie[cie]) byCie[cie] = { cie, nb:0, primes:0, commission:0, commission_sa:0 }
+      byCie[cie].nb++
+      byCie[cie].primes += parseFloat(r.prime_totale)||0
+      byCie[cie].commission += parseFloat(r.commission)||0
+      byCie[cie].commission_sa += parseFloat(r.commission_sa)||0
+    }
+    const rows = []
+    const vus = new Set()
+    for (const cie of Object.keys(byCie)) {
+      const hasRcp = !!idx[`${norm(cie)}-${mm}-RCP`]
+      const hasBqt = !!idx[`${norm(cie)}-${mm}-BQT`]
+      const hasBord = hasRcp || hasBqt
+      rows.push({ ...byCie[cie], hasRcp, hasBqt, statut: hasBord ? "complet" : "a_reclamer" })
+      vus.add(norm(cie))
+    }
+    // 2) Bordereaux du mois sans quittances correspondantes
+    bRows.forEach(b => {
+      if (String(b.annee) !== filterAnnee || normMois(b.mois) !== mm) return
+      if (vus.has(norm(b.compagnie))) return
+      vus.add(norm(b.compagnie))
+      rows.push({ cie:b.compagnie, nb:0, primes:0, commission:0, commission_sa:0, hasRcp:b.type==="RCP", hasBqt:b.type==="BQT", statut:"sans_quittance" })
+    })
+    return rows.sort((a,b) => b.commission - a.commission)
+  }, [qRows, bRows, idx, filterMois, filterAnnee])
+
   const reconKpi = useMemo(() => ({
-    total: recon.length,
-    complet: recon.filter(r=>r.statut_reconciliation==="complet").length,
-    alerte: recon.filter(r=>r.statut_reconciliation==="commission_sans_fichier").length,
-    acompleter: recon.filter(r=>["manquant","fichier_sans_chiffres"].includes(r.statut_reconciliation)).length,
-    encaisse: recon.reduce((s,r)=>s+(parseFloat(r.commission_bancaire)||0),0),
-  }), [recon])
+    nbCie: reconcil.filter(r=>r.nb>0).length,
+    commission: reconcil.reduce((s,r)=>s+r.commission,0),
+    commissionSa: reconcil.reduce((s,r)=>s+r.commission_sa,0),
+    aReclamer: reconcil.filter(r=>r.statut==="a_reclamer").length,
+  }), [reconcil])
+
+  // Commissions par sous-agent (mois sélectionné) — calcul automatique
+  const parSousAgent = useMemo(() => {
+    const m = {}
+    for (const r of qRows) {
+      if (!r.date_comptable) continue
+      const d = new Date(r.date_comptable)
+      if (String(d.getMonth()+1) !== filterMois || String(d.getFullYear()) !== filterAnnee) continue
+      const sa = (r.sous_agent || "").trim() || "(aucun)"
+      if (!m[sa]) m[sa] = { sa, nb:0, commission_sa:0 }
+      m[sa].nb++
+      m[sa].commission_sa += parseFloat(r.commission_sa)||0
+    }
+    return Object.values(m).filter(x => x.commission_sa > 0).sort((a,b) => b.commission_sa - a.commission_sa)
+  }, [qRows, filterMois, filterAnnee])
 
   if (loading) return <div style={{ padding:40, textAlign:"center", color:C.textL, fontFamily:"'Source Sans Pro', sans-serif" }}>Chargement…</div>
 
@@ -223,72 +262,89 @@ export default function BordereauxView() {
         </div></div>
       </div>}
 
-      {/* Réconciliation bancaire */}
+      {/* Réconciliation quittances ↔ bordereaux */}
       {view === "reconciliation" && <div>
-        {reconErr ? (
-          <div style={D.alertBox("danger")}>
-            <span style={{ fontSize:15 }}>⛔</span>
-            <div style={{ flex:1 }}>
-              <strong>Vue de réconciliation absente.</strong> Crée la vue <code>v_bordereaux_reconciliation</code> dans Supabase pour activer cet onglet.
-              <div style={{ fontSize:11, color:C.textL, marginTop:4 }}>Détail : {reconErr}</div>
+        <div style={{ ...D.card, padding:"12px 18px", marginBottom:12 }}>
+          <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap" }}>
+            <span style={{ fontSize:13, fontWeight:600, color:C.navy }}>Période :</span>
+            <select style={{ ...D.input, width:"auto" }} value={filterMois} onChange={e => setFilterMois(e.target.value)}>
+              {["1","2","3","4","5","6","7","8","9","10","11","12"].map((m,i) => <option key={m} value={m}>{MOIS_FULL[i]}</option>)}
+            </select>
+            <select style={{ ...D.input, width:"auto" }} value={filterAnnee} onChange={e => setFilterAnnee(e.target.value)}>
+              {["2026","2025","2024"].map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+            <div style={{ marginLeft:"auto", fontSize:12, color:C.textL }}>{reconcil.length} compagnie(s)</div>
+          </div>
+        </div>
+
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))", gap:12, marginBottom:16 }}>
+          {[
+            { l:"Compagnies actives", v:reconKpi.nbCie, c:C.navy },
+            { l:"Commission Dynassur", v:fmt(reconKpi.commission), c:C.ok, small:true },
+            { l:"Commission sous-agents", v:fmt(reconKpi.commissionSa), c:"#9B59B6", small:true },
+            { l:"Bordereaux à réclamer 💰", v:reconKpi.aReclamer, c:C.warn },
+          ].map((k,i) => <div key={i} style={{ ...D.kpi, borderTop:`3px solid ${k.c}` }}>
+            <div style={{ fontSize:k.small?16:22, fontWeight:700, color:k.c }}>{k.v}</div>
+            <div style={{ fontSize:11, color:C.textL, marginTop:3 }}>{k.l}</div>
+          </div>)}
+        </div>
+
+        {reconcil.length === 0 ? (
+          <div style={{ ...D.card, textAlign:"center", padding:40, color:C.textL }}>Aucune donnée pour {MOIS_FULL[parseInt(filterMois)-1]} {filterAnnee}</div>
+        ) : (
+          <div style={{ ...D.card }}>
+            <div style={D.cardTitle}>Réconciliation par compagnie — {MOIS_FULL[parseInt(filterMois)-1]} {filterAnnee}</div>
+            <div style={{ overflowX:"auto" }}>
+            <table style={D.table}><thead><tr style={{ background:C.bg }}>
+              {["Compagnie","Polices","Prime","Comm. Dynassur","Comm. sous-agents","Bordereau","Statut"].map((h,i) =>
+                <th key={h} style={{ ...D.th, textAlign:i>=1&&i<=4?"right":"left" }}>{h}</th>)}
+            </tr></thead><tbody>
+              {reconcil.map((r,i) => {
+                const st = RST[r.statut] || RST.complet
+                return <tr key={i} style={{ background:i%2?C.bg:"#fff" }}>
+                  <td style={{ ...D.td, fontWeight:600, color:C.navy }}>{r.cie}</td>
+                  <td style={{ ...D.td, textAlign:"right", color:C.textM }}>{r.nb || "—"}</td>
+                  <td style={{ ...D.td, textAlign:"right", fontVariantNumeric:"tabular-nums" }}>{r.primes ? fmt(r.primes) : "—"}</td>
+                  <td style={{ ...D.td, textAlign:"right", color:C.ok, fontWeight:600, fontVariantNumeric:"tabular-nums" }}>{r.commission ? fmt(r.commission) : "—"}</td>
+                  <td style={{ ...D.td, textAlign:"right", color:"#9B59B6", fontVariantNumeric:"tabular-nums" }}>{r.commission_sa ? fmt(r.commission_sa) : "—"}</td>
+                  <td style={D.td}>
+                    {r.hasRcp && <span style={D.badge(C.navyMid)}>RCP</span>}
+                    {r.hasBqt && <span style={{ ...D.badge(C.cyanB), marginLeft:4 }}>BQT</span>}
+                    {!r.hasRcp && !r.hasBqt && <span style={{ color:C.danger, fontSize:12, fontWeight:700 }}>✗ aucun</span>}
+                  </td>
+                  <td style={D.td}><span style={D.badge(st.c)}>{st.l}</span></td>
+                </tr>
+              })}
+            </tbody></table>
             </div>
           </div>
-        ) : <>
-          <div style={{ ...D.card, padding:"12px 18px", marginBottom:12 }}>
-            <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap" }}>
-              <span style={{ fontSize:13, fontWeight:600, color:C.navy }}>Filtres :</span>
-              <select style={{ ...D.input, width:"auto" }} value={filterAnnee} onChange={e => setFilterAnnee(e.target.value)}>
-                {["2026","2025","2024","2023","2022","2021","2020"].map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
-              <select style={{ ...D.input, width:"auto" }} value={filterType} onChange={e => setFilterType(e.target.value)}>
-                <option value="tous">BQT + RCP</option><option value="BQT">BQT</option><option value="RCP">RCP</option>
-              </select>
-              <select style={{ ...D.input, width:"auto" }} value={filterStatut} onChange={e => setFilterStatut(e.target.value)}>
-                <option value="tous">Tous statuts</option>
-                {Object.entries(ST).map(([k,v]) => <option key={k} value={k}>{v.l}</option>)}
-              </select>
-              <div style={{ marginLeft:"auto", fontSize:12, color:C.textL }}>{recon.length} ligne(s)</div>
+        )}
+
+        {/* Commissions sous-agents (calcul automatique) */}
+        {parSousAgent.length > 0 && (
+          <div style={{ ...D.card, marginTop:16 }}>
+            <div style={D.cardTitle}>💸 Commissions sous-agents à reverser — {MOIS_FULL[parseInt(filterMois)-1]} {filterAnnee}</div>
+            <div style={{ overflowX:"auto" }}>
+            <table style={D.table}><thead><tr style={{ background:C.bg }}>
+              {["Sous-agent","Quittances","Commission à reverser"].map((h,i) =>
+                <th key={h} style={{ ...D.th, textAlign:i===0?"left":"right" }}>{h}</th>)}
+            </tr></thead><tbody>
+              {parSousAgent.map((s,i) => (
+                <tr key={i} style={{ background:i%2?C.bg:"#fff" }}>
+                  <td style={{ ...D.td, fontWeight:600, color:C.navy }}>{s.sa}</td>
+                  <td style={{ ...D.td, textAlign:"right", color:C.textM }}>{s.nb}</td>
+                  <td style={{ ...D.td, textAlign:"right", color:"#9B59B6", fontWeight:600, fontVariantNumeric:"tabular-nums" }}>{fmt(s.commission_sa)}</td>
+                </tr>
+              ))}
+              <tr style={{ background:"#9B59B608", fontWeight:700, borderTop:`2px solid #9B59B6` }}>
+                <td style={{ ...D.td, fontWeight:700, color:C.navy }}>TOTAL</td>
+                <td style={{ ...D.td, textAlign:"right", fontWeight:700 }}>{parSousAgent.reduce((s,x)=>s+x.nb,0)}</td>
+                <td style={{ ...D.td, textAlign:"right", fontWeight:700, color:"#9B59B6" }}>{fmt(parSousAgent.reduce((s,x)=>s+x.commission_sa,0))}</td>
+              </tr>
+            </tbody></table>
             </div>
           </div>
-
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))", gap:12, marginBottom:16 }}>
-            {[
-              { l:"Total", v:reconKpi.total, c:C.navy },
-              { l:"Complets ✅", v:reconKpi.complet, c:C.ok },
-              { l:"Commission sans fichier ⚠", v:reconKpi.alerte, c:C.danger },
-              { l:"À compléter 🔍", v:reconKpi.acompleter, c:C.cyanB },
-              { l:"Commissions encaissées", v:fmt(reconKpi.encaisse), c:C.cyanB, small:true },
-            ].map((k,i) => <div key={i} style={{ ...D.kpi, borderTop:`3px solid ${k.c}` }}>
-              <div style={{ fontSize:k.small?16:22, fontWeight:700, color:k.c }}>{k.v}</div>
-              <div style={{ fontSize:11, color:C.textL, marginTop:3 }}>{k.l}</div>
-            </div>)}
-          </div>
-
-          {recon.length === 0 ? (
-            <div style={{ ...D.card, textAlign:"center", padding:40, color:C.textL }}>Aucune ligne pour ces filtres</div>
-          ) : (
-            <div style={D.card}><div style={{ overflowX:"auto" }}>
-              <table style={D.table}><thead><tr style={{ background:C.bg }}>
-                {["Période","Type","Compagnie","N° Compte","Statut","Commission BDX","Encaissé banque","Fichier"].map((h,i) =>
-                  <th key={h} style={{ ...D.th, textAlign:i>=5&&i<=6?"right":"left" }}>{h}</th>)}
-              </tr></thead><tbody>
-                {recon.map((r,i) => {
-                  const st = ST[r.statut_reconciliation] || ST.manquant
-                  return <tr key={i} style={{ background:i%2?C.bg:"#fff" }}>
-                    <td style={{ ...D.td, fontWeight:600, color:C.navy, whiteSpace:"nowrap" }}>{MOIS_L[r.mois]||r.mois} {r.annee}</td>
-                    <td style={D.td}><span style={D.badge(r.type==="RCP"?C.navyMid:C.cyanB)}>{r.type}</span></td>
-                    <td style={{ ...D.td, fontWeight:600 }}>{r.compagnie||"—"}</td>
-                    <td style={{ ...D.td, fontSize:12, color:C.textL }}>{r.compte_producteur||"—"}</td>
-                    <td style={D.td}><span style={D.badge(st.c)}>{st.l}</span></td>
-                    <td style={{ ...D.td, textAlign:"right", fontVariantNumeric:"tabular-nums" }}>{r.commission!=null?fmt(r.commission):"—"}</td>
-                    <td style={{ ...D.td, textAlign:"right", fontWeight:r.commission_bancaire?600:400, color:r.commission_bancaire?C.ok:C.textL, fontVariantNumeric:"tabular-nums" }}>{r.commission_bancaire!=null?fmt(r.commission_bancaire):"—"}</td>
-                    <td style={D.td}>{r.url_sharepoint ? <a href={r.url_sharepoint} target="_blank" rel="noreferrer" style={{ color:C.cyanB, textDecoration:"none", fontSize:12 }}>📄 Ouvrir</a> : <span style={{ color:C.textL, fontSize:12 }}>—</span>}</td>
-                  </tr>
-                })}
-              </tbody></table>
-            </div></div>
-          )}
-        </>}
+        )}
       </div>}
 
       {/* Alertes */}
