@@ -110,23 +110,31 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
     if (isConsolide || !comptes.length) return
     setLoadingTx(true)
     const ids = comptes.map(c => c.id)
-    supabase.from('transactions').select('*')
-      .in('compte_id', ids)
-      .order('date_valeur', { ascending: false })
-      .limit(5000)
-      .then(({ data, error }) => {
-        if (error) console.error('Erreur transactions:', error)
-        // Enrichir avec les infos compte depuis comptes déjà chargés
-        const enriched = (data || []).map(t => ({
-          ...t,
-          _date: t.date_valeur || t.date_execution || null,
-          comptes_bancaires: comptes.find(c => c.id === t.compte_id) || null
-        }))
-        // Tri par date unifiée décroissante
-        enriched.sort((a,b) => (b._date || '').localeCompare(a._date || ''))
-        setTransactions(enriched)
-        setLoadingTx(false)
-      })
+    ;(async () => {
+      const PAGE = 1000
+      let from = 0, all = []
+      while (true) {
+        const { data, error } = await supabase.from('transactions').select('*')
+          .in('compte_id', ids)
+          .order('date_valeur', { ascending: false })
+          .range(from, from + PAGE - 1)
+        if (error) { console.error('Erreur transactions:', error); break }
+        const rows = Array.isArray(data) ? data : []
+        all = all.concat(rows)
+        if (rows.length < PAGE) break
+        from += PAGE
+      }
+      // Enrichir avec les infos compte depuis comptes déjà chargés
+      const enriched = all.map(t => ({
+        ...t,
+        _date: t.date_valeur || t.date_execution || null,
+        comptes_bancaires: comptes.find(c => c.id === t.compte_id) || null
+      }))
+      // Tri par date unifiée décroissante
+      enriched.sort((a,b) => (b._date || '').localeCompare(a._date || ''))
+      setTransactions(enriched)
+      setLoadingTx(false)
+    })()
   }, [comptes.map(c=>c.id).join(',')])
 
   // Reset pagination quand les filtres changent

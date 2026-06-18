@@ -404,12 +404,23 @@ export default function DynassurProduction() {
 
   useEffect(() => {
     setLoading(true)
-    supabase.from('mouvements_production')
-      .select('type_prod, agent_code, annee, mois, num_contrat, client_nom, branche, compagnie')
-      .eq('annee', annee)
-      .order('mois', { ascending: false })
-      .limit(100000)
-      .then(({ data: rows }) => { setData(rows || []); setLoading(false) })
+    ;(async () => {
+      const PAGE = 1000
+      let from = 0, all = []
+      while (true) {
+        const { data: rows, error } = await supabase.from('mouvements_production')
+          .select('type_prod, agent_code, annee, mois, num_contrat, client_nom, branche, compagnie')
+          .eq('annee', annee)
+          .order('mois', { ascending: false })
+          .range(from, from + PAGE - 1)
+        if (error) { console.error(error); break }
+        const r = Array.isArray(rows) ? rows : []
+        all = all.concat(r)
+        if (r.length < PAGE) break
+        from += PAGE
+      }
+      setData(all); setLoading(false)
+    })()
   }, [annee])
 
   return (
