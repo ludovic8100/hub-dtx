@@ -1,4 +1,3 @@
-import React from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/auth'
 
@@ -65,24 +64,9 @@ const P = ({ children }) => <ProtectedRoute>{children}</ProtectedRoute>
 const A = ({ children }) => <ProtectedRoute requireAdmin>{children}</ProtectedRoute>
 
 
-class ErrorBoundary extends React.Component {
-  constructor(props) { super(props); this.state = { error: null } }
-  static getDerivedStateFromError(e) { return { error: e } }
-  render() {
-    if (this.state.error) return (
-      <div style={{ padding:40, fontFamily:'monospace', background:'#fff', color:'red', whiteSpace:'pre-wrap' }}>
-        <h2>Crash React: {this.state.error?.message}</h2>
-        <pre>{this.state.error?.stack?.slice(0,800)}</pre>
-      </div>
-    )
-    return this.props.children
-  }
-}
-
 export default function App() {
   return (
     <BrowserRouter>
-      <ErrorBoundary>
       <AuthProvider>
         <Routes>
           <Route path="/login"         element={<Login />} />
@@ -135,7 +119,6 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>
-      </ErrorBoundary>
     </BrowserRouter>
   )
 }
