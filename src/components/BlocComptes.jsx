@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
+// URL du webhook n8n qui déclenche le workflow IBAN SYNC (à remplacer par l'URL de production)
+const SYNC_WEBHOOK_URL = 'https://n8n.srv1082740.hstgr.cloud/webhook/iban-sync'
+
 const fmt = v => v==null?'—':new Intl.NumberFormat('fr-BE',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(v)
 const fmtDate = v => v ? new Date(v).toLocaleDateString('fr-BE',{day:'2-digit',month:'2-digit',year:'2-digit'}) : '—'
 
@@ -25,17 +28,38 @@ export default function BlocComptes({ societeCode, color }) {
   const [comptes, setComptes] = useState([])
   const [loading, setLoading] = useState(true)
   const [revealed, setRevealed] = useState({})
+  const [syncing, setSyncing] = useState(false)
+  const [syncMsg, setSyncMsg] = useState(null)
 
-  useEffect(() => {
-    async function load() {
-      const { data: soc } = await supabase.from('societes').select('id').eq('code', societeCode).single()
-      if (!soc) { setLoading(false); return }
-      const { data } = await supabase.from('comptes_bancaires').select('*').eq('societe_id', soc.id).eq('actif', true).order('banque')
-      setComptes(data || [])
-      setLoading(false)
+  async function chargerComptes() {
+    const { data: soc } = await supabase.from('societes').select('id').eq('code', societeCode).single()
+    if (!soc) { setLoading(false); return }
+    const { data } = await supabase.from('comptes_bancaires').select('*').eq('societe_id', soc.id).eq('actif', true).order('banque')
+    setComptes(data || [])
+    setLoading(false)
+  }
+
+  useEffect(() => { chargerComptes() }, [societeCode])
+
+  async function handleSync() {
+    setSyncing(true)
+    setSyncMsg(null)
+    try {
+      const res = await fetch(SYNC_WEBHOOK_URL, { method: 'POST' })
+      if (!res.ok) throw new Error('HTTP ' + res.status)
+      // Laisser le temps au workflow d'écrire les soldes, puis recharger
+      setSyncMsg({ ok: true, txt: 'Synchronisation lancée…' })
+      setTimeout(async () => {
+        await chargerComptes()
+        setSyncMsg({ ok: true, txt: 'Soldes mis à jour' })
+        setTimeout(() => setSyncMsg(null), 4000)
+      }, 6000)
+    } catch (e) {
+      setSyncMsg({ ok: false, txt: 'Échec : ' + e.message })
+      setTimeout(() => setSyncMsg(null), 6000)
     }
-    load()
-  }, [societeCode])
+    setSyncing(false)
+  }
 
   const totalSolde = comptes.reduce((s,c) => s + parseFloat(c.solde_actuel||0), 0)
   const allRevealed = comptes.length > 0 && comptes.every(c => revealed[c.id])
@@ -46,6 +70,7 @@ export default function BlocComptes({ societeCode, color }) {
 
   return (
     <div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       {/* Header */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
@@ -56,12 +81,26 @@ export default function BlocComptes({ societeCode, color }) {
           </span>
         </div>
         {comptes.length > 0 && (
-          <button
-            onClick={() => { const all={}; comptes.forEach(c=>{all[c.id]=!allRevealed}); setRevealed(all) }}
-            style={{ fontSize:11, color, background:color+'15', border:`1px solid ${color}40`,
-              borderRadius:6, padding:'3px 10px', cursor:'pointer', fontWeight:600 }}>
-            {allRevealed ? '🔒 Masquer' : '👁 Révéler tout'}
-          </button>
+          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            {syncMsg && (
+              <span style={{ fontSize:11, fontWeight:600, color: syncMsg.ok?'#16a34a':'#dc2626' }}>{syncMsg.txt}</span>
+            )}
+            <button
+              onClick={handleSync}
+              disabled={syncing}
+              style={{ fontSize:11, color:'#fff', background: syncing?'#94a3b8':color, border:'none',
+                borderRadius:6, padding:'4px 12px', cursor: syncing?'default':'pointer', fontWeight:600,
+                display:'flex', alignItems:'center', gap:5 }}>
+              <i className="ti ti-refresh" style={{ fontSize:12, animation: syncing?'spin 1s linear infinite':'none' }} />
+              {syncing ? 'Synchronisation…' : 'Synchroniser'}
+            </button>
+            <button
+              onClick={() => { const all={}; comptes.forEach(c=>{all[c.id]=!allRevealed}); setRevealed(all) }}
+              style={{ fontSize:11, color, background:color+'15', border:`1px solid ${color}40`,
+                borderRadius:6, padding:'3px 10px', cursor:'pointer', fontWeight:600 }}>
+              {allRevealed ? '🔒 Masquer' : '👁 Révéler tout'}
+            </button>
+          </div>
         )}
       </div>
 
