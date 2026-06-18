@@ -35,7 +35,7 @@
       "parameters": {
         "url": "https://graph.microsoft.com/v1.0/drives/b!s8-PQ_gQW0WDCB-DLU2ybfMoM6iRwklCj8QNH1cSEoznLVG9EIBnTrUMiFeCwXD8/items/01XZEE24JJIT56P26UKJALQ3YLAZEHDHHO/content",
         "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "microsoftGraphOAuth2Api",
+        "nodeCredentialType": "microsoftGraphSecurityOAuth2Api",
         "options": { "response": { "response": { "responseFormat": "file" } } }
       },
       "id": "node_download",
@@ -44,7 +44,7 @@
       "typeVersion": 4.2,
       "position": [480, 300],
       "credentials": {
-        "microsoftGraphOAuth2Api": { "id": "REMPLACER_PAR_ID_CREDENTIAL_MSGRAPH", "name": "N8N_MS_GRAPH" }
+        "microsoftGraphSecurityOAuth2Api": { "id": "weR4XterR23abnLv", "name": "Microsoft Graph Security account" }
       }
     },
     {
