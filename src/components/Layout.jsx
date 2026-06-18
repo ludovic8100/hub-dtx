@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import Header from './Header'
 import Sidebar from './Sidebar'
+import ErrorBoundary from './ErrorBoundary'
 
 export default function Layout({ children, currentPage }) {
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 900)
@@ -67,7 +68,9 @@ export default function Layout({ children, currentPage }) {
           background: '#f1f5f9',
           padding: isMobile ? '16px 14px' : '28px 32px'
         }}>
-          {children}
+          <ErrorBoundary resetKey={currentPage}>
+            {children}
+          </ErrorBoundary>
         </main>
       </div>
     </div>
