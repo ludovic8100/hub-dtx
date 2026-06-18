@@ -79,7 +79,7 @@ function FicheClient({ client, onBack }) {
             <div style={{ fontSize:12, color:'#64748b', display:'flex', gap:16, flexWrap:'wrap' }}>
               {client.dossier && <span><i className="ti ti-hash" style={{ marginRight:4 }} />{client.dossier}</span>}
               {client.localite && <span><i className="ti ti-map-pin" style={{ marginRight:4 }} />{client.cp} {client.localite}</span>}
-              {client.dn && <span><i className="ti ti-cake" style={{ marginRight:4 }} />{fmtDate(client.dn)}</span>}
+              {client.date_naissance && <span><i className="ti ti-cake" style={{ marginRight:4 }} />{fmtDate(client.date_naissance)}</span>}
             </div>
           </div>
 
@@ -102,9 +102,9 @@ function FicheClient({ client, onBack }) {
             { icon:'ti-map-pin', label:'Adresse', val: [client.rue, client.num_maison, client.boite].filter(Boolean).join(' ') || '—' },
             { icon:'ti-phone',   label:'GSM',     val: client.gsm || '—' },
             { icon:'ti-phone',   label:'Fixe',    val: client.tel_fixe || '—' },
-            { icon:'ti-mail',    label:'Email',   val: client.e_mail || '—' },
-            { icon:'ti-user',    label:'Gestionnaire', val: client.gestionnaire || '—' },
-            { icon:'ti-user',    label:'Sous-agent', val: client.sa || '—' },
+            { icon:'ti-mail',    label:'Email',   val: client.email || '—' },
+            { icon:'ti-user',    label:'Gestionnaire', val: client.gestionnaire_nom || '—' },
+            { icon:'ti-user',    label:'Sous-agent', val: client.sa_nom || '—' },
           ].map(row => (
             <div key={row.label} style={{ display:'flex', alignItems:'flex-start', gap:8 }}>
               <i className={`ti ${row.icon}`} style={{ fontSize:14, color:'#94a3b8', marginTop:1, flexShrink:0 }} />
@@ -255,22 +255,22 @@ function ListeClients({ onSelect }) {
 
   // Charger la liste des agents une seule fois
   useEffect(() => {
-    supabase.from('clients').select('gestionnaire').neq('gestionnaire', null)
+    supabase.from('clients').select('gestionnaire').neq('gestionnaire_nom', null)
       .then(({ data }) => {
-        const uniq = [...new Set((data||[]).map(d=>d.gestionnaire).filter(Boolean))].sort()
+        const uniq = [...new Set((data||[]).map(d=>d.gestionnaire_nom).filter(Boolean))].sort()
         setAgents(uniq)
       })
   }, [])
 
   const load = useCallback(async (search, agent, p) => {
     setLoading(true)
-    let q = supabase.from('clients').select('dossier,nom,prenom,cp,localite,gsm,tel_fixe,e_mail,gestionnaire,sa,dn,etat_civil,sexe,classe', { count:'exact' })
+    let q = supabase.from('clients').select('dossier,nom,prenom,cp,localite,gsm,tel_fixe,email,date_naissance,sa_code,sa_nom,gestionnaire_code,gestionnaire_nom,bureau,classe,alerte', { count:'exact' })
 
     if (search.length >= 2) {
       // Recherche sur nom, prénom ou dossier
       q = q.or(`nom.ilike.%${search}%,prenom.ilike.%${search}%,dossier.ilike.%${search}%`)
     }
-    if (agent !== 'all') q = q.eq('gestionnaire', agent)
+    if (agent !== 'all') q = q.eq('gestionnaire_nom', agent)
 
     const from = p * PER_PAGE
     const { data, count } = await q.order('nom').range(from, from + PER_PAGE - 1)
@@ -343,8 +343,8 @@ function ListeClients({ onSelect }) {
                   <td style={{ padding:'10px 14px', borderBottom:'1px solid #f1f5f9', fontWeight:600, color:'#1e293b' }}>{c.nom||'—'}</td>
                   <td style={{ padding:'10px 14px', borderBottom:'1px solid #f1f5f9', color:'#374151' }}>{c.prenom||'—'}</td>
                   <td style={{ padding:'10px 14px', borderBottom:'1px solid #f1f5f9', color:'#64748b' }}>{c.cp} {c.localite||'—'}</td>
-                  <td style={{ padding:'10px 14px', borderBottom:'1px solid #f1f5f9', color:'#64748b', fontSize:12 }}>{c.gestionnaire||'—'}</td>
-                  <td style={{ padding:'10px 14px', borderBottom:'1px solid #f1f5f9', color:'#64748b', fontSize:12 }}>{c.sa||'—'}</td>
+                  <td style={{ padding:'10px 14px', borderBottom:'1px solid #f1f5f9', color:'#64748b', fontSize:12 }}>{c.gestionnaire_nom||'—'}</td>
+                  <td style={{ padding:'10px 14px', borderBottom:'1px solid #f1f5f9', color:'#64748b', fontSize:12 }}>{c.sa_nom||'—'}</td>
                   <td style={{ padding:'10px 14px', borderBottom:'1px solid #f1f5f9' }}>
                     <button onClick={e=>{e.stopPropagation();onSelect(c)}} style={{ fontSize:11, color:BLUE, background:'#e0f2fe', border:'none', borderRadius:5, padding:'3px 8px', cursor:'pointer', fontWeight:600 }}>
                       Fiche →
