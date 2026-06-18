@@ -1,5 +1,6 @@
 import Layout from '../../components/Layout'
 import { useAuth } from '../../lib/auth'
+import BlocComptes from '../../components/BlocComptes'
 
 export default function DashboardDtx() {
   const { perms, user } = useAuth()

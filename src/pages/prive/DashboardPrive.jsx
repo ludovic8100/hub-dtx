@@ -1,5 +1,6 @@
 import Layout from '../../components/Layout'
 import { useAuth } from '../../lib/auth'
+import BlocComptes from '../../components/BlocComptes'
 
 export default function DashboardPrive() {
   const { perms, user } = useAuth()

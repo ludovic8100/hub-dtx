@@ -15,7 +15,6 @@ const MODULES = {
     { key: 'dyn_objectifs',    label: 'Objectifs',         icon: 'ti-target',           path: '/dynassur/objectifs' },
     { key: 'dyn_compagnies',   label: 'Compagnies',        icon: 'ti-building',         path: '/dynassur/compagnies' },
     { key: 'dyn_sinistres',    label: 'Sinistres',         icon: 'ti-alert-triangle',   path: '/dynassur/sinistres' },
-    { key: 'dyn_banque',       label: 'Banque',            icon: 'ti-credit-card',      path: '/dynassur/banque' },
     { key: 'dyn_comptabilite', label: 'Comptabilité',      icon: 'ti-calculator',       path: '/dynassur/comptabilite' },
   ],
   dtx: [
@@ -28,17 +27,14 @@ const MODULES = {
   lode: [
     { key: 'lode_dashboard',    label: 'Tableau de bord', icon: 'ti-layout-dashboard', path: '/lode' },
     { key: 'lode_clients',      label: 'Clients',          icon: 'ti-users',            path: '/lode/clients' },
-    { key: 'lode_banque',       label: 'Banque',           icon: 'ti-credit-card',      path: '/lode/banque' },
     { key: 'lode_comptabilite', label: 'Comptabilité',     icon: 'ti-calculator',       path: '/lode/comptabilite' },
   ],
   hexagroup: [
     { key: 'hex_dashboard',      label: 'Tableau de bord', icon: 'ti-layout-dashboard', path: '/hexagroup' },
-    { key: 'hex_banque',         label: 'Banque',           icon: 'ti-credit-card',      path: '/hexagroup/banque' },
     { key: 'hex_comptabilite',   label: 'Comptabilité',     icon: 'ti-calculator',       path: '/hexagroup/comptabilite' },
   ],
   prive: [
     { key: 'prive_dashboard',    label: 'Tableau de bord', icon: 'ti-layout-dashboard', path: '/prive' },
-    { key: 'prive_banque',       label: 'Banque',           icon: 'ti-credit-card',      path: '/prive/banque' },
     { key: 'prive_comptabilite', label: 'Comptabilité',     icon: 'ti-calculator',       path: '/prive/comptabilite' },
   ],
 }
