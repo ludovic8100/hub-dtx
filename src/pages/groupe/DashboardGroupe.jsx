@@ -273,7 +273,7 @@ function BlocTaches({ taches, loading }) {
 function BlocTresorerie({ comptes, transactions, loading }) {
   const MOIS = ['Jan','Fév','Mar','Apr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc']
   const now = new Date()
-  const currentMonth = now.getMonth()
+  const [revealed, setRevealed] = useState({})
 
   // Soldes par société
   const soldesParSoc = Object.entries(SOCIETES).map(([key, cfg]) => {
@@ -282,6 +282,7 @@ function BlocTresorerie({ comptes, transactions, loading }) {
   }).filter(s => s.total !== 0)
 
   const totalGroupe = soldesParSoc.reduce((s,r)=>s+r.total,0)
+  const allRevealed = soldesParSoc.length > 0 && soldesParSoc.every(s => revealed[s.key])
 
   // Revenus/dépenses des 6 derniers mois depuis transactions
   const sixMois = Array.from({length:6},(_,i)=>{
@@ -310,25 +311,47 @@ function BlocTresorerie({ comptes, transactions, loading }) {
 
       <div style={{ padding:18 }}>
         {/* Total groupe */}
-        <div style={{ marginBottom:18 }}>
-          <div style={{ fontSize:11, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:4 }}>Solde total groupe</div>
-          <div style={{ fontSize:32, fontWeight:900, color: totalGroupe<0?'#dc2626':'#0f172a' }}>{fmt(totalGroupe)}</div>
+        <div style={{ marginBottom:18, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <div>
+            <div style={{ fontSize:11, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:4 }}>Solde total groupe</div>
+            <div style={{ fontSize:32, fontWeight:900,
+              color: allRevealed?(totalGroupe<0?'#dc2626':'#0f172a'):'#cbd5e1',
+              letterSpacing: allRevealed?'normal':'.1em' }}>
+              {allRevealed ? fmt(totalGroupe) : '● ● ● ● ●'}
+            </div>
+          </div>
+          <button onClick={() => { const all={}; soldesParSoc.forEach(s=>{all[s.key]=!allRevealed}); setRevealed(all) }}
+            style={{ fontSize:11, color:'#0d9488', background:'#f0fdfa', border:'1px solid #99f6e4', borderRadius:6, padding:'5px 10px', cursor:'pointer', fontWeight:600 }}>
+            {allRevealed ? '🔒 Masquer' : '👁 Révéler'}
+          </button>
         </div>
 
         {/* Par société */}
-        <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:18 }}>
-          {soldesParSoc.map(s => (
-            <div key={s.key} style={{ display:'flex', alignItems:'center', gap:10 }}>
-              <div style={{ width:10, height:10, borderRadius:'50%', background:s.color, flexShrink:0 }} />
-              <span style={{ fontSize:12, color:'#64748b', flex:1 }}>{s.label}</span>
-              <span style={{ fontSize:13, fontWeight:700, color: s.total<0?'#dc2626':'#1e293b' }}>{fmt(s.total)}</span>
-              <div style={{ width:80 }}>
-                <div style={{ background:'#f1f5f9', borderRadius:3, height:5, overflow:'hidden' }}>
-                  <div style={{ width:`${Math.abs(s.total)/Math.max(Math.abs(totalGroupe),1)*100}%`, height:'100%', background:s.color, borderRadius:3 }} />
+        <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:18 }}>
+          {soldesParSoc.map(s => {
+            const show = revealed[s.key]
+            return (
+              <div key={s.key} style={{ display:'flex', alignItems:'center', gap:10, padding:'7px 10px', borderRadius:8, background:'#f8fafc' }}>
+                <div style={{ width:10, height:10, borderRadius:'50%', background:s.color, flexShrink:0 }} />
+                <span style={{ fontSize:12, color:'#64748b', flex:1 }}>{s.label}</span>
+                <span style={{ fontSize:13, fontWeight:700, minWidth:90, textAlign:'right',
+                  color: show?(s.total<0?'#dc2626':s.color):'#cbd5e1',
+                  letterSpacing: show?'normal':'.1em' }}>
+                  {show ? fmt(s.total) : '● ● ●'}
+                </span>
+                <div style={{ width:70 }}>
+                  <div style={{ background:'#e2e8f0', borderRadius:3, height:5, overflow:'hidden' }}>
+                    <div style={{ width: show?`${Math.abs(s.total)/Math.max(Math.abs(totalGroupe),1)*100}%`:'0%', height:'100%', background:s.color, borderRadius:3, transition:'width 0.4s' }} />
+                  </div>
                 </div>
+                <button onClick={() => setRevealed(r => ({ ...r, [s.key]: !r[s.key] }))}
+                  style={{ background:show?'#f0fdf4':'#fff', border:`1px solid ${show?'#bbf7d0':'#e2e8f0'}`,
+                    borderRadius:6, padding:'3px 6px', cursor:'pointer', color:show?'#16a34a':'#94a3b8', fontSize:12 }}>
+                  <i className={`ti ${show?'ti-eye-off':'ti-eye'}`} />
+                </button>
               </div>
-            </div>
-          ))}
+            )
+          })}
           {soldesParSoc.length === 0 && (
             <div style={{ fontSize:12, color:'#94a3b8', padding:'12px 0' }}>Synchronisation Ponto requise pour afficher les soldes</div>
           )}
