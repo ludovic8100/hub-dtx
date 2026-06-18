@@ -1,5 +1,5 @@
-import PageEnConstruction from '../../components/PageEnConstruction'
+import ObjectifsView from '../../components/ObjectifsView'
 
 export default function DynassurObjectifs() {
-  return <PageEnConstruction titre="Objectifs" icon="ti-target" color="#0080BD" currentPage="Objectifs" />
+  return <ObjectifsView />
 }
