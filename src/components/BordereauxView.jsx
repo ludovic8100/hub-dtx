@@ -30,10 +30,23 @@ export default function BordereauxView() {
     const load = async () => {
       setLoading(true)
       try {
-        const { data: b } = await supabase.from("bordereaux").select("*").order("annee", { ascending: false }).order("mois").order("compagnie").limit(100000)
-        setBRows(Array.isArray(b) ? b : [])
-        const { data: q } = await supabase.from("quittances").select("compagnie,date_comptable,prime_totale,commission,commission_sa,sous_agent,compte_producteur").limit(100000)
-        const qq = Array.isArray(q) ? q : []
+        // Pagination : PostgREST plafonne à 1000 lignes/requête, on récupère tout par tranches
+        const fetchAll = async (builder) => {
+          const PAGE = 1000
+          let from = 0, out = []
+          while (true) {
+            const { data, error } = await builder().range(from, from + PAGE - 1)
+            if (error) { console.error(error); break }
+            const rows = Array.isArray(data) ? data : []
+            out = out.concat(rows)
+            if (rows.length < PAGE) break
+            from += PAGE
+          }
+          return out
+        }
+        const b = await fetchAll(() => supabase.from("bordereaux").select("*").order("annee", { ascending: false }).order("mois").order("compagnie"))
+        setBRows(b)
+        const qq = await fetchAll(() => supabase.from("quittances").select("compagnie,date_comptable,prime_totale,commission,commission_sa,sous_agent,compte_producteur"))
         setQRows(qq)
         // Défaut : dernier mois de l'année sélectionnée ayant des quittances (évite l'onglet vide)
         const moisDispo = {}
