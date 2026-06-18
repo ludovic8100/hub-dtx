@@ -383,111 +383,117 @@ function BlocTresorerie({ comptes, transactions, loading }) {
   )
 }
 
-// ── Carte objectif réutilisable ──
-function ObjCard({ obj, label, color }) {
-  return (
-    <div style={{ padding:'10px 14px', background:'#f8fafc', borderRadius:8, border:'1px solid #e2e8f0' }}>
-      <div style={{ fontSize:12, fontWeight:700, color, marginBottom:8 }}>{label}</div>
-      <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-        {obj.target_na > 0 && (
-          <div>
-            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:2 }}>
-              <span style={{ fontSize:11, color:'#64748b' }}>NA</span>
-              <span style={{ fontSize:11, fontWeight:700, color:'#0f172a' }}>{fmtN(obj.actual_na)} / {fmtN(obj.target_na)}</span>
-            </div>
-            <Bar pct={obj.pct_na} col={color} />
-          </div>
-        )}
-        {obj.target_primes > 0 && (
-          <div>
-            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:2 }}>
-              <span style={{ fontSize:11, color:'#64748b' }}>Primes</span>
-              <span style={{ fontSize:11, fontWeight:700, color:'#0f172a' }}>{fmt(obj.actual_primes)} / {fmt(obj.target_primes)}</span>
-            </div>
-            <Bar pct={obj.pct_primes} col={color} />
-          </div>
-        )}
-        {obj.target_commissions > 0 && (
-          <div>
-            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:2 }}>
-              <span style={{ fontSize:11, color:'#64748b' }}>Commissions</span>
-              <span style={{ fontSize:11, fontWeight:700, color:'#0f172a' }}>{fmt(obj.actual_commissions)} / {fmt(obj.target_commissions)}</span>
-            </div>
-            <Bar pct={obj.pct_commissions} col={color} />
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
 // ══════════════════════════
-// BLOC 4 — Objectifs par société
+// BLOC 4 — Production Dynassur
 // ══════════════════════════
-function BlocObjectifs({ objectifs, loading }) {
-  const navigate = useNavigate()
+function BlocProduction({ loading: loadingExt }) {
+  const [prod, setProd] = useState([])
+  const [loading, setLoading] = useState(true)
+  const now = new Date()
+  const annee = now.getFullYear()
+  const mois = String(now.getMonth() + 1).padStart(2, '0')
 
-  const AGENT_NOMS = {
-    GGO:'Gregory Godfroid', TJA:'Thibault Japsenne', PFQ:'Priscilla Fernandez',
-    MTE:'Michelangelo Terrana', NGI:'Nadine Ginis', LDE:'Ludovic Detilloux',
-    JFS:'Jean-François Simonis', FMZ:'Fabrice Mammo', ICE:'Ingrid Cezar',
-    RCA:'Raphael Carrea', MVM:'Michael Van Muylder', VPE:'Vincent Pesser',
-    RDE:'Renaud Desclez', OBA:'Olivier Baudelet', LGM:'Luisa Gaen Munoz',
-    HML:'Homelinks', DCO:'Didier Coco',
+  const TYPES = {
+    'N.A.':                    { label:'Nouvelles Affaires',       col:'#16a34a', sign:+1 },
+    'Mandat faveur':            { label:'Mandats faveur',           col:'#0080BD', sign:+1 },
+    'Mandat défaveur':          { label:'Mandats défaveur',         col:'#f59e0b', sign:-1 },
+    'Renon':                    { label:'Résiliations',             col:'#dc2626', sign:-1 },
+    'Résiliation Non paiement': { label:'Résil. non-paiement',      col:'#dc2626', sign:-1 },
+    'Avenant':                  { label:'Avenants',                 col:'#94a3b8', sign:0  },
   }
 
-  const global2026 = objectifs.filter(o => o.year===2026 && o.period_type==='year')
-  const objGlobal     = global2026.filter(o => o.scope==='global')
-  const objAgents     = global2026.filter(o => o.scope==='agent')
-  const objSousAgents = global2026.filter(o => o.scope==='sous_agent')
+  useEffect(() => {
+    supabase.from('mouvements_production')
+      .select('type_prod, agent_code, annee, mois')
+      .eq('annee', annee)
+      .then(({ data }) => { setProd(data || []); setLoading(false) })
+  }, [])
+
+  // Comptage par type pour le mois en cours et l'année
+  const byType = {}
+  Object.keys(TYPES).forEach(t => { byType[t] = { mois: 0, annee: 0 } })
+  prod.forEach(p => {
+    if (!byType[p.type_prod]) return
+    byType[p.type_prod].annee++
+    if (p.mois === mois) byType[p.type_prod].mois++
+  })
+
+  // Solde net NA
+  const naAnnee = byType['N.A.']?.annee || 0
+  const renonAnnee = (byType['Renon']?.annee || 0) + (byType['Résiliation Non paiement']?.annee || 0) + (byType['Mandat défaveur']?.annee || 0)
+  const soldeNet = naAnnee - renonAnnee
+
+  // Top agents NA ce mois
+  const agentsMois = {}
+  prod.filter(p => p.mois === mois && p.type_prod === 'N.A.').forEach(p => {
+    agentsMois[p.agent_code] = (agentsMois[p.agent_code] || 0) + 1
+  })
+  const topAgents = Object.entries(agentsMois).sort((a,b) => b[1]-a[1]).slice(0,5)
+
+  const AGENT_NOMS = { GGO:'G. Godfroid', TJA:'T. Japsenne', PFQ:'P. Fernandez', MTE:'M. Terrana', NGI:'N. Ginis', LDE:'L. Detilloux' }
 
   return (
     <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
       <div style={{ padding:'14px 18px', borderBottom:'1px solid #f1f5f9', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-          <i className="ti ti-target" style={{ fontSize:16, color:'#0080BD' }} />
-          <span style={{ fontSize:13, fontWeight:700, color:'#0f172a' }}>Objectifs 2026</span>
+          <i className="ti ti-chart-line" style={{ fontSize:16, color:'#0080BD' }} />
+          <span style={{ fontSize:13, fontWeight:700, color:'#0f172a' }}>Production {annee}</span>
         </div>
-        <button onClick={() => navigate('/dynassur/objectifs')} style={{ fontSize:11, color:'#0080BD', background:'#e0f2fe', border:'none', borderRadius:6, padding:'4px 10px', cursor:'pointer', fontWeight:600 }}>
-          Voir détail →
-        </button>
+        <span style={{ fontSize:11, background:'#e0f2fe', color:'#0080BD', padding:'2px 8px', borderRadius:10, fontWeight:700 }}>DYNASSUR</span>
       </div>
 
-      <div style={{ padding:16 }}>
-        {loading ? (
-          <div style={{ textAlign:'center', color:'#94a3b8', padding:20 }}>Chargement…</div>
-        ) : global2026.length === 0 ? (
-          <div style={{ textAlign:'center', color:'#94a3b8', padding:20, fontSize:13 }}>Aucun objectif configuré</div>
-        ) : (
-          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+      {loading ? (
+        <div style={{ padding:30, textAlign:'center', color:'#94a3b8' }}>Chargement…</div>
+      ) : (
+        <div style={{ padding:16 }}>
 
-            {/* Global Dynassur */}
-            {objGlobal.map(obj => (
-              <ObjCard key={obj.id} obj={obj} label="Dynassur — Global" color="#0080BD" />
-            ))}
-
-            {/* Commerciaux */}
-            {objAgents.length > 0 && (
-              <div style={{ fontSize:10, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'.05em', marginTop:4 }}>Commerciaux</div>
-            )}
-            {objAgents.map(obj => (
-              <ObjCard key={obj.id} obj={obj} label={AGENT_NOMS[obj.agent_code] || obj.agent_code} color="#0080BD" />
-            ))}
-
-            {/* Sous-agents */}
-            {objSousAgents.length > 0 && (
-              <div style={{ fontSize:10, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'.05em', marginTop:4 }}>Sous-agents</div>
-            )}
-            {objSousAgents.map(obj => (
-              <ObjCard key={obj.id} obj={obj} label={AGENT_NOMS[obj.agent_code] || obj.agent_code} color="#7c3aed" />
-            ))}
-
-            {global2026.length === 0 && (
-              <div style={{ textAlign:'center', color:'#94a3b8', padding:20, fontSize:13 }}>Aucun objectif configuré</div>
-            )}
+          {/* Solde net en gros */}
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:16 }}>
+            <div style={{ background: soldeNet>=0?'#f0fdf4':'#fff5f5', borderRadius:8, padding:'12px 14px', border:`1px solid ${soldeNet>=0?'#bbf7d0':'#fecaca'}` }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:4 }}>Solde net {annee}</div>
+              <div style={{ fontSize:26, fontWeight:900, color: soldeNet>=0?'#16a34a':'#dc2626' }}>{soldeNet>0?'+':''}{fmtN(soldeNet)}</div>
+              <div style={{ fontSize:11, color:'#64748b' }}>{fmtN(naAnnee)} NA − {fmtN(renonAnnee)} résil.</div>
+            </div>
+            <div style={{ background:'#eff6ff', borderRadius:8, padding:'12px 14px', border:'1px solid #bfdbfe' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:4 }}>NA ce mois</div>
+              <div style={{ fontSize:26, fontWeight:900, color:'#0080BD' }}>{fmtN(byType['N.A.']?.mois||0)}</div>
+              <div style={{ fontSize:11, color:'#64748b' }}>Mois {mois}/{annee}</div>
+            </div>
           </div>
-        )}
-      </div>
+
+          {/* Tableau types de mouvements */}
+          <div style={{ marginBottom:14 }}>
+            {Object.entries(TYPES).filter(([,v])=>v.sign!==0).map(([type, cfg]) => {
+              const d = byType[type] || { mois:0, annee:0 }
+              if (d.annee === 0 && d.mois === 0) return null
+              return (
+                <div key={type} style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 0', borderBottom:'1px solid #f8fafc' }}>
+                  <div style={{ width:6, height:6, borderRadius:'50%', background:cfg.col, flexShrink:0 }} />
+                  <span style={{ fontSize:12, color:'#64748b', flex:1 }}>{cfg.label}</span>
+                  <span style={{ fontSize:11, color:'#94a3b8' }}>ce mois : <strong style={{ color:cfg.col }}>{d.mois}</strong></span>
+                  <span style={{ fontSize:12, fontWeight:700, color:cfg.col, minWidth:30, textAlign:'right' }}>{d.annee}</span>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Top agents NA ce mois */}
+          {topAgents.length > 0 && (
+            <div>
+              <div style={{ fontSize:10, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:8 }}>Top NA — mois en cours</div>
+              {topAgents.map(([code, nb]) => (
+                <div key={code} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:5 }}>
+                  <span style={{ fontSize:11, color:'#64748b', flex:1 }}>{AGENT_NOMS[code]||code}</span>
+                  <div style={{ flex:2, background:'#f1f5f9', borderRadius:3, height:6, overflow:'hidden' }}>
+                    <div style={{ width:`${nb/Math.max(...topAgents.map(a=>a[1]))*100}%`, height:'100%', background:'#0080BD', borderRadius:3 }} />
+                  </div>
+                  <span style={{ fontSize:12, fontWeight:700, color:'#0080BD', minWidth:20, textAlign:'right' }}>{nb}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -499,7 +505,6 @@ export default function DashboardGroupe() {
   const [comptes, setComptes]           = useState([])
   const [transactions, setTransactions] = useState([])
   const [taches, setTaches]             = useState([])
-  const [objectifs, setObjectifs]       = useState([])
   const [loading, setLoading]           = useState(true)
 
   useEffect(() => {
@@ -510,17 +515,14 @@ export default function DashboardGroupe() {
           { data: cpts },
           { data: txs },
           { data: tsk },
-          { data: obj },
         ] = await Promise.all([
           supabase.from('comptes_bancaires').select('*, societes(code,nom)').eq('actif', true).order('banque'),
           supabase.from('transactions').select('id,date,date_valeur,montant,societe_id').gte('date', new Date(new Date().setMonth(new Date().getMonth()-6)).toISOString().slice(0,10)).limit(2000),
           supabase.from('taches').select('*').in('statut',['en_cours','en_attente','retard','urgent']).order('echeance',{ascending:true}).limit(100),
-          supabase.from('objectives_global').select('*').eq('year',2026).eq('period_type','year'),
         ])
         setComptes(cpts || [])
         setTransactions(txs || [])
         setTaches(tsk || [])
-        setObjectifs(obj || [])
       } catch(e) { console.error('DashboardGroupe load error:', e) }
       setLoading(false)
     }
@@ -559,7 +561,7 @@ export default function DashboardGroupe() {
         {/* Grille secondaire : 2 colonnes */}
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20 }}>
           <BlocTresorerie comptes={comptes} transactions={transactions} loading={loading} />
-          <BlocObjectifs objectifs={objectifs} loading={loading} />
+          <BlocProduction />
         </div>
 
       </div>
