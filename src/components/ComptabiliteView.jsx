@@ -141,9 +141,28 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   useEffect(() => { setPage(1) }, [filtre.compte, filtre.type, filtre.libelle, filtre.annee, filtre.categorie])
 
   // Charger les catégories
-  useEffect(() => {
-    supabase.from('categories').select('*').order('nom').then(({ data }) => setCategories(data || []))
-  }, [])
+  async function chargerCategories() {
+    const { data } = await supabase.from('categories').select('*').order('nom')
+    setCategories(data || [])
+    return data || []
+  }
+  useEffect(() => { chargerCategories() }, [])
+
+  // Créer une catégorie manuellement (et l'assigner à la transaction en cours si fournie)
+  const [nouvelleCat, setNouvelleCat] = useState({ ouvert: false, nom: '', type: 'depense', couleur: '#0080BD' })
+  async function creerCategorie(txIdAAssigner) {
+    const nom = nouvelleCat.nom.trim()
+    if (!nom) { alert('Donne un nom à la catégorie.'); return }
+    const { data, error } = await supabase
+      .from('categories')
+      .insert({ nom, type: nouvelleCat.type, couleur: nouvelleCat.couleur })
+      .select()
+      .single()
+    if (error) { alert('Erreur création catégorie : ' + error.message); return }
+    await chargerCategories()
+    setNouvelleCat({ ouvert: false, nom: '', type: 'depense', couleur: '#0080BD' })
+    if (txIdAAssigner && data?.id) await assignerCategorie(txIdAAssigner, data.id)
+  }
 
   // Assigner une catégorie à une transaction
   async function assignerCategorie(txId, categorieId) {
@@ -667,6 +686,37 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                     <button onClick={()=>appliquerParContrepartie(t.contrepartie_nom, t.categorie_id)} style={{ marginTop:'8px', width:'100%', padding:'9px 12px', borderRadius:'8px', fontSize:'13px', fontWeight:'600', border:`1px solid ${color}`, background:`${color}0d`, color, cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>
                       ⚡ Appliquer à toutes les transactions de « {t.contrepartie_nom} »
                     </button>
+                  )}
+                  {/* Création manuelle de catégorie */}
+                  {!nouvelleCat.ouvert ? (
+                    <button onClick={()=>setNouvelleCat(s=>({...s, ouvert:true}))} style={{ marginTop:'8px', width:'100%', padding:'9px 12px', borderRadius:'8px', fontSize:'13px', fontWeight:'600', border:'1px dashed #cbd5e1', background:'#f8fafc', color:'#475569', cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                      ➕ Nouvelle catégorie
+                    </button>
+                  ) : (
+                    <div style={{ marginTop:'10px', padding:'12px', border:'1px solid #e2e8f0', borderRadius:'8px', background:'#f8fafc' }}>
+                      <div style={{ fontSize:'11px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'8px' }}>Nouvelle catégorie</div>
+                      <input
+                        value={nouvelleCat.nom}
+                        onChange={e=>setNouvelleCat(s=>({...s, nom:e.target.value}))}
+                        placeholder="Nom de la catégorie"
+                        style={{ width:'100%', padding:'8px 10px', border:'1px solid #e2e8f0', borderRadius:'6px', fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif", boxSizing:'border-box', marginBottom:'8px' }}
+                      />
+                      <div style={{ display:'flex', gap:'8px', alignItems:'center', marginBottom:'10px' }}>
+                        <select value={nouvelleCat.type} onChange={e=>setNouvelleCat(s=>({...s, type:e.target.value}))} style={{ flex:1, padding:'8px 10px', border:'1px solid #e2e8f0', borderRadius:'6px', fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif", cursor:'pointer' }}>
+                          <option value="depense">Dépense</option>
+                          <option value="recette">Recette</option>
+                        </select>
+                        <input type="color" value={nouvelleCat.couleur} onChange={e=>setNouvelleCat(s=>({...s, couleur:e.target.value}))} title="Couleur" style={{ width:'40px', height:'36px', border:'1px solid #e2e8f0', borderRadius:'6px', padding:'2px', cursor:'pointer' }} />
+                      </div>
+                      <div style={{ display:'flex', gap:'8px' }}>
+                        <button onClick={()=>creerCategorie(t.id)} style={{ flex:1, padding:'9px 12px', borderRadius:'7px', fontSize:'13px', fontWeight:'600', border:'none', background:'#0080BD', color:'#fff', cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                          Créer et assigner
+                        </button>
+                        <button onClick={()=>setNouvelleCat({ ouvert:false, nom:'', type:'depense', couleur:'#0080BD' })} style={{ padding:'9px 12px', borderRadius:'7px', fontSize:'13px', fontWeight:'600', border:'1px solid #e2e8f0', background:'#fff', color:'#64748b', cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                          Annuler
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
                 <Row label="Contrepartie" value={t.contrepartie_nom} />
