@@ -33,7 +33,7 @@ function FicheClient({ client, onBack }) {
       setLoading(true)
       const dossier = client.dossier
       const [{ data: c }, { data: t }, { data: p }] = await Promise.all([
-        supabase.from('contrats').select('*').eq('dossier', dossier).order('date_creation', { ascending: false }),
+        supabase.from('contrats').select('dossier,police,nom,situation___libelle,date_de_creation,domaine,type_production,garantie___valeur,sa,gestionnaire_nom').eq('dossier', dossier).order('date_de_creation', { ascending: false }),
         supabase.from('taches').select('*').eq('dossier_client', dossier).order('echeance', { ascending: true }).limit(20),
         supabase.from('mouvements_production').select('*').eq('dossier', dossier).order('annee', { ascending: false }).order('mois', { ascending: false }).limit(50),
       ])
@@ -51,7 +51,7 @@ function FicheClient({ client, onBack }) {
     { key:'taches',   label:'Tâches',     icon:'ti-checkbox',    count: taches.length },
   ]
 
-  const contrats_actifs = contrats.filter(c => c.situation === 'En cours').length
+  const contrats_actifs = contrats.filter(c => c.situation___libelle === 'En cours').length
 
   return (
     <div>
@@ -102,7 +102,7 @@ function FicheClient({ client, onBack }) {
             { icon:'ti-map-pin', label:'Adresse', val: [client.rue, client.num_maison, client.boite].filter(Boolean).join(' ') || '—' },
             { icon:'ti-phone',   label:'GSM',     val: client.gsm || '—' },
             { icon:'ti-phone',   label:'Fixe',    val: client.tel_fixe || '—' },
-            { icon:'ti-mail',    label:'Email',   val: client.email || '—' },
+            { icon:'ti-mail',    label:'Email',   val: client.e_mail || '—' },
             { icon:'ti-user',    label:'Gestionnaire', val: client.gestionnaire || '—' },
             { icon:'ti-user',    label:'Sous-agent', val: client.sa || '—' },
           ].map(row => (
@@ -157,12 +157,12 @@ function FicheClient({ client, onBack }) {
                             onMouseEnter={e=>e.currentTarget.style.background='#f0f9ff'}
                             onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'#fff':'#fafafe'}>
                             <td style={{ padding:'10px 14px', borderBottom:'1px solid #f1f5f9', fontFamily:'monospace', fontSize:12, fontWeight:600, color:NAVY }}>{c.police||'—'}</td>
-                            <td style={{ padding:'10px 14px', borderBottom:'1px solid #f1f5f9', color:'#1e293b', fontWeight:500 }}>{c.compagnie||'—'}</td>
+                            <td style={{ padding:'10px 14px', borderBottom:'1px solid #f1f5f9', color:'#1e293b', fontWeight:500 }}>{c.nom||'—'}</td>
                             <td style={{ padding:'10px 14px', borderBottom:'1px solid #f1f5f9', color:'#64748b' }}>{c.domaine||'—'}</td>
-                            <td style={{ padding:'10px 14px', borderBottom:'1px solid #f1f5f9' }}><SituationBadge v={c.situation} /></td>
-                            <td style={{ padding:'10px 14px', borderBottom:'1px solid #f1f5f9', color:'#64748b', whiteSpace:'nowrap' }}>{fmtDate(c.date_creation)}</td>
+                            <td style={{ padding:'10px 14px', borderBottom:'1px solid #f1f5f9' }}><SituationBadge v={c.situation___libelle} /></td>
+                            <td style={{ padding:'10px 14px', borderBottom:'1px solid #f1f5f9', color:'#64748b', whiteSpace:'nowrap' }}>{fmtDate(c.date_de_creation)}</td>
                             <td style={{ padding:'10px 14px', borderBottom:'1px solid #f1f5f9', color:'#64748b' }}>{c.type_production||'—'}</td>
-                            <td style={{ padding:'10px 14px', borderBottom:'1px solid #f1f5f9', color:'#64748b' }}>{c.garantie||'—'}</td>
+                            <td style={{ padding:'10px 14px', borderBottom:'1px solid #f1f5f9', color:'#64748b' }}>{c.garantie___valeur||'—'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -264,7 +264,7 @@ function ListeClients({ onSelect }) {
 
   const load = useCallback(async (search, agent, p) => {
     setLoading(true)
-    let q = supabase.from('clients').select('dossier,nom,prenom,cp,localite,gsm,email,gestionnaire,sa,dn,actif', { count:'exact' })
+    let q = supabase.from('clients').select('dossier,nom,prenom,cp,localite,gsm,tel_fixe,e_mail,gestionnaire,sa,dn,etat_civil,sexe,classe', { count:'exact' })
 
     if (search.length >= 2) {
       // Recherche sur nom, prénom ou dossier
