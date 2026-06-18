@@ -88,6 +88,45 @@ function BlocBanque({ comptes, loading }) {
         )}
       </div>
 
+      {/* Section bordereaux manquants */}
+      {!loading && bordereaux.length > 0 && (
+        <div style={{ background:'#fff5f5', borderBottom:'2px solid #fecaca' }}>
+          <div style={{ padding:'8px 18px 4px', fontSize:10, fontWeight:700, color:'#dc2626', textTransform:'uppercase', letterSpacing:'.05em', display:'flex', alignItems:'center', gap:6 }}>
+            <i className="ti ti-alert-triangle" style={{ fontSize:13 }} />
+            Bordereaux non réconciliés
+          </div>
+          <div style={{ maxHeight:160, overflowY:'auto' }}>
+            {bordereaux.slice(0,10).map((b,i) => {
+              const STATUT = {
+                fichier_ok_non_encaisse:  { label:'Fichier OK — non encaissé', col:'#f59e0b', bg:'#fef3c7' },
+                fichier_sans_chiffres:    { label:'Fichier sans chiffres',      col:'#ea580c', bg:'#fff7ed' },
+                commission_sans_fichier:  { label:'Commission sans fichier',    col:'#7c3aed', bg:'#f5f3ff' },
+                manquant:                 { label:'Manquant',                   col:'#dc2626', bg:'#fee2e2' },
+              }
+              const s = STATUT[b.statut_reconciliation] || STATUT.manquant
+              return (
+                <div key={i} style={{ display:'grid', gridTemplateColumns:'auto 1fr auto auto', alignItems:'center', gap:8,
+                  padding:'7px 18px', borderBottom: i<Math.min(bordereaux.length,10)-1?'1px solid #fee2e2':'none', background: i%2===0?'#fff5f5':'#fff8f8' }}>
+                  <span style={{ fontSize:10, fontWeight:700, padding:'2px 5px', borderRadius:3, background:'#0080BD18', color:'#0080BD' }}>{b.type||'RCP'}</span>
+                  <div>
+                    <span style={{ fontSize:12, fontWeight:600, color:'#1e293b' }}>{b.compagnie||'—'}</span>
+                    <span style={{ fontSize:11, color:'#94a3b8', marginLeft:8 }}>{b.mois}/{b.annee}</span>
+                  </div>
+                  <span style={{ fontSize:10, fontWeight:700, padding:'2px 6px', borderRadius:4, background:s.bg, color:s.col, whiteSpace:'nowrap' }}>
+                    {s.label}
+                  </span>
+                </div>
+              )
+            })}
+            {bordereaux.length > 10 && (
+              <div style={{ padding:'6px 18px', fontSize:11, color:'#dc2626', fontWeight:600 }}>
+                + {bordereaux.length - 10} autres bordereaux non réconciliés
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div style={{ padding:30, textAlign:'center', color:'#94a3b8' }}>Chargement…</div>
       ) : comptes.length === 0 ? (
@@ -190,7 +229,7 @@ function BlocBanque({ comptes, loading }) {
 // ══════════════════════════
 // BLOC 2 — Tâches en cours
 // ══════════════════════════
-function BlocTaches({ taches, loading }) {
+function BlocTaches({ taches, bordereaux, loading }) {
   const now = new Date()
   const STATUT_STYLE = {
     en_retard:  { bg:'#fee2e2', color:'#dc2626', label:'⚠ Retard' },
@@ -206,16 +245,60 @@ function BlocTaches({ taches, loading }) {
 
   return (
     <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
-      <div style={{ padding:'14px 18px', borderBottom:'1px solid #f1f5f9', display:'flex', alignItems:'center', gap:8 }}>
+      <div style={{ padding:'14px 18px', borderBottom:'1px solid #f1f5f9', display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
         <i className="ti ti-checkbox" style={{ fontSize:16, color:'#f59e0b' }} />
-        <span style={{ fontSize:13, fontWeight:700, color:'#0f172a' }}>Tâches en cours</span>
+        <span style={{ fontSize:13, fontWeight:700, color:'#0f172a' }}>Tâches & Alertes</span>
         <span style={{ fontSize:11, background:'#fef3c7', color:'#92400e', padding:'2px 7px', borderRadius:10, fontWeight:700 }}>
           {taches.filter(t=>t.echeance&&new Date(t.echeance)<now).length} en retard
         </span>
         <span style={{ fontSize:11, background:'#f1f5f9', color:'#64748b', padding:'2px 7px', borderRadius:10, fontWeight:600 }}>
-          {taches.length} total
+          {taches.length} tâches
         </span>
+        {bordereaux.length > 0 && (
+          <span style={{ fontSize:11, background:'#fee2e2', color:'#dc2626', padding:'2px 7px', borderRadius:10, fontWeight:700 }}>
+            {bordereaux.length} bordereau{bordereaux.length>1?'x':''} ⚠
+          </span>
+        )}
       </div>
+
+      {/* Section bordereaux manquants */}
+      {!loading && bordereaux.length > 0 && (
+        <div style={{ background:'#fff5f5', borderBottom:'2px solid #fecaca' }}>
+          <div style={{ padding:'8px 18px 4px', fontSize:10, fontWeight:700, color:'#dc2626', textTransform:'uppercase', letterSpacing:'.05em', display:'flex', alignItems:'center', gap:6 }}>
+            <i className="ti ti-alert-triangle" style={{ fontSize:13 }} />
+            Bordereaux non réconciliés
+          </div>
+          <div style={{ maxHeight:160, overflowY:'auto' }}>
+            {bordereaux.slice(0,10).map((b,i) => {
+              const STATUT = {
+                fichier_ok_non_encaisse:  { label:'Fichier OK — non encaissé', col:'#f59e0b', bg:'#fef3c7' },
+                fichier_sans_chiffres:    { label:'Fichier sans chiffres',      col:'#ea580c', bg:'#fff7ed' },
+                commission_sans_fichier:  { label:'Commission sans fichier',    col:'#7c3aed', bg:'#f5f3ff' },
+                manquant:                 { label:'Manquant',                   col:'#dc2626', bg:'#fee2e2' },
+              }
+              const s = STATUT[b.statut_reconciliation] || STATUT.manquant
+              return (
+                <div key={i} style={{ display:'grid', gridTemplateColumns:'auto 1fr auto auto', alignItems:'center', gap:8,
+                  padding:'7px 18px', borderBottom: i<Math.min(bordereaux.length,10)-1?'1px solid #fee2e2':'none', background: i%2===0?'#fff5f5':'#fff8f8' }}>
+                  <span style={{ fontSize:10, fontWeight:700, padding:'2px 5px', borderRadius:3, background:'#0080BD18', color:'#0080BD' }}>{b.type||'RCP'}</span>
+                  <div>
+                    <span style={{ fontSize:12, fontWeight:600, color:'#1e293b' }}>{b.compagnie||'—'}</span>
+                    <span style={{ fontSize:11, color:'#94a3b8', marginLeft:8 }}>{b.mois}/{b.annee}</span>
+                  </div>
+                  <span style={{ fontSize:10, fontWeight:700, padding:'2px 6px', borderRadius:4, background:s.bg, color:s.col, whiteSpace:'nowrap' }}>
+                    {s.label}
+                  </span>
+                </div>
+              )
+            })}
+            {bordereaux.length > 10 && (
+              <div style={{ padding:'6px 18px', fontSize:11, color:'#dc2626', fontWeight:600 }}>
+                + {bordereaux.length - 10} autres bordereaux non réconciliés
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div style={{ padding:30, textAlign:'center', color:'#94a3b8' }}>Chargement…</div>
@@ -442,6 +525,45 @@ function BlocProduction({ loading: loadingExt }) {
         <span style={{ fontSize:11, background:'#e0f2fe', color:'#0080BD', padding:'2px 8px', borderRadius:10, fontWeight:700 }}>DYNASSUR</span>
       </div>
 
+      {/* Section bordereaux manquants */}
+      {!loading && bordereaux.length > 0 && (
+        <div style={{ background:'#fff5f5', borderBottom:'2px solid #fecaca' }}>
+          <div style={{ padding:'8px 18px 4px', fontSize:10, fontWeight:700, color:'#dc2626', textTransform:'uppercase', letterSpacing:'.05em', display:'flex', alignItems:'center', gap:6 }}>
+            <i className="ti ti-alert-triangle" style={{ fontSize:13 }} />
+            Bordereaux non réconciliés
+          </div>
+          <div style={{ maxHeight:160, overflowY:'auto' }}>
+            {bordereaux.slice(0,10).map((b,i) => {
+              const STATUT = {
+                fichier_ok_non_encaisse:  { label:'Fichier OK — non encaissé', col:'#f59e0b', bg:'#fef3c7' },
+                fichier_sans_chiffres:    { label:'Fichier sans chiffres',      col:'#ea580c', bg:'#fff7ed' },
+                commission_sans_fichier:  { label:'Commission sans fichier',    col:'#7c3aed', bg:'#f5f3ff' },
+                manquant:                 { label:'Manquant',                   col:'#dc2626', bg:'#fee2e2' },
+              }
+              const s = STATUT[b.statut_reconciliation] || STATUT.manquant
+              return (
+                <div key={i} style={{ display:'grid', gridTemplateColumns:'auto 1fr auto auto', alignItems:'center', gap:8,
+                  padding:'7px 18px', borderBottom: i<Math.min(bordereaux.length,10)-1?'1px solid #fee2e2':'none', background: i%2===0?'#fff5f5':'#fff8f8' }}>
+                  <span style={{ fontSize:10, fontWeight:700, padding:'2px 5px', borderRadius:3, background:'#0080BD18', color:'#0080BD' }}>{b.type||'RCP'}</span>
+                  <div>
+                    <span style={{ fontSize:12, fontWeight:600, color:'#1e293b' }}>{b.compagnie||'—'}</span>
+                    <span style={{ fontSize:11, color:'#94a3b8', marginLeft:8 }}>{b.mois}/{b.annee}</span>
+                  </div>
+                  <span style={{ fontSize:10, fontWeight:700, padding:'2px 6px', borderRadius:4, background:s.bg, color:s.col, whiteSpace:'nowrap' }}>
+                    {s.label}
+                  </span>
+                </div>
+              )
+            })}
+            {bordereaux.length > 10 && (
+              <div style={{ padding:'6px 18px', fontSize:11, color:'#dc2626', fontWeight:600 }}>
+                + {bordereaux.length - 10} autres bordereaux non réconciliés
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div style={{ padding:30, textAlign:'center', color:'#94a3b8' }}>Chargement…</div>
       ) : (
@@ -503,6 +625,7 @@ function BlocProduction({ loading: loadingExt }) {
 // ══════════════════════════
 export default function DashboardGroupe() {
   const [comptes, setComptes]           = useState([])
+  const [bordereaux, setBordereaux]     = useState([])
   const [transactions, setTransactions] = useState([])
   const [taches, setTaches]             = useState([])
   const [loading, setLoading]           = useState(true)
@@ -513,14 +636,17 @@ export default function DashboardGroupe() {
       try {
         const [
           { data: cpts },
+          { data: bord },
           { data: txs },
           { data: tsk },
         ] = await Promise.all([
           supabase.from('comptes_bancaires').select('*, societes(code,nom)').eq('actif', true).order('banque'),
+          supabase.from('v_bordereaux_reconciliation').select('annee,mois,type,compagnie,statut_reconciliation').in('statut_reconciliation',['fichier_ok_non_encaisse','fichier_sans_chiffres','commission_sans_fichier','manquant']),
           supabase.from('transactions').select('id,date,date_valeur,montant,societe_id').gte('date', new Date(new Date().setMonth(new Date().getMonth()-6)).toISOString().slice(0,10)).limit(2000),
           supabase.from('taches').select('*').in('statut',['en_cours','en_attente','retard','urgent']).order('echeance',{ascending:true}).limit(100),
         ])
         setComptes(cpts || [])
+        setBordereaux(bord || [])
         setTransactions(txs || [])
         setTaches(tsk || [])
       } catch(e) { console.error('DashboardGroupe load error:', e) }
@@ -555,7 +681,7 @@ export default function DashboardGroupe() {
         {/* Grille principale : 2 colonnes */}
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginBottom:20 }}>
           <BlocBanque comptes={comptes} loading={loading} />
-          <BlocTaches taches={taches} loading={loading} />
+          <BlocTaches taches={taches} bordereaux={bordereaux} loading={loading} />
         </div>
 
         {/* Grille secondaire : 2 colonnes */}
