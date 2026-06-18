@@ -1,0 +1,752 @@
+{
+  "name": "2026 - Import Dynassur (Quittances + Clients + Contrats + Production)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger_manual",
+      "name": "▶️ Démarrage Manuel",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "id": "trigger_schedule",
+      "name": "⏰ Tous les jours 6h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst totals = [];\ntry { totals.push('Quittances: ' + $('🔧 Parse Quittances').first().json.total); } catch(e) {}\ntry { totals.push('Clients: ' + $('🔧 Parse Clients').first().json.total); } catch(e) {}\ntry { totals.push('Contrats: ' + $('🔧 Parse Contrats').first().json.total); } catch(e) {}\ntry { totals.push('Production: ' + $('🔧 Parse Production').first().json.total); } catch(e) {}\nconsole.log('=== IMPORT DYNASSUR ===');\nconsole.log(totals.join(' | '));\nreturn [{ json: { ok: true, totals } }];\n"
+      },
+      "id": "node_log",
+      "name": "📊 Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1400,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "https://tndwonqdbeszkcztkzqe.supabase.co/rest/v1/quittances?annee=eq.2026",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuZHdvbnFkYmVzemtjenRrenFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MDg1MTcsImV4cCI6MjA5NjI4NDUxN30.jRrq7nV2Y6KSW_JwHbyOSm4lvckTLmVcAAROhq6sSuw"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuZHdvbnFkYmVzemtjenRrenFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MDg1MTcsImV4cCI6MjA5NjI4NDUxN30.jRrq7nV2Y6KSW_JwHbyOSm4lvckTLmVcAAROhq6sSuw"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "purge_quittances",
+      "name": "🗑️ Purge Quittances",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        280,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://graph.microsoft.com/v1.0/drives/b!s8-PQ_gQW0WDCB-DLU2ybfMoM6iRwklCj8QNH1cSEoznLVG9EIBnTrUMiFeCwXD8/items/01XZEE24IYFKQQYUCMZ5BJV2FM2EVGNXE3/content",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "microsoftGraphSecurityOAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "dl_quittances",
+      "name": "📥 Download Quittances",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        560,
+        0
+      ],
+      "credentials": {
+        "microsoftGraphSecurityOAuth2Api": {
+          "id": "weR4XterR23abnLv",
+          "name": "Microsoft Graph Security account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse QUITTANCE_2026.csv (séparateur ; , quotes, BOM, CRLF)\n//  [5] compagnie  [11] prime  [12] commission  [13] commission_sa  [14] date JJ/MM/AAAA\nconst item = $input.first();\nif (!item.binary) throw new Error('Aucune donnée binaire reçue du noeud Download CSV');\nconst propName = item.binary.data ? 'data' : Object.keys(item.binary)[0];\nconst binMeta = item.binary[propName];\nlet buffer;\nif (binMeta && binMeta.data) buffer = Buffer.from(binMeta.data, 'base64');\nelse buffer = await this.helpers.getBinaryDataBuffer(0, propName);\nlet txt = buffer.toString('utf8').replace(/^\\uFEFF/, '');\nconst lines = txt.split(/\\r?\\n/);\n\nconst num = (s) => {\n  s = (s || '').toString().trim();\n  if (!s) return null;\n  s = s.replace(/\\s/g, '');\n  if (s.includes(',') && s.includes('.')) s = s.replace(/\\./g, '').replace(',', '.');\n  else s = s.replace(',', '.');\n  const n = parseFloat(s);\n  return isNaN(n) ? null : n;\n};\nconst toISO = (s) => {\n  s = (s || '').toString().trim();\n  const p = s.split('/');\n  if (p.length === 3 && p[2].length === 4) return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;\n  return null;\n};\nconst clean = (s) => (s || '').toString().trim().replace(/^\"|\"$/g, '');\n\nconst rows = [];\nfor (let i = 1; i < lines.length; i++) {\n  const line = lines[i];\n  if (!line || !line.trim()) continue;\n  const f = line.split(';');\n  if (f.length < 15) continue;\n  const compagnie = clean(f[5]);\n  const prime = num(clean(f[11]));\n  const commission = num(clean(f[12]));\n  const commission_sa = num(clean(f[13]));\n  const date_comptable = toISO(clean(f[14]));\n  if (!compagnie && prime === null && commission === null) continue;\n  rows.push({ compagnie, prime_totale: prime, commission, commission_sa, date_comptable });\n}\n\n// 1 item par lot de 1000 ; le noeud HTTP suivant itère nativement sur chaque item\nconst CHUNK = 1000;\nconst out = [];\nfor (let i = 0; i < rows.length; i += CHUNK) {\n  out.push({ json: { rows: rows.slice(i, i + CHUNK), total: rows.length, lot: (i / CHUNK) + 1 } });\n}\nif (out.length === 0) out.push({ json: { rows: [], total: 0, lot: 0 } });\nreturn out;"
+      },
+      "id": "parse_quittances",
+      "name": "🔧 Parse Quittances",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        840,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://tndwonqdbeszkcztkzqe.supabase.co/rest/v1/quittances",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuZHdvbnFkYmVzemtjenRrenFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MDg1MTcsImV4cCI6MjA5NjI4NDUxN30.jRrq7nV2Y6KSW_JwHbyOSm4lvckTLmVcAAROhq6sSuw"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuZHdvbnFkYmVzemtjenRrenFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MDg1MTcsImV4cCI6MjA5NjI4NDUxN30.jRrq7nV2Y6KSW_JwHbyOSm4lvckTLmVcAAROhq6sSuw"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.rows) }}",
+        "options": {}
+      },
+      "id": "insert_quittances",
+      "name": "💾 Insert Quittances",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "https://tndwonqdbeszkcztkzqe.supabase.co/rest/v1/clients?actif=eq.true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuZHdvbnFkYmVzemtjenRrenFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MDg1MTcsImV4cCI6MjA5NjI4NDUxN30.jRrq7nV2Y6KSW_JwHbyOSm4lvckTLmVcAAROhq6sSuw"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuZHdvbnFkYmVzemtjenRrenFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MDg1MTcsImV4cCI6MjA5NjI4NDUxN30.jRrq7nV2Y6KSW_JwHbyOSm4lvckTLmVcAAROhq6sSuw"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "purge_clients",
+      "name": "🗑️ Purge Clients",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        280,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://graph.microsoft.com/v1.0/drives/b!s8-PQ_gQW0WDCB-DLU2ybfMoM6iRwklCj8QNH1cSEoznLVG9EIBnTrUMiFeCwXD8/items/01XZEE24JOHQEE3J6HPZAYT7JXLERJNUXD/content",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "microsoftGraphSecurityOAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "dl_clients",
+      "name": "📥 Download Clients",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        560,
+        600
+      ],
+      "credentials": {
+        "microsoftGraphSecurityOAuth2Api": {
+          "id": "weR4XterR23abnLv",
+          "name": "Microsoft Graph Security account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse DATA_CLIENT.csv → table clients\n// Colonnes: Dossier;Nom;Prénom;Rue;Num_Maison;Boîte;CP;Localité;DN;GSM;Tel Fixe;E-mail;Etat civil;Sexe;SA;Bureau;SA;Gestionnaire;# Délégués commerciaux;Alerte;Classe\nconst item = $input.first();\nif (!item.binary) throw new Error('Pas de données binaires');\nconst propName = item.binary.data ? 'data' : Object.keys(item.binary)[0];\nconst binMeta = item.binary[propName];\nlet buffer;\nif (binMeta && binMeta.data) buffer = Buffer.from(binMeta.data, 'base64');\nelse buffer = await this.helpers.getBinaryDataBuffer(0, propName);\nlet txt = buffer.toString('utf8').replace(/^\\uFEFF/, '');\nconst lines = txt.split(/\\r?\\n/);\n\nconst clean = (s) => (s || '').toString().trim().replace(/^\\\"|\\\"$/g, '');\nconst toISO = (s) => {\n  s = (s || '').toString().trim();\n  const p = s.split('/');\n  if (p.length === 3 && p[2].length === 4) return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;\n  return null;\n};\n\nconst rows = [];\nfor (let i = 1; i < lines.length; i++) {\n  const line = lines[i];\n  if (!line || !line.trim()) continue;\n  const f = line.split(';');\n  if (f.length < 10) continue;\n  rows.push({\n    dossier:      clean(f[0]) || null,\n    nom:          clean(f[1]),\n    prenom:       clean(f[2]),\n    rue:          clean(f[3]),\n    num_maison:   clean(f[4]),\n    boite:        clean(f[5]),\n    cp:           clean(f[6]),\n    localite:     clean(f[7]),\n    dn:           toISO(clean(f[8])),\n    gsm:          clean(f[9]),\n    tel_fixe:     clean(f[10]),\n    e_mail:       clean(f[11]),\n    etat_civil:   clean(f[12]),\n    sexe:         clean(f[13]),\n    sa:           clean(f[14]),\n    bureau:       clean(f[15]),\n    gestionnaire: clean(f[17]),\n    nb_delegues_commerciaux: parseInt(clean(f[18])) || null,\n    alerte:       clean(f[19]),\n    classe:       clean(f[20]),\n    actif:        true,\n  });\n}\n\nconst CHUNK = 1000;\nconst out = [];\nfor (let i = 0; i < rows.length; i += CHUNK) {\n  out.push({ json: { rows: rows.slice(i, i + CHUNK), total: rows.length, lot: (i/CHUNK)+1 } });\n}\nif (out.length === 0) out.push({ json: { rows: [], total: 0, lot: 0 } });\nreturn out;"
+      },
+      "id": "parse_clients",
+      "name": "🔧 Parse Clients",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        840,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://tndwonqdbeszkcztkzqe.supabase.co/rest/v1/clients",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuZHdvbnFkYmVzemtjenRrenFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MDg1MTcsImV4cCI6MjA5NjI4NDUxN30.jRrq7nV2Y6KSW_JwHbyOSm4lvckTLmVcAAROhq6sSuw"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuZHdvbnFkYmVzemtjenRrenFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MDg1MTcsImV4cCI6MjA5NjI4NDUxN30.jRrq7nV2Y6KSW_JwHbyOSm4lvckTLmVcAAROhq6sSuw"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.rows) }}",
+        "options": {}
+      },
+      "id": "insert_clients",
+      "name": "💾 Insert Clients",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "https://tndwonqdbeszkcztkzqe.supabase.co/rest/v1/contrats?id=gte.0",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuZHdvbnFkYmVzemtjenRrenFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MDg1MTcsImV4cCI6MjA5NjI4NDUxN30.jRrq7nV2Y6KSW_JwHbyOSm4lvckTLmVcAAROhq6sSuw"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuZHdvbnFkYmVzemtjenRrenFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MDg1MTcsImV4cCI6MjA5NjI4NDUxN30.jRrq7nV2Y6KSW_JwHbyOSm4lvckTLmVcAAROhq6sSuw"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "purge_contrats",
+      "name": "🗑️ Purge Contrats",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        280,
+        1200
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://graph.microsoft.com/v1.0/drives/b!s8-PQ_gQW0WDCB-DLU2ybfMoM6iRwklCj8QNH1cSEoznLVG9EIBnTrUMiFeCwXD8/items/01XZEE24PFBGUDBWHOTZHZVZC2YNAWN5XX/content",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "microsoftGraphSecurityOAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "dl_contrats",
+      "name": "📥 Download Contrats",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        560,
+        1200
+      ],
+      "credentials": {
+        "microsoftGraphSecurityOAuth2Api": {
+          "id": "weR4XterR23abnLv",
+          "name": "Microsoft Graph Security account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse DATA_CONTRAT.csv → table contrats\n// Colonnes: Dossier;Nom sous-agent;SA;# Délégués commerciaux;Gestionnaire nom;Nom(client);Prénom;Date de naissance;Code postal;Localité;Nom(compagnie);Police;Situation - Libellé;Date de création;Domaine;Version;Type production;Garantie - Valeur;# Conditions générales\nconst item = $input.first();\nif (!item.binary) throw new Error('Pas de données binaires');\nconst propName = item.binary.data ? 'data' : Object.keys(item.binary)[0];\nconst binMeta = item.binary[propName];\nlet buffer;\nif (binMeta && binMeta.data) buffer = Buffer.from(binMeta.data, 'base64');\nelse buffer = await this.helpers.getBinaryDataBuffer(0, propName);\nlet txt = buffer.toString('utf8').replace(/^\\uFEFF/, '');\nconst lines = txt.split(/\\r?\\n/);\n\nconst clean = (s) => (s || '').toString().trim().replace(/^\\\"|\\\"$/g, '');\nconst toISO = (s) => {\n  s = (s || '').toString().trim();\n  const p = s.split('/');\n  if (p.length === 3 && p[2].length === 4) return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;\n  return null;\n};\n\nconst rows = [];\nfor (let i = 1; i < lines.length; i++) {\n  const line = lines[i];\n  if (!line || !line.trim()) continue;\n  const f = line.split(';');\n  if (f.length < 12) continue;\n  const police = clean(f[11]);\n  if (!police) continue;\n  rows.push({\n    dossier:          clean(f[0]) || null,\n    nom_sous_agent:   clean(f[1]),\n    sa:               clean(f[2]),\n    nb_delegues_commerciaux: parseInt(clean(f[3])) || null,\n    gestionnaire_nom: clean(f[4]),\n    nom:              clean(f[5]),\n    prenom:           clean(f[6]),\n    date_de_naissance: toISO(clean(f[7])),\n    code_postal:      clean(f[8]),\n    localite:         clean(f[9]),\n    compagnie:        clean(f[10]),\n    police:           police,\n    situation___libelle: clean(f[12]),\n    date_de_creation: toISO(clean(f[13])),\n    domaine:          clean(f[14]),\n    version:          clean(f[15]),\n    type_production:  clean(f[16]),\n    garantie___valeur: clean(f[17]),\n    nb_conditions_generales: parseInt(clean(f[18])) || null,\n  });\n}\n\nconst CHUNK = 1000;\nconst out = [];\nfor (let i = 0; i < rows.length; i += CHUNK) {\n  out.push({ json: { rows: rows.slice(i, i + CHUNK), total: rows.length, lot: (i/CHUNK)+1 } });\n}\nif (out.length === 0) out.push({ json: { rows: [], total: 0, lot: 0 } });\nreturn out;"
+      },
+      "id": "parse_contrats",
+      "name": "🔧 Parse Contrats",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        840,
+        1200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://tndwonqdbeszkcztkzqe.supabase.co/rest/v1/contrats",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuZHdvbnFkYmVzemtjenRrenFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MDg1MTcsImV4cCI6MjA5NjI4NDUxN30.jRrq7nV2Y6KSW_JwHbyOSm4lvckTLmVcAAROhq6sSuw"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuZHdvbnFkYmVzemtjenRrenFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MDg1MTcsImV4cCI6MjA5NjI4NDUxN30.jRrq7nV2Y6KSW_JwHbyOSm4lvckTLmVcAAROhq6sSuw"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.rows) }}",
+        "options": {}
+      },
+      "id": "insert_contrats",
+      "name": "💾 Insert Contrats",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        1200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "https://tndwonqdbeszkcztkzqe.supabase.co/rest/v1/mouvements_production?annee=eq.2026",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuZHdvbnFkYmVzemtjenRrenFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MDg1MTcsImV4cCI6MjA5NjI4NDUxN30.jRrq7nV2Y6KSW_JwHbyOSm4lvckTLmVcAAROhq6sSuw"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuZHdvbnFkYmVzemtjenRrenFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MDg1MTcsImV4cCI6MjA5NjI4NDUxN30.jRrq7nV2Y6KSW_JwHbyOSm4lvckTLmVcAAROhq6sSuw"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "purge_prod",
+      "name": "🗑️ Purge Production",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        280,
+        1800
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://graph.microsoft.com/v1.0/drives/b!s8-PQ_gQW0WDCB-DLU2ybfMoM6iRwklCj8QNH1cSEoznLVG9EIBnTrUMiFeCwXD8/items/01XZEE24IXPWLUKRTTXNCLFUHABT2AK43P/content",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "microsoftGraphSecurityOAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "dl_prod",
+      "name": "📥 Download Production",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        560,
+        1800
+      ],
+      "credentials": {
+        "microsoftGraphSecurityOAuth2Api": {
+          "id": "weR4XterR23abnLv",
+          "name": "Microsoft Graph Security account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse PROD_DYNASSUR_2026.csv → table mouvements_production\n// On lit le header dynamiquement pour mapper les colonnes\nconst item = $input.first();\nif (!item.binary) throw new Error('Pas de données binaires');\nconst propName = item.binary.data ? 'data' : Object.keys(item.binary)[0];\nconst binMeta = item.binary[propName];\nlet buffer;\nif (binMeta && binMeta.data) buffer = Buffer.from(binMeta.data, 'base64');\nelse buffer = await this.helpers.getBinaryDataBuffer(0, propName);\nlet txt = buffer.toString('utf8').replace(/^\\uFEFF/, '');\nconst lines = txt.split(/\\r?\\n/);\n\nconst clean = (s) => (s || '').toString().trim().replace(/^\\\"|\\\"$/g, '');\nconst toISO = (s) => {\n  s = (s || '').toString().trim();\n  const p = s.split('/');\n  if (p.length === 3 && p[2].length === 4) return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;\n  return null;\n};\n\n// Parser le header pour mapper dynamiquement\nconst headers = lines[0].split(';').map(h => clean(h).toLowerCase()\n  .replace(/é|è|ê/g,'e').replace(/à|â/g,'a').replace(/ô/g,'o')\n  .replace(/[^a-z0-9_]/g,'_').replace(/__+/g,'_').replace(/^_|_$/g,''));\n\nconst rows = [];\nfor (let i = 1; i < lines.length; i++) {\n  const line = lines[i];\n  if (!line || !line.trim()) continue;\n  const f = line.split(';');\n  if (f.length < 5) continue;\n  const obj = {};\n  headers.forEach((h, idx) => { if (h) obj[h] = clean(f[idx]); });\n\n  // Mapping vers colonnes Supabase\n  rows.push({\n    dossier:      obj['dossier'] || null,\n    type_prod:    obj['type_production'] || obj['type_prod'] || clean(f[0]),\n    agent_code:   obj['sa'] || obj['agent_code'] || null,\n    annee:        parseInt(obj['annee']) || new Date().getFullYear(),\n    mois:         obj['mois'] ? String(obj['mois']).padStart(2,'0') : null,\n    num_contrat:  obj['police'] || obj['num_contrat'] || null,\n    client_nom:   obj['nom'] || null,\n    branche:      obj['domaine'] || obj['branche'] || null,\n    compagnie:    obj['compagnie'] || null,\n    gestionnaire: obj['gestionnaire_nom'] || obj['gestionnaire'] || null,\n  });\n}\n\nconst CHUNK = 1000;\nconst out = [];\nfor (let i = 0; i < rows.length; i += CHUNK) {\n  out.push({ json: { rows: rows.slice(i, i + CHUNK), total: rows.length, lot: (i/CHUNK)+1 } });\n}\nif (out.length === 0) out.push({ json: { rows: [], total: 0, lot: 0 } });\nreturn out;"
+      },
+      "id": "parse_prod",
+      "name": "🔧 Parse Production",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        840,
+        1800
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://tndwonqdbeszkcztkzqe.supabase.co/rest/v1/mouvements_production",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuZHdvbnFkYmVzemtjenRrenFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MDg1MTcsImV4cCI6MjA5NjI4NDUxN30.jRrq7nV2Y6KSW_JwHbyOSm4lvckTLmVcAAROhq6sSuw"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuZHdvbnFkYmVzemtjenRrenFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MDg1MTcsImV4cCI6MjA5NjI4NDUxN30.jRrq7nV2Y6KSW_JwHbyOSm4lvckTLmVcAAROhq6sSuw"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.rows) }}",
+        "options": {}
+      },
+      "id": "insert_prod",
+      "name": "💾 Insert Production",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        1800
+      ]
+    }
+  ],
+  "connections": {
+    "▶️ Démarrage Manuel": {
+      "main": [
+        [
+          {
+            "node": "🗑️ Purge Quittances",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "🗑️ Purge Clients",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "🗑️ Purge Contrats",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "🗑️ Purge Production",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⏰ Tous les jours 6h": {
+      "main": [
+        [
+          {
+            "node": "🗑️ Purge Quittances",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "🗑️ Purge Clients",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "🗑️ Purge Contrats",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "🗑️ Purge Production",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🗑️ Purge Quittances": {
+      "main": [
+        [
+          {
+            "node": "📥 Download Quittances",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📥 Download Quittances": {
+      "main": [
+        [
+          {
+            "node": "🔧 Parse Quittances",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔧 Parse Quittances": {
+      "main": [
+        [
+          {
+            "node": "💾 Insert Quittances",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "💾 Insert Quittances": {
+      "main": [
+        [
+          {
+            "node": "📊 Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🗑️ Purge Clients": {
+      "main": [
+        [
+          {
+            "node": "📥 Download Clients",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📥 Download Clients": {
+      "main": [
+        [
+          {
+            "node": "🔧 Parse Clients",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔧 Parse Clients": {
+      "main": [
+        [
+          {
+            "node": "💾 Insert Clients",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "💾 Insert Clients": {
+      "main": [
+        [
+          {
+            "node": "📊 Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🗑️ Purge Contrats": {
+      "main": [
+        [
+          {
+            "node": "📥 Download Contrats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📥 Download Contrats": {
+      "main": [
+        [
+          {
+            "node": "🔧 Parse Contrats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔧 Parse Contrats": {
+      "main": [
+        [
+          {
+            "node": "💾 Insert Contrats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "💾 Insert Contrats": {
+      "main": [
+        [
+          {
+            "node": "📊 Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🗑️ Purge Production": {
+      "main": [
+        [
+          {
+            "node": "📥 Download Production",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📥 Download Production": {
+      "main": [
+        [
+          {
+            "node": "🔧 Parse Production",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔧 Parse Production": {
+      "main": [
+        [
+          {
+            "node": "💾 Insert Production",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "💾 Insert Production": {
+      "main": [
+        [
+          {
+            "node": "📊 Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}
