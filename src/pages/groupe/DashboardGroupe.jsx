@@ -61,7 +61,7 @@ function BlocBanque({ comptes, loading }) {
   }
 
   // Solde total si tout révélé
-  const totalVisible = comptes.filter(c => revealed[c.id]).reduce((s,c) => s+(c.balance||0), 0)
+  const totalVisible = comptes.filter(c => revealed[c.id]).reduce((s,c) => s+(c.solde_actuel||0), 0)
   const allRevealed = comptes.length > 0 && comptes.every(c => revealed[c.id])
 
   return (
@@ -96,9 +96,9 @@ function BlocBanque({ comptes, loading }) {
         <>
           <div style={{ padding:'8px 0' }}>
             {comptes.map((c, i) => {
-              const soc = SOCIETES[c.societe_key] || {}
+              const soc = SOCIETES[c.societes?.code] || {}
               const show = revealed[c.id]
-              const bal = c.balance || 0
+              const bal = c.solde_actuel || 0
               const isNeg = bal < 0
               return (
                 <div key={c.id} style={{
@@ -117,10 +117,10 @@ function BlocBanque({ comptes, loading }) {
 
                   {/* Nom + IBAN */}
                   <div>
-                    <div style={{ fontSize:13, fontWeight:600, color:'#1e293b' }}>{c.nom || c.reference_name || '—'}</div>
+                    <div style={{ fontSize:13, fontWeight:600, color:'#1e293b' }}>{c.banque || '—'}</div>
                     <div style={{ fontSize:11, color:'#94a3b8' }}>
                       <span style={{ background:soc.color+'18', color:soc.color, fontWeight:700, padding:'1px 5px', borderRadius:3, fontSize:10, marginRight:5 }}>{soc.short||'?'}</span>
-                      {c.iban ? `${c.iban.slice(0,4)} •• ${c.iban.slice(-4)}` : c.account_type || 'Compte courant'}
+                      {c.iban ? `${c.iban.slice(0,4)} •• ${c.iban.slice(-4)}` : 'Compte courant'}
                     </div>
                   </div>
 
@@ -135,9 +135,9 @@ function BlocBanque({ comptes, loading }) {
                         ● ● ● ● ●
                       </span>
                     )}
-                    {c.balance_date && (
+                    {c.solde_actuel_date && (
                       <div style={{ fontSize:10, color:'#94a3b8', marginTop:1 }}>
-                        {show ? `Mis à jour ${fmtDate(c.balance_date)}` : ' '}
+                        {show ? `Mis à jour ${fmtDate(c.solde_actuel_date)}` : ' '}
                       </div>
                     )}
                   </div>
@@ -261,7 +261,7 @@ function BlocTresorerie({ comptes, transactions, loading }) {
 
   // Soldes par société
   const soldesParSoc = Object.entries(SOCIETES).map(([key, cfg]) => {
-    const total = comptes.filter(c=>c.societe_key===key).reduce((s,c)=>s+(c.balance||0),0)
+    const total = comptes.filter(c=>c.societes?.code===key).reduce((s,c)=>s+(c.solde_actuel||0),0)
     return { key, ...cfg, total }
   }).filter(s => s.total !== 0)
 
@@ -440,7 +440,7 @@ export default function DashboardGroupe() {
           { data: tsk },
           { data: obj },
         ] = await Promise.all([
-          supabase.from('bank_accounts').select('*').order('societe_key'),
+          supabase.from('comptes_bancaires').select('*, societes(code,nom)').eq('actif', true).order('banque'),
           supabase.from('transactions').select('id,date,date_valeur,montant,societe_id').gte('date', new Date(new Date().setMonth(new Date().getMonth()-6)).toISOString().slice(0,10)).limit(2000),
           supabase.from('taches').select('*').in('statut',['en_cours','en_attente','retard','urgent']).order('echeance',{ascending:true}).limit(100),
           supabase.from('objectives_global').select('*').eq('year',2026).eq('period_type','year'),
@@ -458,7 +458,7 @@ export default function DashboardGroupe() {
   const now = new Date()
   const nbRetard  = taches.filter(t => t.echeance && new Date(t.echeance) < now).length
   const nbEnCours = taches.filter(t => t.statut==='en_cours').length
-  const totalSoldes = comptes.reduce((s,c) => s+(c.balance||0), 0)
+  const totalSoldes = comptes.reduce((s,c) => s+(c.solde_actuel||0), 0)
 
   return (
     <Layout currentPage="Tableau de bord général">

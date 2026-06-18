@@ -1,5 +1,10 @@
+import Layout from '../../components/Layout'
 import ObjectifsView from '../../components/ObjectifsView'
 
 export default function DynassurObjectifs() {
-  return <ObjectifsView />
+  return (
+    <Layout currentPage="Objectifs">
+      <ObjectifsView />
+    </Layout>
+  )
 }
