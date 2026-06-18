@@ -217,6 +217,24 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
     .sort((a,b) => a.depenses - b.depenses)
   const nonCategorise = txFiltrees.filter(t => !t.categorie_id).length
 
+  // Synthèse mensuelle (recettes / dépenses par mois)
+  const MOIS_NOMS = ['', 'Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc']
+  const parMois = {}
+  txFiltrees.forEach(t => {
+    const d = t._date || ''
+    if (d.length < 7) return
+    const key = d.substring(0, 7) // YYYY-MM
+    if (!parMois[key]) parMois[key] = { recettes: 0, depenses: 0, nb: 0 }
+    const m = parseFloat(t.montant) || 0
+    if (m >= 0) parMois[key].recettes += m
+    else parMois[key].depenses += m
+    parMois[key].nb++
+  })
+  const syntheseMensuelle = Object.entries(parMois)
+    .map(([ym, v]) => ({ ym, annee: ym.substring(0,4), mois: parseInt(ym.substring(5,7)), ...v, solde: v.recettes + v.depenses }))
+    .sort((a, b) => a.ym.localeCompare(b.ym))
+  const maxFluxMois = Math.max(1, ...syntheseMensuelle.map(m => Math.max(m.recettes, Math.abs(m.depenses))))
+
   // Détail par fournisseur/contrepartie pour une catégorie donnée
   function detailFournisseurs(catId, sens) {
     const map = {}
@@ -431,6 +449,48 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       {nonCategorise > 0 && (
         <div style={{ marginBottom:'14px', padding:'10px 16px', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'8px', fontSize:'13px', color:'#92400e' }}>
           ⚠️ {nonCategorise} transaction{nonCategorise>1?'s':''} non catégorisée{nonCategorise>1?'s':''} — cliquez dessus pour leur attribuer une catégorie.
+        </div>
+      )}
+
+      {/* Synthèse mensuelle */}
+      {syntheseMensuelle.length > 0 && (
+        <div style={{ background:'#fff', borderRadius:'12px', border:'1px solid #e2e8f0', overflow:'hidden', marginBottom:'14px' }}>
+          <div style={{ padding:'12px 16px', background:'#f8fafc', borderBottom:'1px solid #e2e8f0', fontSize:'12px', fontWeight:'700', color:'#475569', textTransform:'uppercase', letterSpacing:'0.05em' }}>
+            📅 Évolution mensuelle
+          </div>
+          <div>
+            {syntheseMensuelle.map((m, i) => {
+              const pctR = (m.recettes / maxFluxMois) * 100
+              const pctD = (Math.abs(m.depenses) / maxFluxMois) * 100
+              return (
+                <div key={m.ym} style={{ padding:'10px 16px', borderBottom: i<syntheseMensuelle.length-1?'1px solid #f8fafc':'none', display:'grid', gridTemplateColumns: isMobile?'70px 1fr':'90px 1fr 120px', gap:'12px', alignItems:'center' }}>
+                  <div style={{ fontSize:'13px', fontWeight:'700', color:'#1e293b' }}>{MOIS_NOMS[m.mois]} {m.annee}</div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:'3px' }}>
+                    {/* Barre recettes */}
+                    <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
+                      <div style={{ flex:1, height:'8px', background:'#f1f5f9', borderRadius:'4px', overflow:'hidden' }}>
+                        <div style={{ height:'100%', width:`${pctR}%`, background:'#16a34a', borderRadius:'4px' }}></div>
+                      </div>
+                      <span style={{ fontSize:'11px', fontWeight:'600', color:'#16a34a', minWidth:'70px', textAlign:'right' }}>+{fmt(m.recettes)}</span>
+                    </div>
+                    {/* Barre dépenses */}
+                    <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
+                      <div style={{ flex:1, height:'8px', background:'#f1f5f9', borderRadius:'4px', overflow:'hidden' }}>
+                        <div style={{ height:'100%', width:`${pctD}%`, background:'#dc2626', borderRadius:'4px' }}></div>
+                      </div>
+                      <span style={{ fontSize:'11px', fontWeight:'600', color:'#dc2626', minWidth:'70px', textAlign:'right' }}>{fmt(m.depenses)}</span>
+                    </div>
+                  </div>
+                  {!isMobile && (
+                    <div style={{ textAlign:'right' }}>
+                      <div style={{ fontSize:'10px', color:'#94a3b8', textTransform:'uppercase', fontWeight:'700' }}>Solde</div>
+                      <div style={{ fontSize:'15px', fontWeight:'800', color: m.solde>=0?'#16a34a':'#dc2626' }}>{m.solde>=0?'+':''}{fmt(m.solde)}</div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
 
