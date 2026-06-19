@@ -1,5 +1,5 @@
-import PageEnConstruction from '../../components/PageEnConstruction'
+import LodeClientsModule from './LodeClientsModule'
 
 export default function LodeClients() {
-  return <PageEnConstruction titre="Clients" icon="ti-users" color="#ea580c" currentPage="Clients" />
+  return <LodeClientsModule />
 }
