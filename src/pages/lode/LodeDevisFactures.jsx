@@ -80,6 +80,25 @@ function Editeur({ type, doc, onClose, onSaved }) {
   })
   const [lignes, setLignes] = useState([{ description: '', quantite: 1, prix_unitaire: 0, remise_pct: 0, tva_pct: 21 }])
   const [saving, setSaving] = useState(false)
+  const [clientsList, setClientsList] = useState([])
+
+  useEffect(() => {
+    supabase.from('lode_clients').select('*').eq('actif', true).order('denomination', { nullsFirst: false })
+      .then(({ data }) => setClientsList(data || []))
+  }, [])
+
+  const choisirClient = (id) => {
+    if (!id) return
+    const c = clientsList.find(x => x.id === id)
+    if (!c) return
+    setF(p => ({
+      ...p,
+      client_id: c.id,
+      client_nom: c.type === 'entreprise' ? c.denomination : `${c.prenom || ''} ${c.nom || ''}`.trim(),
+      client_adresse: c.adresse || '', client_cp: c.cp || '', client_ville: c.ville || '',
+      client_email: c.email || '', client_telephone: c.telephone || c.gsm || '', client_tva: c.tva || '',
+    }))
+  }
 
   useEffect(() => {
     if (doc?.id) {
@@ -147,6 +166,19 @@ function Editeur({ type, doc, onClose, onSaved }) {
 
         {/* Client */}
         <div style={{ fontSize: 13, fontWeight: 800, color: ORANGE, marginBottom: 8 }}>Client</div>
+        {clientsList.length > 0 && (
+          <div style={{ marginBottom: 10 }}>
+            <label style={lbl}>Sélectionner un client encodé</label>
+            <select style={inp} value={f.client_id || ''} onChange={e => choisirClient(e.target.value)}>
+              <option value="">— Saisie manuelle ou choisir un client —</option>
+              {clientsList.map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.type === 'entreprise' ? '🏢 ' + (c.denomination || '') : '👤 ' + `${c.prenom || ''} ${c.nom || ''}`.trim()}{c.ville ? ' · ' + c.ville : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10, marginBottom: 8 }}>
           <div><label style={lbl}>Nom / société *</label><input style={inp} value={f.client_nom} onChange={e => set('client_nom', e.target.value)} /></div>
           <div><label style={lbl}>N° TVA</label><input style={inp} value={f.client_tva} onChange={e => set('client_tva', e.target.value)} /></div>
