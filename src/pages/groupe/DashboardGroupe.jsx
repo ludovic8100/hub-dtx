@@ -12,8 +12,8 @@ const SOCIETES = {
   prive:     { label:'Privé',          color:'#0d9488', colorDark:'#134e4a', short:'PRV' },
 }
 
-const ROUTES = {
-  dynassur:'/dynassur', dtx:'/dtx', lode:'/lode', hexagroup:'/hexagroup', prive:'/prive'
+const SOC_ROUTES = {
+  DYNASSUR: '/dynassur', DTX: '/dtx', LODE: '/lode', HEXAGROUP: '/hexagroup', PRIVE: '/prive'
 }
 
 const fmt = v => v == null ? '—' : new Intl.NumberFormat('fr-BE',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(v)
@@ -36,30 +36,75 @@ function Bar({ pct, col }) {
   )
 }
 
-// ── KPI Card ──
-function KpiCard({ label, value, sub, col, icon }) {
+// ── KPI Card — cliquable si onClick fourni ──
+function KpiCard({ label, value, sub, col, icon, onClick }) {
+  const [hov, setHov] = useState(false)
   return (
-    <div style={{ background:'#fff', borderRadius:10, border:'1px solid #e2e8f0', borderTop:`3px solid ${col||'#0080BD'}`, padding:'16px 20px' }}>
+    <div
+      onClick={onClick}
+      onMouseEnter={() => onClick && setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        background:'#fff', borderRadius:10,
+        border: hov ? `1px solid ${col||'#0080BD'}50` : '1px solid #e2e8f0',
+        borderTop:`3px solid ${col||'#0080BD'}`, padding:'16px 20px',
+        cursor: onClick ? 'pointer' : 'default',
+        transition:'box-shadow 0.15s, transform 0.1s, border-color 0.15s',
+        boxShadow: hov ? `0 4px 16px ${col||'#0080BD'}22` : '0 1px 3px rgba(0,0,0,0.04)',
+        transform: hov ? 'translateY(-1px)' : 'none',
+        position:'relative',
+      }}>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
         <div style={{ fontSize:11, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'.05em' }}>{label}</div>
         {icon && <i className={`ti ${icon}`} style={{ fontSize:18, color:col+'60' }} />}
       </div>
       <div style={{ fontSize:24, fontWeight:800, color:'#0f172a', lineHeight:1 }}>{value}</div>
       {sub && <div style={{ fontSize:12, color:'#64748b', marginTop:4 }}>{sub}</div>}
+      {onClick && (
+        <div style={{
+          marginTop:8, fontSize:11, color:col||'#0080BD', fontWeight:600,
+          display:'flex', alignItems:'center', gap:4,
+          opacity: hov ? 1 : 0.45, transition:'opacity 0.15s'
+        }}>
+          Voir le détail <i className="ti ti-arrow-right" style={{ fontSize:12 }} />
+        </div>
+      )}
     </div>
   )
 }
 
+// ── Petit lien inline "Voir tout →" ──
+function VoirTout({ label, to, col }) {
+  const navigate = useNavigate()
+  const [hov, setHov] = useState(false)
+  return (
+    <button
+      onClick={() => navigate(to)}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        background: hov ? (col||'#0080BD')+'12' : 'transparent',
+        border:`1px solid ${hov?(col||'#0080BD'):'#e2e8f0'}`,
+        borderRadius:6, padding:'3px 9px', cursor:'pointer',
+        fontSize:11, color: col||'#0080BD', fontWeight:600,
+        display:'flex', alignItems:'center', gap:4,
+        transition:'all 0.15s',
+      }}>
+      {label} <i className="ti ti-arrow-right" style={{ fontSize:11 }} />
+    </button>
+  )
+}
+
 // ══════════════════════════
-// BLOC 1 — Comptes bancaires (chiffres masqués par défaut)
+// BLOC 1 — Comptes bancaires
 // ══════════════════════════
 function BlocBanque({ comptes, loading }) {
+  const navigate = useNavigate()
   const [open, setOpen] = useState({})
   const [revealed, setRevealed] = useState({})
 
   const SOC_COLOR = { DYNASSUR:'#0080BD', DTX:'#94a3b8', LODE:'#ea580c', HEXAGROUP:'#dc2626', PRIVE:'#0d9488' }
 
-  // Grouper par société
   const parSociete = {}
   comptes.forEach(c => {
     const code = (c.societes?.code || 'AUTRE').toUpperCase()
@@ -88,7 +133,6 @@ function BlocBanque({ comptes, loading }) {
         )}
       </div>
 
-
       {loading ? (
         <div style={{ padding:30, textAlign:'center', color:'#94a3b8' }}>Chargement…</div>
       ) : comptes.length === 0 ? (
@@ -101,23 +145,41 @@ function BlocBanque({ comptes, loading }) {
           {Object.entries(parSociete).map(([code, soc]) => {
             const isOpen = open[code]
             const socRevealed = revealed[`soc_${code}`]
+            const route = SOC_ROUTES[code]
             return (
               <div key={code} style={{ borderBottom:'1px solid #f1f5f9' }}>
 
-                {/* Ligne société — montant global + flèche déroulante */}
-                <div style={{ display:'flex', alignItems:'center', padding:'11px 18px', gap:10,
+                {/* Ligne société — cliquable → dashboard société */}
+                <div style={{
+                  display:'flex', alignItems:'center', padding:'11px 18px', gap:10,
                   background: isOpen ? soc.color+'08' : '#fff',
-                  transition:'background 0.15s', cursor:'default' }}>
-
-                  {/* Pastille couleur + nom */}
+                  transition:'background 0.15s'
+                }}>
+                  {/* Pastille + nom cliquable */}
                   <div style={{ width:10, height:10, borderRadius:'50%', background:soc.color, flexShrink:0 }} />
-                  <span style={{ fontSize:13, fontWeight:700, color:'#1e293b', flex:1 }}>{soc.nom || code}</span>
+                  <span
+                    onClick={() => route && navigate(route)}
+                    title={route ? `Aller vers ${soc.nom}` : ''}
+                    style={{
+                      fontSize:13, fontWeight:700, color:'#1e293b', flex:1,
+                      cursor: route ? 'pointer' : 'default',
+                      textDecoration: 'none',
+                      display:'flex', alignItems:'center', gap:5,
+                    }}
+                    onMouseEnter={e => { if(route) { e.target.style.color = soc.color; e.target.style.textDecoration='underline' } }}
+                    onMouseLeave={e => { e.target.style.color = '#1e293b'; e.target.style.textDecoration='none' }}
+                  >
+                    {soc.nom || code}
+                    {route && <i className="ti ti-arrow-up-right" style={{ fontSize:11, opacity:0.5 }} />}
+                  </span>
                   <span style={{ fontSize:11, color:'#94a3b8' }}>{soc.comptes.length} compte{soc.comptes.length>1?'s':''}</span>
 
-                  {/* Montant global — avec œil pour révéler */}
-                  <span style={{ fontSize:15, fontWeight:800, minWidth:100, textAlign:'right',
+                  {/* Montant global */}
+                  <span style={{
+                    fontSize:15, fontWeight:800, minWidth:100, textAlign:'right',
                     color: socRevealed ? (soc.total<0?'#dc2626':soc.color) : '#cbd5e1',
-                    letterSpacing: socRevealed?'.01em':'.1em' }}>
+                    letterSpacing: socRevealed?'.01em':'.1em'
+                  }}>
                     {socRevealed ? fmt(soc.total) : '● ● ● ●'}
                   </span>
 
@@ -137,7 +199,7 @@ function BlocBanque({ comptes, loading }) {
                   </button>
                 </div>
 
-                {/* Détail comptes — visible si ouvert */}
+                {/* Détail comptes */}
                 {isOpen && (
                   <div style={{ background:'#fafafe', borderTop:`1px solid ${soc.color}20` }}>
                     {soc.comptes.map((c, i) => {
@@ -148,7 +210,8 @@ function BlocBanque({ comptes, loading }) {
                           display:'grid', gridTemplateColumns:'1fr auto auto',
                           alignItems:'center', gap:12,
                           padding:'9px 18px 9px 36px',
-                          borderBottom: i<soc.comptes.length-1?'1px solid #f1f5f9':'none' }}>
+                          borderBottom: i<soc.comptes.length-1?'1px solid #f1f5f9':'none'
+                        }}>
                           <div>
                             <div style={{ fontSize:13, fontWeight:500, color:'#374151' }}>{c.banque}</div>
                             <div style={{ fontSize:11, color:'#94a3b8', fontFamily:'monospace' }}>
@@ -192,6 +255,7 @@ function BlocBanque({ comptes, loading }) {
 // BLOC 2 — Tâches en cours
 // ══════════════════════════
 function BlocTaches({ taches, bordereaux, loading }) {
+  const navigate = useNavigate()
   const now = new Date()
   const STATUT_STYLE = {
     en_retard:  { bg:'#fee2e2', color:'#dc2626', label:'⚠ Retard' },
@@ -221,14 +285,25 @@ function BlocTaches({ taches, bordereaux, loading }) {
             {bordereaux.length} bordereau{bordereaux.length>1?'x':''} ⚠
           </span>
         )}
+        {/* Lien "Voir toutes" aligné à droite */}
+        <div style={{ marginLeft:'auto' }}>
+          <VoirTout label="Toutes les tâches" to="/dynassur/taches" col="#f59e0b" />
+        </div>
       </div>
 
-      {/* Section bordereaux manquants */}
+      {/* Section bordereaux manquants — cliquable */}
       {!loading && bordereaux.length > 0 && (
-        <div style={{ background:'#fff5f5', borderBottom:'2px solid #fecaca' }}>
+        <div
+          onClick={() => navigate('/dynassur/bordereaux')}
+          style={{ background:'#fff5f5', borderBottom:'2px solid #fecaca', cursor:'pointer', transition:'background 0.15s' }}
+          onMouseEnter={e => e.currentTarget.style.background='#fee2e2'}
+          onMouseLeave={e => e.currentTarget.style.background='#fff5f5'}
+          title="Ouvrir le module Bordereaux"
+        >
           <div style={{ padding:'8px 18px 4px', fontSize:10, fontWeight:700, color:'#dc2626', textTransform:'uppercase', letterSpacing:'.05em', display:'flex', alignItems:'center', gap:6 }}>
             <i className="ti ti-alert-triangle" style={{ fontSize:13 }} />
-            Bordereaux non réconciliés
+            Bordereaux non réconciliés — cliquer pour voir
+            <i className="ti ti-arrow-right" style={{ fontSize:11, marginLeft:'auto' }} />
           </div>
           <div style={{ maxHeight:160, overflowY:'auto' }}>
             {bordereaux.slice(0,10).map((b,i) => {
@@ -275,13 +350,21 @@ function BlocTaches({ taches, bordereaux, loading }) {
             const s = t.isRetard ? STATUT_STYLE.en_retard : (STATUT_STYLE[t.statut] || STATUT_STYLE.en_cours)
             const socCfg = t.societe ? SOCIETES[t.societe.toLowerCase()] : null
             return (
-              <div key={t.id} style={{
-                display:'grid', gridTemplateColumns:'1fr auto auto',
-                alignItems:'center', gap:10,
-                padding:'9px 18px',
-                borderBottom: i < Math.min(enriched.length,20)-1 ? '1px solid #f8fafc' : 'none',
-                background: t.isRetard ? '#fff5f5' : i%2===0?'#fff':'#fafafa'
-              }}>
+              <div
+                key={t.id}
+                onClick={() => navigate('/dynassur/taches')}
+                style={{
+                  display:'grid', gridTemplateColumns:'1fr auto auto',
+                  alignItems:'center', gap:10,
+                  padding:'9px 18px',
+                  borderBottom: i < Math.min(enriched.length,20)-1 ? '1px solid #f8fafc' : 'none',
+                  background: t.isRetard ? '#fff5f5' : i%2===0?'#fff':'#fafafa',
+                  cursor:'pointer', transition:'background 0.12s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = t.isRetard ? '#fee2e2' : '#f0f9ff'}
+                onMouseLeave={e => e.currentTarget.style.background = t.isRetard ? '#fff5f5' : i%2===0?'#fff':'#fafafa'}
+                title="Ouvrir les tâches"
+              >
                 <div>
                   <div style={{ fontSize:13, fontWeight:t.isRetard?700:500, color:'#1e293b' }}>
                     {t.titre || '—'}
@@ -302,8 +385,10 @@ function BlocTaches({ taches, bordereaux, loading }) {
             )
           })}
           {enriched.length > 20 && (
-            <div style={{ padding:'10px 18px', textAlign:'center', fontSize:12, color:'#94a3b8' }}>
-              + {enriched.length-20} tâches supplémentaires
+            <div
+              onClick={() => navigate('/dynassur/taches')}
+              style={{ padding:'10px 18px', textAlign:'center', fontSize:12, color:'#0080BD', fontWeight:600, cursor:'pointer', background:'#f8fafc' }}>
+              + {enriched.length-20} tâches supplémentaires — voir tout →
             </div>
           )}
         </div>
@@ -316,11 +401,11 @@ function BlocTaches({ taches, bordereaux, loading }) {
 // BLOC 3 — Trésorerie consolidée
 // ══════════════════════════
 function BlocTresorerie({ comptes, transactions, loading }) {
+  const navigate = useNavigate()
   const MOIS = ['Jan','Fév','Mar','Apr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc']
   const now = new Date()
   const [revealed, setRevealed] = useState({})
 
-  // Soldes par société
   const soldesParSoc = Object.entries(SOCIETES).map(([key, cfg]) => {
     const total = comptes.filter(c=>(c.societes?.code||'').toUpperCase()===key.toUpperCase()).reduce((s,c)=>s+parseFloat(c.solde_actuel||0),0)
     return { key, ...cfg, total }
@@ -329,7 +414,6 @@ function BlocTresorerie({ comptes, transactions, loading }) {
   const totalGroupe = soldesParSoc.reduce((s,r)=>s+r.total,0)
   const allRevealed = soldesParSoc.length > 0 && soldesParSoc.every(s => revealed[s.key])
 
-  // Revenus/dépenses des 6 derniers mois depuis transactions
   const sixMois = Array.from({length:6},(_,i)=>{
     const d = new Date(now.getFullYear(), now.getMonth()-5+i, 1)
     return { month: d.getMonth(), year: d.getFullYear(), label: MOIS[d.getMonth()] }
@@ -371,14 +455,24 @@ function BlocTresorerie({ comptes, transactions, loading }) {
           </button>
         </div>
 
-        {/* Par société */}
+        {/* Par société — cliquable → dashboard */}
         <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:18 }}>
           {soldesParSoc.map(s => {
             const show = revealed[s.key]
+            const route = SOC_ROUTES[s.key.toUpperCase()]
             return (
-              <div key={s.key} style={{ display:'flex', alignItems:'center', gap:10, padding:'7px 10px', borderRadius:8, background:'#f8fafc' }}>
+              <div key={s.key} style={{ display:'flex', alignItems:'center', gap:10, padding:'7px 10px', borderRadius:8, background:'#f8fafc',
+                cursor: route?'pointer':'default', transition:'background 0.12s' }}
+                onClick={() => route && navigate(route)}
+                onMouseEnter={e => { if(route) e.currentTarget.style.background = s.color+'12' }}
+                onMouseLeave={e => e.currentTarget.style.background = '#f8fafc'}
+                title={route ? `Voir ${s.label}` : ''}
+              >
                 <div style={{ width:10, height:10, borderRadius:'50%', background:s.color, flexShrink:0 }} />
-                <span style={{ fontSize:12, color:'#64748b', flex:1 }}>{s.label}</span>
+                <span style={{ fontSize:12, color:'#64748b', flex:1, display:'flex', alignItems:'center', gap:4 }}>
+                  {s.label}
+                  {route && <i className="ti ti-arrow-up-right" style={{ fontSize:10, opacity:0.4 }} />}
+                </span>
                 <span style={{ fontSize:13, fontWeight:700, minWidth:90, textAlign:'right',
                   color: show?(s.total<0?'#dc2626':s.color):'#cbd5e1',
                   letterSpacing: show?'normal':'.1em' }}>
@@ -389,7 +483,7 @@ function BlocTresorerie({ comptes, transactions, loading }) {
                     <div style={{ width: show?`${Math.abs(s.total)/Math.max(Math.abs(totalGroupe),1)*100}%`:'0%', height:'100%', background:s.color, borderRadius:3, transition:'width 0.4s' }} />
                   </div>
                 </div>
-                <button onClick={() => setRevealed(r => ({ ...r, [s.key]: !r[s.key] }))}
+                <button onClick={e => { e.stopPropagation(); setRevealed(r => ({ ...r, [s.key]: !r[s.key] })) }}
                   style={{ background:show?'#f0fdf4':'#fff', border:`1px solid ${show?'#bbf7d0':'#e2e8f0'}`,
                     borderRadius:6, padding:'3px 6px', cursor:'pointer', color:show?'#16a34a':'#94a3b8', fontSize:12 }}>
                   <i className={`ti ${show?'ti-eye-off':'ti-eye'}`} />
@@ -429,9 +523,10 @@ function BlocTresorerie({ comptes, transactions, loading }) {
 }
 
 // ══════════════════════════
-// BLOC 4 — Production Dynassur
+// BLOC 4 — Production Dynassur (entièrement cliquable)
 // ══════════════════════════
 function BlocProduction({ loading: loadingExt }) {
+  const navigate = useNavigate()
   const [prod, setProd] = useState([])
   const [loading, setLoading] = useState(true)
   const now = new Date()
@@ -439,12 +534,12 @@ function BlocProduction({ loading: loadingExt }) {
   const mois = String(now.getMonth() + 1).padStart(2, '0')
 
   const TYPES = {
-    'N.A.':                    { label:'Nouvelles Affaires',       col:'#16a34a', sign:+1 },
-    'Mandat faveur':            { label:'Mandats faveur',           col:'#0080BD', sign:+1 },
-    'Mandat défaveur':          { label:'Mandats défaveur',         col:'#f59e0b', sign:-1 },
-    'Renon':                    { label:'Résiliations',             col:'#dc2626', sign:-1 },
-    'Résiliation Non paiement': { label:'Résil. non-paiement',      col:'#dc2626', sign:-1 },
-    'Avenant':                  { label:'Avenants',                 col:'#94a3b8', sign:0  },
+    'N.A.':                    { label:'Nouvelles Affaires',  col:'#16a34a', sign:+1 },
+    'Mandat faveur':            { label:'Mandats faveur',      col:'#0080BD', sign:+1 },
+    'Mandat défaveur':          { label:'Mandats défaveur',    col:'#f59e0b', sign:-1 },
+    'Renon':                    { label:'Résiliations',        col:'#dc2626', sign:-1 },
+    'Résiliation Non paiement': { label:'Résil. non-paiement', col:'#dc2626', sign:-1 },
+    'Avenant':                  { label:'Avenants',            col:'#94a3b8', sign:0  },
   }
 
   useEffect(() => {
@@ -454,7 +549,6 @@ function BlocProduction({ loading: loadingExt }) {
       .then(({ data }) => { setProd(data || []); setLoading(false) })
   }, [])
 
-  // Comptage par type pour le mois en cours et l'année
   const byType = {}
   Object.keys(TYPES).forEach(t => { byType[t] = { mois: 0, annee: 0 } })
   prod.forEach(p => {
@@ -463,57 +557,97 @@ function BlocProduction({ loading: loadingExt }) {
     if (p.mois === mois) byType[p.type_prod].mois++
   })
 
-  // Solde net NA
   const naAnnee = byType['N.A.']?.annee || 0
   const renonAnnee = (byType['Renon']?.annee || 0) + (byType['Résiliation Non paiement']?.annee || 0) + (byType['Mandat défaveur']?.annee || 0)
   const soldeNet = naAnnee - renonAnnee
 
-  // Top agents NA ce mois
   const agentsMois = {}
   prod.filter(p => p.mois === mois && p.type_prod === 'N.A.').forEach(p => {
     agentsMois[p.agent_code] = (agentsMois[p.agent_code] || 0) + 1
   })
   const topAgents = Object.entries(agentsMois).sort((a,b) => b[1]-a[1]).slice(0,5)
-
   const AGENT_NOMS = { GGO:'G. Godfroid', TJA:'T. Japsenne', PFQ:'P. Fernandez', MTE:'M. Terrana', NGI:'N. Ginis', LDE:'L. Detilloux' }
 
   return (
-    <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
-      <div style={{ padding:'14px 18px', borderBottom:'1px solid #f1f5f9', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+    <div
+      style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}
+    >
+      {/* Header — clic → production */}
+      <div
+        onClick={() => navigate('/dynassur/production')}
+        style={{
+          padding:'14px 18px', borderBottom:'1px solid #f1f5f9',
+          display:'flex', alignItems:'center', justifyContent:'space-between',
+          cursor:'pointer', transition:'background 0.15s',
+        }}
+        onMouseEnter={e => e.currentTarget.style.background='#eff6ff'}
+        onMouseLeave={e => e.currentTarget.style.background=''}
+        title="Aller vers la production Dynassur"
+      >
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
           <i className="ti ti-chart-line" style={{ fontSize:16, color:'#0080BD' }} />
           <span style={{ fontSize:13, fontWeight:700, color:'#0f172a' }}>Production {annee}</span>
+          <i className="ti ti-arrow-up-right" style={{ fontSize:11, color:'#0080BD', opacity:0.6 }} />
         </div>
         <span style={{ fontSize:11, background:'#e0f2fe', color:'#0080BD', padding:'2px 8px', borderRadius:10, fontWeight:700 }}>DYNASSUR</span>
       </div>
-
 
       {loading ? (
         <div style={{ padding:30, textAlign:'center', color:'#94a3b8' }}>Chargement…</div>
       ) : (
         <div style={{ padding:16 }}>
 
-          {/* Solde net en gros */}
+          {/* Solde net + NA ce mois — cliquables */}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:16 }}>
-            <div style={{ background: soldeNet>=0?'#f0fdf4':'#fff5f5', borderRadius:8, padding:'12px 14px', border:`1px solid ${soldeNet>=0?'#bbf7d0':'#fecaca'}` }}>
+            <div
+              onClick={() => navigate('/dynassur/production')}
+              style={{
+                background: soldeNet>=0?'#f0fdf4':'#fff5f5',
+                borderRadius:8, padding:'12px 14px',
+                border:`1px solid ${soldeNet>=0?'#bbf7d0':'#fecaca'}`,
+                cursor:'pointer', transition:'box-shadow 0.15s, transform 0.1s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.boxShadow='0 3px 12px rgba(0,0,0,0.08)'; e.currentTarget.style.transform='translateY(-1px)' }}
+              onMouseLeave={e => { e.currentTarget.style.boxShadow=''; e.currentTarget.style.transform='' }}
+              title="Voir la production"
+            >
               <div style={{ fontSize:10, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:4 }}>Solde net {annee}</div>
               <div style={{ fontSize:26, fontWeight:900, color: soldeNet>=0?'#16a34a':'#dc2626' }}>{soldeNet>0?'+':''}{fmtN(soldeNet)}</div>
               <div style={{ fontSize:11, color:'#64748b' }}>{fmtN(naAnnee)} NA − {fmtN(renonAnnee)} résil.</div>
+              <div style={{ fontSize:10, color:'#0080BD', marginTop:6, fontWeight:600 }}>Voir détail →</div>
             </div>
-            <div style={{ background:'#eff6ff', borderRadius:8, padding:'12px 14px', border:'1px solid #bfdbfe' }}>
+            <div
+              onClick={() => navigate('/dynassur/production')}
+              style={{
+                background:'#eff6ff', borderRadius:8, padding:'12px 14px',
+                border:'1px solid #bfdbfe', cursor:'pointer',
+                transition:'box-shadow 0.15s, transform 0.1s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.boxShadow='0 3px 12px rgba(0,0,0,0.08)'; e.currentTarget.style.transform='translateY(-1px)' }}
+              onMouseLeave={e => { e.currentTarget.style.boxShadow=''; e.currentTarget.style.transform='' }}
+              title="Voir la production"
+            >
               <div style={{ fontSize:10, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:4 }}>NA ce mois</div>
               <div style={{ fontSize:26, fontWeight:900, color:'#0080BD' }}>{fmtN(byType['N.A.']?.mois||0)}</div>
               <div style={{ fontSize:11, color:'#64748b' }}>Mois {mois}/{annee}</div>
+              <div style={{ fontSize:10, color:'#0080BD', marginTop:6, fontWeight:600 }}>Voir détail →</div>
             </div>
           </div>
 
-          {/* Tableau types de mouvements */}
+          {/* Tableau types */}
           <div style={{ marginBottom:14 }}>
             {Object.entries(TYPES).filter(([,v])=>v.sign!==0).map(([type, cfg]) => {
               const d = byType[type] || { mois:0, annee:0 }
               if (d.annee === 0 && d.mois === 0) return null
               return (
-                <div key={type} style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 0', borderBottom:'1px solid #f8fafc' }}>
+                <div
+                  key={type}
+                  onClick={() => navigate('/dynassur/production')}
+                  style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 4px', borderBottom:'1px solid #f8fafc',
+                    cursor:'pointer', borderRadius:4, transition:'background 0.12s' }}
+                  onMouseEnter={e => e.currentTarget.style.background='#f8fafc'}
+                  onMouseLeave={e => e.currentTarget.style.background=''}
+                >
                   <div style={{ width:6, height:6, borderRadius:'50%', background:cfg.col, flexShrink:0 }} />
                   <span style={{ fontSize:12, color:'#64748b', flex:1 }}>{cfg.label}</span>
                   <span style={{ fontSize:11, color:'#94a3b8' }}>ce mois : <strong style={{ color:cfg.col }}>{d.mois}</strong></span>
@@ -538,6 +672,11 @@ function BlocProduction({ loading: loadingExt }) {
               ))}
             </div>
           )}
+
+          {/* Lien bas de bloc */}
+          <div style={{ marginTop:14, textAlign:'center' }}>
+            <VoirTout label="Production complète" to="/dynassur/production" col="#0080BD" />
+          </div>
         </div>
       )}
     </div>
@@ -548,6 +687,7 @@ function BlocProduction({ loading: loadingExt }) {
 // PAGE PRINCIPALE
 // ══════════════════════════
 export default function DashboardGroupe() {
+  const navigate = useNavigate()
   const [comptes, setComptes]           = useState([])
   const [bordereaux, setBordereaux]     = useState([])
   const [transactions, setTransactions] = useState([])
@@ -582,7 +722,6 @@ export default function DashboardGroupe() {
   const now = new Date()
   const nbRetard  = taches.filter(t => t.echeance && new Date(t.echeance) < now).length
   const nbEnCours = taches.filter(t => t.statut==='en_cours').length
-  const totalSoldes = comptes.reduce((s,c) => s+(c.solde_actuel||0), 0)
 
   return (
     <Layout currentPage="Tableau de bord général">
@@ -594,21 +733,37 @@ export default function DashboardGroupe() {
           <p style={{ fontSize:14, color:'#64748b', margin:0 }}>Vue consolidée — Groupe DTX · Dynassur · LODE · Hexagroup · Privé</p>
         </div>
 
-        {/* KPIs rapides */}
+        {/* KPIs rapides — tous cliquables */}
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:14, marginBottom:28 }}>
-          <KpiCard label="Tâches en cours" value={nbEnCours} col="#f59e0b" icon="ti-checkbox" sub={`dont ${nbRetard} en retard`} />
-          <KpiCard label="Tâches en retard" value={nbRetard} col={nbRetard>0?"#dc2626":"#16a34a"} icon="ti-alert-triangle" sub={nbRetard>0?'⚠ action requise':'✓ aucun retard'} />
-          <KpiCard label="Comptes connectés" value={comptes.length} col="#7c3aed" icon="ti-credit-card" sub="via Ponto / ING" />
-          <KpiCard label="Objectifs 2026" value="configurés" col="#0080BD" icon="ti-target" sub="Dynassur — voir détail" />
+          <KpiCard
+            label="Tâches en cours" value={nbEnCours} col="#f59e0b" icon="ti-checkbox"
+            sub={`dont ${nbRetard} en retard`}
+            onClick={() => navigate('/dynassur/taches')}
+          />
+          <KpiCard
+            label="Tâches en retard" value={nbRetard} col={nbRetard>0?"#dc2626":"#16a34a"} icon="ti-alert-triangle"
+            sub={nbRetard>0?'⚠ action requise':'✓ aucun retard'}
+            onClick={() => navigate('/dynassur/taches')}
+          />
+          <KpiCard
+            label="Comptes connectés" value={comptes.length} col="#7c3aed" icon="ti-credit-card"
+            sub="via Ponto / ING"
+            onClick={() => navigate('/dynassur')}
+          />
+          <KpiCard
+            label="Objectifs 2026" value="configurés" col="#0080BD" icon="ti-target"
+            sub="Dynassur — voir détail"
+            onClick={() => navigate('/dynassur/objectifs')}
+          />
         </div>
 
-        {/* Grille principale : 2 colonnes */}
+        {/* Grille principale */}
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginBottom:20 }}>
           <BlocBanque comptes={comptes} loading={loading} />
           <BlocTaches taches={taches} bordereaux={bordereaux} loading={loading} />
         </div>
 
-        {/* Grille secondaire : 2 colonnes */}
+        {/* Grille secondaire */}
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20 }}>
           <BlocTresorerie comptes={comptes} transactions={transactions} loading={loading} />
           <BlocProduction />
