@@ -4,12 +4,11 @@
 export const LODE = {
   raison_sociale: 'LODE SRL',
   activite: 'Portes de garage · Stores · Pergolas',
-  // ⚠️ À COMPLÉTER : adresse exacte du siège
-  adresse: 'Adresse à compléter',
-  cp: '',
-  ville: '',
+  adresse: 'Chaussée de Tongres 474',
+  cp: '4450',
+  ville: 'Juprelle',
   pays: 'Belgique',
-  tva: 'BE 1010.062.582',     // ⚠️ à confirmer
+  tva: 'BE 1010.062.582',
   iban: 'BE40 3632 4445 2063',
   bic: 'BBRUBEBB',            // ING
   banque: 'ING',
