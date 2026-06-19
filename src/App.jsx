@@ -31,6 +31,7 @@ import DashboardLode      from './pages/lode/DashboardLode'
 import LodeClients        from './pages/lode/LodeClients'
 import LodeBanque         from './pages/lode/LodeBanque'
 import LodeComptabilite   from './pages/lode/LodeComptabilite'
+import LodeDevisFactures  from './pages/lode/LodeDevisFactures'
 
 import DashboardHexagroup  from './pages/hexagroup/DashboardHexagroup'
 import HexagroupBanque     from './pages/hexagroup/HexagroupBanque'
@@ -100,6 +101,7 @@ export default function App() {
           {/* LODE */}
           <Route path="/lode"               element={<P><DashboardLode /></P>} />
           <Route path="/lode/clients"       element={<P><LodeClients /></P>} />
+          <Route path="/lode/devis-factures" element={<P><LodeDevisFactures /></P>} />
           <Route path="/lode/banque"        element={<P><LodeBanque /></P>} />
           <Route path="/lode/comptabilite"  element={<P><LodeComptabilite /></P>} />
 

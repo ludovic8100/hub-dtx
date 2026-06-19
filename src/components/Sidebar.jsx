@@ -27,6 +27,7 @@ const MODULES = {
   lode: [
     { key: 'lode_dashboard',    label: 'Tableau de bord', icon: 'ti-layout-dashboard', path: '/lode' },
     { key: 'lode_clients',      label: 'Clients',          icon: 'ti-users',            path: '/lode/clients' },
+    { key: 'lode_devis',        label: 'Devis & Factures', icon: 'ti-file-invoice',     path: '/lode/devis-factures' },
     { key: 'lode_comptabilite', label: 'Comptabilité',     icon: 'ti-calculator',       path: '/lode/comptabilite' },
   ],
   hexagroup: [
