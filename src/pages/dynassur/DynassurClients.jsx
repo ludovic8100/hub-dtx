@@ -109,52 +109,133 @@ function Primes({ dossier }) {
   )
 }
 
-// ══ Relations familiales ══
+// ══ Objets de risque (table risques liée par police de contrat) ══
+function Risques({ contrats, loadContrats }) {
+  const [risques,setRisques]=useState([]); const [load,setLoad]=useState(true)
+  // Icône par type de risque Brio
+  const RICON = u => {
+    const t=(u||'').toUpperCase()
+    if(t.includes('VÉHIC')||t.includes('VEHIC')||t.includes('AUTO')) return '🚗'
+    if(t.includes('BÂTIMENT')||t.includes('BATIMENT')||t.includes('HABITATION')||t.includes('IMMEUBLE')) return '🏠'
+    if(t.includes('PERSONNE')||t.includes('VIE')) return '💙'
+    if(t.includes('RESPONSAB')) return '⚖️'
+    if(t.includes('NAVIGATION')||t.includes('BATEAU')) return '⛵'
+    return '🛡️'
+  }
+  useEffect(()=>{
+    if(loadContrats) return
+    const polices=[...new Set(contrats.map(c=>c.police).filter(Boolean))]
+    if(!polices.length){ setRisques([]); setLoad(false); return }
+    setLoad(true)
+    // batch par 100 polices pour éviter URL trop longue
+    const fetchAll=async()=>{
+      const out=[]
+      for(let i=0;i<polices.length;i+=100){
+        const chunk=polices.slice(i,i+100)
+        const{data}=await supabase.from('risques')
+          .select('police,type_risque_libelle,description,actif,total_contrats_en_cours,gestionnaire')
+          .in('police',chunk)
+        if(data) out.push(...data)
+      }
+      setRisques(out); setLoad(false)
+    }
+    fetchAll()
+  },[contrats,loadContrats])
+
+  if(loadContrats||load) return <p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>
+  if(!risques.length) return <p style={{color:'#94a3b8',fontSize:12}}>Aucun objet de risque trouvé pour ce client</p>
+
+  // Grouper par type
+  const parType={}
+  risques.forEach(r=>{ const k=r.type_risque_libelle||'Autre'; if(!parType[k])parType[k]=[]; parType[k].push(r) })
+
+  return(
+    <div style={{display:'flex',flexDirection:'column',gap:12}}>
+      {/* Badges résumé par type */}
+      <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+        {Object.entries(parType).map(([type,arr],i)=>(
+          <div key={i} style={{display:'flex',alignItems:'center',gap:8,background:'#faf5ff',borderRadius:9,padding:'9px 14px',border:'1px solid #e9d5ff'}}>
+            <span style={{fontSize:22}}>{RICON(type)}</span>
+            <div>
+              <div style={{fontSize:12,fontWeight:700,color:'#1e293b'}}>{type}</div>
+              <div style={{fontSize:10,color:'#94a3b8'}}>{arr.length} objet{arr.length>1?'s':''}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+      {/* Détail */}
+      <div style={{overflowX:'auto',maxHeight:240,overflowY:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+          <thead style={{position:'sticky',top:0,background:'#f8fafc',zIndex:1}}>
+            <tr>{['Police','Type','Description','Contrats','Statut'].map(h=>(
+              <th key={h} style={{padding:'7px 12px',textAlign:'left',fontWeight:700,color:'#94a3b8',fontSize:10,textTransform:'uppercase',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>
+            ))}</tr>
+          </thead>
+          <tbody>
+            {risques.map((r,i)=>(
+              <tr key={i} style={{background:i%2===0?'#fff':'#fafafe'}}>
+                <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',fontFamily:'monospace',fontSize:11,fontWeight:600,color:NAVY}}>{r.police}</td>
+                <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#1e293b'}}>{RICON(r.type_risque_libelle)} {r.type_risque_libelle||'—'}</td>
+                <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{r.description||'—'}</td>
+                <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',textAlign:'center',color:'#64748b'}}>{r.total_contrats_en_cours||0}</td>
+                <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9'}}>
+                  <span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:4,background:r.actif?'#dcfce7':'#fee2e2',color:r.actif?'#16a34a':'#dc2626'}}>{r.actif?'Actif':'Inactif'}</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+// ══ Relations familiales (vue v_famille_clients depuis Brio) ══
 function Relations({ dossier, onSelectMembre }) {
   const [rels,setRels]=useState([]); const [load,setLoad]=useState(true)
+  // Icône/couleur par type de relation Brio
+  const relCfg = lib => {
+    const t=(lib||'').toLowerCase()
+    if(t.includes('conjoint')||t.includes('époux')||t.includes('epoux')||t.includes('marié')) return {icon:'💍',col:'#ec4899',bg:'#fdf2f8'}
+    if(t.includes('cohabitant')) return {icon:'🏡',col:'#0d9488',bg:'#f0fdfa'}
+    if(t.includes('enfant')||t.includes('fils')||t.includes('fille')) return {icon:'👶',col:'#7c3aed',bg:'#f5f3ff'}
+    if(t.includes('parent')||t.includes('père')||t.includes('mère')||t.includes('pere')||t.includes('mere')) return {icon:'👨‍👩‍👧',col:'#0d9488',bg:'#f0fdfa'}
+    if(t.includes('frère')||t.includes('soeur')||t.includes('sœur')||t.includes('frere')) return {icon:'👫',col:'#2563eb',bg:'#eff6ff'}
+    if(t.includes('cousin')) return {icon:'🧑‍🤝‍🧑',col:'#2563eb',bg:'#eff6ff'}
+    if(t.includes('société')||t.includes('societe')||t.includes('entreprise')||t.includes('morale')) return {icon:'🏢',col:'#94a3b8',bg:'#f8fafc'}
+    return {icon:'🔗',col:'#64748b',bg:'#f1f5f9'}
+  }
   useEffect(()=>{
-    supabase.from('client_relations')
-      .select('*')
-      .or(`dossier_a.eq.${dossier},dossier_b.eq.${dossier}`)
-      .then(async({data})=>{
-        if(!data?.length){ setLoad(false); return }
-        const dossiersLies=[...new Set(data.map(r=>r.dossier_a===dossier?r.dossier_b:r.dossier_a))]
-        const{data:clients}=await supabase.from('clients').select('dossier,nom,prenom,gsm,email,gestionnaire_nom,sa_nom').in('dossier',dossiersLies)
-        const clientMap=Object.fromEntries((clients||[]).map(c=>[c.dossier,c]))
-        const enriched=data.map(r=>{
-          const autreD=r.dossier_a===dossier?r.dossier_b:r.dossier_a
-          const typeAffiche=r.dossier_a===dossier?r.type_relation:(r.type_relation==='enfant'?'parent':r.type_relation==='parent'?'enfant':r.type_relation)
-          return{...r,autreD,typeAffiche,client:clientMap[autreD]}
-        })
-        setRels(enriched); setLoad(false)
-      })
+    if(!dossier){ setLoad(false); return }
+    setLoad(true)
+    supabase.from('v_famille_clients')
+      .select('numero_brio,relation,relation_active,nom_lie,prenom_lie,cp_lie,localite_lie,dossier_lie,gsm_lie,email_lie')
+      .eq('dossier_principal',dossier)
+      .then(({data})=>{ setRels(data||[]); setLoad(false) })
   },[dossier])
+
   if(load) return <p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>
   if(!rels.length) return (
-    <div style={{color:'#94a3b8',fontSize:12,fontStyle:'italic'}}>
-      Aucune relation enregistrée.&nbsp;
-      <span style={{color:BLUE,textDecoration:'underline',cursor:'pointer'}}>Ajouter une relation →</span>
-    </div>
+    <div style={{color:'#94a3b8',fontSize:12,fontStyle:'italic'}}>Aucune relation enregistrée pour ce dossier.</div>
   )
   return(
     <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
       {rels.map((r,i)=>{
-        const cfg=REL_MAP[r.typeAffiche]||REL_MAP.autre
-        const c=r.client
+        const cfg=relCfg(r.relation)
+        const clickable=!!r.dossier_lie
         return(
-          <div key={i} onClick={()=>c&&onSelectMembre(c)}
-            style={{background:cfg.bg,border:`1px solid ${cfg.col}30`,borderRadius:10,padding:'10px 14px',cursor:c?'pointer':'default',minWidth:160,transition:'box-shadow 0.15s'}}
-            onMouseEnter={e=>c&&(e.currentTarget.style.boxShadow=`0 3px 10px ${cfg.col}30`)}
+          <div key={i} onClick={()=>clickable&&onSelectMembre({dossier:r.dossier_lie,nom:r.nom_lie,prenom:r.prenom_lie,gsm:r.gsm_lie,email:r.email_lie})}
+            style={{background:cfg.bg,border:`1px solid ${cfg.col}30`,borderRadius:10,padding:'10px 14px',cursor:clickable?'pointer':'default',minWidth:170,transition:'box-shadow 0.15s'}}
+            onMouseEnter={e=>clickable&&(e.currentTarget.style.boxShadow=`0 3px 10px ${cfg.col}30`)}
             onMouseLeave={e=>e.currentTarget.style.boxShadow=''}>
             <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:5}}>
               <span style={{fontSize:18}}>{cfg.icon}</span>
-              <span style={{fontSize:10,fontWeight:700,color:cfg.col,textTransform:'uppercase',letterSpacing:'.05em'}}>{cfg.label}</span>
+              <span style={{fontSize:10,fontWeight:700,color:cfg.col,textTransform:'uppercase',letterSpacing:'.04em'}}>{r.relation||'Relation'}</span>
+              {!r.relation_active&&<span style={{fontSize:9,color:'#dc2626',marginLeft:'auto'}}>inactive</span>}
             </div>
-            {c?<>
-              <div style={{fontSize:13,fontWeight:700,color:'#1e293b'}}>{c.prenom} {c.nom}</div>
-              <div style={{fontSize:11,color:'#64748b',marginTop:2}}>{c.gsm||c.email||'—'}</div>
-              <div style={{fontSize:10,color:cfg.col,marginTop:4,fontWeight:600}}>Voir fiche →</div>
-            </>:<div style={{fontSize:12,color:'#94a3b8'}}>{r.label||r.autreD}</div>}
+            <div style={{fontSize:13,fontWeight:700,color:'#1e293b'}}>{r.nom_lie} {r.prenom_lie}</div>
+            <div style={{fontSize:11,color:'#64748b',marginTop:2}}>{[r.cp_lie,r.localite_lie].filter(Boolean).join(' ')||'—'}</div>
+            {clickable&&<div style={{fontSize:10,color:cfg.col,marginTop:4,fontWeight:600}}>Voir fiche →</div>}
           </div>
         )
       })}
@@ -173,18 +254,18 @@ function Fiche({ client, onClose, onSelectMembre }) {
     ref.current?.scrollIntoView({behavior:'smooth',block:'start'})
     setLoadF(true)
     Promise.all([
-      supabase.from('contrats').select('police,nom,situation___libelle,date_de_creation,domaine,type_production,garantie___valeur').eq('dossier',client.dossier).order('date_de_creation',{ascending:false}),
+      supabase.from('contrats').select('police,compagnie,nom_client,situation,date_creation,domaine,type_production,garantie_valeur').eq('dossier',client.dossier).order('date_creation',{ascending:false}),
       supabase.from('taches').select('*').eq('dossier_client',client.dossier).order('echeance',{ascending:true}).limit(20),
     ]).then(([{data:c},{data:t}])=>{ setContrats(c||[]); setTaches(t||[]); setLoadF(false) })
   },[client.dossier])
 
   const initiales=`${(client.prenom||'?')[0]}${(client.nom||'?')[0]}`.toUpperCase()
-  const actifs=contrats.filter(c=>c.situation___libelle==='En cours').length
+  const actifs=contrats.filter(c=>c.situation==='En cours').length
   const adresse=[client.rue,client.num_maison,client.boite].filter(Boolean).join(' ')
 
-  // Risques
+  // Risques (dérivés des domaines de contrats actifs)
   const risques={}
-  contrats.filter(c=>c.situation___libelle==='En cours').forEach(c=>{
+  contrats.filter(c=>c.situation==='En cours').forEach(c=>{
     const cfg=getIcon(c.domaine); const k=cfg.label
     if(!risques[k]) risques[k]={...cfg,n:0}
     risques[k].n++
@@ -253,22 +334,9 @@ function Fiche({ client, onClose, onSelectMembre }) {
           <Relations dossier={client.dossier} onSelectMembre={onSelectMembre}/>
         </Sec>
 
-        {/* Objets assurés */}
-        <Sec icon="ti-shield" title="Objets assurés" count={actifs} col="#7c3aed" open={true}>
-          {loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:
-            Object.values(risques).length===0?<p style={{color:'#94a3b8',fontSize:12}}>Aucun contrat actif</p>:
-            <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
-              {Object.values(risques).map((r,i)=>(
-                <div key={i} style={{display:'flex',alignItems:'center',gap:8,background:'#f8fafc',borderRadius:9,padding:'9px 14px',border:'1px solid #e2e8f0'}}>
-                  <span style={{fontSize:22}}>{r.icon}</span>
-                  <div>
-                    <div style={{fontSize:12,fontWeight:700,color:'#1e293b'}}>{r.label}</div>
-                    <div style={{fontSize:10,color:'#94a3b8'}}>{r.n} contrat{r.n>1?'s':''}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          }
+        {/* Objets de risque (vraie table risques, liée par police) */}
+        <Sec icon="ti-shield" title="Objets de risque" count={0} col="#7c3aed" open={true}>
+          <Risques contrats={contrats} loadContrats={loadF}/>
         </Sec>
 
         {/* Contrats */}
@@ -283,15 +351,15 @@ function Fiche({ client, onClose, onSelectMembre }) {
                 </thead>
                 <tbody>
                   {contrats.map((c,i)=>{
-                    const s=SIT[c.situation___libelle]||{bg:'#f1f5f9',col:'#64748b'}
+                    const s=SIT[c.situation]||{bg:'#f1f5f9',col:'#64748b'}
                     return(
                       <tr key={i} style={{background:i%2===0?'#fff':'#fafafe'}}>
                         <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',fontFamily:'monospace',fontSize:11,fontWeight:600,color:NAVY}}>{c.police||'—'}</td>
-                        <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#1e293b'}}>{c.nom||'—'}</td>
+                        <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#1e293b'}}>{c.compagnie||'—'}</td>
                         <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{c.domaine||'—'}</td>
-                        <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9'}}><span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:4,background:s.bg,color:s.col}}>{c.situation___libelle||'—'}</span></td>
+                        <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9'}}><span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:4,background:s.bg,color:s.col}}>{c.situation||'—'}</span></td>
                         <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{c.type_production||'—'}</td>
-                        <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{c.garantie___valeur||'—'}</td>
+                        <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{c.garantie_valeur||'—'}</td>
                       </tr>
                     )
                   })}
