@@ -41,6 +41,7 @@ const MODULES = {
 
 const MODULES_ADMIN = [
   { key: 'admin_users', label: 'Utilisateurs', icon: 'ti-users-group', path: '/admin/users' },
+  { key: 'admin_sync', label: 'Synchronisation', icon: 'ti-refresh', path: '/admin/sync' },
 ]
 
 export default function Sidebar() {

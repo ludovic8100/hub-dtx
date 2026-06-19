@@ -728,9 +728,22 @@ export default function DashboardGroupe() {
       <div style={{ fontFamily:"'Source Sans Pro', sans-serif", maxWidth:1300 }}>
 
         {/* Titre */}
-        <div style={{ marginBottom:24 }}>
-          <h1 style={{ fontSize:22, fontWeight:800, color:'#0f172a', margin:'0 0 4px' }}>Tableau de bord général</h1>
-          <p style={{ fontSize:14, color:'#64748b', margin:0 }}>Vue consolidée — Groupe DTX · Dynassur · LODE · Hexagroup · Privé</p>
+        <div style={{ marginBottom:24, display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:16, flexWrap:'wrap' }}>
+          <div>
+            <h1 style={{ fontSize:22, fontWeight:800, color:'#0f172a', margin:'0 0 4px' }}>Tableau de bord général</h1>
+            <p style={{ fontSize:14, color:'#64748b', margin:0 }}>Vue consolidée — Groupe DTX · Dynassur · LODE · Hexagroup · Privé</p>
+          </div>
+          <button onClick={() => navigate('/admin/sync')} style={{
+            display:'flex', alignItems:'center', gap:8, background:'#fff',
+            border:'1px solid #e2e8f0', borderRadius:10, padding:'10px 16px',
+            cursor:'pointer', fontSize:13, fontWeight:700, color:'#0080BD',
+            fontFamily:"'Source Sans Pro', sans-serif", boxShadow:'0 1px 4px rgba(0,0,0,0.04)',
+          }}
+            onMouseEnter={e=>e.currentTarget.style.borderColor='#0080BD'}
+            onMouseLeave={e=>e.currentTarget.style.borderColor='#e2e8f0'}>
+            <i className="ti ti-refresh" style={{ fontSize:16 }} />
+            Synchroniser les données
+          </button>
         </div>
 
         {/* KPIs rapides — tous cliquables */}

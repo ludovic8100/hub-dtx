@@ -5,6 +5,7 @@ import Login              from './pages/Login'
 import AuthCallback       from './pages/AuthCallback'
 import AccessDenied       from './pages/AccessDenied'
 import AdminUsers         from './pages/AdminUsers'
+import SyncCenter         from './pages/admin/SyncCenter'
 
 import DashboardGroupe    from './pages/groupe/DashboardGroupe'
 
@@ -114,6 +115,7 @@ export default function App() {
 
           {/* Admin */}
           <Route path="/admin/users" element={<A><AdminUsers /></A>} />
+          <Route path="/admin/sync" element={<A><SyncCenter /></A>} />
 
           <Route path="/" element={<P><RootRedirect /></P>} />
           <Route path="*" element={<Navigate to="/" replace />} />
