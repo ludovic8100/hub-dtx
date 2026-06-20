@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
 import { useAuth } from '../../lib/auth'
@@ -46,6 +47,9 @@ export default function DashboardDynassur() {
   const [syncResult, setSyncResult] = useState(null)
   const [data, setData] = useState({ stats:{clients:0,taches:0,sinistres:0,naAnnee:0,naMois:0,renonAnnee:0}, taches:[], bordereaux:[], objectifs:[], prodMois:[] })
   const [loading, setLoading] = useState(true)
+  const navigate = useNavigate()
+  const [recents, setRecents] = useState([])
+  useEffect(()=>{ try{ setRecents(JSON.parse(localStorage.getItem('dyn_recent_clients')||'[]')) }catch(e){} },[])
 
   const firstName = (perms?.nom || user?.user_metadata?.full_name || '').split(' ')[0]
   const now = new Date()
@@ -130,6 +134,32 @@ export default function DashboardDynassur() {
           <KpiCard label="Sinistres ouverts"value={loading?'…':stats.sinistres}       icon="ti-alert-triangle" color={C.danger} />
           {bordereaux.length > 0 && <KpiCard label="Bordereaux ⚠" value={bordereaux.length} icon="ti-file-alert" color={C.danger} sub="non réconciliés" />}
         </div>
+
+        {/* Derniers clients consultés */}
+        {recents.length > 0 && (
+          <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', padding:'14px 18px', marginBottom:24 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+              <i className="ti ti-history" style={{ fontSize:15, color:C.blue }} />
+              <span style={{ fontSize:13, fontWeight:700, color:C.navy }}>Derniers clients consultés</span>
+            </div>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
+              {recents.map(r=>(
+                <button key={r.dossier} onClick={()=>navigate(`/dynassur/clients?dossier=${encodeURIComponent(r.dossier)}`)}
+                  style={{ display:'flex', alignItems:'center', gap:8, background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:10, padding:'8px 12px', cursor:'pointer', textAlign:'left', transition:'all 0.12s' }}
+                  onMouseEnter={e=>{ e.currentTarget.style.borderColor=C.blue; e.currentTarget.style.background='#f0f9ff' }}
+                  onMouseLeave={e=>{ e.currentTarget.style.borderColor='#e2e8f0'; e.currentTarget.style.background='#f8fafc' }}>
+                  <div style={{ width:30, height:30, borderRadius:8, background:C.blue+'18', color:C.blue, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:12, flexShrink:0 }}>
+                    {`${(r.prenom||'?')[0]||''}${(r.nom||'?')[0]||''}`.toUpperCase()}
+                  </div>
+                  <div>
+                    <div style={{ fontSize:12.5, fontWeight:700, color:'#1e293b' }}>{r.prenom} {r.nom}</div>
+                    <div style={{ fontSize:10.5, color:'#94a3b8' }}>#{r.dossier}{r.localite?` · ${r.localite}`:''}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Grille 3 colonnes */}
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:18 }}>

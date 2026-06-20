@@ -37,6 +37,18 @@ const calcAge = v => {
 // Nettoie un numéro de téléphone (retire l'apostrophe parasite d'export Excel)
 const cleanTel = v => { if(!v) return null; const s=String(v).replace(/^'+/,'').trim(); return (s && s.toUpperCase()!=='GSM' && s.toUpperCase()!=='TEL')?s:null }
 
+// Mémorise les derniers clients consultés (localStorage) — lus par le tableau de bord Dynassur
+const RECENT_KEY='dyn_recent_clients'
+const pushRecentClient = c => {
+  if(!c||!c.dossier) return
+  try{
+    const prev=JSON.parse(localStorage.getItem(RECENT_KEY)||'[]')
+    const entry={dossier:c.dossier, nom:c.nom||'', prenom:c.prenom||'', localite:c.localite||'', ts:Date.now()}
+    const next=[entry, ...prev.filter(x=>x.dossier!==c.dossier)].slice(0,8)
+    localStorage.setItem(RECENT_KEY, JSON.stringify(next))
+  }catch(e){}
+}
+
 // ── Domaines → icônes ──
 const DOM = [
   { k:['AUTO','MOTO','CAMION','VÉHICULE'],       icon:'🚗', label:'Auto' },
@@ -63,6 +75,22 @@ function EnDev({ label='En cours de développement', mini=false }) {
     </span>
   )
 }
+
+// ── Couvertures essentielles (analyse 360) ──
+const ESSENTIELS=[
+  {label:'Auto / Véhicule',       icon:'🚗', kw:['AUTO','VÉHIC','VEHIC','MOTO','CAMION']},
+  {label:'Habitation / Incendie', icon:'🏠', kw:['HABITATION','INCENDIE','MAISON','BÂTIMENT','BATIMENT','IMMEUBLE']},
+  {label:'RC Familiale',          icon:'⚖️', kw:['FAMILIALE','RC VIE PRIVÉE','VIE PRIVEE','RESPONSABILIT']},
+  {label:'Protection juridique',  icon:'🛡️', kw:['JURIDIQUE','PROTECTION JUR','D.A.S','DAS']},
+  {label:'Soins de santé / Hospi',icon:'🏥', kw:['SANTÉ','SANTE','HOSPI','MALADIE','SOINS','INDIVIDUELLE','DKV']},
+  {label:'Vie / Décès',           icon:'💙', kw:['VIE ','DÉCÈS','DECES','PLACEMENT']},
+  {label:'Pension / Épargne',     icon:'🐷', kw:['PENSION','ÉPARGNE','EPARGNE','EPL','EIP']},
+  {label:'Accidents',             icon:'🩹', kw:['ACCIDENT','CORPO']},
+]
+// Texte de couverture à partir d'une liste de contrats (domaine + type + compagnie)
+const coverBlob = contrats => (contrats||[]).filter(c=>c.situation==='En cours').map(c=>`${c.domaine||''} ${c.type_production||''} ${c.compagnie||''}`).join(' | ').toUpperCase()
+// Quels types de relation propagent une couverture (foyer + sociétés liées)
+const PROPAGE = lib => { const t=(lib||'').toLowerCase(); return ['conjoint','cohabitant','concubin','gérant','gerant','administrateur','coopérateur','cooperateur','firme','parent','enfant'].some(k=>t.includes(k)) }
 
 // ── Relation → badge ──
 const REL_MAP = {
@@ -152,9 +180,123 @@ function Primes({ dossier }) {
   )
 }
 
+// ══ Analyse 360 — couvertures du client + accessibles via les relations ══
+function Analyse360({ client, contrats }) {
+  const [ext,setExt]=useState({})      // label couvert -> { via, type } (via une relation)
+  const [loadExt,setLoadExt]=useState(true)
+
+  // Couvertures directes (contrats du client)
+  const blobDirect=coverBlob(contrats)
+  const directs={}
+  ESSENTIELS.forEach(e=>{ if(e.kw.some(k=>blobDirect.includes(k))) directs[e.label]=true })
+
+  // Remontée du graphe de relations (profondeur 2) pour couvertures « accessibles via une relation »
+  useEffect(()=>{
+    let annule=false
+    async function run(){
+      setLoadExt(true)
+      try{
+        const startDossier=client.dossier
+        const visited=new Set([startDossier])
+        // frontier : personnes courantes { dossier, nom, prenom }
+        let frontier=[{dossier:startDossier, nom:(client.nom||'').toUpperCase(), prenom:(client.prenom||'')}]
+        const liens=[]   // { dossier, nom, prenom, via, type } des dossiers liés découverts
+        for(let depth=0; depth<2 && frontier.length; depth++){
+          const dossiers=frontier.map(f=>f.dossier).filter(Boolean)
+          const noms=[...new Set(frontier.map(f=>f.nom).filter(Boolean))]
+          const [dirRes, invRes]=await Promise.all([
+            dossiers.length? supabase.from('famille').select('dossier,nom_principal,prenom_principal,type_relation_libelle,nom_lie,prenom_lie').in('dossier',dossiers) : Promise.resolve({data:[]}),
+            noms.length?     supabase.from('famille').select('dossier,nom_principal,prenom_principal,type_relation_libelle,nom_lie,prenom_lie').in('nom_lie',noms) : Promise.resolve({data:[]}),
+          ])
+          const trouvailles=[]
+          // inverses : le principal (avec dossier) est lié à une personne du frontier
+          ;(invRes.data||[]).forEach(r=>{
+            if(!PROPAGE(r.type_relation_libelle)) return
+            const match=frontier.some(f=>f.nom===(r.nom_lie||'').toUpperCase() && (f.prenom||'').toUpperCase()===(r.prenom_lie||'').toUpperCase())
+            if(match && r.dossier && !visited.has(r.dossier))
+              trouvailles.push({dossier:r.dossier, nom:(r.nom_principal||'').toUpperCase(), prenom:r.prenom_principal||'', via:`${r.nom_principal||''} ${r.prenom_principal||''}`.trim(), type:r.type_relation_libelle})
+          })
+          // directes : la personne liée n'a pas de dossier en base → résolue via clients ensuite
+          const aResoudre=[]
+          ;(dirRes.data||[]).forEach(r=>{
+            if(!PROPAGE(r.type_relation_libelle)) return
+            aResoudre.push({nom:(r.nom_lie||'').toUpperCase(), prenom:r.prenom_lie||'', via:`${r.nom_lie||''} ${r.prenom_lie||''}`.trim(), type:r.type_relation_libelle})
+          })
+          if(aResoudre.length){
+            const nomsR=[...new Set(aResoudre.map(x=>x.nom).filter(Boolean))]
+            const{data:cl}=await supabase.from('clients').select('dossier,nom,prenom').in('nom',nomsR).not('dossier','is',null)
+            const idx={}
+            ;(cl||[]).forEach(c=>{ idx[`${(c.nom||'').toUpperCase()}|${(c.prenom||'').toUpperCase()}`]=c.dossier })
+            aResoudre.forEach(x=>{ const dd=idx[`${x.nom}|${x.prenom.toUpperCase()}`]; if(dd&&!visited.has(dd)) trouvailles.push({...x,dossier:dd}) })
+          }
+          // Avancer
+          frontier=[]
+          trouvailles.forEach(t=>{ if(!visited.has(t.dossier)){ visited.add(t.dossier); liens.push(t); frontier.push(t) } })
+        }
+        // Contrats EN COURS de tous les dossiers liés découverts
+        const autresDossiers=liens.map(l=>l.dossier)
+        const couvExt={}
+        if(autresDossiers.length){
+          const{data:ctr}=await supabase.from('contrats').select('dossier,domaine,type_production,compagnie,situation').in('dossier',autresDossiers).eq('situation','En cours')
+          // associer chaque contrat à sa source (lien)
+          const parDossier={}
+          ;(ctr||[]).forEach(c=>{ (parDossier[c.dossier]=parDossier[c.dossier]||[]).push(c) })
+          liens.forEach(l=>{
+            const blob=coverBlob(parDossier[l.dossier]||[])
+            ESSENTIELS.forEach(e=>{
+              if(directs[e.label]) return
+              if(e.kw.some(k=>blob.includes(k)) && !couvExt[e.label]) couvExt[e.label]={via:l.via, type:l.type}
+            })
+          })
+        }
+        if(!annule) setExt(couvExt)
+      }catch(e){ if(!annule) setExt({}) }
+      if(!annule) setLoadExt(false)
+    }
+    run()
+    return ()=>{ annule=true }
+  },[client.dossier, blobDirect])
+
+  const couv=ESSENTIELS.map(e=>{
+    if(directs[e.label]) return {...e, etat:'direct'}
+    if(ext[e.label])     return {...e, etat:'relation', src:ext[e.label]}
+    return {...e, etat:'absent'}
+  })
+  const manquants=couv.filter(e=>e.etat==='absent')
+  const STY={ direct:{bg:'#f0fdf4',col:'#16a34a',bd:'#bbf7d0',ic:'ti-check'}, relation:{bg:'#eff6ff',col:'#2563eb',bd:'#bfdbfe',ic:'ti-users'}, absent:{bg:'#fef2f2',col:'#dc2626',bd:'#fecaca',ic:'ti-x'} }
+
+  return (
+    <div style={{background:'#fafafe',border:'1px solid #e2e8f0',borderRadius:10,padding:'12px 14px',marginBottom:12}}>
+      <div style={{fontSize:11,fontWeight:700,color:NAVY,textTransform:'uppercase',letterSpacing:'.04em',marginBottom:9,display:'flex',alignItems:'center',gap:6}}>
+        <i className="ti ti-radar" style={{color:'#7c3aed'}}/>Analyse 360 — couverture
+        {loadExt&&<span style={{fontSize:10,color:'#94a3b8',fontWeight:500,textTransform:'none'}}>· analyse des relations…</span>}
+      </div>
+      <div style={{display:'flex',flexWrap:'wrap',gap:7}}>
+        {couv.map((e,i)=>{
+          const s=STY[e.etat]
+          return(
+            <div key={i} title={e.etat==='relation'?`Couvert via ${e.src.via} (${e.src.type})`:e.etat==='direct'?'Couvert par un contrat du client':'Non couvert — opportunité'}
+              style={{display:'flex',alignItems:'center',gap:6,padding:'5px 11px',borderRadius:20,fontSize:12,fontWeight:600,background:s.bg,color:s.col,border:`1px solid ${s.bd}`}}>
+              <span style={{fontSize:14,filter:e.etat==='absent'?'grayscale(1)':'none',opacity:e.etat==='absent'?0.6:1}}>{e.icon}</span>
+              {e.label}
+              {e.etat==='relation'&&<span style={{fontSize:9,background:'#dbeafe',padding:'1px 5px',borderRadius:8}}>via relation</span>}
+              <i className={`ti ${s.ic}`} style={{fontSize:13}}/>
+            </div>
+          )
+        })}
+      </div>
+      {manquants.length>0&&(
+        <div style={{fontSize:11,color:'#92400e',marginTop:9,background:'#fffbeb',border:'1px solid #fde68a',borderRadius:7,padding:'7px 11px'}}>
+          <strong>{manquants.length} couverture{manquants.length>1?'s':''} à proposer :</strong> {manquants.map(m=>m.label).join(', ')}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ══ Objets de risque (table risques liée par police de contrat) ══
 function Risques({ contrats, loadContrats }) {
-  const [risques,setRisques]=useState([]); const [load,setLoad]=useState(true)
+  const [risques,setRisques]=useState([]); const [load,setLoad]=useState(true); const [showInactifs,setShowInactifs]=useState(false)
   // Icône par type de risque Brio
   const RICON = u => {
     const t=(u||'').toUpperCase()
@@ -189,50 +331,19 @@ function Risques({ contrats, loadContrats }) {
   const aContratsActifs=contrats.some(c=>c.situation==='En cours')
   if(!risques.length&&!aContratsActifs) return <p style={{color:'#94a3b8',fontSize:12}}>Aucun objet de risque trouvé pour ce client</p>
 
-  // Grouper par type
-  const parType={}
-  risques.forEach(r=>{ const k=r.type_risque_libelle||'Autre'; if(!parType[k])parType[k]=[]; parType[k].push(r) })
+  // Séparer actifs / inactifs
+  const actifs=risques.filter(r=>r.actif)
+  const inactifs=risques.filter(r=>!r.actif)
+  const visibles=showInactifs?risques:actifs
 
-  // ── Analyse 360 : couvertures essentielles présentes / absentes ──
-  // On combine domaines de contrats EN COURS + types de risque pour déterminer ce qui est couvert
-  const blob=(contrats.filter(c=>c.situation==='En cours').map(c=>`${c.domaine} ${c.type_production}`).join(' ')+' '+risques.map(r=>r.type_risque_libelle+' '+r.description).join(' ')).toUpperCase()
-  const ESSENTIELS=[
-    {label:'Auto / Véhicule', icon:'🚗', kw:['AUTO','VÉHIC','VEHIC','MOTO','CAMION']},
-    {label:'Habitation / Incendie', icon:'🏠', kw:['HABITATION','INCENDIE','MAISON','BÂTIMENT','BATIMENT','IMMEUBLE']},
-    {label:'RC Familiale', icon:'⚖️', kw:['FAMILIALE','RC VIE PRIVÉE','VIE PRIVEE','RESPONSABILIT']},
-    {label:'Protection juridique', icon:'🛡️', kw:['JURIDIQUE','PROTECTION JUR']},
-    {label:'Soins de santé / Hospi', icon:'🏥', kw:['SANTÉ','SANTE','HOSPI','MALADIE','SOINS']},
-    {label:'Vie / Décès / Pension', icon:'💙', kw:['VIE','DÉCÈS','DECES','PENSION','ÉPARGNE','EPARGNE']},
-    {label:'Accidents', icon:'🩹', kw:['ACCIDENT','CORPO']},
-  ]
-  const couv=ESSENTIELS.map(e=>({...e,ok:e.kw.some(k=>blob.includes(k))}))
-  const manquants=couv.filter(e=>!e.ok)
+  // Grouper par type (actifs uniquement pour les badges résumé)
+  const parType={}
+  actifs.forEach(r=>{ const k=r.type_risque_libelle||'Autre'; if(!parType[k])parType[k]=[]; parType[k].push(r) })
 
   return(
     <div style={{display:'flex',flexDirection:'column',gap:12}}>
-      {/* ── Analyse 360 ── */}
-      <div style={{background:'#fafafe',border:'1px solid #e2e8f0',borderRadius:10,padding:'12px 14px'}}>
-        <div style={{fontSize:11,fontWeight:700,color:NAVY,textTransform:'uppercase',letterSpacing:'.04em',marginBottom:9,display:'flex',alignItems:'center',gap:6}}>
-          <i className="ti ti-radar" style={{color:'#7c3aed'}}/>Analyse 360 — couverture
-        </div>
-        <div style={{display:'flex',flexWrap:'wrap',gap:7}}>
-          {couv.map((e,i)=>(
-            <div key={i} title={e.ok?'Couvert':'Non couvert — opportunité'} style={{display:'flex',alignItems:'center',gap:6,padding:'5px 11px',borderRadius:20,fontSize:12,fontWeight:600,
-              background:e.ok?'#f0fdf4':'#fef2f2',color:e.ok?'#16a34a':'#dc2626',border:`1px solid ${e.ok?'#bbf7d0':'#fecaca'}`}}>
-              <span style={{fontSize:14,filter:e.ok?'none':'grayscale(1)',opacity:e.ok?1:0.6}}>{e.icon}</span>
-              {e.label}
-              <i className={`ti ${e.ok?'ti-check':'ti-x'}`} style={{fontSize:13}}/>
-            </div>
-          ))}
-        </div>
-        {manquants.length>0&&(
-          <div style={{fontSize:11,color:'#92400e',marginTop:9,background:'#fffbeb',border:'1px solid #fde68a',borderRadius:7,padding:'7px 11px'}}>
-            <strong>{manquants.length} couverture{manquants.length>1?'s':''} potentielle{manquants.length>1?'s':''} à proposer :</strong> {manquants.map(m=>m.label).join(', ')}
-          </div>
-        )}
-      </div>
-      {/* Badges résumé par type */}
-      <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+      {/* Badges résumé par type (actifs) */}
+      {Object.keys(parType).length>0&&<div style={{display:'flex',flexWrap:'wrap',gap:8}}>
         {Object.entries(parType).map(([type,arr],i)=>(
           <div key={i} style={{display:'flex',alignItems:'center',gap:8,background:'#faf5ff',borderRadius:9,padding:'9px 14px',border:'1px solid #e9d5ff'}}>
             <span style={{fontSize:22}}>{RICON(type)}</span>
@@ -242,9 +353,18 @@ function Risques({ contrats, loadContrats }) {
             </div>
           </div>
         ))}
-      </div>
+      </div>}
+
+      {/* Bouton aperçu des inactifs */}
+      {inactifs.length>0&&(
+        <button onClick={()=>setShowInactifs(s=>!s)} style={{alignSelf:'flex-start',display:'flex',alignItems:'center',gap:6,fontSize:12,fontWeight:600,
+          color:showInactifs?'#dc2626':'#64748b',background:showInactifs?'#fef2f2':'#f8fafc',border:`1px solid ${showInactifs?'#fecaca':'#e2e8f0'}`,borderRadius:7,padding:'5px 12px',cursor:'pointer'}}>
+          <i className={`ti ${showInactifs?'ti-eye-off':'ti-eye'}`}/>{showInactifs?`Masquer les ${inactifs.length} inactif${inactifs.length>1?'s':''}`:`Aperçu des ${inactifs.length} risque${inactifs.length>1?'s':''} inactif${inactifs.length>1?'s':''}`}
+        </button>
+      )}
+
       {/* Détail */}
-      {risques.length>0&&<div style={{overflowX:'auto',maxHeight:240,overflowY:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
+      {visibles.length>0&&<div style={{overflowX:'auto',maxHeight:240,overflowY:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
           <thead style={{position:'sticky',top:0,background:'#f8fafc',zIndex:1}}>
             <tr>{['Police','Type','Description','Contrats','Statut'].map(h=>(
@@ -252,8 +372,8 @@ function Risques({ contrats, loadContrats }) {
             ))}</tr>
           </thead>
           <tbody>
-            {risques.map((r,i)=>(
-              <tr key={i} style={{background:i%2===0?'#fff':'#fafafe'}}>
+            {visibles.map((r,i)=>(
+              <tr key={i} style={{background:r.actif?(i%2===0?'#fff':'#fafafe'):'#fef2f2'}}>
                 <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',fontFamily:'monospace',fontSize:11,fontWeight:600,color:NAVY}}>{r.police}</td>
                 <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#1e293b'}}>{RICON(r.type_risque_libelle)} {r.type_risque_libelle||'—'}</td>
                 <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{r.description||'—'}</td>
@@ -289,6 +409,19 @@ function Relations({ client, onOpenDossier }) {
   }
   const SEL='dossier,nom_principal,prenom_principal,type_relation_libelle,relation_active,physique_morale_libelle,nom_lie,prenom_lie,cp_lie,localite_lie'
 
+  // Rôle réel de l'AUTRE personne vis-à-vis du client (Brio : « le principal est le [type] du lié »)
+  const roleAutre = (type, sens) => {
+    const t=(type||'').toLowerCase()
+    const estParent = t.includes('parent')||t.includes('père')||t.includes('pere')||t.includes('mère')||t.includes('mere')||t.includes('grand-parent')
+    const estEnfant = t.includes('enfant')||t.includes('fils')||t.includes('fille')
+    if(estParent||estEnfant){
+      // directe = le client est [type] de l'autre → on inverse pour décrire l'autre
+      if(sens==='directe') return estParent?'Enfant':'Parent'
+      return type // inverse = l'autre est [type] du client
+    }
+    return type // symétrique (conjoint…) ou société (gérant…) : libellé tel quel
+  }
+
   useEffect(()=>{
     if(!client?.dossier){ setLoad(false); return }
     setLoad(true)
@@ -302,12 +435,12 @@ function Relations({ client, onOpenDossier }) {
     ]).then(async([{data:dir},{data:inv}])=>{
       const list=[]
       ;(dir||[]).forEach(r=>list.push({
-        type:r.type_relation_libelle, active:r.relation_active,
+        type:r.type_relation_libelle, active:r.relation_active, sens:'directe',
         autreNom:r.nom_lie, autrePrenom:r.prenom_lie, autreDossier:null,
         cp:r.cp_lie, localite:r.localite_lie, morale:(r.physique_morale_libelle||'').toLowerCase().includes('morale'),
       }))
       ;(inv||[]).forEach(r=>list.push({
-        type:r.type_relation_libelle, active:r.relation_active,
+        type:r.type_relation_libelle, active:r.relation_active, sens:'inverse',
         autreNom:r.nom_principal, autrePrenom:r.prenom_principal, autreDossier:r.dossier,
         cp:r.cp_lie, localite:r.localite_lie, morale:!r.prenom_principal,
       }))
@@ -342,6 +475,12 @@ function Relations({ client, onOpenDossier }) {
         const cfg=relCfg(r.type)
         const clickable=!!r.autreDossier
         const nomAffiche=r.morale?(r.autreNom||'Société'):`${r.autreNom||''} ${r.autrePrenom||''}`.trim()
+        const role=roleAutre(r.type, r.sens)
+        // Phrase directionnelle (lève l'ambiguïté Parent/Enfant)
+        const prenomClient=(client.prenom||client.nom||'ce client').split(' ')[0]
+        const tlow=(r.type||'').toLowerCase()
+        const asym=tlow.includes('parent')||tlow.includes('enfant')||tlow.includes('père')||tlow.includes('mère')||tlow.includes('fils')||tlow.includes('fille')
+        const direction = asym ? (`${role} de ${prenomClient}`) : null
         return(
           <div key={i} onClick={()=>clickable&&onOpenDossier(r.autreDossier)}
             title={clickable?'Ouvrir la fiche':''}
@@ -350,10 +489,11 @@ function Relations({ client, onOpenDossier }) {
             onMouseLeave={e=>{e.currentTarget.style.boxShadow='';e.currentTarget.style.transform=''}}>
             <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:5}}>
               <span style={{fontSize:18}}>{cfg.icon}</span>
-              <span style={{fontSize:10,fontWeight:700,color:cfg.col,textTransform:'uppercase',letterSpacing:'.03em',lineHeight:1.2}}>{r.type||'Relation'}</span>
+              <span style={{fontSize:10,fontWeight:700,color:cfg.col,textTransform:'uppercase',letterSpacing:'.03em',lineHeight:1.2}}>{role||'Relation'}</span>
               {!r.active&&<span style={{fontSize:9,color:'#dc2626',marginLeft:'auto',fontWeight:600}}>inactive</span>}
             </div>
             <div style={{fontSize:13,fontWeight:700,color:'#1e293b'}}>{nomAffiche||'—'}</div>
+            {direction&&<div style={{fontSize:10,color:cfg.col,marginTop:1,fontStyle:'italic'}}>{direction}</div>}
             <div style={{fontSize:11,color:'#64748b',marginTop:2}}>{[r.cp,r.localite].filter(Boolean).join(' ')||'—'}</div>
             {clickable
               ? <div style={{fontSize:10,color:cfg.col,marginTop:4,fontWeight:600}}>Voir la fiche →</div>
@@ -486,6 +626,7 @@ function Fiche({ client, onClose, onOpenDossier }) {
         {/* Objets de risque (vraie table risques, liée par police) */}
         <Sec icon="ti-shield" title="Objets de risque" count={0} col="#7c3aed" open={true}
           extra={<EnDev label="Fiche risque à venir" mini />}>
+          <Analyse360 client={client} contrats={contrats}/>
           <Risques contrats={contrats} loadContrats={loadF}/>
         </Sec>
 
@@ -615,8 +756,14 @@ export default function DynassurClients() {
   const openDossier = useCallback(async(dossier)=>{
     if(!dossier) return
     const{data}=await supabase.from('clients').select('dossier,nom,prenom,cp,localite,gsm,tel_fixe,email,rue,num_maison,boite,date_naissance,etat_civil,sexe,sa_code,sa_nom,gestionnaire_code,gestionnaire_nom,bureau,classe,alerte').eq('dossier',dossier).limit(1)
-    if(data&&data[0]){ setSelected(data[0]); window.scrollTo({top:0,behavior:'smooth'}) }
+    if(data&&data[0]){ setSelected(data[0]); pushRecentClient(data[0]); window.scrollTo({top:0,behavior:'smooth'}) }
   },[])
+
+  // Ouverture directe via ?dossier= (depuis le tableau de bord « derniers clients »)
+  useEffect(()=>{
+    const p=new URLSearchParams(window.location.search).get('dossier')
+    if(p) openDossier(p)
+  },[openDossier])
 
   const nb=Math.ceil(total/PER)
   const tot=counts.total||1
@@ -716,7 +863,7 @@ export default function DynassurClients() {
                   {loading&&!clients.length?(<tr><td colSpan={7} style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Chargement…</td></tr>)
                   :!clients.length?(<tr><td colSpan={7} style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Aucun client trouvé</td></tr>)
                   :clients.map((c,i)=>(
-                    <tr key={c.dossier||i} onClick={()=>setSelected(c)} style={{cursor:'pointer',background:i%2===0?'#fff':'#fafafe',transition:'background 0.1s'}}
+                    <tr key={c.dossier||i} onClick={()=>{ setSelected(c); pushRecentClient(c) }} style={{cursor:'pointer',background:i%2===0?'#fff':'#fafafe',transition:'background 0.1s'}}
                       onMouseEnter={e=>e.currentTarget.style.background='#f0f9ff'}
                       onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'#fff':'#fafafe'}>
                       <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9',fontFamily:'monospace',fontSize:11,color:NAVY,fontWeight:600}}>{c.dossier}</td>
