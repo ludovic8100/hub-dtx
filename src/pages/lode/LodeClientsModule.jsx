@@ -26,31 +26,38 @@ function EditeurClient({ client, onClose, onSaved }) {
 
   const set = (k, v) => setF(p => ({ ...p, [k]: v }))
 
-  const rechercheBCE = async () => {
-    if (!bceQuery.trim()) return
-    setBceLoading(true); setBceError(null); setBceResults(null)
-    const KEY = 'WecYIpno6XvAgZY9jIbyakcL9XfPc1wg'
+  // Recherche BCE en temps réel (debounce 350ms)
+  useEffect(() => {
     const q = bceQuery.trim()
-    const digits = q.replace(/\D/g, '')
-    const isNum = digits.length === 10
-    const url = isNum
-      ? `https://cbeapi.be/api/v1/company/${digits}`
-      : `https://cbeapi.be/api/v1/company/search?name=${encodeURIComponent(q)}`
-    try {
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${KEY}`, Accept: 'application/json' } })
-      if (!res.ok) {
-        if (res.status === 404) { setBceError('Aucune entreprise trouvée.'); return }
-        throw new Error(`HTTP ${res.status}`)
+    if (q.length < 3) { setBceResults(null); setBceError(null); setBceLoading(false); return }
+    setBceLoading(true); setBceError(null)
+    const ctrl = new AbortController()
+    const timer = setTimeout(async () => {
+      const KEY = 'WecYIpno6XvAgZY9jIbyakcL9XfPc1wg'
+      const digits = q.replace(/\D/g, '')
+      const isNum = digits.length === 10
+      const url = isNum
+        ? `https://cbeapi.be/api/v1/company/${digits}`
+        : `https://cbeapi.be/api/v1/company/search?name=${encodeURIComponent(q)}`
+      try {
+        const res = await fetch(url, { headers: { Authorization: `Bearer ${KEY}`, Accept: 'application/json' }, signal: ctrl.signal })
+        if (!res.ok) {
+          if (res.status === 404) { setBceResults([]); setBceError('Aucune entreprise trouvée.'); return }
+          throw new Error(`HTTP ${res.status}`)
+        }
+        const json = await res.json()
+        const data = json.data
+        const list = Array.isArray(data) ? data : (data ? [data] : [])
+        setBceResults(list.slice(0, 8))
+        if (!list.length) setBceError('Aucune entreprise trouvée.')
+      } catch (e) {
+        if (e.name !== 'AbortError') setBceError('Recherche BCE indisponible : ' + e.message)
+      } finally {
+        if (!ctrl.signal.aborted) setBceLoading(false)
       }
-      const json = await res.json()
-      const data = json.data
-      const list = Array.isArray(data) ? data : (data ? [data] : [])
-      if (!list.length) { setBceError('Aucune entreprise trouvée.'); return }
-      setBceResults(list.slice(0, 8))
-    } catch (e) {
-      setBceError('Recherche BCE indisponible : ' + e.message)
-    } finally { setBceLoading(false) }
-  }
+    }, 350)
+    return () => { clearTimeout(timer); ctrl.abort() }
+  }, [bceQuery])
 
   // Remplit le formulaire depuis un résultat CBEAPI
   const appliquerBCE = (e) => {
@@ -109,31 +116,27 @@ function EditeurClient({ client, onClose, onSaved }) {
           ))}
         </div>
 
-        {/* Recherche BCE (entreprise uniquement) */}
+        {/* Recherche BCE (entreprise uniquement) — autocomplétion temps réel */}
         {isEnt && (
-          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: 14, marginBottom: 16 }}>
+          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: 14, marginBottom: 16, position: 'relative' }}>
             <label style={{ ...lbl, color: ORANGE }}>🔍 Rechercher dans la Banque-Carrefour des Entreprises</label>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ position: 'relative' }}>
               <input style={inp} value={bceQuery} onChange={e => setBceQuery(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && rechercheBCE()}
-                placeholder="Nom de l'entreprise ou n° BCE (ex: 0123456789)" />
-              <button onClick={rechercheBCE} disabled={bceLoading} style={{
-                background: ORANGE, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px',
-                cursor: bceLoading ? 'wait' : 'pointer', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap',
-              }}>{bceLoading ? '…' : 'Rechercher'}</button>
+                placeholder="Commencez à taper un nom d'entreprise ou un n° BCE…" autoComplete="off" />
+              {bceLoading && <span style={{ position: 'absolute', right: 12, top: 9, fontSize: 12, color: ORANGE }}>⏳</span>}
             </div>
-            {bceError && <div style={{ fontSize: 11, color: '#dc2626', marginTop: 6 }}>{bceError}</div>}
-            {bceResults && (
-              <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 5, maxHeight: 200, overflowY: 'auto' }}>
+            {bceError && !bceLoading && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 6 }}>{bceError}</div>}
+            {bceResults && bceResults.length > 0 && (
+              <div style={{ position: 'absolute', left: 14, right: 14, top: 70, zIndex: 10, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 9, boxShadow: '0 6px 20px rgba(0,0,0,0.12)', maxHeight: 260, overflowY: 'auto' }}>
                 {bceResults.map((e, i) => (
                   <div key={i} onClick={() => appliquerBCE(e)} style={{
-                    background: '#fff', border: '1px solid #e2e8f0', borderRadius: 7, padding: '8px 10px',
-                    cursor: 'pointer', fontSize: 12,
+                    padding: '9px 12px', cursor: 'pointer', fontSize: 12,
+                    borderBottom: i < bceResults.length - 1 ? '1px solid #f1f5f9' : 'none',
                   }}
-                    onMouseEnter={ev => ev.currentTarget.style.borderColor = ORANGE}
-                    onMouseLeave={ev => ev.currentTarget.style.borderColor = '#e2e8f0'}>
+                    onMouseEnter={ev => ev.currentTarget.style.background = '#fff7ed'}
+                    onMouseLeave={ev => ev.currentTarget.style.background = '#fff'}>
                     <div style={{ fontWeight: 700, color: NAVY }}>{e.denomination_with_legal_form || e.denomination}</div>
-                    <div style={{ color: '#94a3b8', fontSize: 11 }}>{e.cbe_number_formatted || e.cbe_number} · {(e.address?.city || '')}</div>
+                    <div style={{ color: '#94a3b8', fontSize: 11 }}>{e.cbe_number_formatted || e.cbe_number}{e.address?.city ? ' · ' + e.address.city : ''}</div>
                   </div>
                 ))}
               </div>
