@@ -9,8 +9,33 @@ const NAVY  = '#0D2F5E'
 const PER   = 40
 
 const fmt     = v => v == null ? '—' : new Intl.NumberFormat('fr-BE',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(v)
-const fmtDate = v => v ? new Date(v).toLocaleDateString('fr-BE',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—'
-const fmtMois = v => { if(!v) return '—'; const d=new Date(v); return d.toLocaleDateString('fr-BE',{month:'short',year:'numeric'}) }
+
+// Parse une date qui peut être ISO (2026-05-06) OU belge (30/01/1978) → objet Date ou null
+const parseDate = v => {
+  if(!v) return null
+  if(v instanceof Date) return isNaN(v)?null:v
+  const s=String(v).trim()
+  let m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)              // JJ/MM/AAAA
+  if(m) return new Date(+m[3],+m[2]-1,+m[1])
+  m=s.match(/^(\d{4})-(\d{2})-(\d{2})/)                      // AAAA-MM-JJ
+  if(m) return new Date(+m[1],+m[2]-1,+m[3])
+  const d=new Date(s); return isNaN(d)?null:d
+}
+const fmtDate = v => { const d=parseDate(v); return d?d.toLocaleDateString('fr-BE',{day:'2-digit',month:'2-digit',year:'numeric'}):'—' }
+const fmtDateLong = v => { const d=parseDate(v); return d?d.toLocaleDateString('fr-BE',{day:'numeric',month:'long',year:'numeric'}):'—' }
+const fmtMois = v => { const d=parseDate(v); return d?d.toLocaleDateString('fr-BE',{month:'short',year:'numeric'}):'—' }
+// Âge en années (+ mois) à partir d'une date de naissance
+const calcAge = v => {
+  const d=parseDate(v); if(!d) return null
+  const now=new Date()
+  let ans=now.getFullYear()-d.getFullYear()
+  let mois=now.getMonth()-d.getMonth()
+  if(now.getDate()<d.getDate()) mois--
+  if(mois<0){ ans--; mois+=12 }
+  return { ans, mois }
+}
+// Nettoie un numéro de téléphone (retire l'apostrophe parasite d'export Excel)
+const cleanTel = v => { if(!v) return null; const s=String(v).replace(/^'+/,'').trim(); return (s && s.toUpperCase()!=='GSM' && s.toUpperCase()!=='TEL')?s:null }
 
 // ── Domaines → icônes ──
 const DOM = [
@@ -145,14 +170,51 @@ function Risques({ contrats, loadContrats }) {
   },[contrats,loadContrats])
 
   if(loadContrats||load) return <p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>
-  if(!risques.length) return <p style={{color:'#94a3b8',fontSize:12}}>Aucun objet de risque trouvé pour ce client</p>
+  const aContratsActifs=contrats.some(c=>c.situation==='En cours')
+  if(!risques.length&&!aContratsActifs) return <p style={{color:'#94a3b8',fontSize:12}}>Aucun objet de risque trouvé pour ce client</p>
 
   // Grouper par type
   const parType={}
   risques.forEach(r=>{ const k=r.type_risque_libelle||'Autre'; if(!parType[k])parType[k]=[]; parType[k].push(r) })
 
+  // ── Analyse 360 : couvertures essentielles présentes / absentes ──
+  // On combine domaines de contrats EN COURS + types de risque pour déterminer ce qui est couvert
+  const blob=(contrats.filter(c=>c.situation==='En cours').map(c=>`${c.domaine} ${c.type_production}`).join(' ')+' '+risques.map(r=>r.type_risque_libelle+' '+r.description).join(' ')).toUpperCase()
+  const ESSENTIELS=[
+    {label:'Auto / Véhicule', icon:'🚗', kw:['AUTO','VÉHIC','VEHIC','MOTO','CAMION']},
+    {label:'Habitation / Incendie', icon:'🏠', kw:['HABITATION','INCENDIE','MAISON','BÂTIMENT','BATIMENT','IMMEUBLE']},
+    {label:'RC Familiale', icon:'⚖️', kw:['FAMILIALE','RC VIE PRIVÉE','VIE PRIVEE','RESPONSABILIT']},
+    {label:'Protection juridique', icon:'🛡️', kw:['JURIDIQUE','PROTECTION JUR']},
+    {label:'Soins de santé / Hospi', icon:'🏥', kw:['SANTÉ','SANTE','HOSPI','MALADIE','SOINS']},
+    {label:'Vie / Décès / Pension', icon:'💙', kw:['VIE','DÉCÈS','DECES','PENSION','ÉPARGNE','EPARGNE']},
+    {label:'Accidents', icon:'🩹', kw:['ACCIDENT','CORPO']},
+  ]
+  const couv=ESSENTIELS.map(e=>({...e,ok:e.kw.some(k=>blob.includes(k))}))
+  const manquants=couv.filter(e=>!e.ok)
+
   return(
     <div style={{display:'flex',flexDirection:'column',gap:12}}>
+      {/* ── Analyse 360 ── */}
+      <div style={{background:'#fafafe',border:'1px solid #e2e8f0',borderRadius:10,padding:'12px 14px'}}>
+        <div style={{fontSize:11,fontWeight:700,color:NAVY,textTransform:'uppercase',letterSpacing:'.04em',marginBottom:9,display:'flex',alignItems:'center',gap:6}}>
+          <i className="ti ti-radar" style={{color:'#7c3aed'}}/>Analyse 360 — couverture
+        </div>
+        <div style={{display:'flex',flexWrap:'wrap',gap:7}}>
+          {couv.map((e,i)=>(
+            <div key={i} title={e.ok?'Couvert':'Non couvert — opportunité'} style={{display:'flex',alignItems:'center',gap:6,padding:'5px 11px',borderRadius:20,fontSize:12,fontWeight:600,
+              background:e.ok?'#f0fdf4':'#fef2f2',color:e.ok?'#16a34a':'#dc2626',border:`1px solid ${e.ok?'#bbf7d0':'#fecaca'}`}}>
+              <span style={{fontSize:14,filter:e.ok?'none':'grayscale(1)',opacity:e.ok?1:0.6}}>{e.icon}</span>
+              {e.label}
+              <i className={`ti ${e.ok?'ti-check':'ti-x'}`} style={{fontSize:13}}/>
+            </div>
+          ))}
+        </div>
+        {manquants.length>0&&(
+          <div style={{fontSize:11,color:'#92400e',marginTop:9,background:'#fffbeb',border:'1px solid #fde68a',borderRadius:7,padding:'7px 11px'}}>
+            <strong>{manquants.length} couverture{manquants.length>1?'s':''} potentielle{manquants.length>1?'s':''} à proposer :</strong> {manquants.map(m=>m.label).join(', ')}
+          </div>
+        )}
+      </div>
       {/* Badges résumé par type */}
       <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
         {Object.entries(parType).map(([type,arr],i)=>(
@@ -166,7 +228,7 @@ function Risques({ contrats, loadContrats }) {
         ))}
       </div>
       {/* Détail */}
-      <div style={{overflowX:'auto',maxHeight:240,overflowY:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
+      {risques.length>0&&<div style={{overflowX:'auto',maxHeight:240,overflowY:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
           <thead style={{position:'sticky',top:0,background:'#f8fafc',zIndex:1}}>
             <tr>{['Police','Type','Description','Contrats','Statut'].map(h=>(
@@ -187,57 +249,99 @@ function Risques({ contrats, loadContrats }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </div>}
     </div>
   )
 }
 
-// ══ Relations familiales (vue v_famille_clients depuis Brio) ══
-function Relations({ dossier, onSelectMembre }) {
+// ══ Relations (familiales ET sociétés) — lecture BIDIRECTIONNELLE ══
+function Relations({ client, onOpenDossier }) {
   const [rels,setRels]=useState([]); const [load,setLoad]=useState(true)
   // Icône/couleur par type de relation Brio
   const relCfg = lib => {
     const t=(lib||'').toLowerCase()
     if(t.includes('conjoint')||t.includes('époux')||t.includes('epoux')||t.includes('marié')) return {icon:'💍',col:'#ec4899',bg:'#fdf2f8'}
-    if(t.includes('cohabitant')) return {icon:'🏡',col:'#0d9488',bg:'#f0fdfa'}
+    if(t.includes('cohabitant')||t.includes('concubin')) return {icon:'🏡',col:'#0d9488',bg:'#f0fdfa'}
     if(t.includes('enfant')||t.includes('fils')||t.includes('fille')) return {icon:'👶',col:'#7c3aed',bg:'#f5f3ff'}
-    if(t.includes('parent')||t.includes('père')||t.includes('mère')||t.includes('pere')||t.includes('mere')) return {icon:'👨‍👩‍👧',col:'#0d9488',bg:'#f0fdfa'}
+    if(t.includes('parent')||t.includes('père')||t.includes('mère')||t.includes('pere')||t.includes('mere')||t.includes('grand-parent')) return {icon:'👨‍👩‍👧',col:'#0d9488',bg:'#f0fdfa'}
     if(t.includes('frère')||t.includes('soeur')||t.includes('sœur')||t.includes('frere')) return {icon:'👫',col:'#2563eb',bg:'#eff6ff'}
-    if(t.includes('cousin')) return {icon:'🧑‍🤝‍🧑',col:'#2563eb',bg:'#eff6ff'}
-    if(t.includes('société')||t.includes('societe')||t.includes('entreprise')||t.includes('morale')) return {icon:'🏢',col:'#94a3b8',bg:'#f8fafc'}
+    if(t.includes('cousin')||t.includes('oncle')||t.includes('tante')||t.includes('neveu')||t.includes('nièce')||t.includes('beau')||t.includes('belle')) return {icon:'🧑‍🤝‍🧑',col:'#2563eb',bg:'#eff6ff'}
+    if(t.includes('gérant')||t.includes('gerant')||t.includes('administrateur')||t.includes('coopérateur')||t.includes('bénéficiaire effectif')) return {icon:'👔',col:'#b45309',bg:'#fffbeb'}
+    if(t.includes('firme')||t.includes('société')||t.includes('societe')||t.includes('entreprise')||t.includes('morale')||t.includes('organisation')) return {icon:'🏢',col:'#475569',bg:'#f8fafc'}
+    if(t.includes('employeur')||t.includes('salarié')||t.includes('salarie')||t.includes('membre')||t.includes('représentant')||t.includes('representant')) return {icon:'💼',col:'#475569',bg:'#f8fafc'}
     return {icon:'🔗',col:'#64748b',bg:'#f1f5f9'}
   }
+  const SEL='dossier,nom_principal,prenom_principal,type_relation_libelle,relation_active,physique_morale_libelle,nom_lie,prenom_lie,cp_lie,localite_lie'
+
   useEffect(()=>{
-    if(!dossier){ setLoad(false); return }
+    if(!client?.dossier){ setLoad(false); return }
     setLoad(true)
-    supabase.from('v_famille_clients')
-      .select('numero_brio,relation,relation_active,nom_lie,prenom_lie,cp_lie,localite_lie,dossier_lie,gsm_lie,email_lie')
-      .eq('dossier_principal',dossier)
-      .then(({data})=>{ setRels(data||[]); setLoad(false) })
-  },[dossier])
+    const NOM=(client.nom||'').toUpperCase().trim()
+    const PRENOM=(client.prenom||'').trim()
+    Promise.all([
+      // (A) directes : le client est la personne PRINCIPALE
+      supabase.from('famille').select(SEL).eq('dossier',client.dossier),
+      // (B) inverses : le client est la personne LIÉE
+      supabase.from('famille').select(SEL).ilike('nom_lie',NOM).ilike('prenom_lie',PRENOM),
+    ]).then(async([{data:dir},{data:inv}])=>{
+      const list=[]
+      ;(dir||[]).forEach(r=>list.push({
+        type:r.type_relation_libelle, active:r.relation_active,
+        autreNom:r.nom_lie, autrePrenom:r.prenom_lie, autreDossier:null,
+        cp:r.cp_lie, localite:r.localite_lie, morale:(r.physique_morale_libelle||'').toLowerCase().includes('morale'),
+      }))
+      ;(inv||[]).forEach(r=>list.push({
+        type:r.type_relation_libelle, active:r.relation_active,
+        autreNom:r.nom_principal, autrePrenom:r.prenom_principal, autreDossier:r.dossier,
+        cp:r.cp_lie, localite:r.localite_lie, morale:!r.prenom_principal,
+      }))
+      // Résoudre les dossiers manquants (relations directes) via la table clients
+      const aResoudre=[...new Set(list.filter(x=>!x.autreDossier&&x.autreNom).map(x=>x.autreNom.toUpperCase()))]
+      if(aResoudre.length){
+        const{data:cl}=await supabase.from('clients').select('dossier,nom,prenom').in('nom',aResoudre).not('dossier','is',null)
+        const idx={}
+        ;(cl||[]).forEach(c=>{ const k=`${(c.nom||'').toUpperCase()}|${(c.prenom||'').toUpperCase()}`; if(!idx[k]) idx[k]=c.dossier })
+        list.forEach(x=>{ if(!x.autreDossier){ const k=`${(x.autreNom||'').toUpperCase()}|${(x.autrePrenom||'').toUpperCase()}`; if(idx[k]) x.autreDossier=idx[k] } })
+      }
+      // Dédoublonner par (autre personne + type) ; garder la version cliquable
+      const map={}
+      list.forEach(x=>{
+        const k=`${(x.autreNom||'').toUpperCase()}|${(x.autrePrenom||'').toUpperCase()}|${(x.type||'').toLowerCase()}`
+        if(!map[k]||(!map[k].autreDossier&&x.autreDossier)) map[k]=x
+      })
+      // Ne pas s'auto-référencer
+      const self=`${NOM}|${PRENOM.toUpperCase()}`
+      const out=Object.values(map).filter(x=>`${(x.autreNom||'').toUpperCase()}|${(x.autrePrenom||'').toUpperCase()}`!==self)
+      // Trier : actives d'abord, puis sociétés en bas
+      out.sort((a,b)=>(b.active-a.active)||(a.morale-b.morale))
+      setRels(out); setLoad(false)
+    })
+  },[client?.dossier])
 
   if(load) return <p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>
-  if(!rels.length) return (
-    <div style={{color:'#94a3b8',fontSize:12,fontStyle:'italic'}}>Aucune relation enregistrée pour ce dossier.</div>
-  )
+  if(!rels.length) return <div style={{color:'#94a3b8',fontSize:12,fontStyle:'italic'}}>Aucune relation enregistrée pour ce dossier.</div>
   return(
     <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
       {rels.map((r,i)=>{
-        const cfg=relCfg(r.relation)
-        const clickable=!!r.dossier_lie
+        const cfg=relCfg(r.type)
+        const clickable=!!r.autreDossier
+        const nomAffiche=r.morale?(r.autreNom||'Société'):`${r.autreNom||''} ${r.autrePrenom||''}`.trim()
         return(
-          <div key={i} onClick={()=>clickable&&onSelectMembre({dossier:r.dossier_lie,nom:r.nom_lie,prenom:r.prenom_lie,gsm:r.gsm_lie,email:r.email_lie})}
-            style={{background:cfg.bg,border:`1px solid ${cfg.col}30`,borderRadius:10,padding:'10px 14px',cursor:clickable?'pointer':'default',minWidth:170,transition:'box-shadow 0.15s'}}
-            onMouseEnter={e=>clickable&&(e.currentTarget.style.boxShadow=`0 3px 10px ${cfg.col}30`)}
-            onMouseLeave={e=>e.currentTarget.style.boxShadow=''}>
+          <div key={i} onClick={()=>clickable&&onOpenDossier(r.autreDossier)}
+            title={clickable?'Ouvrir la fiche':''}
+            style={{background:cfg.bg,border:`1px solid ${cfg.col}30`,borderRadius:10,padding:'10px 14px',cursor:clickable?'pointer':'default',minWidth:185,transition:'box-shadow 0.15s,transform 0.1s'}}
+            onMouseEnter={e=>{if(clickable){e.currentTarget.style.boxShadow=`0 4px 12px ${cfg.col}30`;e.currentTarget.style.transform='translateY(-1px)'}}}
+            onMouseLeave={e=>{e.currentTarget.style.boxShadow='';e.currentTarget.style.transform=''}}>
             <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:5}}>
               <span style={{fontSize:18}}>{cfg.icon}</span>
-              <span style={{fontSize:10,fontWeight:700,color:cfg.col,textTransform:'uppercase',letterSpacing:'.04em'}}>{r.relation||'Relation'}</span>
-              {!r.relation_active&&<span style={{fontSize:9,color:'#dc2626',marginLeft:'auto'}}>inactive</span>}
+              <span style={{fontSize:10,fontWeight:700,color:cfg.col,textTransform:'uppercase',letterSpacing:'.03em',lineHeight:1.2}}>{r.type||'Relation'}</span>
+              {!r.active&&<span style={{fontSize:9,color:'#dc2626',marginLeft:'auto',fontWeight:600}}>inactive</span>}
             </div>
-            <div style={{fontSize:13,fontWeight:700,color:'#1e293b'}}>{r.nom_lie} {r.prenom_lie}</div>
-            <div style={{fontSize:11,color:'#64748b',marginTop:2}}>{[r.cp_lie,r.localite_lie].filter(Boolean).join(' ')||'—'}</div>
-            {clickable&&<div style={{fontSize:10,color:cfg.col,marginTop:4,fontWeight:600}}>Voir fiche →</div>}
+            <div style={{fontSize:13,fontWeight:700,color:'#1e293b'}}>{nomAffiche||'—'}</div>
+            <div style={{fontSize:11,color:'#64748b',marginTop:2}}>{[r.cp,r.localite].filter(Boolean).join(' ')||'—'}</div>
+            {clickable
+              ? <div style={{fontSize:10,color:cfg.col,marginTop:4,fontWeight:600}}>Voir la fiche →</div>
+              : <div style={{fontSize:10,color:'#cbd5e1',marginTop:4}}>Hors portefeuille</div>}
           </div>
         )
       })}
@@ -248,7 +352,7 @@ function Relations({ dossier, onSelectMembre }) {
 // ══════════════════════
 // FICHE CLIENT complète
 // ══════════════════════
-function Fiche({ client, onClose, onSelectMembre }) {
+function Fiche({ client, onClose, onOpenDossier }) {
   const [contrats,setContrats]=useState([]); const [taches,setTaches]=useState([]); const [loadF,setLoadF]=useState(true)
   const ref=useRef(null)
 
@@ -256,14 +360,24 @@ function Fiche({ client, onClose, onSelectMembre }) {
     ref.current?.scrollIntoView({behavior:'smooth',block:'start'})
     setLoadF(true)
     Promise.all([
-      supabase.from('contrats').select('police,compagnie,nom_client,situation,date_creation,domaine,type_production,garantie_valeur').eq('dossier',client.dossier).order('date_creation',{ascending:false}),
+      supabase.from('contrats').select('police,compagnie,nom_client,situation,date_creation,domaine,type_production,garantie_valeur,version').eq('dossier',client.dossier).order('date_creation',{ascending:false}),
       supabase.from('taches').select('*').eq('dossier_client',client.dossier).order('echeance',{ascending:true}).limit(20),
-    ]).then(([{data:c},{data:t}])=>{ setContrats(c||[]); setTaches(t||[]); setLoadF(false) })
+    ]).then(([{data:c},{data:t}])=>{
+      // Dédoublonnage par police (les imports créent des lignes identiques) — on garde la plus récente
+      const seen=new Set(); const uniq=[]
+      ;(c||[]).forEach(r=>{ const k=r.police||JSON.stringify(r); if(!seen.has(k)){ seen.add(k); uniq.push(r) } })
+      setContrats(uniq); setTaches(t||[]); setLoadF(false)
+    })
   },[client.dossier])
 
-  const initiales=`${(client.prenom||'?')[0]}${(client.nom||'?')[0]}`.toUpperCase()
+  const initiales=`${(client.prenom||'?')[0]||''}${(client.nom||'?')[0]||''}`.toUpperCase()
   const actifs=contrats.filter(c=>c.situation==='En cours').length
   const adresse=[client.rue,client.num_maison,client.boite].filter(Boolean).join(' ')
+  const adresseComplete=[adresse,[client.cp,client.localite].filter(Boolean).join(' ')].filter(Boolean).join(', ')
+  const mapsUrl=adresseComplete?`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(adresseComplete)}`:null
+  const wazeUrl=adresseComplete?`https://waze.com/ul?q=${encodeURIComponent(adresseComplete)}`:null
+  const age=calcAge(client.date_naissance)
+  const gsm=cleanTel(client.gsm); const fixe=cleanTel(client.tel_fixe)
 
   // Risques (dérivés des domaines de contrats actifs)
   const risques={}
@@ -272,27 +386,27 @@ function Fiche({ client, onClose, onSelectMembre }) {
     if(!risques[k]) risques[k]={...cfg,n:0}
     risques[k].n++
   })
-  const SIT={  'En cours':{bg:'#dcfce7',col:'#16a34a'},'Résilié':{bg:'#fee2e2',col:'#dc2626'},'Suspendu':{bg:'#fef3c7',col:'#92400e'} }
+  const SIT={  'En cours':{bg:'#dcfce7',col:'#16a34a'},'Résilié':{bg:'#fee2e2',col:'#dc2626'},'Terminé':{bg:'#fee2e2',col:'#dc2626'},'Suspendu':{bg:'#fef3c7',col:'#92400e'} }
 
   return(
     <div ref={ref} style={{marginTop:20,background:'#fff',borderRadius:14,border:`2px solid ${BLUE}25`,overflow:'hidden',boxShadow:'0 4px 24px rgba(0,128,189,0.1)'}}>
 
-      {/* ── Header gradient ── */}
-      <div style={{background:`linear-gradient(135deg, ${NAVY} 0%, ${BLUE} 100%)`,padding:'18px 22px',display:'flex',alignItems:'center',gap:16,flexWrap:'wrap'}}>
-        <div style={{width:54,height:54,borderRadius:13,background:'rgba(255,255,255,0.2)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:19,fontWeight:800,color:'#fff'}}>{initiales}</div>
+      {/* ── Header compact : nom mis en avant ── */}
+      <div style={{background:`linear-gradient(135deg, ${NAVY} 0%, ${BLUE} 100%)`,padding:'12px 20px',display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
+        <div style={{width:42,height:42,borderRadius:11,background:'rgba(255,255,255,0.2)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:16,fontWeight:800,color:'#fff'}}>{initiales}</div>
         <div style={{flex:1,minWidth:160}}>
-          <h2 style={{fontSize:19,fontWeight:800,color:'#fff',margin:'0 0 3px'}}>{client.prenom} {client.nom}</h2>
-          <div style={{fontSize:12,color:'rgba(255,255,255,0.7)',display:'flex',gap:14,flexWrap:'wrap'}}>
+          <h2 style={{fontSize:24,fontWeight:800,color:'#fff',margin:0,lineHeight:1.1}}>{client.prenom} {client.nom}</h2>
+          <div style={{fontSize:11,color:'rgba(255,255,255,0.65)',display:'flex',gap:12,flexWrap:'wrap',marginTop:2}}>
             <span>#{client.dossier}</span>
+            {client.etat_civil&&<span>{client.etat_civil}</span>}
             {client.bureau&&<span>{client.bureau}</span>}
-            {client.classe&&<span>{client.classe}</span>}
           </div>
         </div>
-        <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
           {[{v:actifs,l:'Actifs'},{v:contrats.length,l:'Contrats'}].map(k=>(
-            <div key={k.l} style={{textAlign:'center',background:'rgba(255,255,255,0.15)',borderRadius:9,padding:'8px 14px'}}>
-              <div style={{fontSize:21,fontWeight:800,color:'#fff'}}>{k.v}</div>
-              <div style={{fontSize:10,color:'rgba(255,255,255,0.65)',fontWeight:600}}>{k.l}</div>
+            <div key={k.l} style={{textAlign:'center',background:'rgba(255,255,255,0.15)',borderRadius:8,padding:'5px 12px'}}>
+              <div style={{fontSize:18,fontWeight:800,color:'#fff',lineHeight:1}}>{k.v}</div>
+              <div style={{fontSize:9,color:'rgba(255,255,255,0.65)',fontWeight:600,marginTop:2}}>{k.l}</div>
             </div>
           ))}
         </div>
@@ -310,19 +424,36 @@ function Fiche({ client, onClose, onSelectMembre }) {
 
         {/* Coordonnées inline compact */}
         <Sec icon="ti-user" title="Coordonnées" col="#64748b" open={true} count={0}>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:10}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(210px,1fr))',gap:10}}>
+            {/* Adresse cliquable */}
+            <div style={{display:'flex',alignItems:'flex-start',gap:8}}>
+              <i className="ti ti-map-pin" style={{fontSize:13,color:'#94a3b8',marginTop:2,flexShrink:0}}/>
+              <div style={{minWidth:0}}>
+                <div style={{fontSize:10,color:'#94a3b8',fontWeight:700,textTransform:'uppercase',letterSpacing:'.04em'}}>Adresse</div>
+                {adresseComplete?(
+                  <div>
+                    <div style={{fontSize:13,color:'#1e293b'}}>{adresseComplete}</div>
+                    <div style={{display:'flex',gap:10,marginTop:3}}>
+                      <a href={mapsUrl} target="_blank" rel="noreferrer" style={{fontSize:11,color:BLUE,fontWeight:600,textDecoration:'none',display:'inline-flex',alignItems:'center',gap:3}}><i className="ti ti-brand-google-maps" style={{fontSize:12}}/>Maps</a>
+                      <a href={wazeUrl} target="_blank" rel="noreferrer" style={{fontSize:11,color:'#0d9488',fontWeight:600,textDecoration:'none',display:'inline-flex',alignItems:'center',gap:3}}><i className="ti ti-navigation" style={{fontSize:12}}/>Waze</a>
+                    </div>
+                  </div>
+                ):<div style={{fontSize:13,color:'#1e293b'}}>—</div>}
+              </div>
+            </div>
             {[
-              {icon:'ti-map-pin',  l:'Adresse',      v:adresse?`${adresse}, ${client.cp||''} ${client.localite||''}`:`${client.cp||''} ${client.localite||''}`},
-              {icon:'ti-device-mobile',l:'GSM',       v:client.gsm||'—'},
-              {icon:'ti-phone',    l:'Fixe',          v:client.tel_fixe||'—'},
+              {icon:'ti-device-mobile',l:'GSM',       v:gsm||'—'},
+              {icon:'ti-phone',    l:'Fixe',          v:fixe||'—'},
               {icon:'ti-mail',     l:'Email',         v:client.email||'—'},
-              {icon:'ti-calendar', l:'Naissance',     v:fmtDate(client.date_naissance)},
+              {icon:'ti-calendar', l:'Naissance',     v:client.date_naissance?`${fmtDateLong(client.date_naissance)}${age?` · ${age.ans} ans`:''}`:'—'},
+              {icon:'ti-heart',    l:'État civil',    v:client.etat_civil||'—'},
+              {icon:'ti-gender-bigender',l:'Sexe',    v:client.sexe||'—'},
               {icon:'ti-user',     l:'Gestionnaire',  v:client.gestionnaire_nom||'—'},
-              {icon:'ti-user',     l:'Sous-agent',    v:client.sa_nom||'—'},
+              {icon:'ti-user-star',l:'Sous-agent',    v:client.sa_nom||'—'},
             ].map(r=>(
               <div key={r.l} style={{display:'flex',alignItems:'flex-start',gap:8}}>
                 <i className={`ti ${r.icon}`} style={{fontSize:13,color:'#94a3b8',marginTop:2,flexShrink:0}}/>
-                <div>
+                <div style={{minWidth:0}}>
                   <div style={{fontSize:10,color:'#94a3b8',fontWeight:700,textTransform:'uppercase',letterSpacing:'.04em'}}>{r.l}</div>
                   <div style={{fontSize:13,color:'#1e293b'}}>{r.v}</div>
                 </div>
@@ -331,9 +462,9 @@ function Fiche({ client, onClose, onSelectMembre }) {
           </div>
         </Sec>
 
-        {/* Relations familiales */}
-        <Sec icon="ti-users-group" title="Relations & famille" col="#ec4899" open={true} count={0}>
-          <Relations dossier={client.dossier} onSelectMembre={onSelectMembre}/>
+        {/* Relations familiales ET sociétés */}
+        <Sec icon="ti-users-group" title="Relations & sociétés" col="#ec4899" open={true} count={0}>
+          <Relations client={client} onOpenDossier={onOpenDossier}/>
         </Sec>
 
         {/* Objets de risque (vraie table risques, liée par police) */}
@@ -347,7 +478,7 @@ function Fiche({ client, onClose, onSelectMembre }) {
             <div style={{overflowX:'auto',maxHeight:240,overflowY:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
               <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
                 <thead style={{position:'sticky',top:0,background:'#f8fafc',zIndex:1}}>
-                  <tr>{['Police','Compagnie','Domaine','Situation','Type','Garantie'].map(h=>(
+                  <tr>{['Police','Compagnie','Domaine','Situation','Type','Date','Garantie'].map(h=>(
                     <th key={h} style={{padding:'7px 12px',textAlign:'left',fontWeight:700,color:'#94a3b8',fontSize:10,textTransform:'uppercase',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>
                   ))}</tr>
                 </thead>
@@ -361,7 +492,8 @@ function Fiche({ client, onClose, onSelectMembre }) {
                         <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{c.domaine||'—'}</td>
                         <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9'}}><span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:4,background:s.bg,color:s.col}}>{c.situation||'—'}</span></td>
                         <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{c.type_production||'—'}</td>
-                        <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{c.garantie_valeur||'—'}</td>
+                        <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b',whiteSpace:'nowrap'}}>{fmtDate(c.date_creation)}</td>
+                        <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}} title={c.garantie_valeur?`Valeur assurée : ${fmt(c.garantie_valeur)}`:''}>{c.garantie_valeur?fmt(c.garantie_valeur):'—'}</td>
                       </tr>
                     )
                   })}
@@ -442,7 +574,7 @@ export default function DynassurClients() {
 
   const load = useCallback(async(search,sc,p)=>{
     setLoading(true)
-    let qb=supabase.from('clients').select('dossier,nom,prenom,cp,localite,gsm,tel_fixe,email,rue,num_maison,boite,date_naissance,sa_code,sa_nom,gestionnaire_code,gestionnaire_nom,bureau,classe,alerte',{count:'exact'})
+    let qb=supabase.from('clients').select('dossier,nom,prenom,cp,localite,gsm,tel_fixe,email,rue,num_maison,boite,date_naissance,etat_civil,sexe,sa_code,sa_nom,gestionnaire_code,gestionnaire_nom,bureau,classe,alerte',{count:'exact'})
     if(search.length>=2) qb=qb.or(`nom.ilike.%${search}%,prenom.ilike.%${search}%,dossier.ilike.%${search}%,email.ilike.%${search}%,gsm.ilike.%${search}%`)
     if(sc==='mine'&&myCode) qb=qb.eq('gestionnaire_code',myCode)
     else if(sc==='bureau'&&myBureau) qb=qb.eq('bureau',myBureau)
@@ -457,6 +589,13 @@ export default function DynassurClients() {
   },[q,scope,myCode,myBureau])
 
   useEffect(()=>{ load(q,scope,page) },[page])
+
+  // Ouvrir une fiche à partir d'un n° de dossier (clic sur une relation)
+  const openDossier = useCallback(async(dossier)=>{
+    if(!dossier) return
+    const{data}=await supabase.from('clients').select('dossier,nom,prenom,cp,localite,gsm,tel_fixe,email,rue,num_maison,boite,date_naissance,etat_civil,sexe,sa_code,sa_nom,gestionnaire_code,gestionnaire_nom,bureau,classe,alerte').eq('dossier',dossier).limit(1)
+    if(data&&data[0]){ setSelected(data[0]); window.scrollTo({top:0,behavior:'smooth'}) }
+  },[])
 
   const nb=Math.ceil(total/PER)
   const tot=counts.total||1
@@ -592,7 +731,7 @@ export default function DynassurClients() {
         )}
 
         {/* ── Fiche ── */}
-        {selected&&<Fiche client={selected} onClose={()=>setSelected(null)} onSelectMembre={c=>setSelected(c)}/>}
+        {selected&&<Fiche client={selected} onClose={()=>setSelected(null)} onOpenDossier={openDossier}/>}
 
       </div>
     </Layout>
