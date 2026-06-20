@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
 import { LODE, TVA_TAUX, CGV, DELAI_PAIEMENT_JOURS } from '../../lib/lodeConfig'
+import { I18N, CGV_I18N, LANGUES } from '../../lib/lodeI18n'
 
 const ORANGE = LODE.couleur
 const NAVY = '#1e293b'
@@ -76,7 +77,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
     objet: '', notes: '', remise_pct: 0,
     date_devis: todayISO(), date_validite: addDays(todayISO(), 30),
     date_facture: todayISO(), date_echeance: addDays(todayISO(), DELAI_PAIEMENT_JOURS),
-    statut: 'brouillon', ...(doc || {}),
+    statut: 'brouillon', langue: 'fr', ...(doc || {}),
   })
   const [lignes, setLignes] = useState([{ description: '', quantite: 1, prix_unitaire: 0, remise_pct: 0, tva_pct: 21 }])
   const [saving, setSaving] = useState(false)
@@ -97,6 +98,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
       client_nom: c.type === 'entreprise' ? c.denomination : `${c.prenom || ''} ${c.nom || ''}`.trim(),
       client_adresse: c.adresse || '', client_cp: c.cp || '', client_ville: c.ville || '',
       client_email: c.email || '', client_telephone: c.telephone || c.gsm || '', client_tva: c.tva || '',
+      langue: c.langue || p.langue || 'fr',
     }))
   }
 
@@ -122,7 +124,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
         client_nom: f.client_nom, client_adresse: f.client_adresse, client_cp: f.client_cp,
         client_ville: f.client_ville, client_email: f.client_email, client_telephone: f.client_telephone,
         client_tva: f.client_tva, objet: f.objet, notes: f.notes,
-        remise_pct: Number(f.remise_pct) || 0, statut: f.statut,
+        remise_pct: Number(f.remise_pct) || 0, statut: f.statut, langue: f.langue || 'fr',
         total_ht: tot.ht, total_tva: tot.tva, total_ttc: tot.ttc,
       }
       if (isDevis) { payload.date_devis = f.date_devis; payload.date_validite = f.date_validite }
@@ -254,8 +256,13 @@ function Editeur({ type, doc, onClose, onSaved }) {
         </div>
 
         {/* Notes + statut */}
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10, marginBottom: 18 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 10, marginBottom: 18 }}>
           <div><label style={lbl}>Notes (optionnel)</label><textarea style={{ ...inp, minHeight: 50, resize: 'vertical' }} value={f.notes} onChange={e => set('notes', e.target.value)} /></div>
+          <div><label style={lbl}>Langue du document</label>
+            <select style={inp} value={f.langue || 'fr'} onChange={e => set('langue', e.target.value)}>
+              {LANGUES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
+            </select>
+          </div>
           <div><label style={lbl}>Statut</label>
             <select style={inp} value={f.statut} onChange={e => set('statut', e.target.value)}>
               {Object.entries(isDevis ? STATUTS_DEVIS : STATUTS_FACT).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
@@ -283,6 +290,8 @@ async function exportPDF(type, doc, lignes) {
   const isDevis = type === 'devis'
   const tot = calcTotaux(lignes, doc.remise_pct)
   const O = [234, 88, 12]
+  const L = I18N[doc.langue] || I18N.fr
+  const cgv = CGV_I18N[doc.langue] || CGV_I18N.fr
 
   // En-tête émetteur
   d.setFontSize(20); d.setTextColor(...O); d.setFont(undefined, 'bold')
@@ -293,21 +302,21 @@ async function exportPDF(type, doc, lignes) {
 
   // Titre document
   d.setFontSize(22); d.setTextColor(30); d.setFont(undefined, 'bold')
-  d.text(isDevis ? 'DEVIS' : 'FACTURE', 196, 20, { align: 'right' })
+  d.text(isDevis ? L.devis : L.facture, 196, 20, { align: 'right' })
   d.setFontSize(11); d.setTextColor(...O)
   d.text(doc.numero || '', 196, 27, { align: 'right' })
   d.setFontSize(9); d.setTextColor(100); d.setFont(undefined, 'normal')
   if (isDevis) {
-    d.text(`Date : ${fmtDate(doc.date_devis)}`, 196, 34, { align: 'right' })
-    d.text(`Validité : ${fmtDate(doc.date_validite)}`, 196, 39, { align: 'right' })
+    d.text(`${L.date} : ${fmtDate(doc.date_devis)}`, 196, 34, { align: 'right' })
+    d.text(`${L.validite} : ${fmtDate(doc.date_validite)}`, 196, 39, { align: 'right' })
   } else {
-    d.text(`Date : ${fmtDate(doc.date_facture)}`, 196, 34, { align: 'right' })
-    d.text(`Échéance : ${fmtDate(doc.date_echeance)}`, 196, 39, { align: 'right' })
+    d.text(`${L.date} : ${fmtDate(doc.date_facture)}`, 196, 34, { align: 'right' })
+    d.text(`${L.echeance} : ${fmtDate(doc.date_echeance)}`, 196, 39, { align: 'right' })
   }
 
   // Client
   d.setFillColor(248, 250, 252); d.rect(14, 50, 90, 32, 'F')
-  d.setFontSize(8); d.setTextColor(150); d.text('CLIENT', 18, 56)
+  d.setFontSize(8); d.setTextColor(150); d.text(L.client, 18, 56)
   d.setFontSize(10); d.setTextColor(30); d.setFont(undefined, 'bold')
   d.text(doc.client_nom || '', 18, 62)
   d.setFont(undefined, 'normal'); d.setFontSize(9); d.setTextColor(80)
@@ -317,7 +326,7 @@ async function exportPDF(type, doc, lignes) {
   if (doc.client_tva) cl.push(`TVA ${doc.client_tva}`)
   d.text(cl, 18, 68)
 
-  if (doc.objet) { d.setFontSize(10); d.setTextColor(30); d.setFont(undefined, 'bold'); d.text(`Objet : ${doc.objet}`, 14, 90) }
+  if (doc.objet) { d.setFontSize(10); d.setTextColor(30); d.setFont(undefined, 'bold'); d.text(`${L.objet} : ${doc.objet}`, 14, 90) }
 
   // Tableau lignes
   const body = lignes.map(l => {
@@ -325,7 +334,7 @@ async function exportPDF(type, doc, lignes) {
     return [l.description, String(l.quantite), eur(l.prix_unitaire), `${l.remise_pct || 0}%`, `${l.tva_pct}%`, eur(t)]
   })
   d.autoTable({
-    startY: 96, head: [['Description', 'Qté', 'P.U.', 'Rem.', 'TVA', 'Total HT']], body,
+    startY: 96, head: [[L.description, L.qte, L.pu, L.remise, L.tva, L.totalHT]], body,
     theme: 'striped', headStyles: { fillColor: O, fontSize: 9 }, bodyStyles: { fontSize: 9 },
     columnStyles: { 0: { cellWidth: 80 }, 1: { halign: 'center' }, 2: { halign: 'right' }, 3: { halign: 'center' }, 4: { halign: 'center' }, 5: { halign: 'right' } },
   })
@@ -334,30 +343,31 @@ async function exportPDF(type, doc, lignes) {
   let y = d.lastAutoTable.finalY + 8
   const tx = 140
   d.setFontSize(10); d.setTextColor(80); d.setFont(undefined, 'normal')
-  if (doc.remise_pct > 0) { d.text(`Remise globale : ${doc.remise_pct}%`, tx, y); y += 6 }
-  d.text('Total HT', tx, y); d.text(eur(tot.ht), 196, y, { align: 'right' }); y += 6
-  Object.entries(tot.parTaux).filter(([, v]) => v > 0).forEach(([t, v]) => { d.text(`TVA ${t}%`, tx, y); d.text(eur(v), 196, y, { align: 'right' }); y += 6 })
+  if (doc.remise_pct > 0) { d.text(`${L.remiseGlobale} : ${doc.remise_pct}%`, tx, y); y += 6 }
+  d.text(L.totalHT, tx, y); d.text(eur(tot.ht), 196, y, { align: 'right' }); y += 6
+  Object.entries(tot.parTaux).filter(([, v]) => v > 0).forEach(([t, v]) => { d.text(`${L.totalTVA} ${t}%`, tx, y); d.text(eur(v), 196, y, { align: 'right' }); y += 6 })
   d.setFont(undefined, 'bold'); d.setFontSize(12); d.setTextColor(...O)
-  d.text('Total TTC', tx, y + 2); d.text(eur(tot.ttc), 196, y + 2, { align: 'right' })
+  d.text(L.totalTTC, tx, y + 2); d.text(eur(tot.ttc), 196, y + 2, { align: 'right' })
 
   // Paiement
   y += 14; d.setFontSize(9); d.setTextColor(80); d.setFont(undefined, 'normal')
-  d.text(`Paiement par virement : ${LODE.iban} (${LODE.bic} – ${LODE.banque})`, 14, y)
-  if (!isDevis) { y += 5; d.text(`Communication : ${doc.numero}`, 14, y) }
+  d.text(`${L.paiement} : ${LODE.iban} (${LODE.bic} – ${LODE.banque})`, 14, y)
+  if (!isDevis) { y += 5; d.text(`${L.communication} : ${doc.numero}`, 14, y) }
+  y += 8; d.setTextColor(120); d.text(L.merci, 14, y)
 
   // CGV (page 2)
   d.addPage()
   d.setFontSize(13); d.setTextColor(...O); d.setFont(undefined, 'bold')
-  d.text('Conditions générales de vente', 14, 20)
+  d.text(L.cgvTitre, 14, 20)
   d.setFontSize(8); d.setTextColor(70); d.setFont(undefined, 'normal')
   let cy = 30
-  CGV.forEach(c => {
+  cgv.forEach(c => {
     const lines = d.splitTextToSize(c, 180)
     if (cy + lines.length * 4 > 285) { d.addPage(); cy = 20 }
     d.text(lines, 14, cy); cy += lines.length * 4 + 3
   })
 
-  d.save(`${isDevis ? 'Devis' : 'Facture'}_${doc.numero}.pdf`)
+  d.save(`${isDevis ? L.devis : L.facture}_${doc.numero}.pdf`)
 }
 
 async function exportExcel(type, doc, lignes) {
@@ -365,31 +375,32 @@ async function exportExcel(type, doc, lignes) {
   const XLSX = window.XLSX
   const tot = calcTotaux(lignes, doc.remise_pct)
   const isDevis = type === 'devis'
+  const L = I18N[doc.langue] || I18N.fr
   const rows = [
-    [LODE.raison_sociale, '', '', isDevis ? 'DEVIS' : 'FACTURE'],
+    [LODE.raison_sociale, '', '', isDevis ? L.devis : L.facture],
     [LODE.adresse, '', '', doc.numero],
-    [`${LODE.cp} ${LODE.ville}`, '', '', isDevis ? `Validité : ${fmtDate(doc.date_validite)}` : `Échéance : ${fmtDate(doc.date_echeance)}`],
+    [`${LODE.cp} ${LODE.ville}`, '', '', isDevis ? `${L.validite} : ${fmtDate(doc.date_validite)}` : `${L.echeance} : ${fmtDate(doc.date_echeance)}`],
     [`TVA ${LODE.tva}`, '', '', ''],
-    [], ['Client', doc.client_nom], ['', doc.client_adresse || ''], ['', `${doc.client_cp || ''} ${doc.client_ville || ''}`],
-    doc.client_tva ? ['TVA client', doc.client_tva] : [],
-    ['Objet', doc.objet || ''], [],
-    ['Description', 'Qté', 'P.U.', 'Remise %', 'TVA %', 'Total HT'],
+    [], [L.client, doc.client_nom], ['', doc.client_adresse || ''], ['', `${doc.client_cp || ''} ${doc.client_ville || ''}`],
+    doc.client_tva ? ['TVA', doc.client_tva] : [],
+    [L.objet, doc.objet || ''], [],
+    [L.description, L.qte, L.pu, L.remise + ' %', L.tva + ' %', L.totalHT],
     ...lignes.map(l => {
       const t = (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * (1 - (Number(l.remise_pct) || 0) / 100)
       return [l.description, Number(l.quantite), Number(l.prix_unitaire), Number(l.remise_pct) || 0, Number(l.tva_pct), Number(t.toFixed(2))]
     }),
     [],
-    ['', '', '', '', 'Remise globale %', Number(doc.remise_pct) || 0],
-    ['', '', '', '', 'Total HT', Number(tot.ht.toFixed(2))],
-    ['', '', '', '', 'TVA', Number(tot.tva.toFixed(2))],
-    ['', '', '', '', 'Total TTC', Number(tot.ttc.toFixed(2))],
-    [], ['Paiement', `${LODE.iban} (${LODE.bic})`],
+    ['', '', '', '', L.remiseGlobale + ' %', Number(doc.remise_pct) || 0],
+    ['', '', '', '', L.totalHT, Number(tot.ht.toFixed(2))],
+    ['', '', '', '', L.totalTVA, Number(tot.tva.toFixed(2))],
+    ['', '', '', '', L.totalTTC, Number(tot.ttc.toFixed(2))],
+    [], [L.paiement, `${LODE.iban} (${LODE.bic})`],
   ].filter(r => r.length > 0)
   const ws = XLSX.utils.aoa_to_sheet(rows)
   ws['!cols'] = [{ wch: 40 }, { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 8 }, { wch: 14 }]
   const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, isDevis ? 'Devis' : 'Facture')
-  XLSX.writeFile(wb, `${isDevis ? 'Devis' : 'Facture'}_${doc.numero}.xlsx`)
+  XLSX.utils.book_append_sheet(wb, ws, isDevis ? L.devis : L.facture)
+  XLSX.writeFile(wb, `${isDevis ? L.devis : L.facture}_${doc.numero}.xlsx`)
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -440,6 +451,7 @@ export default function LodeDevisFactures() {
       client_ville: devisDoc.client_ville, client_email: devisDoc.client_email, client_telephone: devisDoc.client_telephone,
       client_tva: devisDoc.client_tva, objet: devisDoc.objet, notes: devisDoc.notes, remise_pct: devisDoc.remise_pct,
       total_ht: devisDoc.total_ht, total_tva: devisDoc.total_tva, total_ttc: devisDoc.total_ttc,
+      langue: devisDoc.langue || 'fr',
       date_facture: todayISO(), date_echeance: addDays(todayISO(), DELAI_PAIEMENT_JOURS),
     }).select('id').single()
     if (error) { alert('Erreur : ' + error.message); return }

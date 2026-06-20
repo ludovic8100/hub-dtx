@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
 import { LODE } from '../../lib/lodeConfig'
+import { LANGUES } from '../../lib/lodeI18n'
 
 const ORANGE = LODE.couleur
 const NAVY = '#1e293b'
@@ -15,7 +16,7 @@ function EditeurClient({ client, onClose, onSaved }) {
   const [f, setF] = useState({
     type: 'entreprise', numero_bce: '', denomination: '', forme_juridique: '',
     nom: '', prenom: '', adresse: '', cp: '', ville: '', pays: 'Belgique',
-    tva: '', email: '', telephone: '', gsm: '', notes: '', peppol_id: '', actif: true,
+    tva: '', email: '', telephone: '', gsm: '', notes: '', peppol_id: '', actif: true, langue: 'fr',
     ...(client || {}),
   })
   const [saving, setSaving] = useState(false)
@@ -37,7 +38,7 @@ function EditeurClient({ client, onClose, onSaved }) {
     const ctrl = new AbortController()
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`https://photon.komoot.io/api?q=${encodeURIComponent(q)}&limit=8&lang=fr`, { signal: ctrl.signal })
+        const res = await fetch(`https://photon.komoot.io/api?q=${encodeURIComponent(q)}&limit=8`, { signal: ctrl.signal })
         const json = await res.json()
         const list = (json.features || [])
           .map(ft => ft.properties)
@@ -240,6 +241,11 @@ function EditeurClient({ client, onClose, onSaved }) {
           <div><label style={lbl}>GSM</label><input style={inp} value={f.gsm} onChange={e => set('gsm', e.target.value)} /></div>
         </div>
 
+        <div style={{ marginBottom: 12 }}><label style={lbl}>Langue (devis & factures)</label>
+          <select style={{ ...inp, maxWidth: 220 }} value={f.langue || 'fr'} onChange={e => set('langue', e.target.value)}>
+            {LANGUES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
+          </select>
+        </div>
         <div style={{ marginBottom: 18 }}><label style={lbl}>Notes</label><textarea style={{ ...inp, minHeight: 50, resize: 'vertical' }} value={f.notes} onChange={e => set('notes', e.target.value)} /></div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
