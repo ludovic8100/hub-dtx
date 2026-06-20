@@ -50,6 +50,20 @@ const DOM = [
 ]
 const getIcon = d => { const u=(d||'').toUpperCase(); return DOM.find(m=>m.k.some(k=>u.includes(k)))||{icon:'📋',label:d||'Autre'} }
 
+// ── Badge « En cours de développement » ──
+function EnDev({ label='En cours de développement', mini=false }) {
+  return (
+    <span title="Fonctionnalité en cours de développement" style={{
+      display:'inline-flex',alignItems:'center',gap:4,
+      background:'#fff7ed',color:'#c2410c',border:'1px solid #fed7aa',
+      borderRadius:20,padding:mini?'1px 7px':'2px 9px',fontSize:mini?9:10,fontWeight:700,
+      textTransform:'uppercase',letterSpacing:'.03em',whiteSpace:'nowrap',verticalAlign:'middle',
+    }}>
+      <i className="ti ti-tools" style={{fontSize:mini?10:11}}/>{label}
+    </span>
+  )
+}
+
 // ── Relation → badge ──
 const REL_MAP = {
   conjoint:   { icon:'💍', col:'#ec4899', bg:'#fdf2f8', label:'Conjoint·e' },
@@ -62,7 +76,7 @@ const REL_MAP = {
 }
 
 // ── Section pliable ──
-function Sec({ icon, title, count, children, open: defOpen=true, col=BLUE }) {
+function Sec({ icon, title, count, children, extra, open: defOpen=true, col=BLUE }) {
   const [open, setOpen] = useState(defOpen)
   return (
     <div style={{ border:'1px solid #e2e8f0', borderRadius:10, overflow:'hidden', marginBottom:10 }}>
@@ -70,8 +84,10 @@ function Sec({ icon, title, count, children, open: defOpen=true, col=BLUE }) {
         onMouseEnter={e=>e.currentTarget.style.background='#f1f5f9'}
         onMouseLeave={e=>e.currentTarget.style.background='#f8fafc'}>
         <i className={`ti ${icon}`} style={{ fontSize:14, color:col }} />
-        <span style={{ fontSize:13, fontWeight:700, color:NAVY, flex:1 }}>{title}</span>
+        <span style={{ fontSize:13, fontWeight:700, color:NAVY }}>{title}</span>
         {count>0 && <span style={{ fontSize:10, background:col+'20', color:col, padding:'1px 7px', borderRadius:10, fontWeight:700 }}>{count}</span>}
+        {extra}
+        <span style={{ flex:1 }} />
         <i className={`ti ${open?'ti-chevron-up':'ti-chevron-down'}`} style={{ fontSize:11, color:'#94a3b8' }} />
       </div>
       {open && <div style={{ padding:'14px 16px' }}>{children}</div>}
@@ -468,12 +484,14 @@ function Fiche({ client, onClose, onOpenDossier }) {
         </Sec>
 
         {/* Objets de risque (vraie table risques, liée par police) */}
-        <Sec icon="ti-shield" title="Objets de risque" count={0} col="#7c3aed" open={true}>
+        <Sec icon="ti-shield" title="Objets de risque" count={0} col="#7c3aed" open={true}
+          extra={<EnDev label="Fiche risque à venir" mini />}>
           <Risques contrats={contrats} loadContrats={loadF}/>
         </Sec>
 
         {/* Contrats */}
-        <Sec icon="ti-file-text" title="Contrats" count={contrats.length} col={BLUE} open={true}>
+        <Sec icon="ti-file-text" title="Contrats" count={contrats.length} col={BLUE} open={true}
+          extra={<EnDev label="Contrats des relations à venir" mini />}>
           {loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:!contrats.length?<p style={{color:'#94a3b8',fontSize:12}}>Aucun contrat</p>:
             <div style={{overflowX:'auto',maxHeight:240,overflowY:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
               <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
@@ -486,14 +504,17 @@ function Fiche({ client, onClose, onOpenDossier }) {
                   {contrats.map((c,i)=>{
                     const s=SIT[c.situation]||{bg:'#f1f5f9',col:'#64748b'}
                     return(
-                      <tr key={i} style={{background:i%2===0?'#fff':'#fafafe'}}>
+                      <tr key={i} title="Fiche contrat détaillée — en cours de développement" style={{background:i%2===0?'#fff':'#fafafe'}}>
                         <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',fontFamily:'monospace',fontSize:11,fontWeight:600,color:NAVY}}>{c.police||'—'}</td>
                         <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#1e293b'}}>{c.compagnie||'—'}</td>
                         <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{c.domaine||'—'}</td>
                         <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9'}}><span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:4,background:s.bg,color:s.col}}>{c.situation||'—'}</span></td>
                         <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{c.type_production||'—'}</td>
                         <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b',whiteSpace:'nowrap'}}>{fmtDate(c.date_creation)}</td>
-                        <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}} title={c.garantie_valeur?`Valeur assurée : ${fmt(c.garantie_valeur)}`:''}>{c.garantie_valeur?fmt(c.garantie_valeur):'—'}</td>
+                        <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}} title="Détail des garanties — en cours de développement">
+                          {c.garantie_valeur?fmt(c.garantie_valeur):'—'}
+                          <i className="ti ti-tools" style={{fontSize:11,color:'#fb923c',marginLeft:5,verticalAlign:'middle'}}/>
+                        </td>
                       </tr>
                     )
                   })}
