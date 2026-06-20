@@ -5,7 +5,6 @@ import { LODE } from '../../lib/lodeConfig'
 
 const ORANGE = LODE.couleur
 const NAVY = '#1e293b'
-const BCE_WEBHOOK = 'https://n8n.srv1082740.hstgr.cloud/webhook/bce-search'
 
 const fmtDate = iso => iso ? new Date(iso).toLocaleDateString('fr-BE') : '—'
 
@@ -30,38 +29,45 @@ function EditeurClient({ client, onClose, onSaved }) {
   const rechercheBCE = async () => {
     if (!bceQuery.trim()) return
     setBceLoading(true); setBceError(null); setBceResults(null)
+    const KEY = 'WecYIpno6XvAgZY9jIbyakcL9XfPc1wg'
+    const q = bceQuery.trim()
+    const digits = q.replace(/\D/g, '')
+    const isNum = digits.length === 10
+    const url = isNum
+      ? `https://cbeapi.be/api/v1/company/${digits}`
+      : `https://cbeapi.be/api/v1/company/search?name=${encodeURIComponent(q)}`
     try {
-      const res = await fetch(BCE_WEBHOOK, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: bceQuery.trim() }),
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
-      // Normaliser : on attend soit un objet entreprise, soit { results: [...] }
-      const list = Array.isArray(data) ? data : (data.results || data.companies || (data.number || data.denomination ? [data] : []))
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${KEY}`, Accept: 'application/json' } })
+      if (!res.ok) {
+        if (res.status === 404) { setBceError('Aucune entreprise trouvée.'); return }
+        throw new Error(`HTTP ${res.status}`)
+      }
+      const json = await res.json()
+      const data = json.data
+      const list = Array.isArray(data) ? data : (data ? [data] : [])
       if (!list.length) { setBceError('Aucune entreprise trouvée.'); return }
       setBceResults(list.slice(0, 8))
     } catch (e) {
-      setBceError("Recherche BCE indisponible. Vérifie que le webhook n8n « bce-search » est actif et que la clé API CBEAPI est configurée.")
+      setBceError('Recherche BCE indisponible : ' + e.message)
     } finally { setBceLoading(false) }
   }
 
-  // Remplit le formulaire depuis un résultat BCE (mapping souple selon CBEAPI)
+  // Remplit le formulaire depuis un résultat CBEAPI
   const appliquerBCE = (e) => {
-    const bce = e.enterprise_number || e.number || e.bce || e.cbe || ''
-    const denom = e.denomination || e.name || e.company_name || ''
-    const addr = e.address || {}
+    const bce = e.cbe_number_formatted || e.cbe_number || ''
+    const digits = (e.cbe_number || bce).replace(/\D/g, '')
+    const a = e.address || {}
     setF(p => ({
       ...p,
       type: 'entreprise',
       numero_bce: bce,
-      denomination: denom,
-      forme_juridique: e.juridical_form || e.legal_form || e.forme_juridique || p.forme_juridique,
-      tva: bce ? 'BE' + bce.replace(/\D/g, '') : p.tva,
-      peppol_id: bce ? '0208:' + bce.replace(/\D/g, '') : p.peppol_id,
-      adresse: addr.street ? `${addr.street} ${addr.number || ''}`.trim() : (e.street || p.adresse),
-      cp: addr.zipcode || addr.postal_code || e.zipcode || p.cp,
-      ville: addr.city || addr.municipality || e.city || p.ville,
+      denomination: e.denomination_with_legal_form || e.denomination || p.denomination,
+      forme_juridique: e.juridical_form_short || e.juridical_form || p.forme_juridique,
+      tva: digits ? 'BE' + digits : p.tva,
+      peppol_id: digits ? '0208:' + digits : p.peppol_id,
+      adresse: a.street ? `${a.street} ${a.street_number || ''}`.trim() : p.adresse,
+      cp: a.post_code || p.cp,
+      ville: a.city || p.ville,
     }))
     setBceResults(null); setBceQuery('')
   }
@@ -126,8 +132,8 @@ function EditeurClient({ client, onClose, onSaved }) {
                   }}
                     onMouseEnter={ev => ev.currentTarget.style.borderColor = ORANGE}
                     onMouseLeave={ev => ev.currentTarget.style.borderColor = '#e2e8f0'}>
-                    <div style={{ fontWeight: 700, color: NAVY }}>{e.denomination || e.name || e.company_name}</div>
-                    <div style={{ color: '#94a3b8', fontSize: 11 }}>{e.enterprise_number || e.number || e.bce} · {(e.address?.city || e.city || '')}</div>
+                    <div style={{ fontWeight: 700, color: NAVY }}>{e.denomination_with_legal_form || e.denomination}</div>
+                    <div style={{ color: '#94a3b8', fontSize: 11 }}>{e.cbe_number_formatted || e.cbe_number} · {(e.address?.city || '')}</div>
                   </div>
                 ))}
               </div>
