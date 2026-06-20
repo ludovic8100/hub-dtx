@@ -595,7 +595,7 @@ export default function LodeDevisFactures() {
 
   return (
     <Layout currentPage="Devis & Factures">
-      <div style={{ fontFamily: "'Source Sans Pro', sans-serif", maxWidth: 1180 }}>
+      <div style={{ fontFamily: "'Source Sans Pro', sans-serif", width: '100%' }}>
         <StatBanner
           color={C} colorDark={C_DARK} logoUrl={LODE.logo_url}
           title={tab === 'devis' ? 'Devis' : 'Factures'}
