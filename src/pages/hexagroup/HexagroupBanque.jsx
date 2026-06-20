@@ -1,15 +1,15 @@
 import Layout from '../../components/Layout'
 import ComptabiliteView from '../../components/ComptabiliteView'
+import { ENTITES } from '../../lib/entites'
+import { StatBanner } from '../../components/ui/AccountableUI'
 
 export default function HexagroupBanque() {
+  const E = ENTITES.hexagroup
   return (
     <Layout currentPage="Banque">
-      <div style={{ fontFamily:"'Source Sans Pro', sans-serif", maxWidth:'1300px' }}>
-        <div style={{ marginBottom:'24px' }}>
-          <h1 style={{ fontSize:'22px', fontWeight:'700', color:'#7f1d1d', margin:'0 0 4px' }}>Banque — Hexagroup ASBL</h1>
-          <p style={{ fontSize:'14px', color:'#64748b', margin:0 }}>Comptes et transactions</p>
-        </div>
-        <ComptabiliteView societeCodes={['HEXAGROUP']} color="#dc2626" colorDark="#7f1d1d" titre="Hexagroup ASBL" />
+      <div style={{ fontFamily: "'Source Sans Pro', sans-serif", width: '100%' }}>
+        <StatBanner color={E.color} colorDark={E.colorDark} logoUrl={E.logo} title="Banque" subtitle="Hexagroup ASBL — comptes et transactions" />
+        <ComptabiliteView societeCodes={['HEXAGROUP']} color={E.color} colorDark={E.colorDark} titre="Hexagroup ASBL" />
       </div>
     </Layout>
   )

@@ -1,15 +1,15 @@
 import Layout from '../../components/Layout'
 import ComptabiliteView from '../../components/ComptabiliteView'
+import { ENTITES } from '../../lib/entites'
+import { StatBanner } from '../../components/ui/AccountableUI'
 
 export default function DtxComptabilite() {
+  const E = ENTITES.dtx
   return (
     <Layout currentPage="Comptabilité">
-      <div style={{ fontFamily:"'Source Sans Pro', sans-serif", maxWidth:'1300px' }}>
-        <div style={{ marginBottom:'24px' }}>
-          <h1 style={{ fontSize:'22px', fontWeight:'700', color:'#334155', margin:'0 0 4px' }}>Comptabilité — DTX SRL</h1>
-          <p style={{ fontSize:'14px', color:'#64748b', margin:0 }}>Comptes bancaires synchronisés via Ponto</p>
-        </div>
-        <ComptabiliteView societeCodes={['DTX']} color="#94a3b8" colorDark="#334155" titre="DTX SRL" />
+      <div style={{ fontFamily: "'Source Sans Pro', sans-serif", width: '100%' }}>
+        <StatBanner color={E.color} colorDark={E.colorDark} logoUrl={E.logo} title="Comptabilité" subtitle="DTX SRL — comptes synchronisés via Ponto" />
+        <ComptabiliteView societeCodes={['DTX']} color={E.color} colorDark={E.colorDark} titre="DTX SRL" />
       </div>
     </Layout>
   )

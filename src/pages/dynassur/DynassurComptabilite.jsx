@@ -1,15 +1,15 @@
 import Layout from '../../components/Layout'
 import ComptabiliteView from '../../components/ComptabiliteView'
+import { ENTITES } from '../../lib/entites'
+import { StatBanner } from '../../components/ui/AccountableUI'
 
 export default function DynassurComptabilite() {
+  const E = ENTITES.dynassur
   return (
     <Layout currentPage="Comptabilité">
-      <div style={{ fontFamily:"'Source Sans Pro', sans-serif", maxWidth:'1300px' }}>
-        <div style={{ marginBottom:'24px' }}>
-          <h1 style={{ fontSize:'22px', fontWeight:'700', color:'#0D2F5E', margin:'0 0 4px' }}>Comptabilité — Dynassur SRL</h1>
-          <p style={{ fontSize:'14px', color:'#64748b', margin:0 }}>Comptes bancaires synchronisés via Ponto</p>
-        </div>
-        <ComptabiliteView societeCodes={['DYNASSUR']} color="#0080BD" colorDark="#0D2F5E" titre="Dynassur SRL" />
+      <div style={{ fontFamily: "'Source Sans Pro', sans-serif", width: '100%' }}>
+        <StatBanner color={E.color} colorDark={E.colorDark} logoUrl={E.logo} title="Comptabilité" subtitle="Dynassur SRL — comptes synchronisés via Ponto" />
+        <ComptabiliteView societeCodes={['DYNASSUR']} color={E.color} colorDark={E.colorDark} titre="Dynassur SRL" />
       </div>
     </Layout>
   )
