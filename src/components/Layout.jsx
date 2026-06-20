@@ -1,11 +1,32 @@
 import { useState, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import Header from './Header'
 import Sidebar from './Sidebar'
 import ErrorBoundary from './ErrorBoundary'
+import { useAuth } from '../lib/auth'
+
+// Préfixe d'URL → code entité
+const PATH_TO_SOCIETE = [
+  ['/dynassur', 'dynassur'],
+  ['/dtx', 'dtx'],
+  ['/lode', 'lode'],
+  ['/hexagroup', 'hexagroup'],
+  ['/prive', 'prive'],
+  ['/groupe', 'groupe'],
+]
 
 export default function Layout({ children, currentPage }) {
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 900)
   const [menuOuvert, setMenuOuvert] = useState(false)
+  const location = useLocation()
+  const { activeSociete, setActiveSociete } = useAuth()
+
+  // Synchronise l'entité active du menu avec l'URL courante
+  useEffect(() => {
+    const match = PATH_TO_SOCIETE.find(([prefix]) =>
+      location.pathname === prefix || location.pathname.startsWith(prefix + '/'))
+    if (match && match[1] !== activeSociete) setActiveSociete(match[1])
+  }, [location.pathname, activeSociete, setActiveSociete])
 
   useEffect(() => {
     const onResize = () => {
