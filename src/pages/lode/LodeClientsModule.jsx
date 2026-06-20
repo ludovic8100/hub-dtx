@@ -23,8 +23,52 @@ function EditeurClient({ client, onClose, onSaved }) {
   const [bceResults, setBceResults] = useState(null)
   const [bceLoading, setBceLoading] = useState(false)
   const [bceError, setBceError] = useState(null)
+  // Autocomplétion adresse (Photon / OpenStreetMap)
+  const [addrResults, setAddrResults] = useState(null)
+  const [addrLoading, setAddrLoading] = useState(false)
 
   const set = (k, v) => setF(p => ({ ...p, [k]: v }))
+
+  // Autocomplétion adresse en temps réel (Photon, debounce 400ms)
+  useEffect(() => {
+    const q = (f.adresse || '').trim()
+    if (q.length < 4) { setAddrResults(null); setAddrLoading(false); return }
+    setAddrLoading(true)
+    const ctrl = new AbortController()
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`https://photon.komoot.io/api?q=${encodeURIComponent(q)}&limit=8&lang=fr`, { signal: ctrl.signal })
+        const json = await res.json()
+        const list = (json.features || [])
+          .map(ft => ft.properties)
+          .filter(p => (p.countrycode === 'BE' || p.country === 'Belgique') && (p.street || p.name))
+          .map(p => ({
+            street: p.street || p.name || '',
+            housenumber: p.housenumber || '',
+            postcode: p.postcode || '',
+            city: p.city || p.county || '',
+          }))
+          // dédup
+          .filter((p, i, arr) => arr.findIndex(x => x.street === p.street && x.housenumber === p.housenumber && x.postcode === p.postcode) === i)
+        setAddrResults(list.slice(0, 6))
+      } catch (e) {
+        if (e.name !== 'AbortError') setAddrResults(null)
+      } finally {
+        if (!ctrl.signal.aborted) setAddrLoading(false)
+      }
+    }, 400)
+    return () => { clearTimeout(timer); ctrl.abort() }
+  }, [f.adresse])
+
+  const appliquerAdresse = (a) => {
+    setF(p => ({
+      ...p,
+      adresse: [a.street, a.housenumber].filter(Boolean).join(' '),
+      cp: a.postcode || p.cp,
+      ville: a.city || p.ville,
+    }))
+    setAddrResults(null)
+  }
 
   // Recherche BCE en temps réel (debounce 350ms)
   useEffect(() => {
@@ -166,7 +210,25 @@ function EditeurClient({ client, onClose, onSaved }) {
 
         {/* Adresse */}
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 10, marginBottom: 8 }}>
-          <div><label style={lbl}>Adresse</label><input style={inp} value={f.adresse} onChange={e => set('adresse', e.target.value)} /></div>
+          <div style={{ position: 'relative' }}>
+            <label style={lbl}>Adresse {addrLoading && <span style={{ color: ORANGE }}>⏳</span>}</label>
+            <input style={inp} value={f.adresse} onChange={e => set('adresse', e.target.value)} autoComplete="off" placeholder="Commencez à taper la rue…" />
+            {addrResults && addrResults.length > 0 && (
+              <div style={{ position: 'absolute', left: 0, right: 0, top: 60, zIndex: 20, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 9, boxShadow: '0 6px 20px rgba(0,0,0,0.12)', maxHeight: 220, overflowY: 'auto' }}>
+                {addrResults.map((a, i) => (
+                  <div key={i} onClick={() => appliquerAdresse(a)} style={{
+                    padding: '8px 11px', cursor: 'pointer', fontSize: 12,
+                    borderBottom: i < addrResults.length - 1 ? '1px solid #f1f5f9' : 'none',
+                  }}
+                    onMouseEnter={ev => ev.currentTarget.style.background = '#fff7ed'}
+                    onMouseLeave={ev => ev.currentTarget.style.background = '#fff'}>
+                    <span style={{ fontWeight: 600, color: NAVY }}>{[a.street, a.housenumber].filter(Boolean).join(' ')}</span>
+                    <span style={{ color: '#94a3b8' }}> — {a.postcode} {a.city}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           <div><label style={lbl}>Code postal</label><input style={inp} value={f.cp} onChange={e => set('cp', e.target.value)} /></div>
           <div><label style={lbl}>Ville</label><input style={inp} value={f.ville} onChange={e => set('ville', e.target.value)} /></div>
         </div>
