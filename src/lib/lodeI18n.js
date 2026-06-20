@@ -18,6 +18,7 @@ export const I18N = {
     paiement: 'Paiement par virement', communication: 'Communication',
     cgvTitre: 'Conditions générales de vente',
     merci: 'Merci de votre confiance.',
+    montantDu: 'Montant dû',
   },
   nl: {
     devis: 'OFFERTE', facture: 'FACTUUR',
@@ -28,6 +29,7 @@ export const I18N = {
     paiement: 'Betaling per overschrijving', communication: 'Mededeling',
     cgvTitre: 'Algemene verkoopvoorwaarden',
     merci: 'Bedankt voor uw vertrouwen.',
+    montantDu: 'Te betalen bedrag',
   },
   de: {
     devis: 'ANGEBOT', facture: 'RECHNUNG',
@@ -38,6 +40,7 @@ export const I18N = {
     paiement: 'Zahlung per Überweisung', communication: 'Verwendungszweck',
     cgvTitre: 'Allgemeine Geschäftsbedingungen',
     merci: 'Vielen Dank für Ihr Vertrauen.',
+    montantDu: 'Fälliger Betrag',
   },
   en: {
     devis: 'QUOTE', facture: 'INVOICE',
@@ -48,6 +51,7 @@ export const I18N = {
     paiement: 'Payment by bank transfer', communication: 'Reference',
     cgvTitre: 'General terms and conditions of sale',
     merci: 'Thank you for your business.',
+    montantDu: 'Amount due',
   },
 }
 

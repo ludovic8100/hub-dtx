@@ -32,6 +32,13 @@ async function loadImageDataURL(url) {
 }
 
 const eur = n => (Number(n) || 0).toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
+// Format euro pour jsPDF : séparateur de milliers = point, décimale = virgule (évite l'espace insécable mal rendu)
+const eurPDF = n => {
+  const v = (Number(n) || 0).toFixed(2)
+  const [ent, dec] = v.split('.')
+  const entSep = ent.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  return `${entSep},${dec} €`
+}
 const todayISO = () => new Date().toISOString().slice(0, 10)
 const addDays = (iso, d) => { const t = new Date(iso); t.setDate(t.getDate() + d); return t.toISOString().slice(0, 10) }
 const fmtDate = iso => iso ? new Date(iso).toLocaleDateString('fr-BE') : '—'
@@ -303,94 +310,141 @@ async function exportPDF(type, doc, lignes) {
   const d = new jsPDF()
   const isDevis = type === 'devis'
   const tot = calcTotaux(lignes, doc.remise_pct)
-  const O = [234, 88, 12]
+  const O = [234, 88, 12]          // orange LODE
+  const O_PALE = [253, 235, 224]   // orange très clair (fond du blob)
+  const GREY = [100, 116, 139]
+  const DARK = [30, 41, 59]
   const L = I18N[doc.langue] || I18N.fr
   const cgv = CGV_I18N[doc.langue] || CGV_I18N.fr
+  const PW = 210  // largeur page A4
 
-  // Logo LODE (en-tête, à gauche)
-  let textX = 14
+  // ---- Forme courbe orange pâle en arrière-plan (style Accountable) ----
+  // Grand disque pâle qui déborde dans le coin supérieur gauche
+  d.setFillColor(...O_PALE)
+  d.circle(35, 30, 95, 'F')
+  // On masque la partie qui dépasse en haut/gauche par un rectangle blanc géant en dehors,
+  // jsPDF clippe déjà à la page : le cercle crée la courbe organique voulue.
+
+  // ---- Logo LODE (en-tête, à gauche) ----
   if (LODE.logo_url) {
     const logo = await loadImageDataURL(LODE.logo_url)
-    if (logo) {
-      try { d.addImage(logo, 'PNG', 14, 12, 24, 24); textX = 43 } catch (e) { /* logo non ajouté */ }
-    }
+    if (logo) { try { d.addImage(logo, 'PNG', 16, 14, 26, 26) } catch (e) { /* */ } }
   }
 
-  // En-tête émetteur (décalé à droite du logo)
-  d.setFontSize(20); d.setTextColor(...O); d.setFont(undefined, 'bold')
-  d.text(LODE.raison_sociale, textX, 20)
-  d.setFontSize(9); d.setTextColor(100); d.setFont(undefined, 'normal')
-  d.text(LODE.activite, textX, 26)
-  d.text([`${LODE.adresse}`, `${LODE.cp} ${LODE.ville}`, `TVA ${LODE.tva}`, `${LODE.email} · ${LODE.telephone}`], textX, 32)
+  // ---- Titre document (haut droite) ----
+  d.setFontSize(24); d.setTextColor(...O); d.setFont(undefined, 'bold')
+  const titre = isDevis ? L.devis : L.facture
+  d.text(`${titre}  ${doc.numero || ''}`, PW - 16, 22, { align: 'right' })
+  d.setFontSize(9.5); d.setTextColor(...GREY); d.setFont(undefined, 'normal')
+  let yh = 30
+  d.text(`${(L.date || 'Date').toUpperCase()}  ${fmtDate(isDevis ? doc.date_devis : doc.date_facture)}`, PW - 16, yh, { align: 'right' }); yh += 6
+  if (isDevis) d.text(`${(L.validite || 'Validité').toUpperCase()}  ${fmtDate(doc.date_validite)}`, PW - 16, yh, { align: 'right' })
+  else d.text(`${(L.echeance || 'Échéance').toUpperCase()}  ${fmtDate(doc.date_echeance)}`, PW - 16, yh, { align: 'right' })
 
-  // Titre document
-  d.setFontSize(22); d.setTextColor(30); d.setFont(undefined, 'bold')
-  d.text(isDevis ? L.devis : L.facture, 196, 20, { align: 'right' })
-  d.setFontSize(11); d.setTextColor(...O)
-  d.text(doc.numero || '', 196, 27, { align: 'right' })
-  d.setFontSize(9); d.setTextColor(100); d.setFont(undefined, 'normal')
-  if (isDevis) {
-    d.text(`${L.date} : ${fmtDate(doc.date_devis)}`, 196, 34, { align: 'right' })
-    d.text(`${L.validite} : ${fmtDate(doc.date_validite)}`, 196, 39, { align: 'right' })
-  } else {
-    d.text(`${L.date} : ${fmtDate(doc.date_facture)}`, 196, 34, { align: 'right' })
-    d.text(`${L.echeance} : ${fmtDate(doc.date_echeance)}`, 196, 39, { align: 'right' })
-  }
+  // ---- Blocs De / À ----
+  const yDeA = 56
+  // De (LODE)
+  d.setFontSize(8); d.setTextColor(...GREY); d.setFont(undefined, 'normal')
+  d.text('De', 16, yDeA)
+  d.setFontSize(13); d.setTextColor(...O); d.setFont(undefined, 'bold')
+  d.text(LODE.raison_sociale, 16, yDeA + 7)
+  d.setFontSize(9); d.setTextColor(...DARK); d.setFont(undefined, 'normal')
+  d.text([LODE.adresse, `${LODE.cp} ${LODE.ville}`, LODE.pays || 'Belgique', `TVA ${LODE.tva}`], 16, yDeA + 13)
 
-  // Client
-  d.setFillColor(248, 250, 252); d.rect(14, 50, 90, 32, 'F')
-  d.setFontSize(8); d.setTextColor(150); d.text(L.client, 18, 56)
-  d.setFontSize(10); d.setTextColor(30); d.setFont(undefined, 'bold')
-  d.text(doc.client_nom || '', 18, 62)
-  d.setFont(undefined, 'normal'); d.setFontSize(9); d.setTextColor(80)
+  // À (client) - aligné à droite
+  d.setFontSize(8); d.setTextColor(...GREY)
+  d.text('À', PW - 16, yDeA, { align: 'right' })
+  d.setFontSize(12); d.setTextColor(...DARK); d.setFont(undefined, 'bold')
+  d.text(doc.client_nom || '', PW - 16, yDeA + 7, { align: 'right' })
+  d.setFont(undefined, 'normal'); d.setFontSize(9); d.setTextColor(...GREY)
   const cl = []
   if (doc.client_adresse) cl.push(doc.client_adresse)
   if (doc.client_cp || doc.client_ville) cl.push(`${doc.client_cp || ''} ${doc.client_ville || ''}`.trim())
+  cl.push(doc.client_pays || 'Belgique')
   if (doc.client_tva) cl.push(`TVA ${doc.client_tva}`)
-  d.text(cl, 18, 68)
+  d.text(cl, PW - 16, yDeA + 13, { align: 'right' })
 
-  if (doc.objet) { d.setFontSize(10); d.setTextColor(30); d.setFont(undefined, 'bold'); d.text(`${L.objet} : ${doc.objet}`, 14, 90) }
+  let startY = yDeA + 13 + cl.length * 4.5 + 8
+  if (doc.objet) {
+    d.setFontSize(10); d.setTextColor(...DARK); d.setFont(undefined, 'bold')
+    d.text(`${L.objet} : ${doc.objet}`, 16, startY); startY += 8
+  }
 
-  // Tableau lignes
+  // ---- Tableau lignes (en-tête orange plein) ----
   const body = lignes.map(l => {
     const t = (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * (1 - (Number(l.remise_pct) || 0) / 100)
-    return [l.description, String(l.quantite), eur(l.prix_unitaire), `${l.remise_pct || 0}%`, `${l.tva_pct}%`, eur(t)]
+    const cols = [l.description, eurPDF(l.prix_unitaire), `${l.tva_pct}%`]
+    if (lignes.some(x => Number(x.remise_pct) > 0)) cols.push(`${l.remise_pct || 0}%`)
+    cols.push(String(l.quantite), eurPDF(t))
+    return cols
   })
+  const hasRemiseLigne = lignes.some(x => Number(x.remise_pct) > 0)
+  const head = [L.description, L.pu, L.tva]
+  if (hasRemiseLigne) head.push(L.remise)
+  head.push(L.qte, L.totalHT)
+
   d.autoTable({
-    startY: 96, head: [[L.description, L.qte, L.pu, L.remise, L.tva, L.totalHT]], body,
-    theme: 'striped', headStyles: { fillColor: O, fontSize: 9 }, bodyStyles: { fontSize: 9 },
-    columnStyles: { 0: { cellWidth: 80 }, 1: { halign: 'center' }, 2: { halign: 'right' }, 3: { halign: 'center' }, 4: { halign: 'center' }, 5: { halign: 'right' } },
+    startY, head: [head], body,
+    theme: 'plain',
+    headStyles: { fillColor: O, textColor: [255, 255, 255], fontSize: 9.5, fontStyle: 'bold', cellPadding: { top: 3.5, bottom: 3.5, left: 4, right: 4 } },
+    bodyStyles: { fontSize: 9.5, textColor: DARK, cellPadding: { top: 3.5, bottom: 3.5, left: 4, right: 4 } },
+    alternateRowStyles: { fillColor: [252, 247, 243] },
+    margin: { left: 16, right: 16 },
+    columnStyles: hasRemiseLigne
+      ? { 0: { cellWidth: 'auto' }, 1: { halign: 'right' }, 2: { halign: 'center' }, 3: { halign: 'center' }, 4: { halign: 'center' }, 5: { halign: 'right' } }
+      : { 0: { cellWidth: 'auto' }, 1: { halign: 'right' }, 2: { halign: 'center' }, 3: { halign: 'center' }, 4: { halign: 'right' } },
   })
 
-  // Totaux
-  let y = d.lastAutoTable.finalY + 8
-  const tx = 140
-  d.setFontSize(10); d.setTextColor(80); d.setFont(undefined, 'normal')
-  if (doc.remise_pct > 0) { d.text(`${L.remiseGlobale} : ${doc.remise_pct}%`, tx, y); y += 6 }
-  d.text(L.totalHT, tx, y); d.text(eur(tot.ht), 196, y, { align: 'right' }); y += 6
-  Object.entries(tot.parTaux).filter(([, v]) => v > 0).forEach(([t, v]) => { d.text(`${L.totalTVA} ${t}%`, tx, y); d.text(eur(v), 196, y, { align: 'right' }); y += 6 })
-  d.setFont(undefined, 'bold'); d.setFontSize(12); d.setTextColor(...O)
-  d.text(L.totalTTC, tx, y + 2); d.text(eur(tot.ttc), 196, y + 2, { align: 'right' })
+  // ---- Totaux (alignés à droite, libellés orange) ----
+  let y = d.lastAutoTable.finalY + 10
+  const labelX = PW - 70, valX = PW - 16
+  d.setFontSize(10); d.setFont(undefined, 'normal')
+  if (doc.remise_pct > 0) {
+    d.setTextColor(...GREY)
+    d.text(`${L.remiseGlobale} ${doc.remise_pct}%`, labelX, y); d.text('', valX, y, { align: 'right' }); y += 6.5
+  }
+  d.setTextColor(...O); d.setFont(undefined, 'bold')
+  d.text(L.totalHT, labelX, y)
+  d.setTextColor(...DARK); d.setFont(undefined, 'normal')
+  d.text(eurPDF(tot.ht), valX, y, { align: 'right' }); y += 6.5
+  Object.entries(tot.parTaux).filter(([, v]) => v > 0).forEach(([t, v]) => {
+    d.setTextColor(...O); d.setFont(undefined, 'bold'); d.text(`${L.totalTVA} ${t}%`, labelX, y)
+    d.setTextColor(...DARK); d.setFont(undefined, 'normal'); d.text(eurPDF(v), valX, y, { align: 'right' }); y += 6.5
+  })
+  // Ligne séparatrice + Montant dû
+  y += 1
+  d.setDrawColor(...O); d.setLineWidth(0.4); d.line(labelX, y, valX, y); y += 7
+  d.setFont(undefined, 'bold'); d.setFontSize(13); d.setTextColor(...O)
+  d.text(isDevis ? L.totalTTC : (L.montantDu || L.totalTTC), labelX, y)
+  d.setTextColor(...DARK); d.text(eurPDF(tot.ttc), valX, y, { align: 'right' })
 
-  // Paiement
-  y += 14; d.setFontSize(9); d.setTextColor(80); d.setFont(undefined, 'normal')
-  d.text(`${L.paiement} : ${LODE.iban} (${LODE.bic} – ${LODE.banque})`, 14, y)
-  if (!isDevis) { y += 5; d.text(`${L.communication} : ${doc.numero}`, 14, y) }
-  y += 8; d.setTextColor(120); d.text(L.merci, 14, y)
+  // ---- Paiement ----
+  y += 16; d.setFontSize(9); d.setTextColor(...GREY); d.setFont(undefined, 'normal')
+  d.text(`${L.paiement} : ${LODE.iban}  (${LODE.bic} – ${LODE.banque})`, 16, y)
+  if (!isDevis) { y += 5; d.text(`${L.communication} : ${doc.numero}`, 16, y) }
+  y += 9; d.setTextColor(...O); d.setFont(undefined, 'bold'); d.setFontSize(10)
+  d.text(L.merci, 16, y)
 
-  // CGV (page 2)
+  // Notes éventuelles
+  if (doc.notes) {
+    y += 8; d.setFontSize(8.5); d.setTextColor(...GREY); d.setFont(undefined, 'normal')
+    d.text(d.splitTextToSize(doc.notes, PW - 32), 16, y)
+  }
+
+  // ---- CGV (page 2) ----
   d.addPage()
-  d.setFontSize(13); d.setTextColor(...O); d.setFont(undefined, 'bold')
-  d.text(L.cgvTitre, 14, 20)
+  d.setFillColor(...O_PALE); d.circle(180, 12, 60, 'F')
+  d.setFontSize(14); d.setTextColor(...O); d.setFont(undefined, 'bold')
+  d.text(L.cgvTitre, 16, 22)
   d.setFontSize(8); d.setTextColor(70); d.setFont(undefined, 'normal')
-  let cy = 30
+  let cy = 33
   cgv.forEach(c => {
-    const lines = d.splitTextToSize(c, 180)
+    const lines = d.splitTextToSize(c, PW - 32)
     if (cy + lines.length * 4 > 285) { d.addPage(); cy = 20 }
-    d.text(lines, 14, cy); cy += lines.length * 4 + 3
+    d.text(lines, 16, cy); cy += lines.length * 4 + 3.5
   })
 
-  d.save(`${isDevis ? L.devis : L.facture}_${doc.numero}.pdf`)
+  d.save(`${titre}_${doc.numero}.pdf`)
 }
 
 async function exportExcel(type, doc, lignes) {
