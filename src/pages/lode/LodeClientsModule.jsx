@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
 import { LODE } from '../../lib/lodeConfig'
 import { LANGUES } from '../../lib/lodeI18n'
+import { StatBanner, DataCard, ActionButton, PrimaryButton, useMobile } from '../../components/ui/AccountableUI'
 
 const ORANGE = LODE.couleur
 const NAVY = '#1e293b'
@@ -13,6 +14,7 @@ const fmtDate = iso => iso ? new Date(iso).toLocaleDateString('fr-BE') : '—'
 //  ÉDITEUR CLIENT (avec recherche BCE)
 // ════════════════════════════════════════════════════════════════
 function EditeurClient({ client, onClose, onSaved }) {
+  const mobE = useMobile()
   const [f, setF] = useState({
     type: 'entreprise', numero_bce: '', denomination: '', forme_juridique: '',
     nom: '', prenom: '', adresse: '', cp: '', ville: '', pays: 'Belgique',
@@ -144,7 +146,7 @@ function EditeurClient({ client, onClose, onSaved }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: 20, overflowY: 'auto' }}>
-      <div style={{ background: '#fff', borderRadius: 14, maxWidth: 720, width: '100%', padding: 24, fontFamily: "'Source Sans Pro', sans-serif" }}>
+      <div style={{ background: '#fff', borderRadius: 14, maxWidth: 720, width: '100%', padding: mobE ? 16 : 24, fontFamily: "'Source Sans Pro', sans-serif" }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
           <h2 style={{ fontSize: 18, fontWeight: 800, color: NAVY, margin: 0 }}>{client?.id ? 'Modifier le client' : 'Nouveau client'}</h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#94a3b8' }}>×</button>
@@ -191,26 +193,26 @@ function EditeurClient({ client, onClose, onSaved }) {
 
         {/* Champs entreprise */}
         {isEnt && (
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10, marginBottom: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: mobE ? '1fr' : '2fr 1fr', gap: 10, marginBottom: 8 }}>
             <div><label style={lbl}>Dénomination *</label><input style={inp} value={f.denomination} onChange={e => set('denomination', e.target.value)} /></div>
             <div><label style={lbl}>N° BCE</label><input style={inp} value={f.numero_bce} onChange={e => set('numero_bce', e.target.value)} /></div>
           </div>
         )}
         {isEnt && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: mobE ? '1fr' : '1fr 1fr', gap: 10, marginBottom: 8 }}>
             <div><label style={lbl}>Forme juridique</label><input style={inp} value={f.forme_juridique} onChange={e => set('forme_juridique', e.target.value)} /></div>
             <div><label style={lbl}>N° TVA</label><input style={inp} value={f.tva} onChange={e => set('tva', e.target.value)} /></div>
           </div>
         )}
 
         {/* Contact / particulier */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: mobE ? '1fr' : '1fr 1fr', gap: 10, marginBottom: 8 }}>
           <div><label style={lbl}>{isEnt ? 'Nom du contact' : 'Nom *'}</label><input style={inp} value={f.nom} onChange={e => set('nom', e.target.value)} /></div>
           <div><label style={lbl}>Prénom</label><input style={inp} value={f.prenom} onChange={e => set('prenom', e.target.value)} /></div>
         </div>
 
         {/* Adresse */}
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 10, marginBottom: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: mobE ? '1fr' : '2fr 1fr 1fr', gap: 10, marginBottom: 8 }}>
           <div style={{ position: 'relative' }}>
             <label style={lbl}>Adresse {addrLoading && <span style={{ color: ORANGE }}>⏳</span>}</label>
             <input style={inp} value={f.adresse} onChange={e => set('adresse', e.target.value)} autoComplete="off" placeholder="Commencez à taper la rue…" />
@@ -235,7 +237,7 @@ function EditeurClient({ client, onClose, onSaved }) {
         </div>
 
         {/* Coordonnées */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: mobE ? '1fr' : '1fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
           <div><label style={lbl}>Email</label><input style={inp} value={f.email} onChange={e => set('email', e.target.value)} /></div>
           <div><label style={lbl}>Téléphone</label><input style={inp} value={f.telephone} onChange={e => set('telephone', e.target.value)} /></div>
           <div><label style={lbl}>GSM</label><input style={inp} value={f.gsm} onChange={e => set('gsm', e.target.value)} /></div>
@@ -289,48 +291,77 @@ export default function LodeClientsModule() {
 
   return (
     <Layout currentPage="Clients">
-      <div style={{ fontFamily: "'Source Sans Pro', sans-serif", maxWidth: 1100 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
-          <div>
-            <h1 style={{ fontSize: 20, fontWeight: 800, color: NAVY, margin: '0 0 2px' }}>Clients LODE</h1>
-            <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>{clients.length} client{clients.length > 1 ? 's' : ''} encodé{clients.length > 1 ? 's' : ''}</p>
-          </div>
-          <button onClick={() => setEditing({})} style={{ background: ORANGE, border: 'none', borderRadius: 10, padding: '10px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: 7 }}>
-            <i className="ti ti-plus" /> Nouveau client
-          </button>
-        </div>
+      <div style={{ fontFamily: "'Source Sans Pro', sans-serif", width: '100%' }}>
+        <StatBanner
+          color={ORANGE} colorDark="#7c2d12" logoUrl={LODE.logo_url}
+          title="Clients" subtitle="LODE SRL — répertoire clients"
+          stats={[
+            { label: 'Clients', value: clients.length },
+            { label: 'Entreprises', value: clients.filter(c => c.type === 'entreprise').length },
+            { label: 'Particuliers', value: clients.filter(c => c.type !== 'entreprise').length },
+          ]}
+          action={<PrimaryButton color={ORANGE} onClick={() => setEditing({})}><i className="ti ti-plus" /> Nouveau client</PrimaryButton>}
+        />
 
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher (nom, dénomination, BCE, ville)…"
-          style={{ width: '100%', maxWidth: 420, padding: '9px 14px', border: '1px solid #e2e8f0', borderRadius: 9, fontSize: 13, marginBottom: 16, boxSizing: 'border-box', fontFamily: 'inherit' }} />
+          style={{ width: '100%', maxWidth: 420, padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: 10, fontSize: 13, marginBottom: 16, boxSizing: 'border-box', fontFamily: 'inherit' }} />
 
         {loading ? <p style={{ color: '#94a3b8' }}>Chargement…</p> :
-          filtered.length === 0 ? <p style={{ color: '#94a3b8', fontStyle: 'italic' }}>Aucun client. Clique sur « Nouveau client » pour commencer.</p> :
-            <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          filtered.length === 0 ? (
+            <DataCard style={{ padding: '40px 24px', textAlign: 'center' }}>
+              <p style={{ color: '#94a3b8', fontStyle: 'italic', margin: 0 }}>Aucun client. Clique sur « Nouveau client » pour commencer.</p>
+            </DataCard>
+          ) : mob ? (
+            /* === Mobile : cartes === */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {filtered.map(c => (
+                <DataCard key={c.id} style={{ padding: 14 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, color: '#1e293b', fontSize: 15 }}>
+                        <span style={{ marginRight: 6 }}>{c.type === 'entreprise' ? '🏢' : '👤'}</span>{nomAffiche(c) || '—'}
+                      </div>
+                      <div style={{ fontFamily: 'monospace', fontSize: 11, color: '#64748b', marginTop: 3 }}>{c.numero_bce || c.tva || '—'}</div>
+                      <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 2 }}>{c.ville || '—'} · {c.email || c.gsm || c.telephone || '—'}</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, marginTop: 10, borderTop: '1px solid #f1f5f9', paddingTop: 10 }}>
+                    <ActionButton tone="grey" onClick={() => setEditing(c)}>Modifier</ActionButton>
+                    <ActionButton tone="danger" onClick={() => supprimer(c.id)}>Supprimer</ActionButton>
+                  </div>
+                </DataCard>
+              ))}
+            </div>
+          ) : (
+            /* === Desktop : tableau === */
+            <DataCard style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 720 }}>
                 <thead style={{ background: '#f8fafc' }}>
                   <tr>{['', 'Nom / Dénomination', 'BCE / TVA', 'Ville', 'Contact', 'Actions'].map(h => (
-                    <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>{h}</th>
+                    <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.03em' }}>{h}</th>
                   ))}</tr>
                 </thead>
                 <tbody>
-                  {filtered.map((c, i) => (
-                    <tr key={c.id} style={{ background: i % 2 ? '#fafafe' : '#fff', borderTop: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '9px 12px', fontSize: 18 }}>{c.type === 'entreprise' ? '🏢' : '👤'}</td>
-                      <td style={{ padding: '9px 12px', fontWeight: 600, color: '#1e293b' }}>{nomAffiche(c) || '—'}</td>
-                      <td style={{ padding: '9px 12px', color: '#64748b', fontFamily: 'monospace', fontSize: 11 }}>{c.numero_bce || c.tva || '—'}</td>
-                      <td style={{ padding: '9px 12px', color: '#64748b' }}>{c.ville || '—'}</td>
-                      <td style={{ padding: '9px 12px', color: '#64748b' }}>{c.email || c.gsm || c.telephone || '—'}</td>
-                      <td style={{ padding: '9px 12px' }}>
+                  {filtered.map(c => (
+                    <tr key={c.id} style={{ borderTop: '1px solid #f1f5f9' }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#fafbfc'}
+                      onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                      <td style={{ padding: '11px 14px', fontSize: 18 }}>{c.type === 'entreprise' ? '🏢' : '👤'}</td>
+                      <td style={{ padding: '11px 14px', fontWeight: 600, color: '#1e293b' }}>{nomAffiche(c) || '—'}</td>
+                      <td style={{ padding: '11px 14px', color: '#64748b', fontFamily: 'monospace', fontSize: 11 }}>{c.numero_bce || c.tva || '—'}</td>
+                      <td style={{ padding: '11px 14px', color: '#64748b' }}>{c.ville || '—'}</td>
+                      <td style={{ padding: '11px 14px', color: '#64748b' }}>{c.email || c.gsm || c.telephone || '—'}</td>
+                      <td style={{ padding: '11px 14px' }}>
                         <div style={{ display: 'flex', gap: 5 }}>
-                          <button onClick={() => setEditing(c)} style={{ background: '#f1f5f9', border: 'none', borderRadius: 7, padding: '5px 10px', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: '#64748b' }}>Modifier</button>
-                          <button onClick={() => supprimer(c.id)} style={{ background: '#fff', border: 'none', borderRadius: 7, padding: '5px 10px', cursor: 'pointer', fontSize: 13, color: '#dc2626' }}>×</button>
+                          <ActionButton tone="grey" onClick={() => setEditing(c)}>Modifier</ActionButton>
+                          <ActionButton tone="danger" onClick={() => supprimer(c.id)}>×</ActionButton>
                         </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>}
+            </DataCard>)}
       </div>
 
       {editing && <EditeurClient client={editing.id ? editing : null} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load() }} />}
