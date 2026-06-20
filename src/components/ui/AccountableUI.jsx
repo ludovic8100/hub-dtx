@@ -2,7 +2,20 @@
 // Tous prennent une couleur d'accent (color) pour respecter l'identité de chaque entité.
 // Usage : import { StatBanner, TabsBar, StatusBadge, ActionButton, DataCard } from '../components/ui/AccountableUI'
 
+import { useState, useEffect } from 'react'
+
 const FONT = "'Source Sans Pro', sans-serif"
+
+// Détection mobile interne (évite une dépendance externe)
+function useMobile(bp = 768) {
+  const [m, setM] = useState(typeof window !== 'undefined' && window.innerWidth < bp)
+  useEffect(() => {
+    const f = () => setM(window.innerWidth < bp)
+    window.addEventListener('resize', f); f()
+    return () => window.removeEventListener('resize', f)
+  }, [bp])
+  return m
+}
 
 // Convertit un hex en rgba (pour les fonds translucides)
 function hexToRgba(hex, a = 1) {
@@ -18,38 +31,39 @@ function hexToRgba(hex, a = 1) {
  * props: color, colorLight, title, subtitle, stats[{label,value}], action (JSX), logoUrl
  * ------------------------------------------------------------------------- */
 export function StatBanner({ color, colorDark, title, subtitle, stats = [], action, logoUrl }) {
+  const mob = useMobile()
   return (
     <div style={{
       position: 'relative', overflow: 'hidden',
       background: `linear-gradient(135deg, ${color} 0%, ${colorDark || color} 140%)`,
-      borderRadius: 16, padding: '22px 26px', marginBottom: 22, color: '#fff',
+      borderRadius: 16, padding: mob ? '16px 16px' : '22px 26px', marginBottom: mob ? 16 : 22, color: '#fff',
       fontFamily: FONT, boxShadow: `0 6px 20px ${hexToRgba(color, 0.25)}`,
     }}>
       {/* Cercle décoratif en fond */}
       <div style={{ position: 'absolute', right: -40, top: -60, width: 220, height: 220, borderRadius: '50%', background: 'rgba(255,255,255,0.08)' }} />
       <div style={{ position: 'absolute', right: 70, bottom: -90, width: 180, height: 180, borderRadius: '50%', background: 'rgba(255,255,255,0.06)' }} />
 
-      <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+      <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: mob ? 'stretch' : 'flex-start', flexDirection: mob ? 'column' : 'row', flexWrap: 'wrap', gap: mob ? 14 : 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: mob ? 12 : 16 }}>
           {logoUrl && (
-            <div style={{ width: 54, height: 54, borderRadius: 12, background: 'rgba(255,255,255,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 7, flexShrink: 0 }}>
+            <div style={{ width: mob ? 44 : 54, height: mob ? 44 : 54, borderRadius: 12, background: 'rgba(255,255,255,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 7, flexShrink: 0 }}>
               <img src={logoUrl} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
             </div>
           )}
           <div>
-            <h1 style={{ fontSize: 26, fontWeight: 800, margin: 0, letterSpacing: '-0.01em' }}>{title}</h1>
-            {subtitle && <p style={{ fontSize: 13.5, margin: '3px 0 0', opacity: 0.85 }}>{subtitle}</p>}
+            <h1 style={{ fontSize: mob ? 21 : 26, fontWeight: 800, margin: 0, letterSpacing: '-0.01em' }}>{title}</h1>
+            {subtitle && <p style={{ fontSize: mob ? 12.5 : 13.5, margin: '3px 0 0', opacity: 0.85 }}>{subtitle}</p>}
           </div>
         </div>
         {action && <div style={{ position: 'relative' }}>{action}</div>}
       </div>
 
       {stats.length > 0 && (
-        <div style={{ position: 'relative', display: 'flex', gap: 36, marginTop: 18, flexWrap: 'wrap' }}>
+        <div style={{ position: 'relative', display: 'flex', gap: mob ? 20 : 36, marginTop: mob ? 14 : 18, flexWrap: 'wrap' }}>
           {stats.map((s, i) => (
             <div key={i}>
-              <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{s.label}</div>
-              <div style={{ fontSize: 24, fontWeight: 800, marginTop: 2 }}>{s.value}</div>
+              <div style={{ fontSize: mob ? 10 : 11, fontWeight: 700, opacity: 0.8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{s.label}</div>
+              <div style={{ fontSize: mob ? 19 : 24, fontWeight: 800, marginTop: 2 }}>{s.value}</div>
             </div>
           ))}
         </div>
@@ -153,4 +167,4 @@ export function PrimaryButton({ onClick, children, color }) {
   )
 }
 
-export { hexToRgba }
+export { hexToRgba, useMobile }

@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
 import { LODE, TVA_TAUX, CGV, DELAI_PAIEMENT_JOURS } from '../../lib/lodeConfig'
 import { I18N, CGV_I18N, LANGUES } from '../../lib/lodeI18n'
-import { StatBanner, TabsBar, StatusBadge, ActionButton, DataCard, PrimaryButton } from '../../components/ui/AccountableUI'
+import { StatBanner, TabsBar, StatusBadge, ActionButton, DataCard, PrimaryButton, useMobile } from '../../components/ui/AccountableUI'
 
 const ORANGE = LODE.couleur
 const NAVY = '#1e293b'
@@ -89,6 +89,7 @@ const STATUTS_FACT = {
 // ════════════════════════════════════════════════════════════════
 function Editeur({ type, doc, onClose, onSaved }) {
   const isDevis = type === 'devis'
+  const mobE = useMobile()
   const table = isDevis ? 'lode_devis' : 'lode_factures'
   const tableLignes = isDevis ? 'lode_devis_lignes' : 'lode_factures_lignes'
   const fk = isDevis ? 'devis_id' : 'facture_id'
@@ -179,8 +180,8 @@ function Editeur({ type, doc, onClose, onSaved }) {
   const lbl = { fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 3, display: 'block' }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: 20, overflowY: 'auto' }}>
-      <div style={{ background: '#fff', borderRadius: 14, maxWidth: 880, width: '100%', padding: 24, fontFamily: "'Source Sans Pro', sans-serif" }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: mobE ? 8 : 20, overflowY: 'auto' }}>
+      <div style={{ background: '#fff', borderRadius: 14, maxWidth: 880, width: '100%', padding: mobE ? 16 : 24, fontFamily: "'Source Sans Pro', sans-serif" }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
           <h2 style={{ fontSize: 18, fontWeight: 800, color: NAVY, margin: 0 }}>
             {doc?.id ? 'Modifier' : 'Nouveau'} {isDevis ? 'devis' : 'facture'} {doc?.numero ? `· ${doc.numero}` : ''}
@@ -203,22 +204,22 @@ function Editeur({ type, doc, onClose, onSaved }) {
             </select>
           </div>
         )}
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10, marginBottom: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: mobE ? '1fr' : '2fr 1fr', gap: 10, marginBottom: 8 }}>
           <div><label style={lbl}>Nom / société *</label><input style={inp} value={f.client_nom} onChange={e => set('client_nom', e.target.value)} /></div>
           <div><label style={lbl}>N° TVA</label><input style={inp} value={f.client_tva} onChange={e => set('client_tva', e.target.value)} /></div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 10, marginBottom: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: mobE ? '1fr' : '2fr 1fr 1fr', gap: 10, marginBottom: 8 }}>
           <div><label style={lbl}>Adresse</label><input style={inp} value={f.client_adresse} onChange={e => set('client_adresse', e.target.value)} /></div>
           <div><label style={lbl}>Code postal</label><input style={inp} value={f.client_cp} onChange={e => set('client_cp', e.target.value)} /></div>
           <div><label style={lbl}>Ville</label><input style={inp} value={f.client_ville} onChange={e => set('client_ville', e.target.value)} /></div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: mobE ? '1fr' : '1fr 1fr', gap: 10, marginBottom: 16 }}>
           <div><label style={lbl}>Email</label><input style={inp} value={f.client_email} onChange={e => set('client_email', e.target.value)} /></div>
           <div><label style={lbl}>Téléphone</label><input style={inp} value={f.client_telephone} onChange={e => set('client_telephone', e.target.value)} /></div>
         </div>
 
         {/* Objet + dates */}
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: mobE ? '1fr' : '2fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
           <div><label style={lbl}>Objet</label><input style={inp} value={f.objet} onChange={e => set('objet', e.target.value)} placeholder="ex: Installation porte sectionnelle" /></div>
           {isDevis ? <>
             <div><label style={lbl}>Date devis</label><input type="date" style={inp} value={f.date_devis} onChange={e => set('date_devis', e.target.value)} /></div>
@@ -231,8 +232,8 @@ function Editeur({ type, doc, onClose, onSaved }) {
 
         {/* Lignes */}
         <div style={{ fontSize: 13, fontWeight: 800, color: ORANGE, marginBottom: 8 }}>Lignes</div>
-        <div style={{ border: '1px solid #f1f5f9', borderRadius: 9, overflow: 'hidden', marginBottom: 10 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+        <div style={{ border: '1px solid #f1f5f9', borderRadius: 9, overflowX: 'auto', marginBottom: 10 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: mobE ? 520 : 'auto' }}>
             <thead style={{ background: '#f8fafc' }}>
               <tr>{['Description', 'Qté', 'P.U. €', 'Rem.%', 'TVA', 'Total HT', ''].map(h => (
                 <th key={h} style={{ padding: '7px 8px', textAlign: h === 'Description' ? 'left' : 'center', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>{h}</th>
@@ -278,7 +279,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
         </div>
 
         {/* Notes + statut */}
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 10, marginBottom: 18 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: mobE ? '1fr' : '2fr 1fr 1fr', gap: 10, marginBottom: 18 }}>
           <div><label style={lbl}>Notes (optionnel)</label><textarea style={{ ...inp, minHeight: 50, resize: 'vertical' }} value={f.notes} onChange={e => set('notes', e.target.value)} /></div>
           <div><label style={lbl}>Langue du document</label>
             <select style={inp} value={f.langue || 'fr'} onChange={e => set('langue', e.target.value)}>
@@ -577,6 +578,7 @@ export default function LodeDevisFactures() {
   const STAT = tab === 'devis' ? STATUTS_DEVIS : STATUTS_FACT
   const C = LODE.couleur
   const C_DARK = '#7c2d12'
+  const mob = useMobile()
 
   // Stats du bandeau
   const sum = (arr) => arr.reduce((a, d) => a + (Number(d.total_ttc) || 0), 0)
@@ -614,9 +616,44 @@ export default function LodeDevisFactures() {
             <DataCard style={{ padding: '48px 24px', textAlign: 'center' }}>
               <p style={{ color: '#94a3b8', fontStyle: 'italic', margin: 0 }}>Aucun {tab === 'devis' ? 'devis' : 'facture'} pour le moment.</p>
             </DataCard>
-          ) :
-            <DataCard>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          ) : mob ? (
+            /* === Vue mobile : cartes empilées === */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {liste.map((doc) => {
+                const s = STAT[doc.statut] || STAT.brouillon
+                const t = tab === 'devis' ? 'devis' : 'facture'
+                return (
+                  <DataCard key={doc.id} style={{ padding: 14 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontFamily: 'monospace', fontWeight: 700, color: C, fontSize: 13 }}>{doc.numero}</div>
+                        <div style={{ color: '#1e293b', fontWeight: 700, fontSize: 15, marginTop: 2 }}>{doc.client_nom}</div>
+                        {doc.objet && <div style={{ color: '#64748b', fontSize: 12.5, marginTop: 2 }}>{doc.objet}</div>}
+                      </div>
+                      <StatusBadge bg={s.bg} col={s.col} label={s.label} />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: 8 }}>
+                      <span style={{ color: '#94a3b8', fontSize: 12 }}>{fmtDate(tab === 'devis' ? doc.date_devis : doc.date_facture)}</span>
+                      <span style={{ fontWeight: 800, color: NAVY, fontSize: 16 }}>{eur(doc.total_ttc)}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
+                      <ActionButton tone="grey" onClick={() => setEditing({ type: t, doc })}>Modifier</ActionButton>
+                      <ActionButton tone="pdf" disabled={busy === doc.id + 'pdf'} onClick={() => doExport('pdf', t, doc)}>{busy === doc.id + 'pdf' ? '…' : 'PDF'}</ActionButton>
+                      <ActionButton tone="excel" disabled={busy === doc.id + 'excel'} onClick={() => doExport('excel', t, doc)}>{busy === doc.id + 'excel' ? '…' : 'Excel'}</ActionButton>
+                      {tab === 'factures' && doc.client_tva && doc.statut !== 'payée' && doc.statut !== 'annulée' && (
+                        <ActionButton tone="peppol" disabled={busy === doc.id + 'peppol'} onClick={() => envoyerPeppol(doc)}>{busy === doc.id + 'peppol' ? '…' : '📨 Peppol'}</ActionButton>
+                      )}
+                      {tab === 'devis' && doc.statut === 'accepté' && <ActionButton tone="accent" color={C} onClick={() => convertir(doc)}>→ Facture</ActionButton>}
+                      <ActionButton tone="danger" onClick={() => supprimer(t, doc.id)}>Supprimer</ActionButton>
+                    </div>
+                  </DataCard>
+                )
+              })}
+            </div>
+          ) : (
+            /* === Vue desktop : tableau === */
+            <DataCard style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 760 }}>
                 <thead style={{ background: '#f8fafc' }}>
                   <tr>{['N°', 'Client', 'Objet', 'Date', 'Total TTC', 'Statut', 'Actions'].map(h => (
                     <th key={h} style={{ padding: '11px 14px', textAlign: h === 'Total TTC' ? 'right' : 'left', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.03em' }}>{h}</th>
@@ -652,7 +689,7 @@ export default function LodeDevisFactures() {
                   })}
                 </tbody>
               </table>
-            </DataCard>}
+            </DataCard>)}
       </div>
 
       {editing && <Editeur type={editing.type} doc={editing.doc} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load() }} />}
