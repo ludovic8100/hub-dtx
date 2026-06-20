@@ -17,6 +17,20 @@ function loadScript(src) {
   })
 }
 
+// Charge une image distante et la convertit en dataURL (pour jsPDF)
+async function loadImageDataURL(url) {
+  try {
+    const res = await fetch(url)
+    const blob = await res.blob()
+    return await new Promise((resolve, reject) => {
+      const r = new FileReader()
+      r.onload = () => resolve(r.result)
+      r.onerror = reject
+      r.readAsDataURL(blob)
+    })
+  } catch { return null }
+}
+
 const eur = n => (Number(n) || 0).toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
 const todayISO = () => new Date().toISOString().slice(0, 10)
 const addDays = (iso, d) => { const t = new Date(iso); t.setDate(t.getDate() + d); return t.toISOString().slice(0, 10) }
@@ -293,12 +307,21 @@ async function exportPDF(type, doc, lignes) {
   const L = I18N[doc.langue] || I18N.fr
   const cgv = CGV_I18N[doc.langue] || CGV_I18N.fr
 
-  // En-tête émetteur
+  // Logo LODE (en-tête, à gauche)
+  let textX = 14
+  if (LODE.logo_url) {
+    const logo = await loadImageDataURL(LODE.logo_url)
+    if (logo) {
+      try { d.addImage(logo, 'PNG', 14, 12, 24, 24); textX = 43 } catch (e) { /* logo non ajouté */ }
+    }
+  }
+
+  // En-tête émetteur (décalé à droite du logo)
   d.setFontSize(20); d.setTextColor(...O); d.setFont(undefined, 'bold')
-  d.text(LODE.raison_sociale, 14, 20)
+  d.text(LODE.raison_sociale, textX, 20)
   d.setFontSize(9); d.setTextColor(100); d.setFont(undefined, 'normal')
-  d.text(LODE.activite, 14, 26)
-  d.text([`${LODE.adresse}`, `${LODE.cp} ${LODE.ville}`, `TVA ${LODE.tva}`, `${LODE.email} · ${LODE.telephone}`], 14, 32)
+  d.text(LODE.activite, textX, 26)
+  d.text([`${LODE.adresse}`, `${LODE.cp} ${LODE.ville}`, `TVA ${LODE.tva}`, `${LODE.email} · ${LODE.telephone}`], textX, 32)
 
   // Titre document
   d.setFontSize(22); d.setTextColor(30); d.setFont(undefined, 'bold')
