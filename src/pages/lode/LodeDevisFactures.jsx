@@ -441,6 +441,31 @@ export default function LodeDevisFactures() {
     finally { setBusy(null) }
   }
 
+  // Envoi de la facture sur le réseau Peppol via le proxy Billit (n8n)
+  const PEPPOL_WEBHOOK = 'https://n8n.srv1082740.hstgr.cloud/webhook/lode-peppol-send'
+  const envoyerPeppol = async (doc) => {
+    if (!confirm(`Envoyer la facture ${doc.numero} sur le réseau Peppol via Billit ?`)) return
+    setBusy(doc.id + 'peppol')
+    try {
+      const lignes = await getLignes('facture', doc.id)
+      const res = await fetch(PEPPOL_WEBHOOK, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ facture: { ...doc, lignes } }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json().catch(() => ({}))
+      if (data && data.ok) {
+        await supabase.from('lode_factures').update({ statut: 'envoyée' }).eq('id', doc.id)
+        alert(`Facture ${doc.numero} envoyée sur Peppol ✓`)
+        load()
+      } else {
+        throw new Error(data?.error || 'Réponse inattendue de Billit')
+      }
+    } catch (e) {
+      alert(`Échec de l'envoi Peppol : ${e.message}\n\nVérifie que le workflow n8n « LODE - Peppol Send » est actif et que la clé API Billit est renseignée.`)
+    } finally { setBusy(null) }
+  }
+
   const convertir = async (devisDoc) => {
     if (!confirm(`Convertir le devis ${devisDoc.numero} en facture ?`)) return
     const lignes = await getLignes('devis', devisDoc.id)
@@ -524,6 +549,9 @@ export default function LodeDevisFactures() {
                             <button onClick={() => setEditing({ type: tab === 'devis' ? 'devis' : 'facture', doc })} style={btn('#f1f5f9', '#64748b')}>Modifier</button>
                             <button onClick={() => doExport('pdf', tab === 'devis' ? 'devis' : 'facture', doc)} disabled={busy === doc.id + 'pdf'} style={btn('#fef2f2', '#dc2626')}>{busy === doc.id + 'pdf' ? '…' : 'PDF'}</button>
                             <button onClick={() => doExport('excel', tab === 'devis' ? 'devis' : 'facture', doc)} disabled={busy === doc.id + 'excel'} style={btn('#f0fdf4', '#16a34a')}>{busy === doc.id + 'excel' ? '…' : 'Excel'}</button>
+                            {tab === 'factures' && doc.client_tva && doc.statut !== 'payée' && doc.statut !== 'annulée' && (
+                              <button onClick={() => envoyerPeppol(doc)} disabled={busy === doc.id + 'peppol'} style={btn('#eff6ff', '#2563eb')}>{busy === doc.id + 'peppol' ? '…' : '📨 Peppol'}</button>
+                            )}
                             {tab === 'devis' && doc.statut === 'accepté' && <button onClick={() => convertir(doc)} style={btn('#fff7ed', ORANGE)}>→ Facture</button>}
                             <button onClick={() => supprimer(tab === 'devis' ? 'devis' : 'facture', doc.id)} style={btn('#fff', '#dc2626')}>×</button>
                           </div>
