@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
 import { LODE, TVA_TAUX, CGV, DELAI_PAIEMENT_JOURS } from '../../lib/lodeConfig'
 import { I18N, CGV_I18N, LANGUES } from '../../lib/lodeI18n'
+import { StatBanner, TabsBar, StatusBadge, ActionButton, DataCard, PrimaryButton } from '../../components/ui/AccountableUI'
 
 const ORANGE = LODE.couleur
 const NAVY = '#1e293b'
@@ -574,63 +575,76 @@ export default function LodeDevisFactures() {
 
   const liste = tab === 'devis' ? devis : factures
   const STAT = tab === 'devis' ? STATUTS_DEVIS : STATUTS_FACT
+  const C = LODE.couleur
+  const C_DARK = '#7c2d12'
 
-  const btn = (bg, col) => ({ background: bg, color: col, border: 'none', borderRadius: 7, padding: '5px 10px', cursor: 'pointer', fontSize: 11, fontWeight: 600, fontFamily: 'inherit' })
+  // Stats du bandeau
+  const sum = (arr) => arr.reduce((a, d) => a + (Number(d.total_ttc) || 0), 0)
+  const factEnAttente = factures.filter(f => !['payée', 'annulée'].includes(f.statut))
+  const stats = tab === 'devis'
+    ? [
+        { label: 'Devis', value: devis.length },
+        { label: 'Total devis', value: eur(sum(devis)) },
+        { label: 'Acceptés', value: devis.filter(d => d.statut === 'accepté').length },
+      ]
+    : [
+        { label: 'Factures', value: factures.length },
+        { label: 'Total facturé', value: eur(sum(factures)) },
+        { label: 'En attente', value: eur(sum(factEnAttente)) },
+      ]
 
   return (
     <Layout currentPage="Devis & Factures">
-      <div style={{ fontFamily: "'Source Sans Pro', sans-serif", maxWidth: 1150 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
-          <div>
-            <h1 style={{ fontSize: 20, fontWeight: 800, color: NAVY, margin: '0 0 2px' }}>Devis & Factures</h1>
-            <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>LODE SRL — {LODE.activite}</p>
-          </div>
-          <button onClick={() => setEditing({ type: tab === 'factures' ? 'facture' : 'devis', doc: null })} style={{ background: ORANGE, border: 'none', borderRadius: 10, padding: '10px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: 7 }}>
+      <div style={{ fontFamily: "'Source Sans Pro', sans-serif", maxWidth: 1180 }}>
+        <StatBanner
+          color={C} colorDark={C_DARK} logoUrl={LODE.logo_url}
+          title={tab === 'devis' ? 'Devis' : 'Factures'}
+          subtitle={`LODE SRL — ${LODE.activite}`}
+          stats={stats}
+          action={<PrimaryButton color={C} onClick={() => setEditing({ type: tab === 'factures' ? 'facture' : 'devis', doc: null })}>
             <i className="ti ti-plus" /> Nouveau {tab === 'factures' ? 'facture' : 'devis'}
-          </button>
-        </div>
+          </PrimaryButton>}
+        />
 
-        {/* Onglets */}
-        <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '2px solid #f1f5f9' }}>
-          {[['devis', 'Devis', devis.length], ['factures', 'Factures', factures.length]].map(([k, label, n]) => (
-            <button key={k} onClick={() => setTab(k)} style={{
-              background: 'none', border: 'none', padding: '10px 18px', cursor: 'pointer',
-              fontSize: 14, fontWeight: 700, color: tab === k ? ORANGE : '#94a3b8',
-              borderBottom: tab === k ? `2px solid ${ORANGE}` : '2px solid transparent', marginBottom: -2,
-            }}>{label} <span style={{ fontSize: 11, opacity: 0.7 }}>({n})</span></button>
-          ))}
-        </div>
+        <TabsBar color={C} active={tab} onChange={setTab}
+          tabs={[{ key: 'devis', label: 'Devis', count: devis.length }, { key: 'factures', label: 'Factures', count: factures.length }]} />
 
         {loading ? <p style={{ color: '#94a3b8' }}>Chargement…</p> :
-          liste.length === 0 ? <p style={{ color: '#94a3b8', fontStyle: 'italic' }}>Aucun {tab === 'devis' ? 'devis' : 'facture'} pour le moment.</p> :
-            <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+          liste.length === 0 ? (
+            <DataCard style={{ padding: '48px 24px', textAlign: 'center' }}>
+              <p style={{ color: '#94a3b8', fontStyle: 'italic', margin: 0 }}>Aucun {tab === 'devis' ? 'devis' : 'facture'} pour le moment.</p>
+            </DataCard>
+          ) :
+            <DataCard>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead style={{ background: '#f8fafc' }}>
                   <tr>{['N°', 'Client', 'Objet', 'Date', 'Total TTC', 'Statut', 'Actions'].map(h => (
-                    <th key={h} style={{ padding: '10px 12px', textAlign: h === 'Total TTC' ? 'right' : 'left', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>{h}</th>
+                    <th key={h} style={{ padding: '11px 14px', textAlign: h === 'Total TTC' ? 'right' : 'left', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.03em' }}>{h}</th>
                   ))}</tr>
                 </thead>
                 <tbody>
-                  {liste.map((doc, i) => {
+                  {liste.map((doc) => {
                     const s = STAT[doc.statut] || STAT.brouillon
                     return (
-                      <tr key={doc.id} style={{ background: i % 2 ? '#fafafe' : '#fff', borderTop: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '9px 12px', fontFamily: 'monospace', fontWeight: 700, color: ORANGE }}>{doc.numero}</td>
-                        <td style={{ padding: '9px 12px', color: '#1e293b', fontWeight: 600 }}>{doc.client_nom}</td>
-                        <td style={{ padding: '9px 12px', color: '#64748b' }}>{doc.objet || '—'}</td>
-                        <td style={{ padding: '9px 12px', color: '#64748b' }}>{fmtDate(tab === 'devis' ? doc.date_devis : doc.date_facture)}</td>
-                        <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: NAVY }}>{eur(doc.total_ttc)}</td>
-                        <td style={{ padding: '9px 12px' }}><span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 5, background: s.bg, color: s.col }}>{s.label}</span></td>
-                        <td style={{ padding: '9px 12px' }}>
+                      <tr key={doc.id} style={{ borderTop: '1px solid #f1f5f9' }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#fafbfc'}
+                        onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                        <td style={{ padding: '11px 14px', fontFamily: 'monospace', fontWeight: 700, color: C }}>{doc.numero}</td>
+                        <td style={{ padding: '11px 14px', color: '#1e293b', fontWeight: 600 }}>{doc.client_nom}</td>
+                        <td style={{ padding: '11px 14px', color: '#64748b' }}>{doc.objet || '—'}</td>
+                        <td style={{ padding: '11px 14px', color: '#64748b' }}>{fmtDate(tab === 'devis' ? doc.date_devis : doc.date_facture)}</td>
+                        <td style={{ padding: '11px 14px', textAlign: 'right', fontWeight: 700, color: NAVY }}>{eur(doc.total_ttc)}</td>
+                        <td style={{ padding: '11px 14px' }}><StatusBadge bg={s.bg} col={s.col} label={s.label} /></td>
+                        <td style={{ padding: '11px 14px' }}>
                           <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-                            <button onClick={() => setEditing({ type: tab === 'devis' ? 'devis' : 'facture', doc })} style={btn('#f1f5f9', '#64748b')}>Modifier</button>
-                            <button onClick={() => doExport('pdf', tab === 'devis' ? 'devis' : 'facture', doc)} disabled={busy === doc.id + 'pdf'} style={btn('#fef2f2', '#dc2626')}>{busy === doc.id + 'pdf' ? '…' : 'PDF'}</button>
-                            <button onClick={() => doExport('excel', tab === 'devis' ? 'devis' : 'facture', doc)} disabled={busy === doc.id + 'excel'} style={btn('#f0fdf4', '#16a34a')}>{busy === doc.id + 'excel' ? '…' : 'Excel'}</button>
+                            <ActionButton tone="grey" onClick={() => setEditing({ type: tab === 'devis' ? 'devis' : 'facture', doc })}>Modifier</ActionButton>
+                            <ActionButton tone="pdf" disabled={busy === doc.id + 'pdf'} onClick={() => doExport('pdf', tab === 'devis' ? 'devis' : 'facture', doc)}>{busy === doc.id + 'pdf' ? '…' : 'PDF'}</ActionButton>
+                            <ActionButton tone="excel" disabled={busy === doc.id + 'excel'} onClick={() => doExport('excel', tab === 'devis' ? 'devis' : 'facture', doc)}>{busy === doc.id + 'excel' ? '…' : 'Excel'}</ActionButton>
                             {tab === 'factures' && doc.client_tva && doc.statut !== 'payée' && doc.statut !== 'annulée' && (
-                              <button onClick={() => envoyerPeppol(doc)} disabled={busy === doc.id + 'peppol'} style={btn('#eff6ff', '#2563eb')}>{busy === doc.id + 'peppol' ? '…' : '📨 Peppol'}</button>
+                              <ActionButton tone="peppol" disabled={busy === doc.id + 'peppol'} onClick={() => envoyerPeppol(doc)}>{busy === doc.id + 'peppol' ? '…' : '📨 Peppol'}</ActionButton>
                             )}
-                            {tab === 'devis' && doc.statut === 'accepté' && <button onClick={() => convertir(doc)} style={btn('#fff7ed', ORANGE)}>→ Facture</button>}
-                            <button onClick={() => supprimer(tab === 'devis' ? 'devis' : 'facture', doc.id)} style={btn('#fff', '#dc2626')}>×</button>
+                            {tab === 'devis' && doc.statut === 'accepté' && <ActionButton tone="accent" color={C} onClick={() => convertir(doc)}>→ Facture</ActionButton>}
+                            <ActionButton tone="danger" onClick={() => supprimer(tab === 'devis' ? 'devis' : 'facture', doc.id)}>×</ActionButton>
                           </div>
                         </td>
                       </tr>
@@ -638,7 +652,7 @@ export default function LodeDevisFactures() {
                   })}
                 </tbody>
               </table>
-            </div>}
+            </DataCard>}
       </div>
 
       {editing && <Editeur type={editing.type} doc={editing.doc} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load() }} />}
