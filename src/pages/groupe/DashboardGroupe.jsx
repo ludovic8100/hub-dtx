@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
+import { ENTITES } from '../../lib/entites'
+import { StatBanner, PrimaryButton } from '../../components/ui/AccountableUI'
 
 // ── Constantes ──
 const SOCIETES = {
@@ -725,26 +727,16 @@ export default function DashboardGroupe() {
 
   return (
     <Layout currentPage="Tableau de bord général">
-      <div style={{ fontFamily:"'Source Sans Pro', sans-serif", maxWidth:1300 }}>
+      <div style={{ fontFamily:"'Source Sans Pro', sans-serif", width:'100%' }}>
 
-        {/* Titre */}
-        <div style={{ marginBottom:24, display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:16, flexWrap:'wrap' }}>
-          <div>
-            <h1 style={{ fontSize:22, fontWeight:800, color:'#0f172a', margin:'0 0 4px' }}>Tableau de bord général</h1>
-            <p style={{ fontSize:14, color:'#64748b', margin:0 }}>Vue consolidée — Groupe DTX · Dynassur · LODE · Hexagroup · Privé</p>
-          </div>
-          <button onClick={() => navigate('/admin/sync')} style={{
-            display:'flex', alignItems:'center', gap:8, background:'#fff',
-            border:'1px solid #e2e8f0', borderRadius:10, padding:'10px 16px',
-            cursor:'pointer', fontSize:13, fontWeight:700, color:'#0080BD',
-            fontFamily:"'Source Sans Pro', sans-serif", boxShadow:'0 1px 4px rgba(0,0,0,0.04)',
-          }}
-            onMouseEnter={e=>e.currentTarget.style.borderColor='#0080BD'}
-            onMouseLeave={e=>e.currentTarget.style.borderColor='#e2e8f0'}>
-            <i className="ti ti-refresh" style={{ fontSize:16 }} />
-            Synchroniser les données
-          </button>
-        </div>
+        <StatBanner
+          color={ENTITES.groupe.color} colorDark={ENTITES.groupe.colorDark}
+          title="Tableau de bord général"
+          subtitle="Vue consolidée — Groupe DTX · Dynassur · LODE · Hexagroup · Privé"
+          action={<PrimaryButton color={ENTITES.groupe.color} onClick={() => navigate('/admin/sync')}>
+            <i className="ti ti-refresh" /> Synchroniser
+          </PrimaryButton>}
+        />
 
         {/* KPIs rapides — tous cliquables */}
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:14, marginBottom:28 }}>

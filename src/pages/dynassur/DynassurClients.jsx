@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
+import { ENTITES } from '../../lib/entites'
+import { StatBanner } from '../../components/ui/AccountableUI'
 
 const BLUE  = '#0080BD'
 const NAVY  = '#0D2F5E'
@@ -469,27 +471,17 @@ export default function DynassurClients() {
 
   return(
     <Layout currentPage="Clients">
-      <div style={{fontFamily:"'Source Sans Pro',sans-serif",maxWidth:1300}}>
+      <div style={{fontFamily:"'Source Sans Pro',sans-serif",width:'100%'}}>
 
-        {/* Titre */}
-        <div style={{marginBottom:20,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-          <div>
-            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}>
-              <i className="ti ti-users" style={{fontSize:20,color:BLUE}}/>
-              <h1 style={{fontSize:20,fontWeight:800,color:NAVY,margin:0}}>Clients Dynassur</h1>
-            </div>
-            <p style={{fontSize:13,color:'#64748b',margin:0}}>Base clients — {new Date().getFullYear()}</p>
-          </div>
-          {/* Mini KPIs */}
-          <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
-            {[{l:'Avec alerte',v:kpis?.avec_alerte,col:'#f59e0b'},{l:'Sans contrat',v:kpis?.sans_contrat,col:'#dc2626'},{l:'Sans comm. 2026',v:kpis?.sans_commissions,col:'#7c3aed'}].map(k=>(
-              <div key={k.l} style={{background:'#fff',borderRadius:8,border:`1px solid ${k.col}30`,borderTop:`2px solid ${k.col}`,padding:'8px 14px',minWidth:110}}>
-                <div style={{fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:2}}>{k.l}</div>
-                <div style={{fontSize:20,fontWeight:800,color:k.col}}>{k.v!=null?k.v.toLocaleString('fr-BE'):'…'}</div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <StatBanner
+          color={ENTITES.dynassur.color} colorDark={ENTITES.dynassur.colorDark} logoUrl={ENTITES.dynassur.logo}
+          title="Clients" subtitle={`Dynassur SRL — base clients ${new Date().getFullYear()}`}
+          stats={[
+            { label: 'Avec alerte', value: kpis?.avec_alerte != null ? kpis.avec_alerte.toLocaleString('fr-BE') : '…' },
+            { label: 'Sans contrat', value: kpis?.sans_contrat != null ? kpis.sans_contrat.toLocaleString('fr-BE') : '…' },
+            { label: 'Sans comm. 2026', value: kpis?.sans_commissions != null ? kpis.sans_commissions.toLocaleString('fr-BE') : '…' },
+          ]}
+        />
 
         {/* ── Barre de recherche en HAUT ── */}
         {!selected&&(

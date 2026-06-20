@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
+import { ENTITES } from '../../lib/entites'
+import { StatBanner } from '../../components/ui/AccountableUI'
 
 // ── Constantes ──
 const BLUE = '#0080BD'
@@ -425,21 +427,14 @@ export default function DynassurProduction() {
 
   return (
     <Layout currentPage="Production">
-      <div style={{ fontFamily:"'Source Sans Pro', sans-serif", maxWidth:1400 }}>
+      <div style={{ fontFamily:"'Source Sans Pro', sans-serif", width:'100%' }}>
 
-        {/* Header */}
-        <div style={{ marginBottom:24 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:4 }}>
-            <i className="ti ti-chart-line" style={{ fontSize:20, color:BLUE }} />
-            <h1 style={{ fontSize:20, fontWeight:800, color:NAVY, margin:0 }}>Production {annee}</h1>
-            {!loading && (
-              <span style={{ fontSize:12, background:BLUE+'18', color:BLUE, fontWeight:700, padding:'2px 10px', borderRadius:20 }}>
-                {fmtN(data.length)} mouvements
-              </span>
-            )}
-          </div>
-          <p style={{ fontSize:13, color:'#64748b', margin:0 }}>Suivi de la production par type et collaborateur</p>
-        </div>
+        <StatBanner
+          color={ENTITES.dynassur.color} colorDark={ENTITES.dynassur.colorDark} logoUrl={ENTITES.dynassur.logo}
+          title={`Production ${annee}`}
+          subtitle="Dynassur SRL — suivi par type et collaborateur"
+          stats={!loading ? [{ label: 'Mouvements', value: fmtN(data.length) }] : []}
+        />
 
         {/* Onglets */}
         <div style={{ display:'flex', borderBottom:'1px solid #e2e8f0', marginBottom:24, background:'#fff', borderRadius:'10px 10px 0 0', padding:'0 16px' }}>

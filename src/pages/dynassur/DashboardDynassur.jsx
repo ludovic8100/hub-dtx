@@ -3,6 +3,8 @@ import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
 import { useAuth } from '../../lib/auth'
 import BlocComptes from '../../components/BlocComptes'
+import { ENTITES } from '../../lib/entites'
+import { StatBanner } from '../../components/ui/AccountableUI'
 
 const C = { navy:'#0D2F5E', blue:'#0080BD', cyan:'#5DC3E8', ok:'#16a34a', warn:'#f59e0b', danger:'#dc2626', border:'#e2e8f0', bg:'#f8fafc', text:'#1e293b', muted:'#94a3b8' }
 const fmt = v => v==null?'—':new Intl.NumberFormat('fr-BE',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(v)
@@ -111,13 +113,13 @@ export default function DashboardDynassur() {
 
   return (
     <Layout currentPage="Tableau de bord">
-      <div style={{ fontFamily:"'Source Sans Pro', sans-serif", maxWidth:1300 }}>
+      <div style={{ fontFamily:"'Source Sans Pro', sans-serif", width:'100%' }}>
 
-        {/* Titre */}
-        <div style={{ marginBottom:24 }}>
-          <h1 style={{ fontSize:22, fontWeight:800, color:C.navy, margin:'0 0 4px' }}>Bonjour {firstName} 👋</h1>
-          <p style={{ fontSize:14, color:C.muted, margin:0 }}>Dynassur SRL — aperçu de l'activité {annee}</p>
-        </div>
+        <StatBanner
+          color={ENTITES.dynassur.color} colorDark={ENTITES.dynassur.colorDark} logoUrl={ENTITES.dynassur.logo}
+          title={`Bonjour ${firstName || ''}`.trim()}
+          subtitle={`Dynassur SRL — aperçu de l'activité ${annee}`}
+        />
 
         {/* KPIs */}
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:14, marginBottom:24 }}>
