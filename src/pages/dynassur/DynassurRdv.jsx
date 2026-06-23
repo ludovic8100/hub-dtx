@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
 import { ENTITES } from '../../lib/entites'
@@ -8,7 +8,6 @@ const E = ENTITES.dynassur
 const NAVY = '#0D2F5E'
 const MOIS = ['', 'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
 
-// Formatage date/heure FR à partir d'un dateTime Graph (sans offset)
 function fmtDateHeure(iso, journee) {
   if (!iso) return '—'
   const d = new Date(iso.length <= 19 ? iso + 'Z' : iso)
@@ -20,6 +19,21 @@ function fmtDateHeure(iso, journee) {
   return `${jour} · ${hh}:${mm}`
 }
 function tsOf(iso) { const d = new Date((iso || '').length <= 19 ? iso + 'Z' : iso); return isNaN(d) ? 0 : d.getTime() }
+
+// Mots à ignorer pour deviner le nom du client dans l'objet
+const STOP = new Set(['RDV','RDVS','PH','PRET','PRÊT','HYPO','HYPOTHEQUE','HYPOTHÉCAIRE','HYPOTHECAIRE','SIGN','SIGNATURE','CARDIF',
+  'DOSSIER','DOSSIERS','CREDIT','CRÉDIT','SRDU','DEUX','AVEC','ATTENTION','SORTIR','BNB','CAR','FAILLITE','FAILLI','REUNION','RÉUNION',
+  'EXPERTISE','MME','MMME','MR','MONSIEUR','MADAME','LES','DES','POUR','RESTO','EQUIPE','ÉQUIPE','DYNASSUR','FORMATION','PROVIDIS',
+  'MICROSOFT','POWER','DAYS','FOUNDRY','LIEGE','LIÈGE','JUPRELLE','VISIO','TEAMS','APPEL','CALL','TEL','TÉL','VIE','IARD','AUTO',
+  'CONTRAT','CLIENT','NOUVEAU','NEW','SUIVI','POINT','DEBRIEF','DÉBRIEF','MEETING','LUNCH','MIDI','SS','QG','OK','URGENT','SUITE'])
+
+function guessNom(objet) {
+  const toks = (objet || '').split(/[^A-Za-zÀ-ÿ]+/).filter(t => t.length >= 3 && !STOP.has(t.toUpperCase()))
+  // privilégie un token tout en majuscules (souvent le nom de famille), sinon le plus long
+  const caps = toks.find(t => t === t.toUpperCase())
+  if (caps) return caps
+  return toks.sort((a, b) => b.length - a.length)[0] || ''
+}
 
 function KpiCard({ label, value, col, sub }) {
   return (
@@ -41,15 +55,100 @@ function CatBadge({ code, cats }) {
   )
 }
 
+// ---- Modale de sélection d'un client -------------------------------------
+function ClientPicker({ rdv, onClose, onPick }) {
+  const collab = (rdv.user_email || '').split('@')[0].toUpperCase()
+  const [q, setQ] = useState(() => guessNom(rdv.objet))
+  const [res, setRes] = useState([])
+  const [loading, setLoading] = useState(false)
+  const timer = useRef(null)
+
+  async function run(term) {
+    if (!term || term.trim().length < 2) { setRes([]); return }
+    setLoading(true)
+    const t = term.trim()
+    const { data } = await supabase.from('clients')
+      .select('id,nom,prenom,dossier,localite,cp,sa_code,gestionnaire_code,sa_nom,gestionnaire_nom')
+      .or(`nom.ilike.%${t}%,prenom.ilike.%${t}%,dossier.ilike.%${t}%`)
+      .limit(40)
+    // portefeuille du collaborateur en premier
+    const sorted = (data || []).sort((a, b) => {
+      const pa = (a.sa_code === collab || a.gestionnaire_code === collab) ? 0 : 1
+      const pb = (b.sa_code === collab || b.gestionnaire_code === collab) ? 0 : 1
+      return pa - pb || (a.nom || '').localeCompare(b.nom || '')
+    })
+    setRes(sorted)
+    setLoading(false)
+  }
+  useEffect(() => { run(q) /* recherche initiale */ }, [])
+  function onChange(v) {
+    setQ(v)
+    clearTimeout(timer.current)
+    timer.current = setTimeout(() => run(v), 300)
+  }
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '8vh 16px' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 620, maxHeight: '78vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
+          <div style={{ fontSize: 15, fontWeight: 800, color: NAVY }}>Lier au client</div>
+          <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{rdv.objet} · {fmtDateHeure(rdv.debut, rdv.journee_entiere)} · agenda {collab}</div>
+          <input autoFocus value={q} onChange={e => onChange(e.target.value)} placeholder="Nom, prénom ou n° de dossier…"
+            style={{ marginTop: 12, width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 8, border: `2px solid ${E.color}`, fontSize: 14, color: NAVY, fontFamily: "'Source Sans Pro', sans-serif" }} />
+        </div>
+        <div style={{ overflowY: 'auto', flex: 1 }}>
+          {loading ? (
+            <div style={{ padding: 30, textAlign: 'center', color: '#94a3b8' }}><i className="ti ti-loader-2" style={{ fontSize: 24, animation: 'spin 1s linear infinite' }} /></div>
+          ) : res.length === 0 ? (
+            <div style={{ padding: 30, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>Aucun client trouvé. Affine la recherche.</div>
+          ) : res.map(c => {
+            const inPf = c.sa_code === collab || c.gestionnaire_code === collab
+            return (
+              <div key={c.id} onClick={() => onPick(c)} style={{ padding: '10px 20px', borderTop: '1px solid #f8fafc', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: NAVY }}>
+                    {c.nom} {c.prenom}
+                    {inPf && <span style={{ marginLeft: 8, fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 4, background: E.color + '18', color: E.color }}>SON CLIENT</span>}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#94a3b8' }}>
+                    {c.dossier ? `Dossier ${c.dossier} · ` : ''}{c.cp || ''} {c.localite || ''}
+                    {c.sa_code ? ` · com. ${c.sa_code}` : ''}{c.gestionnaire_code ? ` · gest. ${c.gestionnaire_code}` : ''}
+                  </div>
+                </div>
+                <i className="ti ti-link" style={{ color: E.color, fontSize: 18 }} />
+              </div>
+            )
+          })}
+        </div>
+        <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Annuler</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function DynassurRdv() {
   const [rdv, setRdv] = useState([])
-  const [cats, setCats] = useState({})        // { code: {libelle, couleur, entite} }
+  const [cats, setCats] = useState({})
+  const [clientsById, setClientsById] = useState({})   // id -> {nom,prenom,dossier}
   const [loading, setLoading] = useState(true)
-  const [periode, setPeriode] = useState('avenir')   // avenir | passes | tous
+  const [periode, setPeriode] = useState('avenir')
   const [filtreCat, setFiltreCat] = useState('')
   const [recherche, setRecherche] = useState('')
   const [busyId, setBusyId] = useState(null)
   const [flash, setFlash] = useState(null)
+  const [picker, setPicker] = useState(null)            // rdv en cours de liaison
+
+  async function chargerClients(rows) {
+    const ids = [...new Set(rows.map(r => r.client_id).filter(Boolean))]
+    if (ids.length === 0) { setClientsById({}); return }
+    const { data } = await supabase.from('clients').select('id,nom,prenom,dossier').in('id', ids)
+    const m = {}
+    ;(data || []).forEach(c => { m[c.id] = c })
+    setClientsById(m)
+  }
 
   async function charger() {
     setLoading(true)
@@ -61,11 +160,11 @@ export default function DynassurRdv() {
     ;(cdata || []).forEach(c => { map[c.code] = c })
     setCats(map)
     setRdv(rData || [])
+    await chargerClients(rData || [])
     setLoading(false)
   }
   useEffect(() => { charger() }, [])
 
-  // Catégories Dynassur uniquement (DP / MANAGEMENT / FORMATION …)
   const codesDyn = useMemo(
     () => Object.values(cats).filter(c => (c.entite || '').toUpperCase() === 'DYNASSUR').map(c => c.code),
     [cats]
@@ -79,21 +178,51 @@ export default function DynassurRdv() {
     if (periode === 'passes') l = l.filter(r => tsOf(r.debut) < now - 86400000)
     if (recherche.trim()) {
       const q = recherche.toLowerCase()
-      l = l.filter(r => (r.objet || '').toLowerCase().includes(q)
-        || (r.dossier_client || '').toLowerCase().includes(q)
-        || (r.user_email || '').toLowerCase().includes(q))
+      l = l.filter(r => {
+        const c = clientsById[r.client_id]
+        return (r.objet || '').toLowerCase().includes(q)
+          || (r.user_email || '').toLowerCase().includes(q)
+          || (c && `${c.nom} ${c.prenom}`.toLowerCase().includes(q))
+      })
     }
     return l.sort((a, b) => periode === 'passes' ? tsOf(b.debut) - tsOf(a.debut) : tsOf(a.debut) - tsOf(b.debut))
-  }, [rdv, codesDyn, filtreCat, periode, recherche, now])
+  }, [rdv, codesDyn, filtreCat, periode, recherche, now, clientsById])
 
-  // KPIs
   const totalDyn = useMemo(() => rdv.filter(r => codesDyn.includes(r.categorie)), [rdv, codesDyn])
   const avenir = totalDyn.filter(r => tsOf(r.debut) >= now - 86400000).length
+  const lies = useMemo(() => totalDyn.filter(r => r.client_id).length, [totalDyn])
   const parCat = useMemo(() => {
     const c = {}
     totalDyn.forEach(r => { c[r.categorie] = (c[r.categorie] || 0) + 1 })
     return c
   }, [totalDyn])
+
+  function notify(ok, msg) { setFlash({ ok, msg }); setTimeout(() => setFlash(null), 4000) }
+
+  async function lierClient(client) {
+    const r = picker
+    setPicker(null)
+    setBusyId(r.id)
+    try {
+      const { error } = await supabase.from('rdv').update({ client_id: client.id, dossier_client: client.dossier || null }).eq('id', r.id)
+      if (error) throw error
+      setRdv(prev => prev.map(x => x.id === r.id ? { ...x, client_id: client.id, dossier_client: client.dossier || null } : x))
+      setClientsById(prev => ({ ...prev, [client.id]: client }))
+      notify(true, `RDV lié à ${client.nom} ${client.prenom}.`)
+    } catch (e) { notify(false, 'Erreur : ' + (e.message || e)) }
+    finally { setBusyId(null) }
+  }
+
+  async function delier(r) {
+    setBusyId(r.id)
+    try {
+      const { error } = await supabase.from('rdv').update({ client_id: null }).eq('id', r.id)
+      if (error) throw error
+      setRdv(prev => prev.map(x => x.id === r.id ? { ...x, client_id: null } : x))
+      notify(true, 'Lien client retiré.')
+    } catch (e) { notify(false, 'Erreur : ' + (e.message || e)) }
+    finally { setBusyId(null) }
+  }
 
   async function creerTacheSuivi(r) {
     setBusyId(r.id)
@@ -103,22 +232,14 @@ export default function DynassurRdv() {
       const { error } = await supabase.from('taches').insert({
         titre: `Suivi RDV : ${r.objet || 'sans objet'}`,
         description: `RDV du ${dateTxt} — catégorie ${r.categorie}${r.lieu ? ` — ${r.lieu}` : ''}${r.user_email ? ` (agenda ${r.user_email})` : ''}`,
-        statut: 'todo',
-        priorite: 'moyenne',
-        categorie: 'RDV',
-        source: 'rdv',
-        dossier_client: r.dossier_client || null,
-        echeance,
-        lien_url: r.web_link || null,
+        statut: 'todo', priorite: 'moyenne', categorie: 'RDV', source: 'rdv',
+        client_id: r.client_id || null, dossier_client: r.dossier_client || null,
+        echeance, lien_url: r.web_link || null,
       })
       if (error) throw error
-      setFlash({ ok: true, msg: 'Tâche de suivi créée.' })
-    } catch (e) {
-      setFlash({ ok: false, msg: 'Échec création tâche : ' + (e.message || e) })
-    } finally {
-      setBusyId(null)
-      setTimeout(() => setFlash(null), 4000)
-    }
+      notify(true, 'Tâche de suivi créée.')
+    } catch (e) { notify(false, 'Échec création tâche : ' + (e.message || e)) }
+    finally { setBusyId(null) }
   }
 
   const selStyle = { padding: '7px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, color: NAVY, background: '#fff', fontFamily: "'Source Sans Pro', sans-serif" }
@@ -143,16 +264,15 @@ export default function DynassurRdv() {
         </div>
       )}
 
-      {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 12, marginBottom: 20 }}>
         <KpiCard label="RDV 2026" value={totalDyn.length} col={E.color} />
         <KpiCard label="À venir" value={avenir} col="#16a34a" />
+        <KpiCard label="Liés à un client" value={lies} col="#7c3aed" sub={`${totalDyn.length - lies} à lier`} />
         {Object.keys(parCat).sort().map(code => (
           <KpiCard key={code} label={(cats[code] && cats[code].libelle) || code} value={parCat[code]} col={(cats[code] && cats[code].couleur) || '#64748b'} />
         ))}
       </div>
 
-      {/* Filtres */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 16, alignItems: 'center' }}>
         <div style={{ display: 'flex', gap: 6 }}>
           {[['avenir', 'À venir'], ['passes', 'Passés'], ['tous', 'Tous']].map(([k, lbl]) => (
@@ -166,11 +286,10 @@ export default function DynassurRdv() {
           <option value="">Toutes catégories</option>
           {codesDyn.map(code => <option key={code} value={code}>{code} — {cats[code] && cats[code].libelle}</option>)}
         </select>
-        <input value={recherche} onChange={e => setRecherche(e.target.value)} placeholder="Rechercher objet / dossier / agenda…"
+        <input value={recherche} onChange={e => setRecherche(e.target.value)} placeholder="Rechercher objet / client / agenda…"
           style={{ ...selStyle, flex: 1, minWidth: 200 }} />
       </div>
 
-      {/* Tableau */}
       {loading ? (
         <div style={{ padding: 60, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
           <i className="ti ti-loader-2" style={{ fontSize: 32, display: 'block', marginBottom: 12, animation: 'spin 1s linear infinite' }} />
@@ -192,39 +311,60 @@ export default function DynassurRdv() {
                   <th style={{ padding: '10px 14px' }}>Quand</th>
                   <th style={{ padding: '10px 14px' }}>Objet</th>
                   <th style={{ padding: '10px 14px' }}>Catégorie</th>
-                  <th style={{ padding: '10px 14px' }}>Dossier</th>
+                  <th style={{ padding: '10px 14px' }}>Client</th>
                   <th style={{ padding: '10px 14px' }}>Agenda</th>
                   <th style={{ padding: '10px 14px', textAlign: 'right' }}>Suivi</th>
                 </tr>
               </thead>
               <tbody>
-                {liste.map(r => (
-                  <tr key={r.id} style={{ borderTop: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '10px 14px', whiteSpace: 'nowrap', color: NAVY, fontWeight: 600 }}>{fmtDateHeure(r.debut, r.journee_entiere)}</td>
-                    <td style={{ padding: '10px 14px', maxWidth: 320 }}>
-                      {r.web_link
-                        ? <a href={r.web_link} target="_blank" rel="noreferrer" style={{ color: NAVY, textDecoration: 'none', fontWeight: 600 }}>{r.objet || '—'}</a>
-                        : (r.objet || '—')}
-                      {r.lieu && <div style={{ fontSize: 11, color: '#94a3b8' }}><i className="ti ti-map-pin" style={{ marginRight: 3 }} />{r.lieu}</div>}
-                    </td>
-                    <td style={{ padding: '10px 14px' }}><CatBadge code={r.categorie} cats={cats} /></td>
-                    <td style={{ padding: '10px 14px', color: '#64748b' }}>{r.dossier_client || '—'}</td>
-                    <td style={{ padding: '10px 14px', color: '#64748b', fontSize: 12 }}>{(r.user_email || '').replace('@dynassur.be', '')}</td>
-                    <td style={{ padding: '10px 14px', textAlign: 'right' }}>
-                      <button onClick={() => creerTacheSuivi(r)} disabled={busyId === r.id} style={{
-                        padding: '5px 10px', borderRadius: 6, border: `1px solid ${E.color}40`, background: E.color + '12',
-                        color: E.color, fontSize: 12, fontWeight: 700, cursor: busyId === r.id ? 'wait' : 'pointer', whiteSpace: 'nowrap'
-                      }}>
-                        <i className="ti ti-checkbox" style={{ marginRight: 4 }} />Tâche
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {liste.map(r => {
+                  const c = clientsById[r.client_id]
+                  return (
+                    <tr key={r.id} style={{ borderTop: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '10px 14px', whiteSpace: 'nowrap', color: NAVY, fontWeight: 600 }}>{fmtDateHeure(r.debut, r.journee_entiere)}</td>
+                      <td style={{ padding: '10px 14px', maxWidth: 300 }}>
+                        {r.web_link
+                          ? <a href={r.web_link} target="_blank" rel="noreferrer" style={{ color: NAVY, textDecoration: 'none', fontWeight: 600 }}>{r.objet || '—'}</a>
+                          : (r.objet || '—')}
+                        {r.lieu && <div style={{ fontSize: 11, color: '#94a3b8' }}><i className="ti ti-map-pin" style={{ marginRight: 3 }} />{r.lieu}</div>}
+                      </td>
+                      <td style={{ padding: '10px 14px' }}><CatBadge code={r.categorie} cats={cats} /></td>
+                      <td style={{ padding: '10px 14px' }}>
+                        {c ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontWeight: 700, color: NAVY }}>{c.nom} {c.prenom}</span>
+                            <button onClick={() => delier(r)} disabled={busyId === r.id} title="Retirer le lien" style={{ border: 'none', background: 'none', color: '#cbd5e1', cursor: 'pointer', padding: 0, fontSize: 14 }}>
+                              <i className="ti ti-x" />
+                            </button>
+                          </span>
+                        ) : (
+                          <button onClick={() => setPicker(r)} disabled={busyId === r.id} style={{
+                            padding: '4px 10px', borderRadius: 6, border: '1px dashed #cbd5e1', background: '#fff',
+                            color: '#64748b', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap'
+                          }}>
+                            <i className="ti ti-link" style={{ marginRight: 4 }} />Lier
+                          </button>
+                        )}
+                      </td>
+                      <td style={{ padding: '10px 14px', color: '#64748b', fontSize: 12 }}>{(r.user_email || '').replace('@dynassur.be', '')}</td>
+                      <td style={{ padding: '10px 14px', textAlign: 'right' }}>
+                        <button onClick={() => creerTacheSuivi(r)} disabled={busyId === r.id} style={{
+                          padding: '5px 10px', borderRadius: 6, border: `1px solid ${E.color}40`, background: E.color + '12',
+                          color: E.color, fontSize: 12, fontWeight: 700, cursor: busyId === r.id ? 'wait' : 'pointer', whiteSpace: 'nowrap'
+                        }}>
+                          <i className="ti ti-checkbox" style={{ marginRight: 4 }} />Tâche
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
         </div>
       )}
+
+      {picker && <ClientPicker rdv={picker} onClose={() => setPicker(null)} onPick={lierClient} />}
     </Layout>
   )
 }
