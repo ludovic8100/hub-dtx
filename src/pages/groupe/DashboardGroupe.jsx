@@ -782,6 +782,11 @@ export default function DashboardGroupe() {
           </PrimaryButton>}
         />
 
+        {/* Synchronisations — pleine largeur, 3 cartes sur une ligne */}
+        <div style={{ marginBottom:28 }}>
+          <BlocSync />
+        </div>
+
         {/* KPIs rapides — tous cliquables */}
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:14, marginBottom:28 }}>
           <KpiCard
@@ -813,12 +818,9 @@ export default function DashboardGroupe() {
         </div>
 
         {/* Grille secondaire — Production pleine largeur */}
-        <div style={{ marginBottom:20 }}>
+        <div>
           <BlocProduction />
         </div>
-
-        {/* Synchronisations — pleine largeur, 3 cartes sur une ligne */}
-        <BlocSync />
 
       </div>
     </Layout>
