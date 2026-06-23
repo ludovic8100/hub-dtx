@@ -230,6 +230,7 @@ function BlocBanque({ comptes, loading }) {
             </div>
           </div>
         </div>
+      )}
     </div>
   )
 }
@@ -528,6 +529,10 @@ function BlocProduction({ loading: loadingExt }) {
         right={<span style={{ fontSize:11, fontWeight:700, color:'#0080BD', background:'#eff6ff', padding:'3px 10px', borderRadius:6, cursor:'pointer' }}
           onClick={() => navigate('/dynassur/production')}>DYNASSUR →</span>}
       />
+      {loadingExt ? (
+        <div style={{ padding:30, textAlign:'center', color:'#94a3b8' }}>Chargement…</div>
+      ) : (
+        <div style={{ padding:16 }}>
       {/* Solde net + NA ce mois — cliquables */}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:16 }}>
             <div
