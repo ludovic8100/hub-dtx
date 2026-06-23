@@ -554,7 +554,7 @@ function BlocSync() {
       </div>
       <div style={{ padding:14 }}>
         <WebhookStatus />
-        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:12 }}>
           {SYNCS.map(s => <SyncCard key={s.key} sync={s} />)}
         </div>
       </div>
@@ -812,11 +812,13 @@ export default function DashboardGroupe() {
           <BlocTaches taches={taches} bordereaux={bordereaux} loading={loading} />
         </div>
 
-        {/* Grille secondaire */}
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20 }}>
-          <BlocSync />
+        {/* Grille secondaire — Production pleine largeur */}
+        <div style={{ marginBottom:20 }}>
           <BlocProduction />
         </div>
+
+        {/* Synchronisations — pleine largeur, 3 cartes sur une ligne */}
+        <BlocSync />
 
       </div>
     </Layout>
