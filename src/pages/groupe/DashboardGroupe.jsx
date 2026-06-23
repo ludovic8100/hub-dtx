@@ -116,7 +116,10 @@ function BlocBanque({ comptes, loading }) {
   })
 
   const totalGroupe = comptes.reduce((s,c) => s + parseFloat(c.solde_actuel||0), 0)
-  const allRevealed = comptes.length > 0 && comptes.every(c => revealed[c.id])
+  const allRevealed = comptes.length > 0
+    && comptes.every(c => revealed[c.id])
+    && Object.keys(parSociete).every(code => revealed[`soc_${code}`])
+    && !!revealed['__total__']
 
   return (
     <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
@@ -128,7 +131,13 @@ function BlocBanque({ comptes, loading }) {
           <span style={{ fontSize:11, background:'#f1f5f9', color:'#64748b', padding:'2px 7px', borderRadius:10, fontWeight:600 }}>{comptes.length} comptes</span>
         </div>
         {comptes.length > 0 && (
-          <button onClick={() => { const all={}; comptes.forEach(c=>{all[c.id]=!allRevealed}); setRevealed(all) }}
+          <button onClick={() => {
+            const next = !allRevealed
+            const all = { '__total__': next }
+            comptes.forEach(c => { all[c.id] = next })
+            Object.keys(parSociete).forEach(code => { all[`soc_${code}`] = next })
+            setRevealed(all)
+          }}
             style={{ fontSize:11, color:'#7c3aed', background:'#f5f3ff', border:'1px solid #ede9fe', borderRadius:6, padding:'4px 10px', cursor:'pointer', fontWeight:600 }}>
             {allRevealed ? '🔒 Tout masquer' : '👁 Tout révéler'}
           </button>
@@ -243,9 +252,15 @@ function BlocBanque({ comptes, loading }) {
           {/* Total groupe */}
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 18px', background:'#0f172a' }}>
             <span style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,0.45)', textTransform:'uppercase', letterSpacing:'.05em' }}>Total Groupe</span>
-            <span style={{ fontSize:16, fontWeight:800, color: allRevealed?(totalGroupe<0?'#f87171':'#86efac'):'#374151' }}>
-              {allRevealed ? fmt(totalGroupe) : '● ● ● ● ●'}
-            </span>
+            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <span style={{ fontSize:16, fontWeight:800, color: revealed['__total__']?(totalGroupe<0?'#f87171':'#86efac'):'#374151' }}>
+                {revealed['__total__'] ? fmt(totalGroupe) : '● ● ● ● ●'}
+              </span>
+              <button onClick={() => setRevealed(r => ({ ...r, '__total__': !r['__total__'] }))}
+                style={{ background:'transparent', border:'1px solid rgba(255,255,255,0.15)', borderRadius:6, padding:'3px 7px', cursor:'pointer', color:'rgba(255,255,255,0.5)', fontSize:12 }}>
+                <i className={`ti ${revealed['__total__']?'ti-eye-off':'ti-eye'}`} />
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -525,6 +540,99 @@ function BlocTresorerie({ comptes, transactions, loading }) {
 }
 
 // ══════════════════════════
+// BLOC SYNC — 3 cartes mini
+// ══════════════════════════
+const N8N_WH  = 'https://n8n.srv1082740.hstgr.cloud/webhook'
+const SYNCS_DEF = [
+  { key:'import',     label:'Import Brio',       icon:'ti-database-import', col:'#0080BD', wh:'run-import-dynassur', tables:['clients','contrats','mouvements_production','quittances'] },
+  { key:'iban',       label:'Comptes bancaires',  icon:'ti-building-bank',  col:'#16a34a', wh:'iban-sync',           tables:['transactions'] },
+  { key:'bordereaux', label:'Bordereaux BQT/RCP', icon:'ti-file-invoice',   col:'#7c3aed', wh:'run-bordereaux',      tables:['bordereaux'] },
+]
+
+function BlocSync() {
+  const navigate = useNavigate()
+  const [states, setStates]   = useState({})
+  const [counts, setCounts]   = useState({})
+
+  useEffect(() => {
+    async function loadCounts() {
+      const all = {}
+      for (const s of SYNCS_DEF) {
+        for (const t of s.tables) {
+          const { count } = await supabase.from(t).select('*', { count:'exact', head:true })
+          all[t] = count
+        }
+      }
+      setCounts(all)
+    }
+    loadCounts()
+  }, [])
+
+  const trigger = async (key, wh) => {
+    setStates(s => ({ ...s, [key]: 'running' }))
+    try {
+      const res = await fetch(`${N8N_WH}/${wh}`, { method:'POST' })
+      setStates(s => ({ ...s, [key]: res.ok ? 'ok' : 'error' }))
+      if (res.ok) setTimeout(async () => {
+        const all = { ...counts }
+        for (const t of SYNCS_DEF.find(x=>x.key===key).tables) {
+          const { count } = await supabase.from(t).select('*',{count:'exact',head:true})
+          all[t] = count
+        }
+        setCounts(all)
+        setStates(s => ({ ...s, [key]: 'idle' }))
+      }, 8000)
+    } catch {
+      setStates(s => ({ ...s, [key]: 'error' }))
+    }
+  }
+
+  return (
+    <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
+      <div style={{ padding:'14px 18px', borderBottom:'1px solid #f1f5f9', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <i className="ti ti-refresh" style={{ fontSize:16, color:'#7c3aed' }} />
+          <span style={{ fontSize:13, fontWeight:700, color:'#0f172a' }}>Synchronisations</span>
+        </div>
+        <button onClick={() => navigate('/admin/sync')} style={{ fontSize:11, color:'#7c3aed', background:'#f5f3ff', border:'1px solid #ede9fe', borderRadius:6, padding:'4px 10px', cursor:'pointer', fontWeight:600, display:'flex', alignItems:'center', gap:4 }}>
+          <i className="ti ti-settings" style={{ fontSize:12 }} /> Centre de synchro
+        </button>
+      </div>
+      <div style={{ padding:14, display:'flex', flexDirection:'column', gap:10 }}>
+        {SYNCS_DEF.map(s => {
+          const st = states[s.key] || 'idle'
+          const running = st === 'running'
+          const mainCount = counts[s.tables[0]]
+          return (
+            <div key={s.key} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', borderRadius:9, background:'#f8fafc', border:`1px solid #e2e8f0` }}>
+              <div style={{ width:36, height:36, borderRadius:9, background:`${s.col}15`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                <i className={`ti ${s.icon}`} style={{ fontSize:17, color:s.col }} />
+              </div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:12, fontWeight:700, color:'#1e293b' }}>{s.label}</div>
+                <div style={{ fontSize:11, color:'#94a3b8', marginTop:1 }}>
+                  {mainCount != null ? `${mainCount.toLocaleString('fr-BE')} ${s.tables[0]}` : '—'}
+                  {s.key==='import' && counts['contrats'] != null && ` · ${counts['contrats'].toLocaleString('fr-BE')} contrats`}
+                </div>
+              </div>
+              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                {st === 'ok'    && <i className="ti ti-circle-check" style={{ color:'#16a34a', fontSize:16 }} />}
+                {st === 'error' && <i className="ti ti-alert-circle" style={{ color:'#dc2626', fontSize:16 }} />}
+                <button onClick={() => trigger(s.key, s.wh)} disabled={running}
+                  style={{ display:'flex', alignItems:'center', gap:5, background:running?'#f1f5f9':s.col, color:running?'#94a3b8':'#fff', border:'none', borderRadius:7, padding:'6px 12px', cursor:running?'wait':'pointer', fontSize:12, fontWeight:700, transition:'background 0.15s' }}>
+                  <i className={`ti ${running?'ti-loader-2':'ti-refresh'}`} style={running?{animation:'spin 1s linear infinite'}:{}} />
+                  {running ? '…' : 'Sync'}
+                </button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ══════════════════════════
 // BLOC 4 — Production Dynassur (entièrement cliquable)
 // ══════════════════════════
 function BlocProduction({ loading: loadingExt }) {
@@ -721,6 +829,12 @@ export default function DashboardGroupe() {
     load()
   }, [])
 
+  const [nbObjectifs, setNbObjectifs] = useState(null)
+  useEffect(() => {
+    supabase.from('objectives_global').select('*', { count:'exact', head:true })
+      .then(({ count }) => setNbObjectifs(count || 0))
+  }, [])
+
   const now = new Date()
   const nbRetard  = taches.filter(t => t.echeance && new Date(t.echeance) < now).length
   const nbEnCours = taches.filter(t => t.statut==='en_cours').length
@@ -756,8 +870,8 @@ export default function DashboardGroupe() {
             onClick={() => navigate('/dynassur')}
           />
           <KpiCard
-            label="Objectifs 2026" value="configurés" col="#0080BD" icon="ti-target"
-            sub="Dynassur — voir détail"
+            label="Objectifs 2026" value={nbObjectifs != null ? nbObjectifs : '…'} col="#0080BD" icon="ti-target"
+            sub={nbObjectifs ? `${nbObjectifs} objectif${nbObjectifs>1?'s':''} configuré${nbObjectifs>1?'s':''}` : 'Aucun objectif — configurer'}
             onClick={() => navigate('/dynassur/objectifs')}
           />
         </div>
@@ -770,7 +884,7 @@ export default function DashboardGroupe() {
 
         {/* Grille secondaire */}
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20 }}>
-          <BlocTresorerie comptes={comptes} transactions={transactions} loading={loading} />
+          <BlocSync />
           <BlocProduction />
         </div>
 
