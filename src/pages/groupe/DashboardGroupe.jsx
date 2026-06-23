@@ -101,8 +101,22 @@ function VoirTout({ label, to, col }) {
 // ══════════════════════════
 // BLOC 1 — Comptes bancaires
 // ══════════════════════════
+// ── Header de bloc — fond noir, texte blanc ──
+function BlocHeader({ icon, title, right }) {
+  return (
+    <div style={{ background:'#0f172a', padding:'11px 18px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+        {icon && <i className={`ti ${icon}`} style={{ fontSize:15, color:'rgba(255,255,255,0.7)' }} />}
+        <span style={{ fontSize:13, fontWeight:700, color:'#fff', textTransform:'uppercase', letterSpacing:'.06em' }}>{title}</span>
+      </div>
+      {right && <div>{right}</div>}
+    </div>
+  )
+}
+
 function BlocBanque({ comptes, loading }) {
   const navigate = useNavigate()
+  const [open, setOpen] = useState({})
   const [revealed, setRevealed] = useState({})
 
   const SOC_COLOR = { DYNASSUR:'#0080BD', DTX:'#94a3b8', LODE:'#ea580c', HEXAGROUP:'#dc2626', PRIVE:'#0d9488' }
@@ -123,25 +137,19 @@ function BlocBanque({ comptes, loading }) {
 
   return (
     <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
-      {/* Header */}
-      <div style={{ padding:'14px 18px', borderBottom:'1px solid #f1f5f9', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-          <i className="ti ti-credit-card" style={{ fontSize:16, color:'#7c3aed' }} />
-          <span style={{ fontSize:13, fontWeight:700, color:'#0f172a' }}>Comptes bancaires</span>
-          <span style={{ fontSize:11, background:'#f1f5f9', color:'#64748b', padding:'2px 7px', borderRadius:10, fontWeight:600 }}>{comptes.length} comptes</span>
-        </div>
-        {comptes.length > 0 && (
+      <BlocHeader icon="ti-credit-card" title="Comptes bancaires"
+        right={comptes.length > 0 && (
           <button onClick={() => {
             const next = !allRevealed
             const all = { '__total__': next }
             comptes.forEach(c => { all[c.id] = next })
             Object.keys(parSociete).forEach(code => { all[`soc_${code}`] = next })
             setRevealed(all)
-          }} style={{ fontSize:11, color:'#7c3aed', background:'#f5f3ff', border:'1px solid #ede9fe', borderRadius:6, padding:'4px 10px', cursor:'pointer', fontWeight:600 }}>
+          }} style={{ fontSize:11, color:'rgba(255,255,255,0.8)', background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.2)', borderRadius:6, padding:'4px 10px', cursor:'pointer', fontWeight:600 }}>
             {allRevealed ? '🔒 Tout masquer' : '👁 Tout révéler'}
           </button>
         )}
-      </div>
+      />
 
       {loading ? (
         <div style={{ padding:30, textAlign:'center', color:'#94a3b8' }}>Chargement…</div>
@@ -151,52 +159,68 @@ function BlocBanque({ comptes, loading }) {
           Aucun compte — synchronisation Ponto requise
         </div>
       ) : (
-        <div style={{ padding:16 }}>
-          {/* Cartes par compte — grille responsive */}
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:12, marginBottom:16 }}>
-            {comptes.map(c => {
-              const code = (c.societes?.code || 'AUTRE').toUpperCase()
-              const color = SOC_COLOR[code] || '#94a3b8'
-              const socNom = c.societes?.nom || code
-              const bal = parseFloat(c.solde_actuel || 0)
-              const show = revealed[c.id]
+        <div>
+          {/* Blocs par société */}
+          <div style={{ padding:16, display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px, 1fr))', gap:12 }}>
+            {Object.entries(parSociete).map(([code, soc]) => {
+              const isOpen = open[code]
+              const socRevealed = revealed[`soc_${code}`]
               const route = SOC_ROUTES[code]
               return (
-                <div key={c.id} style={{ background:'#f8fafc', borderRadius:10, border:`1px solid #e2e8f0`, borderTop:`3px solid ${color}`, padding:'12px 14px' }}>
-                  {/* Société */}
-                  <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:8 }}>
-                    <div style={{ width:8, height:8, borderRadius:'50%', background:color, flexShrink:0 }} />
-                    <span onClick={() => route && navigate(route)}
-                      style={{ fontSize:11, fontWeight:700, color, cursor:route?'pointer':'default', textTransform:'uppercase', letterSpacing:'.04em' }}>
-                      {socNom}
+                <div key={code} style={{ border:`1px solid #e2e8f0`, borderTop:`3px solid ${soc.color}`, borderRadius:10, overflow:'hidden', background:'#fff' }}>
+                  {/* En-tête société */}
+                  <div style={{ padding:'10px 14px', display:'flex', alignItems:'center', gap:8, cursor:'pointer', background:isOpen?soc.color+'08':'#fff' }}
+                    onClick={() => setOpen(o => ({ ...o, [code]: !o[code] }))}>
+                    <div style={{ width:9, height:9, borderRadius:'50%', background:soc.color, flexShrink:0 }} />
+                    <span onClick={e => { e.stopPropagation(); route && navigate(route) }}
+                      style={{ fontSize:13, fontWeight:700, color:'#1e293b', flex:1, cursor:route?'pointer':'default' }}>
+                      {soc.nom}
                     </span>
-                  </div>
-                  {/* Banque */}
-                  <div style={{ fontSize:13, fontWeight:600, color:'#1e293b', marginBottom:3 }}>{c.banque}</div>
-                  <div style={{ fontSize:10, color:'#94a3b8', fontFamily:'monospace', marginBottom:10 }}>
-                    {c.iban ? `${c.iban.slice(0,4)} •• ${c.iban.slice(-4)}` : 'Compte courant'}
-                    {!c.ponto_account_id && <span style={{ marginLeft:5, background:'#fef3c7', color:'#92400e', padding:'1px 4px', borderRadius:3, fontSize:9, fontWeight:700 }}>Non Ponto</span>}
-                  </div>
-                  {/* Solde + œil */}
-                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                    <span style={{ fontSize:16, fontWeight:800, color: show?(bal<0?'#dc2626':color):'#cbd5e1', letterSpacing:show?'.01em':'.1em' }}>
-                      {show ? fmt(bal) : '● ● ●'}
+                    <span style={{ fontSize:11, color:'#94a3b8' }}>{soc.comptes.length} cpt{soc.comptes.length>1?'s':''}</span>
+                    <span style={{ fontSize:14, fontWeight:800, color:socRevealed?(soc.total<0?'#dc2626':soc.color):'#cbd5e1', letterSpacing:socRevealed?'.01em':'.1em', marginRight:4 }}>
+                      {socRevealed ? fmt(soc.total) : '● ● ●'}
                     </span>
-                    <button onClick={() => setRevealed(r => ({ ...r, [c.id]: !r[c.id] }))}
-                      style={{ background:show?'#f0fdf4':'#fff', border:`1px solid ${show?'#bbf7d0':'#e2e8f0'}`, borderRadius:6, padding:'4px 7px', cursor:'pointer', color:show?'#16a34a':'#94a3b8', fontSize:12 }}>
-                      <i className={`ti ${show?'ti-eye-off':'ti-eye'}`} />
+                    <button onClick={e => { e.stopPropagation(); setRevealed(r => ({ ...r, [`soc_${code}`]: !r[`soc_${code}`] })) }}
+                      style={{ background:socRevealed?'#f0fdf4':'#f8fafc', border:`1px solid ${socRevealed?'#bbf7d0':'#e2e8f0'}`, borderRadius:5, padding:'3px 6px', cursor:'pointer', color:socRevealed?'#16a34a':'#94a3b8', fontSize:12 }}>
+                      <i className={`ti ${socRevealed?'ti-eye-off':'ti-eye'}`} />
                     </button>
+                    <i className={`ti ti-chevron-down`} style={{ fontSize:11, color:'#94a3b8', transform:isOpen?'rotate(180deg)':'none', transition:'transform 0.2s' }} />
                   </div>
+                  {/* Comptes individuels */}
+                  {isOpen && (
+                    <div style={{ borderTop:`1px solid ${soc.color}20`, background:'#fafafe' }}>
+                      {soc.comptes.map((c, i) => {
+                        const show = revealed[c.id]
+                        const bal = parseFloat(c.solde_actuel || 0)
+                        return (
+                          <div key={c.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 14px', borderBottom:i<soc.comptes.length-1?'1px solid #f1f5f9':'none' }}>
+                            <div style={{ flex:1 }}>
+                              <div style={{ fontSize:12, fontWeight:500, color:'#374151' }}>{c.banque}</div>
+                              <div style={{ fontSize:10, color:'#94a3b8', fontFamily:'monospace' }}>
+                                {c.iban ? `${c.iban.slice(0,4)} •• ${c.iban.slice(-4)}` : '—'}
+                              </div>
+                            </div>
+                            <span style={{ fontSize:13, fontWeight:700, color:show?(bal<0?'#dc2626':soc.color):'#cbd5e1', letterSpacing:show?'.01em':'.1em' }}>
+                              {show ? fmt(bal) : '● ●'}
+                            </span>
+                            <button onClick={() => setRevealed(r => ({ ...r, [c.id]: !r[c.id] }))}
+                              style={{ background:show?'#f0fdf4':'#fff', border:`1px solid ${show?'#bbf7d0':'#e2e8f0'}`, borderRadius:5, padding:'3px 6px', cursor:'pointer', color:show?'#16a34a':'#94a3b8', fontSize:11 }}>
+                              <i className={`ti ${show?'ti-eye-off':'ti-eye'}`} />
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               )
             })}
           </div>
-
           {/* Total groupe */}
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 16px', background:'#0f172a', borderRadius:9 }}>
+          <div style={{ margin:'0 16px 16px', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 16px', background:'#0f172a', borderRadius:9 }}>
             <span style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,0.45)', textTransform:'uppercase', letterSpacing:'.05em' }}>Total Groupe</span>
             <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-              <span style={{ fontSize:16, fontWeight:800, color: revealed['__total__']?(totalGroupe<0?'#f87171':'#86efac'):'#374151' }}>
+              <span style={{ fontSize:16, fontWeight:800, color:revealed['__total__']?(totalGroupe<0?'#f87171':'#86efac'):'#374151' }}>
                 {revealed['__total__'] ? fmt(totalGroupe) : '● ● ● ● ●'}
               </span>
               <button onClick={() => setRevealed(r => ({ ...r, '__total__': !r['__total__'] }))}
@@ -206,15 +230,11 @@ function BlocBanque({ comptes, loading }) {
             </div>
           </div>
         </div>
-      )}
     </div>
   )
 }
 
 
-// ══════════════════════════
-// BLOC 2 — Tâches en cours
-// ══════════════════════════
 function BlocTaches({ taches, bordereaux, loading }) {
   const navigate = useNavigate()
   const now = new Date()
@@ -232,72 +252,9 @@ function BlocTaches({ taches, bordereaux, loading }) {
 
   return (
     <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
-      <div style={{ padding:'14px 18px', borderBottom:'1px solid #f1f5f9', display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-        <i className="ti ti-checkbox" style={{ fontSize:16, color:'#f59e0b' }} />
-        <span style={{ fontSize:13, fontWeight:700, color:'#0f172a' }}>Tâches & Alertes</span>
-        <span style={{ fontSize:11, background:'#fef3c7', color:'#92400e', padding:'2px 7px', borderRadius:10, fontWeight:700 }}>
-          {taches.filter(t=>t.echeance&&new Date(t.echeance)<now).length} en retard
-        </span>
-        <span style={{ fontSize:11, background:'#f1f5f9', color:'#64748b', padding:'2px 7px', borderRadius:10, fontWeight:600 }}>
-          {taches.length} tâches
-        </span>
-        {bordereaux.length > 0 && (
-          <span style={{ fontSize:11, background:'#fee2e2', color:'#dc2626', padding:'2px 7px', borderRadius:10, fontWeight:700 }}>
-            {bordereaux.length} bordereau{bordereaux.length>1?'x':''} ⚠
-          </span>
-        )}
-        {/* Lien "Voir toutes" aligné à droite */}
-        <div style={{ marginLeft:'auto' }}>
-          <VoirTout label="Toutes les tâches" to="/dynassur/taches" col="#f59e0b" />
-        </div>
-      </div>
-
-      {/* Section bordereaux manquants — cliquable */}
-      {!loading && bordereaux.length > 0 && (
-        <div
-          onClick={() => navigate('/dynassur/bordereaux')}
-          style={{ background:'#fff5f5', borderBottom:'2px solid #fecaca', cursor:'pointer', transition:'background 0.15s' }}
-          onMouseEnter={e => e.currentTarget.style.background='#fee2e2'}
-          onMouseLeave={e => e.currentTarget.style.background='#fff5f5'}
-          title="Ouvrir le module Bordereaux"
-        >
-          <div style={{ padding:'8px 18px 4px', fontSize:10, fontWeight:700, color:'#dc2626', textTransform:'uppercase', letterSpacing:'.05em', display:'flex', alignItems:'center', gap:6 }}>
-            <i className="ti ti-alert-triangle" style={{ fontSize:13 }} />
-            Bordereaux non réconciliés — cliquer pour voir
-            <i className="ti ti-arrow-right" style={{ fontSize:11, marginLeft:'auto' }} />
-          </div>
-          <div style={{ maxHeight:160, overflowY:'auto' }}>
-            {bordereaux.slice(0,10).map((b,i) => {
-              const STATUT = {
-                fichier_ok_non_encaisse:  { label:'Fichier OK — non encaissé', col:'#f59e0b', bg:'#fef3c7' },
-                fichier_sans_chiffres:    { label:'Fichier sans chiffres',      col:'#ea580c', bg:'#fff7ed' },
-                commission_sans_fichier:  { label:'Commission sans fichier',    col:'#7c3aed', bg:'#f5f3ff' },
-                manquant:                 { label:'Manquant',                   col:'#dc2626', bg:'#fee2e2' },
-              }
-              const s = STATUT[b.statut_reconciliation] || STATUT.manquant
-              return (
-                <div key={i} style={{ display:'grid', gridTemplateColumns:'auto 1fr auto auto', alignItems:'center', gap:8,
-                  padding:'7px 18px', borderBottom: i<Math.min(bordereaux.length,10)-1?'1px solid #fee2e2':'none', background: i%2===0?'#fff5f5':'#fff8f8' }}>
-                  <span style={{ fontSize:10, fontWeight:700, padding:'2px 5px', borderRadius:3, background:'#0080BD18', color:'#0080BD' }}>{b.type||'RCP'}</span>
-                  <div>
-                    <span style={{ fontSize:12, fontWeight:600, color:'#1e293b' }}>{b.compagnie||'—'}</span>
-                    <span style={{ fontSize:11, color:'#94a3b8', marginLeft:8 }}>{b.mois}/{b.annee}</span>
-                  </div>
-                  <span style={{ fontSize:10, fontWeight:700, padding:'2px 6px', borderRadius:4, background:s.bg, color:s.col, whiteSpace:'nowrap' }}>
-                    {s.label}
-                  </span>
-                </div>
-              )
-            })}
-            {bordereaux.length > 10 && (
-              <div style={{ padding:'6px 18px', fontSize:11, color:'#dc2626', fontWeight:600 }}>
-                + {bordereaux.length - 10} autres bordereaux non réconciliés
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
+      <BlocHeader icon="ti-checkbox" title="Tâches &amp; Alertes"
+        right={<VoirTout label="Toutes les tâches" to="/dynassur/taches" col="rgba(255,255,255,0.7)" />}
+      />
       {loading ? (
         <div style={{ padding:30, textAlign:'center', color:'#94a3b8' }}>Chargement…</div>
       ) : taches.length === 0 ? (
@@ -487,14 +444,25 @@ function BlocTresorerie({ comptes, transactions, loading }) {
 // BLOC SYNC — cartes complètes du centre de synchro
 // ══════════════════════════
 function BlocSync() {
+  const [syncingAll, setSyncingAll] = useState(false)
+
+  const syncAll = async () => {
+    setSyncingAll(true)
+    await Promise.all(SYNCS.map(s => triggerWorkflow(s.webhook, s.workflowId)))
+    setSyncingAll(false)
+  }
+
   return (
     <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
-      <div style={{ padding:'14px 18px', borderBottom:'1px solid #f1f5f9' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-          <i className="ti ti-refresh" style={{ fontSize:16, color:'#7c3aed' }} />
-          <span style={{ fontSize:13, fontWeight:700, color:'#0f172a' }}>Synchronisations</span>
-        </div>
-      </div>
+      <BlocHeader icon="ti-refresh" title="Synchronisations"
+        right={
+          <button onClick={syncAll} disabled={syncingAll}
+            style={{ display:'flex', alignItems:'center', gap:6, background:syncingAll?'rgba(255,255,255,0.1)':'rgba(255,255,255,0.15)', color:'#fff', border:'1px solid rgba(255,255,255,0.25)', borderRadius:7, padding:'6px 14px', cursor:syncingAll?'wait':'pointer', fontSize:12, fontWeight:700, transition:'background 0.15s' }}>
+            <i className={`ti ${syncingAll?'ti-loader-2':'ti-refresh'}`} style={syncingAll?{animation:'spin 1s linear infinite'}:{}} />
+            {syncingAll ? 'En cours…' : 'Tout synchroniser'}
+          </button>
+        }
+      />
       <div style={{ padding:14 }}>
         <WebhookStatus />
         <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:12 }}>
@@ -555,32 +523,12 @@ function BlocProduction({ loading: loadingExt }) {
     <div
       style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}
     >
-      {/* Header — clic → production */}
-      <div
-        onClick={() => navigate('/dynassur/production')}
-        style={{
-          padding:'14px 18px', borderBottom:'1px solid #f1f5f9',
-          display:'flex', alignItems:'center', justifyContent:'space-between',
-          cursor:'pointer', transition:'background 0.15s',
-        }}
-        onMouseEnter={e => e.currentTarget.style.background='#eff6ff'}
-        onMouseLeave={e => e.currentTarget.style.background=''}
-        title="Aller vers la production Dynassur"
-      >
-        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-          <i className="ti ti-chart-line" style={{ fontSize:16, color:'#0080BD' }} />
-          <span style={{ fontSize:13, fontWeight:700, color:'#0f172a' }}>Production {annee}</span>
-          <i className="ti ti-arrow-up-right" style={{ fontSize:11, color:'#0080BD', opacity:0.6 }} />
-        </div>
-        <span style={{ fontSize:11, background:'#e0f2fe', color:'#0080BD', padding:'2px 8px', borderRadius:10, fontWeight:700 }}>DYNASSUR</span>
-      </div>
-
-      {loading ? (
-        <div style={{ padding:30, textAlign:'center', color:'#94a3b8' }}>Chargement…</div>
-      ) : (
-        <div style={{ padding:16 }}>
-
-          {/* Solde net + NA ce mois — cliquables */}
+      {/* Header */}
+      <BlocHeader icon="ti-chart-line" title="Production 2026"
+        right={<span style={{ fontSize:11, fontWeight:700, color:'#0080BD', background:'#eff6ff', padding:'3px 10px', borderRadius:6, cursor:'pointer' }}
+          onClick={() => navigate('/dynassur/production')}>DYNASSUR →</span>}
+      />
+      {/* Solde net + NA ce mois — cliquables */}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:16 }}>
             <div
               onClick={() => navigate('/dynassur/production')}
@@ -721,9 +669,7 @@ export default function DashboardGroupe() {
           color={ENTITES.groupe.color} colorDark={ENTITES.groupe.colorDark}
           title="Tableau de bord général"
           subtitle="Vue consolidée — Groupe DTX · Dynassur · LODE · Hexagroup · Privé"
-          action={<PrimaryButton color={ENTITES.groupe.color} onClick={() => navigate('/admin/sync')}>
-            <i className="ti ti-refresh" /> Synchroniser
-          </PrimaryButton>}
+
         />
 
         {/* 1 — Synchronisations tout en haut */}
