@@ -103,7 +103,6 @@ function VoirTout({ label, to, col }) {
 // ══════════════════════════
 function BlocBanque({ comptes, loading }) {
   const navigate = useNavigate()
-  const [open, setOpen] = useState({})
   const [revealed, setRevealed] = useState({})
 
   const SOC_COLOR = { DYNASSUR:'#0080BD', DTX:'#94a3b8', LODE:'#ea580c', HEXAGROUP:'#dc2626', PRIVE:'#0d9488' }
@@ -138,8 +137,7 @@ function BlocBanque({ comptes, loading }) {
             comptes.forEach(c => { all[c.id] = next })
             Object.keys(parSociete).forEach(code => { all[`soc_${code}`] = next })
             setRevealed(all)
-          }}
-            style={{ fontSize:11, color:'#7c3aed', background:'#f5f3ff', border:'1px solid #ede9fe', borderRadius:6, padding:'4px 10px', cursor:'pointer', fontWeight:600 }}>
+          }} style={{ fontSize:11, color:'#7c3aed', background:'#f5f3ff', border:'1px solid #ede9fe', borderRadius:6, padding:'4px 10px', cursor:'pointer', fontWeight:600 }}>
             {allRevealed ? '🔒 Tout masquer' : '👁 Tout révéler'}
           </button>
         )}
@@ -153,105 +151,49 @@ function BlocBanque({ comptes, loading }) {
           Aucun compte — synchronisation Ponto requise
         </div>
       ) : (
-        <div>
-          {Object.entries(parSociete).map(([code, soc]) => {
-            const isOpen = open[code]
-            const socRevealed = revealed[`soc_${code}`]
-            const route = SOC_ROUTES[code]
-            return (
-              <div key={code} style={{ borderBottom:'1px solid #f1f5f9' }}>
-
-                {/* Ligne société — cliquable → dashboard société */}
-                <div style={{
-                  display:'flex', alignItems:'center', padding:'11px 18px', gap:10,
-                  background: isOpen ? soc.color+'08' : '#fff',
-                  transition:'background 0.15s'
-                }}>
-                  {/* Pastille + nom cliquable */}
-                  <div style={{ width:10, height:10, borderRadius:'50%', background:soc.color, flexShrink:0 }} />
-                  <span
-                    onClick={() => route && navigate(route)}
-                    title={route ? `Aller vers ${soc.nom}` : ''}
-                    style={{
-                      fontSize:13, fontWeight:700, color:'#1e293b', flex:1,
-                      cursor: route ? 'pointer' : 'default',
-                      textDecoration: 'none',
-                      display:'flex', alignItems:'center', gap:5,
-                    }}
-                    onMouseEnter={e => { if(route) { e.target.style.color = soc.color; e.target.style.textDecoration='underline' } }}
-                    onMouseLeave={e => { e.target.style.color = '#1e293b'; e.target.style.textDecoration='none' }}
-                  >
-                    {soc.nom || code}
-                    {route && <i className="ti ti-arrow-up-right" style={{ fontSize:11, opacity:0.5 }} />}
-                  </span>
-                  <span style={{ fontSize:11, color:'#94a3b8' }}>{soc.comptes.length} compte{soc.comptes.length>1?'s':''}</span>
-
-                  {/* Montant global */}
-                  <span style={{
-                    fontSize:15, fontWeight:800, minWidth:100, textAlign:'right',
-                    color: socRevealed ? (soc.total<0?'#dc2626':soc.color) : '#cbd5e1',
-                    letterSpacing: socRevealed?'.01em':'.1em'
-                  }}>
-                    {socRevealed ? fmt(soc.total) : '● ● ● ●'}
-                  </span>
-
-                  {/* Bouton œil */}
-                  <button onClick={() => setRevealed(r => ({ ...r, [`soc_${code}`]: !r[`soc_${code}`] }))}
-                    title={socRevealed?'Masquer':'Révéler'}
-                    style={{ background:socRevealed?'#f0fdf4':'#f8fafc', border:`1px solid ${socRevealed?'#bbf7d0':'#e2e8f0'}`,
-                      borderRadius:6, padding:'4px 7px', cursor:'pointer', color:socRevealed?'#16a34a':'#94a3b8', fontSize:13, transition:'all 0.15s' }}>
-                    <i className={`ti ${socRevealed?'ti-eye-off':'ti-eye'}`} />
-                  </button>
-
-                  {/* Flèche déroulant */}
-                  <button onClick={() => setOpen(o => ({ ...o, [code]: !o[code] }))}
-                    style={{ background:'transparent', border:'none', cursor:'pointer', color:'#94a3b8', padding:'4px 6px', fontSize:13, transition:'transform 0.2s',
-                      transform: isOpen?'rotate(180deg)':'rotate(0deg)' }}>
-                    <i className="ti ti-chevron-down" />
-                  </button>
-                </div>
-
-                {/* Détail comptes */}
-                {isOpen && (
-                  <div style={{ background:'#fafafe', borderTop:`1px solid ${soc.color}20` }}>
-                    {soc.comptes.map((c, i) => {
-                      const show = revealed[c.id]
-                      const bal = parseFloat(c.solde_actuel || 0)
-                      return (
-                        <div key={c.id} style={{
-                          display:'grid', gridTemplateColumns:'1fr auto auto',
-                          alignItems:'center', gap:12,
-                          padding:'9px 18px 9px 36px',
-                          borderBottom: i<soc.comptes.length-1?'1px solid #f1f5f9':'none'
-                        }}>
-                          <div>
-                            <div style={{ fontSize:13, fontWeight:500, color:'#374151' }}>{c.banque}</div>
-                            <div style={{ fontSize:11, color:'#94a3b8', fontFamily:'monospace' }}>
-                              {c.iban ? `${c.iban.slice(0,4)} •• ${c.iban.slice(-4)}` : 'Compte courant'}
-                              {!c.ponto_account_id && <span style={{ marginLeft:6, background:'#fef3c7', color:'#92400e', padding:'1px 4px', borderRadius:3, fontSize:9, fontWeight:700 }}>Non Ponto</span>}
-                            </div>
-                          </div>
-                          <span style={{ fontSize:14, fontWeight:700, minWidth:100, textAlign:'right',
-                            color: show?(bal<0?'#dc2626':soc.color):'#cbd5e1',
-                            letterSpacing: show?'.01em':'.1em' }}>
-                            {show ? fmt(bal) : '● ● ●'}
-                          </span>
-                          <button onClick={() => setRevealed(r => ({ ...r, [c.id]: !r[c.id] }))}
-                            style={{ background:show?'#f0fdf4':'#f8fafc', border:`1px solid ${show?'#bbf7d0':'#e2e8f0'}`,
-                              borderRadius:6, padding:'4px 7px', cursor:'pointer', color:show?'#16a34a':'#94a3b8', fontSize:13 }}>
-                            <i className={`ti ${show?'ti-eye-off':'ti-eye'}`} />
-                          </button>
-                        </div>
-                      )
-                    })}
+        <div style={{ padding:16 }}>
+          {/* Cartes par compte — grille responsive */}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:12, marginBottom:16 }}>
+            {comptes.map(c => {
+              const code = (c.societes?.code || 'AUTRE').toUpperCase()
+              const color = SOC_COLOR[code] || '#94a3b8'
+              const socNom = c.societes?.nom || code
+              const bal = parseFloat(c.solde_actuel || 0)
+              const show = revealed[c.id]
+              const route = SOC_ROUTES[code]
+              return (
+                <div key={c.id} style={{ background:'#f8fafc', borderRadius:10, border:`1px solid #e2e8f0`, borderTop:`3px solid ${color}`, padding:'12px 14px' }}>
+                  {/* Société */}
+                  <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:8 }}>
+                    <div style={{ width:8, height:8, borderRadius:'50%', background:color, flexShrink:0 }} />
+                    <span onClick={() => route && navigate(route)}
+                      style={{ fontSize:11, fontWeight:700, color, cursor:route?'pointer':'default', textTransform:'uppercase', letterSpacing:'.04em' }}>
+                      {socNom}
+                    </span>
                   </div>
-                )}
-              </div>
-            )
-          })}
+                  {/* Banque */}
+                  <div style={{ fontSize:13, fontWeight:600, color:'#1e293b', marginBottom:3 }}>{c.banque}</div>
+                  <div style={{ fontSize:10, color:'#94a3b8', fontFamily:'monospace', marginBottom:10 }}>
+                    {c.iban ? `${c.iban.slice(0,4)} •• ${c.iban.slice(-4)}` : 'Compte courant'}
+                    {!c.ponto_account_id && <span style={{ marginLeft:5, background:'#fef3c7', color:'#92400e', padding:'1px 4px', borderRadius:3, fontSize:9, fontWeight:700 }}>Non Ponto</span>}
+                  </div>
+                  {/* Solde + œil */}
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                    <span style={{ fontSize:16, fontWeight:800, color: show?(bal<0?'#dc2626':color):'#cbd5e1', letterSpacing:show?'.01em':'.1em' }}>
+                      {show ? fmt(bal) : '● ● ●'}
+                    </span>
+                    <button onClick={() => setRevealed(r => ({ ...r, [c.id]: !r[c.id] }))}
+                      style={{ background:show?'#f0fdf4':'#fff', border:`1px solid ${show?'#bbf7d0':'#e2e8f0'}`, borderRadius:6, padding:'4px 7px', cursor:'pointer', color:show?'#16a34a':'#94a3b8', fontSize:12 }}>
+                      <i className={`ti ${show?'ti-eye-off':'ti-eye'}`} />
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
 
           {/* Total groupe */}
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 18px', background:'#0f172a' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 16px', background:'#0f172a', borderRadius:9 }}>
             <span style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,0.45)', textTransform:'uppercase', letterSpacing:'.05em' }}>Total Groupe</span>
             <div style={{ display:'flex', alignItems:'center', gap:10 }}>
               <span style={{ fontSize:16, fontWeight:800, color: revealed['__total__']?(totalGroupe<0?'#f87171':'#86efac'):'#374151' }}>
@@ -268,6 +210,7 @@ function BlocBanque({ comptes, loading }) {
     </div>
   )
 }
+
 
 // ══════════════════════════
 // BLOC 2 — Tâches en cours
@@ -771,6 +714,7 @@ export default function DashboardGroupe() {
 
   return (
     <Layout currentPage="Tableau de bord général">
+      <style>{`@keyframes spin { to { transform:rotate(360deg) } }`}</style>
       <div style={{ fontFamily:"'Source Sans Pro', sans-serif", width:'100%' }}>
 
         <StatBanner
@@ -782,45 +726,31 @@ export default function DashboardGroupe() {
           </PrimaryButton>}
         />
 
-        {/* Synchronisations — pleine largeur, 3 cartes sur une ligne */}
-        <div style={{ marginBottom:28 }}>
+        {/* 1 — Synchronisations tout en haut */}
+        <div style={{ marginBottom:24 }}>
           <BlocSync />
         </div>
 
-        {/* KPIs rapides — tous cliquables */}
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:14, marginBottom:28 }}>
-          <KpiCard
-            label="Tâches en cours" value={nbEnCours} col="#f59e0b" icon="ti-checkbox"
-            sub={`dont ${nbRetard} en retard`}
-            onClick={() => navigate('/dynassur/taches')}
-          />
-          <KpiCard
-            label="Tâches en retard" value={nbRetard} col={nbRetard>0?"#dc2626":"#16a34a"} icon="ti-alert-triangle"
-            sub={nbRetard>0?'⚠ action requise':'✓ aucun retard'}
-            onClick={() => navigate('/dynassur/taches')}
-          />
-          <KpiCard
-            label="Comptes connectés" value={comptes.length} col="#7c3aed" icon="ti-credit-card"
-            sub="via Ponto / ING"
-            onClick={() => navigate('/dynassur')}
-          />
-          <KpiCard
-            label="Objectifs 2026" value={nbObjectifs != null ? nbObjectifs : '…'} col="#0080BD" icon="ti-target"
-            sub={nbObjectifs ? `${nbObjectifs} objectif${nbObjectifs>1?'s':''} configuré${nbObjectifs>1?'s':''}` : 'Aucun objectif — configurer'}
-            onClick={() => navigate('/dynassur/objectifs')}
-          />
+        {/* 2 — KPIs */}
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:24 }}>
+          <KpiCard label="Tâches en cours"   value={nbEnCours} col="#f59e0b" icon="ti-checkbox"       sub={`dont ${nbRetard} en retard`}             onClick={() => navigate('/dynassur/taches')} />
+          <KpiCard label="Tâches en retard"  value={nbRetard}  col={nbRetard>0?"#dc2626":"#16a34a"} icon="ti-alert-triangle" sub={nbRetard>0?'⚠ action requise':'✓ aucun retard'} onClick={() => navigate('/dynassur/taches')} />
+          <KpiCard label="Comptes connectés" value={comptes.length} col="#7c3aed" icon="ti-credit-card" sub="via Ponto / ING" onClick={() => navigate('/dynassur')} />
+          <KpiCard label="Objectifs 2026"    value={nbObjectifs != null ? nbObjectifs : '…'} col="#0080BD" icon="ti-target" sub={nbObjectifs ? `${nbObjectifs} objectif${nbObjectifs>1?'s':''} configuré${nbObjectifs>1?'s':''}` : 'Aucun objectif — configurer'} onClick={() => navigate('/dynassur/objectifs')} />
         </div>
 
-        {/* Grille principale */}
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginBottom:20 }}>
+        {/* 3 — Comptes bancaires pleine largeur */}
+        <div style={{ marginBottom:24 }}>
           <BlocBanque comptes={comptes} loading={loading} />
+        </div>
+
+        {/* 4 — Tâches pleine largeur */}
+        <div style={{ marginBottom:24 }}>
           <BlocTaches taches={taches} bordereaux={bordereaux} loading={loading} />
         </div>
 
-        {/* Grille secondaire — Production pleine largeur */}
-        <div>
-          <BlocProduction />
-        </div>
+        {/* 5 — Production */}
+        <BlocProduction />
 
       </div>
     </Layout>
