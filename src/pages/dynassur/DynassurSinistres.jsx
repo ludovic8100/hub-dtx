@@ -98,7 +98,7 @@ export default function DynassurSinistres() {
   const [gest, setGest] = useState('')
   const [annee, setAnnee] = useState('')
   const [q, setQ] = useState('')
-  const [sel, setSel] = useState(null)
+  const [detail, setDetail] = useState(null)
 
   async function charger() {
     setLoading(true)
@@ -205,7 +205,7 @@ export default function DynassurSinistres() {
                 {liste.slice(0, 600).map(s => {
                   const es = etatStyle(s.etat)
                   return (
-                    <tr key={s.pointeur_sinistre} onClick={() => setSel(s)} style={{ borderTop: '1px solid #f1f5f9', cursor: 'pointer' }}
+                    <tr key={s.pointeur_sinistre} onClick={() => setDetail(s)} style={{ borderTop: '1px solid #f1f5f9', cursor: 'pointer' }}
                       onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
                       <td style={{ padding: '9px 14px', fontWeight: 700, color: NAVY, whiteSpace: 'nowrap' }}>{s.reference_sinistre || '—'}</td>
                       <td style={{ padding: '9px 14px' }}>
@@ -232,7 +232,7 @@ export default function DynassurSinistres() {
         </div>
       )}
 
-      {sel && <SinistreDetail s={sel} onClose={() => setSel(null)} />}
+      {detail && <SinistreDetail s={detail} onClose={() => setDetail(null)} />}
     </Layout>
   )
 }
