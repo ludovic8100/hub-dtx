@@ -116,7 +116,6 @@ function BlocHeader({ icon, title, right }) {
 
 function BlocBanque({ comptes, loading }) {
   const navigate = useNavigate()
-  const [open, setOpen] = useState({})
   const [revealed, setRevealed] = useState({})
 
   const SOC_COLOR = { DYNASSUR:'#0080BD', DTX:'#94a3b8', LODE:'#ea580c', HEXAGROUP:'#dc2626', PRIVE:'#0d9488' }
@@ -159,65 +158,62 @@ function BlocBanque({ comptes, loading }) {
           Aucun compte — synchronisation Ponto requise
         </div>
       ) : (
-        <div>
-          {/* Blocs par société */}
-          <div style={{ padding:16, display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px, 1fr))', gap:12 }}>
+        <div style={{ padding:16 }}>
+          {/* Blocs société en grille pleine largeur — toujours développés */}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(280px, 1fr))', gap:12, marginBottom:14 }}>
             {Object.entries(parSociete).map(([code, soc]) => {
-              const isOpen = open[code]
               const socRevealed = revealed[`soc_${code}`]
               const route = SOC_ROUTES[code]
               return (
-                <div key={code} style={{ border:`1px solid #e2e8f0`, borderTop:`3px solid ${soc.color}`, borderRadius:10, overflow:'hidden', background:'#fff' }}>
+                <div key={code} style={{ border:`1px solid #e2e8f0`, borderTop:`3px solid ${soc.color}`, borderRadius:10, overflow:'hidden', background:'#f8fafc' }}>
                   {/* En-tête société */}
-                  <div style={{ padding:'10px 14px', display:'flex', alignItems:'center', gap:8, cursor:'pointer', background:isOpen?soc.color+'08':'#fff' }}
-                    onClick={() => setOpen(o => ({ ...o, [code]: !o[code] }))}>
+                  <div style={{ padding:'9px 14px', display:'flex', alignItems:'center', gap:8, background:'#fff', borderBottom:`1px solid ${soc.color}15` }}>
                     <div style={{ width:9, height:9, borderRadius:'50%', background:soc.color, flexShrink:0 }} />
-                    <span onClick={e => { e.stopPropagation(); route && navigate(route) }}
+                    <span onClick={() => route && navigate(route)}
                       style={{ fontSize:13, fontWeight:700, color:'#1e293b', flex:1, cursor:route?'pointer':'default' }}>
                       {soc.nom}
+                      {route && <i className="ti ti-arrow-up-right" style={{ fontSize:11, opacity:0.4, marginLeft:4 }} />}
                     </span>
-                    <span style={{ fontSize:11, color:'#94a3b8' }}>{soc.comptes.length} cpt{soc.comptes.length>1?'s':''}</span>
-                    <span style={{ fontSize:14, fontWeight:800, color:socRevealed?(soc.total<0?'#dc2626':soc.color):'#cbd5e1', letterSpacing:socRevealed?'.01em':'.1em', marginRight:4 }}>
+                    <span style={{ fontSize:14, fontWeight:800, color:socRevealed?(soc.total<0?'#dc2626':soc.color):'#cbd5e1', letterSpacing:socRevealed?'.01em':'.1em' }}>
                       {socRevealed ? fmt(soc.total) : '● ● ●'}
                     </span>
-                    <button onClick={e => { e.stopPropagation(); setRevealed(r => ({ ...r, [`soc_${code}`]: !r[`soc_${code}`] })) }}
+                    <button onClick={() => setRevealed(r => ({ ...r, [`soc_${code}`]: !r[`soc_${code}`] }))}
                       style={{ background:socRevealed?'#f0fdf4':'#f8fafc', border:`1px solid ${socRevealed?'#bbf7d0':'#e2e8f0'}`, borderRadius:5, padding:'3px 6px', cursor:'pointer', color:socRevealed?'#16a34a':'#94a3b8', fontSize:12 }}>
                       <i className={`ti ${socRevealed?'ti-eye-off':'ti-eye'}`} />
                     </button>
-                    <i className={`ti ti-chevron-down`} style={{ fontSize:11, color:'#94a3b8', transform:isOpen?'rotate(180deg)':'none', transition:'transform 0.2s' }} />
                   </div>
-                  {/* Comptes individuels */}
-                  {isOpen && (
-                    <div style={{ borderTop:`1px solid ${soc.color}20`, background:'#fafafe' }}>
-                      {soc.comptes.map((c, i) => {
-                        const show = revealed[c.id]
-                        const bal = parseFloat(c.solde_actuel || 0)
-                        return (
-                          <div key={c.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 14px', borderBottom:i<soc.comptes.length-1?'1px solid #f1f5f9':'none' }}>
-                            <div style={{ flex:1 }}>
-                              <div style={{ fontSize:12, fontWeight:500, color:'#374151' }}>{c.banque}</div>
-                              <div style={{ fontSize:10, color:'#94a3b8', fontFamily:'monospace' }}>
-                                {c.iban ? `${c.iban.slice(0,4)} •• ${c.iban.slice(-4)}` : '—'}
-                              </div>
+                  {/* Comptes — toujours visibles */}
+                  <div>
+                    {soc.comptes.map((c, i) => {
+                      const show = revealed[c.id]
+                      const bal = parseFloat(c.solde_actuel || 0)
+                      return (
+                        <div key={c.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 14px', borderBottom:i<soc.comptes.length-1?'1px solid #f1f5f9':'none' }}>
+                          <div style={{ flex:1 }}>
+                            <div style={{ fontSize:12, fontWeight:500, color:'#374151' }}>{c.banque}</div>
+                            <div style={{ fontSize:10, color:'#94a3b8', fontFamily:'monospace' }}>
+                              {c.iban ? `${c.iban.slice(0,4)} •• ${c.iban.slice(-4)}` : '—'}
+                              {!c.ponto_account_id && <span style={{ marginLeft:5, background:'#fef3c7', color:'#92400e', padding:'1px 4px', borderRadius:3, fontSize:9, fontWeight:700 }}>Non Ponto</span>}
                             </div>
-                            <span style={{ fontSize:13, fontWeight:700, color:show?(bal<0?'#dc2626':soc.color):'#cbd5e1', letterSpacing:show?'.01em':'.1em' }}>
-                              {show ? fmt(bal) : '● ●'}
-                            </span>
-                            <button onClick={() => setRevealed(r => ({ ...r, [c.id]: !r[c.id] }))}
-                              style={{ background:show?'#f0fdf4':'#fff', border:`1px solid ${show?'#bbf7d0':'#e2e8f0'}`, borderRadius:5, padding:'3px 6px', cursor:'pointer', color:show?'#16a34a':'#94a3b8', fontSize:11 }}>
-                              <i className={`ti ${show?'ti-eye-off':'ti-eye'}`} />
-                            </button>
                           </div>
-                        )
-                      })}
-                    </div>
-                  )}
+                          <span style={{ fontSize:13, fontWeight:700, color:show?(bal<0?'#dc2626':soc.color):'#cbd5e1', letterSpacing:show?'.01em':'.1em' }}>
+                            {show ? fmt(bal) : '● ●'}
+                          </span>
+                          <button onClick={() => setRevealed(r => ({ ...r, [c.id]: !r[c.id] }))}
+                            style={{ background:show?'#f0fdf4':'#fff', border:`1px solid ${show?'#bbf7d0':'#e2e8f0'}`, borderRadius:5, padding:'3px 6px', cursor:'pointer', color:show?'#16a34a':'#94a3b8', fontSize:11 }}>
+                            <i className={`ti ${show?'ti-eye-off':'ti-eye'}`} />
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
               )
             })}
           </div>
+
           {/* Total groupe */}
-          <div style={{ margin:'0 16px 16px', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 16px', background:'#0f172a', borderRadius:9 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 16px', background:'#0f172a', borderRadius:9 }}>
             <span style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,0.45)', textTransform:'uppercase', letterSpacing:'.05em' }}>Total Groupe</span>
             <div style={{ display:'flex', alignItems:'center', gap:10 }}>
               <span style={{ fontSize:16, fontWeight:800, color:revealed['__total__']?(totalGroupe<0?'#f87171':'#86efac'):'#374151' }}>
