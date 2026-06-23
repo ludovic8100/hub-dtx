@@ -252,7 +252,7 @@ function BlocTaches({ taches, bordereaux, loading }) {
 
   return (
     <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
-      <BlocHeader icon="ti-checkbox" title="Tâches &amp; Alertes"
+      <BlocHeader icon="ti-checkbox" title="Tâches & Alertes"
         right={<VoirTout label="Toutes les tâches" to="/dynassur/taches" col="rgba(255,255,255,0.7)" />}
       />
       {loading ? (
