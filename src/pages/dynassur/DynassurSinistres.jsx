@@ -27,6 +27,70 @@ function Kpi({ label, value, col, sub }) {
   )
 }
 
+function Field({ label, value, full }) {
+  const v = (value === null || value === undefined || value === '') ? '—' : value
+  return (
+    <div style={{ gridColumn: full ? '1 / -1' : 'auto' }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.04em' }}>{label}</div>
+      <div style={{ fontSize: 14, color: NAVY, marginTop: 2, lineHeight: 1.4 }}>{v}</div>
+    </div>
+  )
+}
+
+function MontantCard({ label, value, col }) {
+  return (
+    <div style={{ flex: '1 1 110px', background: col + '10', border: `1px solid ${col}30`, borderRadius: 8, padding: '8px 12px' }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: col, textTransform: 'uppercase', letterSpacing: '.04em' }}>{label}</div>
+      <div style={{ fontSize: 16, fontWeight: 800, color: NAVY, marginTop: 2 }}>{eur(value)}</div>
+    </div>
+  )
+}
+
+function SinistreDetail({ s, onClose }) {
+  const es = etatStyle(s.etat)
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '6vh 16px' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 680, maxHeight: '84vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+        <div style={{ padding: '18px 22px', borderBottom: '1px solid #f1f5f9', background: `linear-gradient(135deg, ${E.color}, ${E.colorDark})`, color: '#fff' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <div style={{ fontSize: 12, opacity: .85 }}>Sinistre</div>
+              <div style={{ fontSize: 22, fontWeight: 800 }}>{s.reference_sinistre || s.pointeur_sinistre}</div>
+              <div style={{ fontSize: 14, opacity: .9, marginTop: 2 }}>{s.sinistre_nom || '—'}</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 5, background: es.bg, color: es.fg }}>{es.label}</span>
+              <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', width: 30, height: 30, borderRadius: 8, cursor: 'pointer', fontSize: 16 }}>✕</button>
+            </div>
+          </div>
+        </div>
+        <div style={{ padding: 22, overflowY: 'auto' }}>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20 }}>
+            <MontantCard label="À payer" value={s.montant_a_payer} col="#0d9488" />
+            <MontantCard label="Payé" value={s.montant_paye} col="#7c3aed" />
+            {Number(s.montant_attente || 0) !== 0 && <MontantCard label="En attente" value={s.montant_attente} col="#ea580c" />}
+            {Number(s.montant_reserve || 0) !== 0 && <MontantCard label="Réserve" value={s.montant_reserve} col="#2563eb" />}
+            {Number(s.montant_recours || 0) !== 0 && <MontantCard label="Recours" value={s.montant_recours} col="#dc2626" />}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 16, rowGap: 14 }}>
+            <Field label="Date de survenance" value={fmtD(s.date_survenance)} />
+            <Field label="Date d'ouverture" value={fmtD(s.date_ouverture)} />
+            <Field label="Dernier état le" value={fmtD(s.date_etat)} />
+            <Field label="Domaine" value={s.domaine} />
+            <Field label="Garantie(s)" value={s.garantie} />
+            <Field label="Responsabilité" value={s.responsabilite} />
+            <Field label="Gestionnaire" value={s.gestionnaire} />
+            <Field label="Réf. producteur" value={s.reference_producteur} />
+            <Field label="Police (lien)" value={s.police_objet_lien} />
+            <Field label="Année" value={s.annee} />
+            <Field label="Description" value={s.description} full />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function DynassurSinistres() {
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
@@ -34,6 +98,7 @@ export default function DynassurSinistres() {
   const [gest, setGest] = useState('')
   const [annee, setAnnee] = useState('')
   const [q, setQ] = useState('')
+  const [sel, setSel] = useState(null)
 
   async function charger() {
     setLoading(true)
@@ -140,7 +205,8 @@ export default function DynassurSinistres() {
                 {liste.slice(0, 600).map(s => {
                   const es = etatStyle(s.etat)
                   return (
-                    <tr key={s.pointeur_sinistre} style={{ borderTop: '1px solid #f1f5f9' }}>
+                    <tr key={s.pointeur_sinistre} onClick={() => setSel(s)} style={{ borderTop: '1px solid #f1f5f9', cursor: 'pointer' }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
                       <td style={{ padding: '9px 14px', fontWeight: 700, color: NAVY, whiteSpace: 'nowrap' }}>{s.reference_sinistre || '—'}</td>
                       <td style={{ padding: '9px 14px' }}>
                         <div style={{ color: '#1e293b', fontWeight: 600 }}>{s.sinistre_nom || '—'}</div>
@@ -165,6 +231,8 @@ export default function DynassurSinistres() {
           )}
         </div>
       )}
+
+      {sel && <SinistreDetail s={sel} onClose={() => setSel(null)} />}
     </Layout>
   )
 }
