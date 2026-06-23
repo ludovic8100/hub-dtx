@@ -24,6 +24,28 @@ const parseDate = v => {
 const fmtDate = v => { const d=parseDate(v); return d?d.toLocaleDateString('fr-BE',{day:'2-digit',month:'2-digit',year:'numeric'}):'—' }
 const fmtDateLong = v => { const d=parseDate(v); return d?d.toLocaleDateString('fr-BE',{day:'numeric',month:'long',year:'numeric'}):'—' }
 const fmtMois = v => { const d=parseDate(v); return d?d.toLocaleDateString('fr-BE',{month:'short',year:'numeric'}):'—' }
+// RDV : le debut Graph peut être sans offset → on force UTC
+const tsRdv = iso => { if(!iso) return 0; const d=new Date(String(iso).length<=19?iso+'Z':iso); return isNaN(d)?0:d.getTime() }
+const fmtRdv = iso => { const t=tsRdv(iso); return t?new Date(t).toLocaleDateString('fr-BE',{day:'2-digit',month:'2-digit',year:'numeric'}):'—' }
+const ilYa = jours => {
+  if(jours==null) return ''
+  if(jours<31) return `il y a ${jours} j`
+  const mois=Math.round(jours/30.44)
+  if(mois<12) return `il y a ${mois} mois`
+  const ans=Math.floor(jours/365); const r=Math.round((jours%365)/30.44)
+  return r>=1 ? `il y a ${ans} an${ans>1?'s':''} ${r} m` : `il y a ${ans} an${ans>1?'s':''}`
+}
+// Tranches « dernier contact » pour la relance (bornes en jours)
+const TRANCHES = [
+  { val:'m1',  label:'Ce mois (< 1 mois)',  min:0,   max:31 },
+  { val:'m3',  label:'1 à 3 mois',          min:31,  max:92 },
+  { val:'m6',  label:'3 à 6 mois',          min:92,  max:183 },
+  { val:'m12', label:'6 à 12 mois',         min:183, max:365 },
+  { val:'a2',  label:'1 à 2 ans',           min:365, max:730 },
+  { val:'a2p', label:'Plus de 2 ans',       min:730, max:Infinity },
+]
+const trancheDe = jours => TRANCHES.find(t=>jours>=t.min&&jours<t.max)?.val || null
+const TRANCHE_COL = { m1:'#16a34a', m3:'#65a30d', m6:'#ca8a04', m12:'#ea580c', a2:'#dc2626', a2p:'#991b1b' }
 // Âge en années (+ mois) à partir d'une date de naissance
 const calcAge = v => {
   const d=parseDate(v); if(!d) return null
@@ -509,7 +531,7 @@ function Relations({ client, onOpenDossier }) {
 // FICHE CLIENT complète
 // ══════════════════════
 function Fiche({ client, onClose, onOpenDossier }) {
-  const [contrats,setContrats]=useState([]); const [taches,setTaches]=useState([]); const [loadF,setLoadF]=useState(true)
+  const [contrats,setContrats]=useState([]); const [taches,setTaches]=useState([]); const [rdvs,setRdvs]=useState([]); const [loadF,setLoadF]=useState(true)
   const ref=useRef(null)
 
   useEffect(()=>{
@@ -518,13 +540,16 @@ function Fiche({ client, onClose, onOpenDossier }) {
     Promise.all([
       supabase.from('contrats').select('police,compagnie,nom_client,situation,date_creation,domaine,type_production,garantie_valeur,version').eq('dossier',client.dossier).order('date_creation',{ascending:false}),
       supabase.from('taches').select('*').eq('dossier_client',client.dossier).order('echeance',{ascending:true}).limit(20),
-    ]).then(([{data:c},{data:t}])=>{
+      client.id
+        ? supabase.from('rdv').select('id,objet,debut,categorie,user_email,web_link,journee_entiere,lieu').eq('client_id',client.id).order('debut',{ascending:false})
+        : Promise.resolve({data:[]}),
+    ]).then(([{data:c},{data:t},{data:rv}])=>{
       // Dédoublonnage par police (les imports créent des lignes identiques) — on garde la plus récente
       const seen=new Set(); const uniq=[]
       ;(c||[]).forEach(r=>{ const k=r.police||JSON.stringify(r); if(!seen.has(k)){ seen.add(k); uniq.push(r) } })
-      setContrats(uniq); setTaches(t||[]); setLoadF(false)
+      setContrats(uniq); setTaches(t||[]); setRdvs(rv||[]); setLoadF(false)
     })
-  },[client.dossier])
+  },[client.dossier,client.id])
 
   const initiales=`${(client.prenom||'?')[0]||''}${(client.nom||'?')[0]||''}`.toUpperCase()
   const actifs=contrats.filter(c=>c.situation==='En cours').length
@@ -534,6 +559,14 @@ function Fiche({ client, onClose, onOpenDossier }) {
   const wazeUrl=adresseComplete?`https://waze.com/ul?q=${encodeURIComponent(adresseComplete)}`:null
   const age=calcAge(client.date_naissance)
   const gsm=cleanTel(client.gsm); const fixe=cleanTel(client.tel_fixe)
+
+  // RDV : dernier contact (passé) + prochain (à venir)
+  const nowTs=Date.now()
+  const rdvPasses=rdvs.filter(r=>tsRdv(r.debut)<=nowTs)          // déjà triés desc
+  const rdvFuturs=rdvs.filter(r=>tsRdv(r.debut)>nowTs).sort((a,b)=>tsRdv(a.debut)-tsRdv(b.debut))
+  const dernier=rdvPasses[0]||null
+  const joursDernier=dernier?Math.floor((nowTs-tsRdv(dernier.debut))/86400000):null
+  const prochain=rdvFuturs[0]||null
 
   // Risques (dérivés des domaines de contrats actifs)
   const risques={}
@@ -616,6 +649,48 @@ function Fiche({ client, onClose, onOpenDossier }) {
               </div>
             ))}
           </div>
+        </Sec>
+
+        {/* Dernier contact / RDV */}
+        <Sec icon="ti-calendar-heart" title="Dernier contact" count={rdvs.length} col="#0d9488" open={true}>
+          {loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:!rdvs.length?
+            <p style={{color:'#94a3b8',fontSize:12}}>Aucun RDV lié à ce client. <span style={{color:'#cbd5e1'}}>(Lie un RDV depuis la page RDV / Agenda.)</span></p>:(
+            <div>
+              <div style={{display:'flex',gap:12,flexWrap:'wrap',marginBottom:rdvPasses.length>1||prochain?12:0}}>
+                {dernier&&(
+                  <div style={{flex:'1 1 220px',background:'#f0fdfa',border:'1px solid #99f6e4',borderRadius:10,padding:'12px 16px'}}>
+                    <div style={{fontSize:10,fontWeight:800,color:'#0d9488',textTransform:'uppercase',letterSpacing:'.05em'}}>Dernier contact</div>
+                    <div style={{fontSize:20,fontWeight:800,color:NAVY,lineHeight:1.1,marginTop:3}}>{fmtRdv(dernier.debut)}</div>
+                    <div style={{fontSize:12,color:'#0d9488',fontWeight:600}}>{ilYa(joursDernier)}</div>
+                    <div style={{fontSize:12,color:'#64748b',marginTop:4}}>{dernier.objet}</div>
+                  </div>
+                )}
+                {prochain&&(
+                  <div style={{flex:'1 1 220px',background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:10,padding:'12px 16px'}}>
+                    <div style={{fontSize:10,fontWeight:800,color:'#2563eb',textTransform:'uppercase',letterSpacing:'.05em'}}>Prochain RDV</div>
+                    <div style={{fontSize:20,fontWeight:800,color:NAVY,lineHeight:1.1,marginTop:3}}>{fmtRdv(prochain.debut)}</div>
+                    <div style={{fontSize:12,color:'#64748b',marginTop:4}}>{prochain.objet}</div>
+                  </div>
+                )}
+              </div>
+              <div style={{maxHeight:200,overflowY:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
+                {rdvs.map((r,i)=>{
+                  const futur=tsRdv(r.debut)>nowTs
+                  return(
+                    <div key={r.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',borderBottom:i<rdvs.length-1?'1px solid #f8fafc':'none',background:futur?'#f8fbff':'#fff'}}>
+                      <span style={{fontSize:12,fontWeight:700,color:NAVY,whiteSpace:'nowrap',minWidth:78}}>{fmtRdv(r.debut)}</span>
+                      <span style={{flex:1,fontSize:12,color:'#1e293b'}}>
+                        {r.web_link?<a href={r.web_link} target="_blank" rel="noreferrer" style={{color:'#1e293b',textDecoration:'none'}}>{r.objet||'—'}</a>:(r.objet||'—')}
+                        {r.lieu&&<span style={{fontSize:11,color:'#94a3b8'}}> · {r.lieu}</span>}
+                      </span>
+                      <span style={{fontSize:10,fontWeight:700,color:'#64748b'}}>{(r.user_email||'').replace('@dynassur.be','')}</span>
+                      {futur&&<span style={{fontSize:9,fontWeight:800,padding:'2px 6px',borderRadius:4,background:'#dbeafe',color:'#2563eb'}}>À VENIR</span>}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </Sec>
 
         {/* Relations familiales ET sociétés */}
@@ -709,6 +784,8 @@ export default function DynassurClients() {
   const [page,setPage]       = useState(0)
   const [loading,setLoading] = useState(false)
   const [selected,setSelected] = useState(null)
+  const [contactFilter,setContactFilter] = useState('tous')   // tous | m1 | m3 | m6 | m12 | a2 | a2p
+  const [relance,setRelance]   = useState(null)               // null = pas encore chargé
   const searchRef = useRef(null)
 
   // Init user + counts
@@ -736,7 +813,7 @@ export default function DynassurClients() {
 
   const load = useCallback(async(search,sc,p)=>{
     setLoading(true)
-    let qb=supabase.from('clients').select('dossier,nom,prenom,cp,localite,gsm,tel_fixe,email,rue,num_maison,boite,date_naissance,etat_civil,sexe,sa_code,sa_nom,gestionnaire_code,gestionnaire_nom,bureau,classe,alerte',{count:'exact'})
+    let qb=supabase.from('clients').select('id,dossier,nom,prenom,cp,localite,gsm,tel_fixe,email,rue,num_maison,boite,date_naissance,etat_civil,sexe,sa_code,sa_nom,gestionnaire_code,gestionnaire_nom,bureau,classe,alerte',{count:'exact'})
     if(search.length>=2) qb=qb.or(`nom.ilike.%${search}%,prenom.ilike.%${search}%,dossier.ilike.%${search}%,email.ilike.%${search}%,gsm.ilike.%${search}%`)
     if(sc==='mine'&&myCode) qb=qb.eq('gestionnaire_code',myCode)
     else if(sc==='bureau'&&myBureau) qb=qb.eq('bureau',myBureau)
@@ -744,6 +821,25 @@ export default function DynassurClients() {
     const seen=new Set(); const uniq=(data||[]).filter(c=>{ if(!c.dossier||seen.has(c.dossier))return false; seen.add(c.dossier); return true })
     setClients(uniq); setTotal(count||0); setLoading(false)
   },[myCode,myBureau])
+
+  // Données de relance : dernier contact (RDV passé lié) par client
+  const loadRelance = useCallback(async()=>{
+    const {data:rv}=await supabase.from('rdv').select('client_id,debut').not('client_id','is',null).range(0,4999)
+    const now=Date.now(); const last={}
+    ;(rv||[]).forEach(r=>{ const t=tsRdv(r.debut); if(t&&t<=now){ if(!last[r.client_id]||t>last[r.client_id]) last[r.client_id]=t } })
+    const ids=Object.keys(last).map(Number)
+    if(!ids.length){ setRelance([]); return }
+    const rows=[]
+    for(let i=0;i<ids.length;i+=200){
+      const {data}=await supabase.from('clients')
+        .select('id,dossier,nom,prenom,cp,localite,gestionnaire_code,gestionnaire_nom,sa_code,sa_nom,bureau,gsm,tel_fixe,email')
+        .in('id',ids.slice(i,i+200))
+      ;(data||[]).forEach(c=>{ const t=last[c.id]; const jours=Math.floor((now-t)/86400000); rows.push({...c,last:t,jours,tranche:trancheDe(jours)}) })
+    }
+    rows.sort((a,b)=>b.jours-a.jours)   // les plus anciens d'abord = priorité de relance
+    setRelance(rows)
+  },[])
+  useEffect(()=>{ loadRelance() },[loadRelance])
 
   useEffect(()=>{
     const t=setTimeout(()=>{ setPage(0); setSelected(null); load(q,scope,0) },300)
@@ -755,7 +851,7 @@ export default function DynassurClients() {
   // Ouvrir une fiche à partir d'un n° de dossier (clic sur une relation)
   const openDossier = useCallback(async(dossier)=>{
     if(!dossier) return
-    const{data}=await supabase.from('clients').select('dossier,nom,prenom,cp,localite,gsm,tel_fixe,email,rue,num_maison,boite,date_naissance,etat_civil,sexe,sa_code,sa_nom,gestionnaire_code,gestionnaire_nom,bureau,classe,alerte').eq('dossier',dossier).limit(1)
+    const{data}=await supabase.from('clients').select('id,dossier,nom,prenom,cp,localite,gsm,tel_fixe,email,rue,num_maison,boite,date_naissance,etat_civil,sexe,sa_code,sa_nom,gestionnaire_code,gestionnaire_nom,bureau,classe,alerte').eq('dossier',dossier).limit(1)
     if(data&&data[0]){ setSelected(data[0]); pushRecentClient(data[0]); window.scrollTo({top:0,behavior:'smooth'}) }
   },[])
 
@@ -775,6 +871,17 @@ export default function DynassurClients() {
     { val:'bureau', icon:'ti-building',label:'Mon bureau',  nb:counts.bureau,pct:pctBureau, col:'#7c3aed', note:myBureau },
     { val:'all',    icon:'ti-users',  label:'Tous Dynassur',nb:counts.total, pct:'100',     col:'#16a34a', note:'Dynassur' },
   ]
+
+  // Vue relance (dernier contact), filtrée par scope + tranche + recherche
+  const relanceBase = (relance||[]).filter(c =>
+    scope==='mine'   ? (myCode && c.gestionnaire_code===myCode)
+    : scope==='bureau' ? (myBureau && c.bureau===myBureau)
+    : true)
+  const relanceCounts = TRANCHES.reduce((a,t)=>{ a[t.val]=relanceBase.filter(c=>c.tranche===t.val).length; return a },{})
+  const relanceActif = contactFilter!=='tous'
+  let relanceView = relanceBase
+  if(relanceActif) relanceView = relanceView.filter(c=>c.tranche===contactFilter)
+  if(q.length>=2){ const s=q.toLowerCase(); relanceView = relanceView.filter(c=>`${c.nom} ${c.prenom} ${c.dossier}`.toLowerCase().includes(s)) }
 
   return(
     <Layout currentPage="Clients">
@@ -799,6 +906,21 @@ export default function DynassurClients() {
               style={{width:'100%',padding:'12px 14px 12px 42px',borderRadius:10,border:`1.5px solid ${q?BLUE:'#e2e8f0'}`,fontSize:14,fontFamily:"'Source Sans Pro',sans-serif",outline:'none',boxSizing:'border-box',transition:'border-color 0.15s',background:'#fff',boxShadow:'0 2px 8px rgba(0,0,0,0.04)'}}
             />
             {q&&<button onClick={()=>setQ('')} style={{position:'absolute',right:12,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',color:'#94a3b8',fontSize:18}}>✕</button>}
+          </div>
+        )}
+
+        {/* ── Filtre relance : dernier contact ── */}
+        {!selected&&(
+          <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:18}}>
+            <span style={{fontSize:13,color:'#64748b',fontWeight:600}}><i className="ti ti-calendar-heart" style={{marginRight:5,color:'#0d9488'}}/>Dernier contact :</span>
+            <select value={contactFilter} onChange={e=>setContactFilter(e.target.value)}
+              style={{padding:'7px 12px',borderRadius:8,border:`1.5px solid ${relanceActif?'#0d9488':'#e2e8f0'}`,fontSize:13,color:NAVY,background:'#fff',fontFamily:"'Source Sans Pro',sans-serif",fontWeight:relanceActif?700:400}}>
+              <option value="tous">Tous les clients (base complète)</option>
+              {TRANCHES.map(t=><option key={t.val} value={t.val}>{t.label} ({relanceCounts[t.val]||0})</option>)}
+            </select>
+            {relance===null
+              ? <span style={{fontSize:12,color:'#94a3b8'}}>chargement des contacts…</span>
+              : relanceActif && <span style={{fontSize:12,color:'#0d9488',fontWeight:600}}>{relanceView.length} client(s) — du plus ancien au plus récent</span>}
           </div>
         )}
 
@@ -848,7 +970,7 @@ export default function DynassurClients() {
         )}
 
         {/* ── Tableau ── */}
-        {!selected&&(
+        {!selected&&!relanceActif&&(
           <div style={{background:'#fff',borderRadius:12,border:'1px solid #e2e8f0',overflow:'hidden',marginBottom:4}}>
             <div style={{overflowX:'auto'}}>
               <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
@@ -895,6 +1017,46 @@ export default function DynassurClients() {
                 <button onClick={()=>setPage(p=>Math.min(nb-1,p+1))} disabled={page===nb-1} style={{padding:'5px 14px',borderRadius:6,border:'1px solid #e2e8f0',background:page===nb-1?'#f8fafc':'#fff',cursor:page===nb-1?'not-allowed':'pointer',fontSize:12,color:page===nb-1?'#94a3b8':'#374151'}}>Suivant →</button>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── Tableau relance (dernier contact) ── */}
+        {!selected&&relanceActif&&(
+          <div style={{background:'#fff',borderRadius:12,border:'1px solid #e2e8f0',overflow:'hidden',marginBottom:4}}>
+            <div style={{overflowX:'auto'}}>
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+                <thead>
+                  <tr style={{background:'#f8fafc'}}>
+                    {['N° Dossier','Nom & Prénom','Localité','Dernier contact','Ancienneté','Gestionnaire / SA',''].map(h=>(
+                      <th key={h} style={{padding:'9px 14px',textAlign:'left',fontWeight:700,color:'#94a3b8',fontSize:10,textTransform:'uppercase',letterSpacing:'.05em',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {relance===null?(<tr><td colSpan={7} style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Chargement…</td></tr>)
+                  :!relanceView.length?(<tr><td colSpan={7} style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Aucun client dans cette tranche.</td></tr>)
+                  :relanceView.map((c,i)=>{
+                    const col=TRANCHE_COL[c.tranche]||'#64748b'
+                    return(
+                      <tr key={c.id} onClick={()=>openDossier(c.dossier)} style={{cursor:'pointer',background:i%2===0?'#fff':'#fafafe'}}
+                        onMouseEnter={e=>e.currentTarget.style.background='#f0fdfa'}
+                        onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'#fff':'#fafafe'}>
+                        <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9',fontFamily:'monospace',fontSize:11,color:NAVY,fontWeight:600}}>{c.dossier}</td>
+                        <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9'}}>
+                          <div style={{fontWeight:600,color:'#1e293b'}}>{c.nom} {c.prenom}</div>
+                          {(c.gsm||c.tel_fixe)&&<div style={{fontSize:11,color:'#94a3b8'}}>{c.gsm||c.tel_fixe}</div>}
+                        </td>
+                        <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{c.cp} {c.localite||'—'}</td>
+                        <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9',color:NAVY,fontWeight:600,whiteSpace:'nowrap'}}>{new Date(c.last).toLocaleDateString('fr-BE',{day:'2-digit',month:'2-digit',year:'numeric'})}</td>
+                        <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9'}}><span style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:4,background:col+'18',color:col,whiteSpace:'nowrap'}}>{ilYa(c.jours)}</span></td>
+                        <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9',color:'#64748b',fontSize:12}}>{c.gestionnaire_nom||c.gestionnaire_code||'—'}{c.sa_nom?` · ${c.sa_nom}`:''}</td>
+                        <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9',textAlign:'right'}}><span style={{fontSize:11,color:'#0d9488',fontWeight:600}}>Fiche ▼</span></td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
