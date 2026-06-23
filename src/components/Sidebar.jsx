@@ -44,6 +44,7 @@ const MODULES = {
 const MODULES_ADMIN = [
   { key: 'admin_users', label: 'Utilisateurs', icon: 'ti-users-group', path: '/admin/users' },
   { key: 'admin_sync', label: 'Synchronisation', icon: 'ti-refresh', path: '/admin/sync' },
+  { key: 'admin_rdv_cat', label: 'Catégories RDV', icon: 'ti-tags', path: '/admin/rdv-categories' },
 ]
 
 export default function Sidebar() {
