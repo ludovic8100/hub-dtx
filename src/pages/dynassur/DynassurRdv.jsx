@@ -333,6 +333,9 @@ export default function DynassurRdv() {
                         {c ? (
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                             <span style={{ fontWeight: 700, color: NAVY }}>{c.nom} {c.prenom}</span>
+                            <button onClick={() => setPicker(r)} disabled={busyId === r.id} title="Changer de client" style={{ border: 'none', background: 'none', color: E.color, cursor: 'pointer', padding: 0, fontSize: 14 }}>
+                              <i className="ti ti-pencil" />
+                            </button>
                             <button onClick={() => delier(r)} disabled={busyId === r.id} title="Retirer le lien" style={{ border: 'none', background: 'none', color: '#cbd5e1', cursor: 'pointer', padding: 0, fontSize: 14 }}>
                               <i className="ti ti-x" />
                             </button>
