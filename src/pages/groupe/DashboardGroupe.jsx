@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
 import { ENTITES } from '../../lib/entites'
 import { StatBanner, PrimaryButton } from '../../components/ui/AccountableUI'
+import { SYNCS, SyncCard, WebhookStatus } from '../../components/SyncCards'
 
 // ── Constantes ──
 const SOCIETES = {
@@ -540,93 +541,22 @@ function BlocTresorerie({ comptes, transactions, loading }) {
 }
 
 // ══════════════════════════
-// BLOC SYNC — 3 cartes mini
+// BLOC SYNC — cartes complètes du centre de synchro
 // ══════════════════════════
-const N8N_WH  = 'https://n8n.srv1082740.hstgr.cloud/webhook'
-const SYNCS_DEF = [
-  { key:'import',     label:'Import Brio',       icon:'ti-database-import', col:'#0080BD', wh:'run-import-dynassur', tables:['clients','contrats','mouvements_production','quittances'] },
-  { key:'iban',       label:'Comptes bancaires',  icon:'ti-building-bank',  col:'#16a34a', wh:'iban-sync',           tables:['transactions'] },
-  { key:'bordereaux', label:'Bordereaux BQT/RCP', icon:'ti-file-invoice',   col:'#7c3aed', wh:'run-bordereaux',      tables:['bordereaux'] },
-]
-
 function BlocSync() {
-  const navigate = useNavigate()
-  const [states, setStates]   = useState({})
-  const [counts, setCounts]   = useState({})
-
-  useEffect(() => {
-    async function loadCounts() {
-      const all = {}
-      for (const s of SYNCS_DEF) {
-        for (const t of s.tables) {
-          const { count } = await supabase.from(t).select('*', { count:'exact', head:true })
-          all[t] = count
-        }
-      }
-      setCounts(all)
-    }
-    loadCounts()
-  }, [])
-
-  const trigger = async (key, wh) => {
-    setStates(s => ({ ...s, [key]: 'running' }))
-    try {
-      const res = await fetch(`${N8N_WH}/${wh}`, { method:'POST' })
-      setStates(s => ({ ...s, [key]: res.ok ? 'ok' : 'error' }))
-      if (res.ok) setTimeout(async () => {
-        const all = { ...counts }
-        for (const t of SYNCS_DEF.find(x=>x.key===key).tables) {
-          const { count } = await supabase.from(t).select('*',{count:'exact',head:true})
-          all[t] = count
-        }
-        setCounts(all)
-        setStates(s => ({ ...s, [key]: 'idle' }))
-      }, 8000)
-    } catch {
-      setStates(s => ({ ...s, [key]: 'error' }))
-    }
-  }
-
   return (
     <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
-      <div style={{ padding:'14px 18px', borderBottom:'1px solid #f1f5f9', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+      <div style={{ padding:'14px 18px', borderBottom:'1px solid #f1f5f9' }}>
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
           <i className="ti ti-refresh" style={{ fontSize:16, color:'#7c3aed' }} />
           <span style={{ fontSize:13, fontWeight:700, color:'#0f172a' }}>Synchronisations</span>
         </div>
-        <button onClick={() => navigate('/admin/sync')} style={{ fontSize:11, color:'#7c3aed', background:'#f5f3ff', border:'1px solid #ede9fe', borderRadius:6, padding:'4px 10px', cursor:'pointer', fontWeight:600, display:'flex', alignItems:'center', gap:4 }}>
-          <i className="ti ti-settings" style={{ fontSize:12 }} /> Centre de synchro
-        </button>
       </div>
-      <div style={{ padding:14, display:'flex', flexDirection:'column', gap:10 }}>
-        {SYNCS_DEF.map(s => {
-          const st = states[s.key] || 'idle'
-          const running = st === 'running'
-          const mainCount = counts[s.tables[0]]
-          return (
-            <div key={s.key} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', borderRadius:9, background:'#f8fafc', border:`1px solid #e2e8f0` }}>
-              <div style={{ width:36, height:36, borderRadius:9, background:`${s.col}15`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                <i className={`ti ${s.icon}`} style={{ fontSize:17, color:s.col }} />
-              </div>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:12, fontWeight:700, color:'#1e293b' }}>{s.label}</div>
-                <div style={{ fontSize:11, color:'#94a3b8', marginTop:1 }}>
-                  {mainCount != null ? `${mainCount.toLocaleString('fr-BE')} ${s.tables[0]}` : '—'}
-                  {s.key==='import' && counts['contrats'] != null && ` · ${counts['contrats'].toLocaleString('fr-BE')} contrats`}
-                </div>
-              </div>
-              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                {st === 'ok'    && <i className="ti ti-circle-check" style={{ color:'#16a34a', fontSize:16 }} />}
-                {st === 'error' && <i className="ti ti-alert-circle" style={{ color:'#dc2626', fontSize:16 }} />}
-                <button onClick={() => trigger(s.key, s.wh)} disabled={running}
-                  style={{ display:'flex', alignItems:'center', gap:5, background:running?'#f1f5f9':s.col, color:running?'#94a3b8':'#fff', border:'none', borderRadius:7, padding:'6px 12px', cursor:running?'wait':'pointer', fontSize:12, fontWeight:700, transition:'background 0.15s' }}>
-                  <i className={`ti ${running?'ti-loader-2':'ti-refresh'}`} style={running?{animation:'spin 1s linear infinite'}:{}} />
-                  {running ? '…' : 'Sync'}
-                </button>
-              </div>
-            </div>
-          )
-        })}
+      <div style={{ padding:14 }}>
+        <WebhookStatus />
+        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+          {SYNCS.map(s => <SyncCard key={s.key} sync={s} />)}
+        </div>
       </div>
     </div>
   )
