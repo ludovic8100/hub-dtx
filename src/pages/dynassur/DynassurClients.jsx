@@ -531,7 +531,7 @@ function Relations({ client, onOpenDossier }) {
 // FICHE CLIENT complète
 // ══════════════════════
 function Fiche({ client, onClose, onOpenDossier }) {
-  const [contrats,setContrats]=useState([]); const [taches,setTaches]=useState([]); const [rdvs,setRdvs]=useState([]); const [loadF,setLoadF]=useState(true)
+  const [contrats,setContrats]=useState([]); const [taches,setTaches]=useState([]); const [rdvs,setRdvs]=useState([]); const [groupe,setGroupe]=useState([]); const [loadF,setLoadF]=useState(true)
   const ref=useRef(null)
 
   useEffect(()=>{
@@ -543,11 +543,12 @@ function Fiche({ client, onClose, onOpenDossier }) {
       client.id
         ? supabase.from('rdv').select('id,objet,debut,categorie,user_email,web_link,journee_entiere,lieu').eq('client_id',client.id).order('debut',{ascending:false})
         : Promise.resolve({data:[]}),
-    ]).then(([{data:c},{data:t},{data:rv}])=>{
+      supabase.from('parentes').select('groupe_nom,groupe_type,membre_nom,nb_polices,prime_totale').eq('dossier_principal',client.dossier),
+    ]).then(([{data:c},{data:t},{data:rv},{data:gr}])=>{
       // Dédoublonnage par police (les imports créent des lignes identiques) — on garde la plus récente
       const seen=new Set(); const uniq=[]
       ;(c||[]).forEach(r=>{ const k=r.police||JSON.stringify(r); if(!seen.has(k)){ seen.add(k); uniq.push(r) } })
-      setContrats(uniq); setTaches(t||[]); setRdvs(rv||[]); setLoadF(false)
+      setContrats(uniq); setTaches(t||[]); setRdvs(rv||[]); setGroupe(gr||[]); setLoadF(false)
     })
   },[client.dossier,client.id])
 
@@ -697,6 +698,22 @@ function Fiche({ client, onClose, onOpenDossier }) {
         <Sec icon="ti-users-group" title="Relations & sociétés" col="#ec4899" open={true} count={0}>
           <Relations client={client} onOpenDossier={onOpenDossier}/>
         </Sec>
+
+        {/* Groupe / Ménage (vue Qlik GroupePreneur) */}
+        {groupe.length>0 && (
+          <Sec icon="ti-home-2" title="Groupe / Ménage" col="#0d9488" open={true} count={groupe.length}>
+            <div style={{fontSize:12,color:'#64748b',marginBottom:8,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+              <strong style={{color:NAVY}}>{groupe[0].groupe_nom||'Groupe'}</strong>
+              {groupe[0].groupe_type&&<span style={{fontSize:10,fontWeight:800,padding:'2px 7px',borderRadius:5,background:'#f0fdfa',color:'#0d9488',border:'1px solid #99f6e4'}}>{groupe[0].groupe_type}</span>}
+              {(groupe[0].nb_polices||groupe[0].prime_totale)?<span style={{color:'#94a3b8'}}>· {Math.round(groupe[0].nb_polices||0)} police(s) · {Math.round(groupe[0].prime_totale||0).toLocaleString('fr-BE')} € de prime</span>:null}
+            </div>
+            <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+              {groupe.map((m,i)=>(
+                <span key={i} style={{fontSize:12,padding:'5px 10px',borderRadius:7,background:'#f8fafc',border:'1px solid #e2e8f0',color:'#1e293b'}}>{m.membre_nom}</span>
+              ))}
+            </div>
+          </Sec>
+        )}
 
         {/* Objets de risque (vraie table risques, liée par police) */}
         <Sec icon="ti-shield" title="Objets de risque" count={0} col="#7c3aed" open={true}
