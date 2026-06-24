@@ -530,8 +530,42 @@ function Relations({ client, onOpenDossier }) {
 // ══════════════════════
 // FICHE CLIENT complète
 // ══════════════════════
+function ObjetsDetail({ objets, loading }) {
+  if(loading) return <p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>
+  if(!objets.length) return <div style={{color:'#94a3b8',fontSize:12,fontStyle:'italic'}}>Aucun objet de risque détaillé pour ce dossier.</div>
+  // regrouper par police
+  const parPolice={}
+  objets.forEach(o=>{ (parPolice[o.police]=parPolice[o.police]||{police:o.police,type:o.type_risque,compagnie:o.compagnie,domaine:o.domaine,gars:[]}).gars.push({g:o.garantie,s:o.situation}) })
+  const groupes=Object.values(parPolice).sort((a,b)=>{
+    const ac=a.gars.some(x=>x.s==='En cours'), bc=b.gars.some(x=>x.s==='En cours'); return (bc-ac)
+  })
+  return(
+    <div style={{display:'flex',flexDirection:'column',gap:8,marginTop:10}}>
+      {groupes.map((p,i)=>{
+        const actif=p.gars.some(x=>x.s==='En cours')
+        return(
+          <div key={i} style={{border:'1px solid #ede9fe',borderRadius:9,padding:'10px 12px',background:actif?'#fbfaff':'#fafafa',opacity:actif?1:.7}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:6}}>
+              <span style={{fontSize:13,fontWeight:800,color:'#6d28d9'}}>{p.type||'Objet de risque'}</span>
+              <span style={{fontSize:11,color:'#94a3b8'}}>n° {p.police}</span>
+              {p.compagnie&&<span style={{fontSize:11,color:'#64748b'}}>· {p.compagnie}</span>}
+              {p.domaine&&<span style={{fontSize:10,fontWeight:700,padding:'1px 7px',borderRadius:5,background:'#f5f3ff',color:'#7c3aed'}}>{p.domaine}</span>}
+            </div>
+            <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+              {p.gars.map((x,j)=>{
+                const enc=x.s==='En cours'
+                return <span key={j} title={x.s} style={{fontSize:11,fontWeight:600,padding:'3px 9px',borderRadius:6,background:enc?'#dcfce7':'#f1f5f9',color:enc?'#15803d':'#94a3b8',border:`1px solid ${enc?'#86efac':'#e2e8f0'}`}}>{x.g||'—'}</span>
+              })}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 function Fiche({ client, onClose, onOpenDossier }) {
-  const [contrats,setContrats]=useState([]); const [taches,setTaches]=useState([]); const [rdvs,setRdvs]=useState([]); const [groupe,setGroupe]=useState([]); const [loadF,setLoadF]=useState(true)
+  const [contrats,setContrats]=useState([]); const [taches,setTaches]=useState([]); const [rdvs,setRdvs]=useState([]); const [groupe,setGroupe]=useState([]); const [objets,setObjets]=useState([]); const [loadF,setLoadF]=useState(true)
   const ref=useRef(null)
 
   useEffect(()=>{
@@ -544,11 +578,12 @@ function Fiche({ client, onClose, onOpenDossier }) {
         ? supabase.from('rdv').select('id,objet,debut,categorie,user_email,web_link,journee_entiere,lieu').eq('client_id',client.id).order('debut',{ascending:false})
         : Promise.resolve({data:[]}),
       supabase.from('parentes').select('groupe_nom,groupe_type,membre_nom,nb_polices,prime_totale').eq('dossier_principal',client.dossier),
-    ]).then(([{data:c},{data:t},{data:rv},{data:gr}])=>{
+      supabase.from('objets_risque').select('police,type_risque,garantie,situation,compagnie,domaine').eq('dossier',client.dossier),
+    ]).then(([{data:c},{data:t},{data:rv},{data:gr},{data:ob}])=>{
       // Dédoublonnage par police (les imports créent des lignes identiques) — on garde la plus récente
       const seen=new Set(); const uniq=[]
       ;(c||[]).forEach(r=>{ const k=r.police||JSON.stringify(r); if(!seen.has(k)){ seen.add(k); uniq.push(r) } })
-      setContrats(uniq); setTaches(t||[]); setRdvs(rv||[]); setGroupe(gr||[]); setLoadF(false)
+      setContrats(uniq); setTaches(t||[]); setRdvs(rv||[]); setGroupe(gr||[]); setObjets(ob||[]); setLoadF(false)
     })
   },[client.dossier,client.id])
 
@@ -715,11 +750,10 @@ function Fiche({ client, onClose, onOpenDossier }) {
           </Sec>
         )}
 
-        {/* Objets de risque (vraie table risques, liée par police) */}
-        <Sec icon="ti-shield" title="Objets de risque" count={0} col="#7c3aed" open={true}
-          extra={<EnDev label="Fiche risque à venir" mini />}>
+        {/* Objets de risque (détail Qlik par garantie, lié par police) */}
+        <Sec icon="ti-shield" title="Objets de risque" count={objets.length} col="#7c3aed" open={true}>
           <Analyse360 client={client} contrats={contrats}/>
-          <Risques contrats={contrats} loadContrats={loadF}/>
+          <ObjetsDetail objets={objets} loading={loadF}/>
         </Sec>
 
         {/* Contrats */}
