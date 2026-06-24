@@ -63,9 +63,6 @@ def extract():
             rec["nom_client"]=nom.upper() if nom else None
             rec["prenom_client"]=prenom.upper() if prenom else None
             rec["sa_preneur"]=rec.get("sa_contrat")
-            d=rec.get("date_mouvement")
-            rec["annee"]=int(d[:4]) if d else None
-            rec["mois"]=int(d[5:7]) if d else None
             if not rec.get("date_mouvement"): continue
             if not rec.get("type_prod") and not rec.get("police"): continue
             out.append(rec)
