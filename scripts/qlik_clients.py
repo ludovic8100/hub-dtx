@@ -139,7 +139,7 @@ def extract():
                 else:
                     rec[col] = v or None
             nom, prenom = split_nom(rec.pop("_nom_prenom"))
-            rec["nom"], rec["prenom"] = nom, prenom
+            rec["nom"], rec["prenom"] = (nom.upper() if nom else None), (prenom.upper() if prenom else None)
             out.append(rec)
         top += len(matrix)
     ws.close()
