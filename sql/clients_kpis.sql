@@ -31,7 +31,7 @@ BEGIN
        AND NOT EXISTS (
          SELECT 1 FROM contrats ct
          WHERE ct.dossier = c.dossier
-           AND (ct.situation___libelle IS NULL OR ct.situation___libelle = 'En cours')
+           AND (ct.situation IS NULL OR ct.situation = 'En cours')
        )),
 
     -- Clients sans commissions cette année
