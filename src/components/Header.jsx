@@ -149,6 +149,7 @@ export default function Header({ currentPage, onToggleMenu, menuOuvert }) {
 
   const displayName = perms?.nom || user?.user_metadata?.full_name || user?.email || ''
   const firstName = displayName.split(' ')[0]
+  const mob = !!onToggleMenu   // Layout ne passe onToggleMenu qu'en mobile
 
   const cfg = societeActive || SOCIETES_CONFIG.dynassur
   const headerBg = cfg.colorDark
@@ -172,7 +173,7 @@ export default function Header({ currentPage, onToggleMenu, menuOuvert }) {
     }}>
 
       {/* Gauche : hamburger (mobile) + dropdown entité + breadcrumb */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: '100%', paddingLeft: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: '100%', paddingLeft: 12, minWidth: 0, flex: '1 1 auto', overflow: 'hidden' }}>
 
         {/* Bouton hamburger mobile */}
         {onToggleMenu && (
@@ -195,8 +196,8 @@ export default function Header({ currentPage, onToggleMenu, menuOuvert }) {
           />
         )}
 
-        {/* Séparateur + breadcrumb */}
-        {currentPage && (
+        {/* Séparateur + breadcrumb (masqué sur mobile) */}
+        {currentPage && !mob && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: 16 }}>/</span>
             <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: 14, fontFamily: "'Source Sans Pro', sans-serif" }}>
@@ -207,9 +208,9 @@ export default function Header({ currentPage, onToggleMenu, menuOuvert }) {
       </div>
 
       {/* Droite : badge admin + nom + boutons */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
 
-        {isAdmin && (
+        {isAdmin && !mob && (
           <span style={{
             background: `${accentColor}30`, border: `1px solid ${accentColor}60`,
             color: cfg.colorAccent, fontSize: '10px', fontWeight: '700',
@@ -220,9 +221,11 @@ export default function Header({ currentPage, onToggleMenu, menuOuvert }) {
           </span>
         )}
 
-        <span style={{ fontFamily: "'Source Sans Pro', sans-serif", fontSize: '14px', color: 'rgba(255,255,255,0.8)' }}>
-          {firstName || displayName}
-        </span>
+        {!mob && (
+          <span style={{ fontFamily: "'Source Sans Pro', sans-serif", fontSize: '14px', color: 'rgba(255,255,255,0.8)' }}>
+            {firstName || displayName}
+          </span>
+        )}
 
         {isAdmin && (
           <button onClick={switchUser} title="Changer d'utilisateur" style={{
@@ -236,7 +239,7 @@ export default function Header({ currentPage, onToggleMenu, menuOuvert }) {
             onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)' }}
           >
             <i className="ti ti-switch-horizontal" style={{ fontSize: '14px' }} />
-            Changer
+            {!mob && 'Changer'}
           </button>
         )}
 
