@@ -1,539 +1,499 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
-// ── Palette & styles cohérents avec le reste du Hub ──
 const C = {
-  navy:'#1A3A6B', navyMid:'#1E5799', cyan:'#29ABE2', cyanB:'#00AEEF',
-  bg:'#F4F6F9', white:'#FFFFFF', border:'#DDE3ED',
-  textD:'#1A3A6B', textM:'#4A5568', textL:'#8A9BBE',
-  ok:'#16a34a', warn:'#f59e0b', danger:'#dc2626',
-  AG:'#005F9E', AXA:'#E63329', VIVIUM:'#00A650', ALLIANZ:'#003781'
+  blue: '#0080BD', blueDark: '#005f8e', bluePale: '#e8f4fb',
+  ok: '#16a34a', okPale: '#dcfce7',
+  warn: '#d97706', warnPale: '#fef3c7',
+  danger: '#dc2626', dangerPale: '#fee2e2',
+  grey: '#64748b', greyPale: '#f1f5f9',
+  border: '#e2e8f0', white: '#ffffff', bg: '#f8fafc',
+  text: '#0f172a', textM: '#475569', textL: '#94a3b8',
 }
-const D = {
-  card:{ background:C.white, border:`1px solid ${C.border}`, borderRadius:10, padding:20, marginBottom:16, boxShadow:'0 1px 4px rgba(26,58,107,0.06)' },
-  th:{ textAlign:'left', padding:'8px 12px', fontSize:11, fontWeight:700, color:C.textL, borderBottom:`1px solid ${C.border}`, textTransform:'uppercase', letterSpacing:.5 },
-  td:{ padding:'10px 12px', borderBottom:`1px solid ${C.border}`, color:C.textM, fontSize:13 },
-  kpi:(col)=>({ background:C.white, border:`1px solid ${C.border}`, borderRadius:10, padding:'18px 20px', boxShadow:'0 1px 4px rgba(26,58,107,0.06)', borderTop:`3px solid ${col||C.cyan}` }),
-  tab:(active, col)=>({ padding:'9px 18px', border:'none', borderBottom: active?`2px solid ${col||C.cyan}`:'2px solid transparent', background:'transparent', cursor:'pointer', fontSize:13, fontWeight: active?700:400, color: active?(col||C.navy):C.textL, transition:'all 0.15s' }),
-  badge:(col)=>({ display:'inline-block', fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:20, background:col+'22', color:col, letterSpacing:.3 }),
-  progress:(pct, col)=>({
-    outer:{ background:'#e2e8f0', borderRadius:6, height:8, width:'100%', overflow:'hidden' },
-    inner:{ width:`${Math.min(pct||0,100)}%`, height:'100%', borderRadius:6, background: (pct||0)>=100?C.ok:(pct||0)>=70?col||C.cyan:C.warn, transition:'width 0.4s' }
-  })
-}
-const fmt = v => v==null?'—':new Intl.NumberFormat('fr-BE',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(v)
-const fmtN = v => v==null?'—':new Intl.NumberFormat('fr-BE').format(v)
-const fmtPct = v => v==null?'—':`${Number(v).toFixed(1)} %`
 
-// ── Barre de progression ──
+const fmt = v => v == null ? '—' : new Intl.NumberFormat('fr-BE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v)
+const fmtN = v => v == null ? '—' : new Intl.NumberFormat('fr-BE').format(v)
+const fmtPct = v => v == null ? '—' : `${Number(v).toFixed(1)} %`
+
+function pctColor(pct) {
+  if (pct == null) return C.grey
+  if (pct >= 100) return C.ok
+  if (pct >= 70) return C.blue
+  if (pct >= 50) return C.warn
+  return C.danger
+}
+
+function retColor(ret) {
+  if (ret == null) return C.grey
+  if (ret >= 80) return C.ok
+  if (ret >= 65) return C.warn
+  return C.danger
+}
+
+// ── Barre de progression ──────────────────────────────────────
 function ProgressBar({ pct, col }) {
-  const s = D.progress(pct, col)
+  const c = col || pctColor(pct)
   return (
-    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-      <div style={s.outer}><div style={s.inner} /></div>
-      <span style={{ fontSize:12, fontWeight:700, color: (pct||0)>=100?C.ok:(pct||0)>=70?col||C.cyan:C.warn, minWidth:38 }}>{fmtPct(pct)}</span>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ flex: 1, background: C.border, borderRadius: 4, height: 7, overflow: 'hidden' }}>
+        <div style={{ width: `${Math.min(pct || 0, 100)}%`, height: '100%', background: c, borderRadius: 4, transition: 'width 0.5s ease' }} />
+      </div>
+      <span style={{ fontSize: 12, fontWeight: 700, color: c, minWidth: 40, textAlign: 'right' }}>{fmtPct(pct)}</span>
     </div>
   )
 }
 
-// ── KPI Card ──
-function KpiCard({ label, value, sub, col, pct }) {
+// ── Badge statut ──────────────────────────────────────────────
+function Badge({ label, color, pale }) {
   return (
-    <div style={D.kpi(col)}>
-      <div style={{ fontSize:11, fontWeight:700, color:C.textL, textTransform:'uppercase', letterSpacing:.05, marginBottom:6 }}>{label}</div>
-      <div style={{ fontSize:26, fontWeight:800, color:'#0f172a', marginBottom:4 }}>{value}</div>
-      {sub && <div style={{ fontSize:12, color:C.textM, marginBottom:pct!=null?6:0 }}>{sub}</div>}
-      {pct!=null && <ProgressBar pct={pct} col={col} />}
+    <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 12, background: pale, color, letterSpacing: 0.3 }}>
+      {label}
+    </span>
+  )
+}
+
+// ── KPI Card ──────────────────────────────────────────────────
+function KpiCard({ label, value, sub, pct, col, icon }) {
+  const c = col || C.blue
+  return (
+    <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 10, padding: '16px 18px', borderTop: `3px solid ${c}` }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: C.textL, textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
+        {icon && <i className={`ti ${icon}`} style={{ fontSize: 18, color: c + '80' }} />}
+      </div>
+      <div style={{ fontSize: 24, fontWeight: 800, color: C.text, marginBottom: sub ? 4 : 0 }}>{value}</div>
+      {sub && <div style={{ fontSize: 12, color: C.textM, marginBottom: pct != null ? 8 : 0 }}>{sub}</div>}
+      {pct != null && <ProgressBar pct={pct} col={c} />}
     </div>
   )
 }
 
-// ══════════════════════════════════════════════
-// ONGLET 1 — DYNASSUR GLOBAL
-// ══════════════════════════════════════════════
-function OngletGlobal({ objectifs, loading }) {
-  const AGENTS = ['GGO','TJA','PFQ','MTE','NGI','LDE']
-  const AGENT_NOMS = { GGO:'Gregory Godfroid', TJA:'Thibault Japsenne', PFQ:'Priscilla Fernandez', MTE:'Michelangelo Terrana', NGI:'Nadine Ginis', LDE:'Ludovic Detilloux' }
+// ══════════════════════════════════════════════════════════════
+// ONGLET 1 — COMMERCIAUX
+// ══════════════════════════════════════════════════════════════
+function OngletCommerciaux({ objectifs, reel, loading }) {
+  const commerciaux = objectifs.filter(o => o.categorie === 'EMPLOYE' && o.obj_com_nette_total)
 
-  const global = objectifs.find(o => o.scope==='global' && o.period_type==='year')
-  const parAgent = AGENTS.map(code => objectifs.find(o => o.scope==='agent' && o.agent_code===code && o.period_type==='year')).filter(Boolean)
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: C.textL }}>Chargement…</div>
 
-  if (loading) return <div style={{ padding:40, textAlign:'center', color:C.textL }}>Chargement…</div>
+  // KPIs globaux commerciaux
+  const totalObj = commerciaux.reduce((s, o) => s + (o.obj_com_nette_total || 0), 0)
+  const totalReel = commerciaux.reduce((s, o) => s + (reel[o.collaborateur_code]?.com_nette || 0), 0)
+  const totalObjNA = commerciaux.reduce((s, o) => s + (o.obj_na_total || 0), 0)
+  const totalReelNA = commerciaux.reduce((s, o) => s + (reel[o.collaborateur_code]?.na || 0), 0)
+  const totalObjVie = commerciaux.reduce((s, o) => s + (o.obj_prime_vie || 0), 0)
+  const totalReelVie = commerciaux.reduce((s, o) => s + (reel[o.collaborateur_code]?.prime_vie || 0), 0)
 
   return (
     <div>
       {/* KPIs globaux */}
-      {global && (
-        <div style={{ marginBottom:24 }}>
-          <h3 style={{ fontSize:13, fontWeight:700, color:C.textL, textTransform:'uppercase', letterSpacing:.5, marginBottom:14 }}>Objectifs annuels Dynassur</h3>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:14 }}>
-            <KpiCard label="Nouvelles Affaires" value={`${fmtN(global.actual_na)} / ${fmtN(global.target_na)}`} col={C.cyan} pct={global.pct_na} sub={`Objectif : ${fmtN(global.target_na)} NA/an`} />
-            <KpiCard label="Primes" value={fmt(global.actual_primes)} col='#7c3aed' pct={global.pct_primes} sub={`Objectif : ${fmt(global.target_primes)}`} />
-            <KpiCard label="Commissions" value={fmt(global.actual_commissions)} col={C.ok} pct={global.pct_commissions} sub={`Objectif : ${fmt(global.target_commissions)}`} />
-            <KpiCard label="Mandats faveur" value={`${fmtN(global.actual_mandat_fav)} / ${fmtN(global.target_mandat_fav)}`} col={C.warn} pct={global.target_mandat_fav>0?global.actual_mandat_fav/global.target_mandat_fav*100:null} />
-          </div>
-        </div>
-      )}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 24 }}>
+        <KpiCard label="Commission nette Dynassur" value={fmt(totalReel)} sub={`Objectif : ${fmt(totalObj)}`} pct={totalObj > 0 ? totalReel / totalObj * 100 : null} col={C.blue} icon="ti-coin" />
+        <KpiCard label="Nouvelles affaires" value={fmtN(totalReelNA)} sub={`Objectif : ${fmtN(totalObjNA)} NA`} pct={totalObjNA > 0 ? totalReelNA / totalObjNA * 100 : null} col="#7c3aed" icon="ti-file-plus" />
+        <KpiCard label="Prime VIE (capital)" value={fmt(totalReelVie)} sub={`Objectif : ${fmt(totalObjVie)}`} pct={totalObjVie > 0 ? totalReelVie / totalObjVie * 100 : null} col="#0d9488" icon="ti-heart" />
+      </div>
 
-      {/* Par agent */}
-      {parAgent.length > 0 && (
-        <div style={D.card}>
-          <div style={{ fontSize:11, fontWeight:700, color:C.textL, textTransform:'uppercase', letterSpacing:.5, marginBottom:16 }}>Objectifs par commercial</div>
-          <div style={{ overflowX:'auto' }}>
-            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
-              <thead>
-                <tr>
-                  {['Agent','Obj. NA','Réalisé NA','Avancement','Obj. Primes','Réalisé Primes'].map(h => (
-                    <th key={h} style={D.th}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {parAgent.map(a => (
-                  <tr key={a.agent_code} style={{ transition:'background 0.1s' }}
-                    onMouseEnter={e=>e.currentTarget.style.background='#f8fafc'}
-                    onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                    <td style={D.td}>
-                      <div style={{ fontWeight:600, color:C.textD }}>{AGENT_NOMS[a.agent_code]||a.agent_code}</div>
-                      <div style={{ fontSize:11, color:C.textL }}>{a.agent_code}</div>
+      {/* Tableau par commercial */}
+      <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
+        <div style={{ padding: '14px 18px', borderBottom: `1px solid ${C.border}`, fontSize: 12, fontWeight: 700, color: C.textL, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+          Détail par commercial
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: C.bg }}>
+                {['Commercial', 'Commission obj.', 'Commission réelle', 'Avancement', 'NA obj.', 'NA réel', 'Prime VIE obj.', 'Prime VIE réelle', 'Rétention obj.', 'Rét. réelle'].map(h => (
+                  <th key={h} style={{ padding: '10px 14px', fontSize: 11, fontWeight: 700, color: C.textL, textAlign: 'left', borderBottom: `1px solid ${C.border}`, textTransform: 'uppercase', letterSpacing: 0.4, whiteSpace: 'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {commerciaux.map(o => {
+                const r = reel[o.collaborateur_code] || {}
+                const pctCom = o.obj_com_nette_total > 0 ? (r.com_nette || 0) / o.obj_com_nette_total * 100 : null
+                const retObj = o.obj_taux_retention
+                const retReel = r.retention
+                return (
+                  <tr key={o.collaborateur_code}
+                    onMouseEnter={e => e.currentTarget.style.background = C.bluePale}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}` }}>
+                      <div style={{ fontWeight: 700, color: C.text, fontSize: 14 }}>{o.collaborateur_code}</div>
+                      <div style={{ fontSize: 11, color: C.textL }}>{o.categorie}</div>
                     </td>
-                    <td style={D.td}>{fmtN(a.target_na)}</td>
-                    <td style={D.td}><span style={{ fontWeight:700, color:C.textD }}>{fmtN(a.actual_na)}</span></td>
-                    <td style={{ ...D.td, minWidth:160 }}><ProgressBar pct={a.pct_na} col={C.cyan} /></td>
-                    <td style={D.td}>{fmt(a.target_primes)}</td>
-                    <td style={D.td}>{fmt(a.actual_primes)}</td>
+                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.textM }}>{fmt(o.obj_com_nette_total)}</td>
+                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 14, fontWeight: 700, color: pctColor(pctCom) }}>{fmt(r.com_nette)}</td>
+                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, minWidth: 160 }}><ProgressBar pct={pctCom} /></td>
+                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.textM }}>{fmtN(o.obj_na_total)}</td>
+                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 14, fontWeight: 700, color: C.text }}>{fmtN(r.na)}</td>
+                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.textM }}>{fmt(o.obj_prime_vie)}</td>
+                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 14, fontWeight: 700, color: C.text }}>{fmt(r.prime_vie)}</td>
+                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.textM }}>{fmtPct(retObj)}</td>
+                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}` }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: retColor(retReel) }}>{fmtPct(retReel)}</span>
+                    </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {!global && !loading && (
-        <div style={{ padding:40, textAlign:'center', background:'#fff', borderRadius:10, border:`1px solid ${C.border}`, color:C.textL }}>
-          <i className="ti ti-target" style={{ fontSize:40, display:'block', marginBottom:12 }} />
-          Aucun objectif configuré pour 2026.<br/>
-          <span style={{ fontSize:12 }}>Les objectifs sont définis dans la table <code>objectives_global</code> de Supabase.</span>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ══════════════════════════════════════════════
-// ONGLET 2 — COMPAGNIES
-// ══════════════════════════════════════════════
-function OngletCompagnies({ stargetResults, technicalResults, loadingStar }) {
-  const [compagnie, setCompagnie] = useState('AG')
-  const COMPAGNIES = ['AG','AXA','VIVIUM','ALLIANZ']
-  const LABELS = { AG:'AG Insurance — Starget', AXA:'AXA Belgium — S\'miles', VIVIUM:'Vivium — Partnership', ALLIANZ:'Allianz — Barème fixe' }
-
-  // Dernier résultat Starget AG
-  const lastStar = stargetResults.length > 0
-    ? [...stargetResults].sort((a,b) => b.week_number - a.week_number)[0]
-    : null
-
-  // Résultats techniques AG par famille
-  const techByFamily = useMemo(() => {
-    const latest = technicalResults.filter(r => r.period_year===2026)
-    const map = {}
-    latest.forEach(r => {
-      if (!map[r.product_family]) map[r.product_family] = r
-    })
-    return map
-  }, [technicalResults])
-
-  const totalPrimesAG = Object.values(techByFamily).reduce((s,r)=>s+(r.primes_acquises_period||0),0)
-  const totalSinistresAG = Object.values(techByFamily).reduce((s,r)=>s+(r.sinistres_period||0),0)
-  const totalComAG = Object.values(techByFamily).reduce((s,r)=>s+(r.commissions_acquises||0),0)
-  const spGlobalAG = totalPrimesAG>0 ? totalSinistresAG/totalPrimesAG*100 : null
-
-  return (
-    <div>
-      {/* Sélecteur compagnie */}
-      <div style={{ display:'flex', gap:8, marginBottom:20, flexWrap:'wrap' }}>
-        {COMPAGNIES.map(c => (
-          <button key={c} onClick={()=>setCompagnie(c)} style={{
-            padding:'7px 16px', borderRadius:20, border:`2px solid ${C[c]||C.border}`,
-            background: compagnie===c ? (C[c]||C.navy) : C.white,
-            color: compagnie===c ? '#fff' : (C[c]||C.textM),
-            fontWeight:700, fontSize:13, cursor:'pointer', transition:'all 0.15s'
-          }}>{c}</button>
-        ))}
-      </div>
-
-      <div style={{ fontSize:11, fontWeight:700, color:C.textL, textTransform:'uppercase', letterSpacing:.5, marginBottom:16 }}>{LABELS[compagnie]}</div>
-
-      {/* ── AG ── */}
-      {compagnie==='AG' && (
-        <div>
-          {/* Starget dernière semaine */}
-          {lastStar ? (
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:14, marginBottom:20 }}>
-              <KpiCard label={`Starget S${lastStar.week_number} / Mois ${lastStar.month_number}`} value={fmt(lastStar.bonus_total)} col={C.AG} sub={`Niveau : ${lastStar.star_level||'—'}`} />
-              <KpiCard label="Bonus Croissance PPE" value={fmt(lastStar.bonus_croissance_ppe)} col={C.AG} />
-              <KpiCard label="Bonus Croissance Entr." value={fmt(lastStar.bonus_croissance_enterprise)} col={C.AG} />
-              <KpiCard label="Bonus Qualité S/P" value={fmt(lastStar.bonus_sp)} col={C.AG} />
-            </div>
-          ) : (
-            <div style={{ ...D.card, color:C.textL, textAlign:'center', padding:30 }}>
-              {loadingStar ? 'Chargement…' : 'Aucun résultat Starget importé. Importer les PDFs 2026.XX depuis SharePoint.'}
-            </div>
-          )}
-
-          {/* Résultats techniques par famille */}
-          {Object.keys(techByFamily).length > 0 && (
-            <div style={D.card}>
-              <div style={{ fontSize:11, fontWeight:700, color:C.textL, textTransform:'uppercase', letterSpacing:.5, marginBottom:12 }}>
-                Résultats techniques 2026 — S/P Global : <span style={{ color: (spGlobalAG||0)<40?C.ok:C.warn }}>{fmtPct(spGlobalAG)}</span>
-              </div>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:16 }}>
-                <div style={{ fontSize:12, color:C.textM }}>Primes acquises : <strong>{fmt(totalPrimesAG)}</strong></div>
-                <div style={{ fontSize:12, color:C.textM }}>Sinistres : <strong style={{ color:(spGlobalAG||0)>45?C.danger:C.textD }}>{fmt(totalSinistresAG)}</strong></div>
-                <div style={{ fontSize:12, color:C.textM }}>Commissions : <strong style={{ color:C.ok }}>{fmt(totalComAG)}</strong></div>
-              </div>
-              <div style={{ overflowX:'auto' }}>
-                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
-                  <thead>
-                    <tr>{['Famille','Primes acquises','Sinistres','Commissions','S/P'].map(h=><th key={h} style={D.th}>{h}</th>)}</tr>
-                  </thead>
-                  <tbody>
-                    {Object.entries(techByFamily).map(([fam, r]) => {
-                      const sp = r.sp_historique_total
-                      return (
-                        <tr key={fam} onMouseEnter={e=>e.currentTarget.style.background='#f8fafc'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                          <td style={{ ...D.td, fontWeight:600, color:C.textD }}>{fam}</td>
-                          <td style={D.td}>{fmt(r.primes_acquises_period)}</td>
-                          <td style={D.td}>{fmt(r.sinistres_period)}</td>
-                          <td style={{ ...D.td, color:C.ok, fontWeight:600 }}>{fmt(r.commissions_acquises)}</td>
-                          <td style={D.td}>
-                            <span style={{ fontWeight:700, color: sp==null?C.textL:sp<40?C.ok:sp<55?C.warn:C.danger }}>
-                              {fmtPct(sp)}
-                            </span>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── AXA ── */}
-      {compagnie==='AXA' && (
-        <div style={D.card}>
-          <div style={{ marginBottom:16 }}>
-            <div style={{ fontSize:13, fontWeight:600, color:C.textD, marginBottom:12 }}>Programme S'miles 2026 — Niveaux de partnership</div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:12 }}>
-              {[
-                { level:'Bronze',   miles:900,  booster:0,   col:'#cd7f32' },
-                { level:'Silver',   miles:1900, booster:10,  col:'#94a3b8' },
-                { level:'Gold',     miles:3500, booster:30,  col:'#f59e0b' },
-                { level:'Platinum', miles:7700, booster:50,  col:'#64748b' },
-              ].map(l => (
-                <div key={l.level} style={{ background:C.bg, borderRadius:8, padding:'14px 16px', borderLeft:`3px solid ${l.col}` }}>
-                  <div style={{ fontWeight:800, color:l.col, fontSize:15, marginBottom:4 }}>{l.level}</div>
-                  <div style={{ fontSize:12, color:C.textM }}>À partir de <strong>{fmtN(l.miles)} miles</strong></div>
-                  <div style={{ fontSize:12, color:C.textM }}>Booster : <strong style={{ color:l.booster>0?C.ok:C.textM }}>{l.booster > 0 ? `+${l.booster}%` : 'Aucun'}</strong></div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div style={{ fontSize:13, fontWeight:600, color:C.textD, marginBottom:10 }}>Taux de base sur nouvelle production</div>
-          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
-            <thead><tr>{['Branche','Taux de base'].map(h=><th key={h} style={D.th}>{h}</th>)}</tr></thead>
-            <tbody>
-              {[
-                ['Mobilité particuliers — formules de base','7 %'],
-                ['Mobilité particuliers — garanties optionnelles','8 %'],
-                ['Incendie particuliers & autres garanties','15 %'],
-                ['Protection juridique','8 %'],
-                ['Protection','7 %'],
-                ['Voyage','7 %'],
-                ['PME (petites & moyennes entreprises)','4,5 %'],
-                ['Vie particuliers, indépendants, entreprises','0,5 %'],
-              ].map(([b,t]) => (
-                <tr key={b} onMouseEnter={e=>e.currentTarget.style.background='#f8fafc'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                  <td style={D.td}>{b}</td>
-                  <td style={{ ...D.td, fontWeight:700, color:C.AXA }}>{t}</td>
-                </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
         </div>
-      )}
+      </div>
 
-      {/* ── VIVIUM ── */}
-      {compagnie==='VIVIUM' && (
-        <div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14, marginBottom:20 }}>
-            {[
-              { level:'Niveau 1', points:600,  rate:3, na:75,   prime:100000,  col:'#6b7280' },
-              { level:'Niveau 2', points:1300, rate:4, na:150,  prime:250000,  col:'#0080BD' },
-              { level:'Niveau 3', points:3000, rate:5, na:200,  prime:400000,  col:'#00A650' },
-            ].map(l => (
-              <div key={l.level} style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:10, padding:18, borderTop:`3px solid ${l.col}` }}>
-                <div style={{ fontWeight:800, color:l.col, fontSize:16, marginBottom:10 }}>{l.level}</div>
-                <div style={{ fontSize:12, color:C.textM, marginBottom:4 }}>≥ <strong>{fmtN(l.points)} points</strong></div>
-                <div style={{ fontSize:12, color:C.textM, marginBottom:4 }}>≥ <strong>{l.na} NA</strong> (Life + Non-Life)</div>
-                <div style={{ fontSize:12, color:C.textM, marginBottom:10 }}>≥ <strong>{fmt(l.prime)}</strong> prime acquise Non-Life</div>
-                <div style={{ background:l.col, color:'#fff', borderRadius:6, padding:'6px 10px', fontSize:14, fontWeight:800, textAlign:'center' }}>
-                  {l.rate} % sur prime production
+      {/* Bonus paliers */}
+      <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 10, padding: 18, marginTop: 16 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: C.textL, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 14 }}>Paliers de bonus — TJA & GGO</div>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          {[
+            { label: 'Palier 1', seuil: '> 200.000 €', bonus: '+5% sur le surplus', col: C.blue },
+            { label: 'Palier 2', seuil: '> 250.000 €', bonus: '+8% sur le surplus', col: C.ok },
+            { label: 'Palier 3', seuil: '> 300.000 €', bonus: '+10% sur le surplus', col: '#7c3aed' },
+          ].map(p => {
+            const tjaReel = reel['TJA']?.com_nette || 0
+            const ggoReel = reel['GGO']?.com_nette || 0
+            const seuilNum = p.label === 'Palier 1' ? 200000 : p.label === 'Palier 2' ? 250000 : 300000
+            return (
+              <div key={p.label} style={{ flex: 1, minWidth: 200, background: C.bg, borderRadius: 8, padding: '12px 16px', borderLeft: `3px solid ${p.col}` }}>
+                <div style={{ fontWeight: 700, color: p.col, marginBottom: 4 }}>{p.label}</div>
+                <div style={{ fontSize: 12, color: C.textM, marginBottom: 4 }}>{p.seuil}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 8 }}>{p.bonus}</div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <Badge label={`TJA ${tjaReel >= seuilNum ? '✓' : '✗'}`} color={tjaReel >= seuilNum ? C.ok : C.danger} pale={tjaReel >= seuilNum ? C.okPale : C.dangerPale} />
+                  <Badge label={`GGO ${ggoReel >= seuilNum ? '✓' : '✗'}`} color={ggoReel >= seuilNum ? C.ok : C.danger} pale={ggoReel >= seuilNum ? C.okPale : C.dangerPale} />
                 </div>
               </div>
-            ))}
-          </div>
-          <div style={D.card}>
-            <div style={{ fontSize:13, fontWeight:600, color:C.textD, marginBottom:10 }}>Bonus rentabilité S/P global (% prime acquise Non-Life)</div>
-            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
-              <thead><tr>{['S/P Global','Niveau 1','Niveau 2','Niveau 3'].map(h=><th key={h} style={D.th}>{h}</th>)}</tr></thead>
-              <tbody>
-                {[
-                  ['< 30 %','0,60 %','0,80 %','1,00 %'],
-                  ['30 % – 35 %','0,40 %','0,60 %','0,80 %'],
-                  ['35 % – 40 %','0,20 %','0,40 %','0,60 %'],
-                  ['40 % – 45 %','0,00 %','0,20 %','0,40 %'],
-                  ['45 % – 50 %','0,00 %','0,00 %','0,20 %'],
-                ].map(([sp,...vals]) => (
-                  <tr key={sp} onMouseEnter={e=>e.currentTarget.style.background='#f8fafc'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                    <td style={{ ...D.td, fontWeight:600 }}>{sp}</td>
-                    {vals.map((v,i)=><td key={i} style={{ ...D.td, fontWeight:700, color:C.VIVIUM }}>{v}</td>)}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+            )
+          })}
         </div>
-      )}
-
-      {/* ── ALLIANZ ── */}
-      {compagnie==='ALLIANZ' && (
-        <div style={D.card}>
-          <div style={{ fontSize:13, color:C.textM, marginBottom:16, background:'#eff6ff', borderRadius:8, padding:'10px 14px', border:'1px solid #bfdbfe' }}>
-            <strong>Allianz</strong> fonctionne sur un barème de base fixe — pas de programme de fidélité ou bonus annuel.
-          </div>
-          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
-            <thead><tr>{['Branche','Produit','Taux de base'].map(h=><th key={h} style={D.th}>{h}</th>)}</tr></thead>
-            <tbody>
-              {[
-                ['Auto','RC Auto Tourisme','17 %'],
-                ['Auto','Omnium Auto Tourisme','19 %'],
-                ['Auto','Conducteur','25 %'],
-                ['Auto','RC Transport ≤ 3,5T','13,5 %'],
-                ['Auto','RC Transport > 3,5T','10 %'],
-                ['Incendie','Home Plan / Biz Commerce','27 %'],
-                ['Incendie','Biz Agriculture / Buildings','25 %'],
-                ['Incendie','Biz Horeca','20 %'],
-                ['Incendie','Risques spéciaux','15 %'],
-                ['RC','Family Plan','22,5 %'],
-                ['RC','RC Exploitation','20 %'],
-                ['RC','RC Professionnelle / D&O / Cyber','15 %'],
-                ['Accidents corporels','Individuelle / Circulation','25 %'],
-                ['Accidents du travail','AT / Gens de maison','7,5 – 15 %'],
-                ['Engineering','TRC / Bris de Machine','15 %'],
-                ['Engineering','Décennale Loi Peeters','10 %'],
-                ['Vie','Solde restant dû / Temporaire','15 %'],
-                ['Vie','Plan for Life+','max 5 %'],
-                ['Vie Entreprise','Vie et décès','max 4 %'],
-                ['Vie Entreprise','Allianz Medical Plan','10 %'],
-              ].map(([b,p,t]) => (
-                <tr key={b+p} onMouseEnter={e=>e.currentTarget.style.background='#f8fafc'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                  <td style={{ ...D.td, fontWeight:600, color:C.textD }}>{b}</td>
-                  <td style={D.td}>{p}</td>
-                  <td style={{ ...D.td, fontWeight:700, color:C.ALLIANZ }}>{t}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      </div>
     </div>
   )
 }
 
-// ══════════════════════════════════════════════
-// ONGLET 3 — RENTABILITÉ
-// ══════════════════════════════════════════════
-function OngletRentabilite({ rentabilite, loading }) {
-  const INSURERS = ['AG','AXA','VIVIUM','ALLIANZ']
+// ══════════════════════════════════════════════════════════════
+// ONGLET 2 — SOUS-AGENTS
+// ══════════════════════════════════════════════════════════════
+function OngletSousAgents({ objectifs, reel, loading }) {
+  const sa = objectifs.filter(o => o.categorie === 'SA' && o.obj_com_nette_total)
 
-  if (loading) return <div style={{ padding:40, textAlign:'center', color:C.textL }}>Chargement…</div>
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: C.textL }}>Chargement…</div>
 
-  if (!rentabilite.length) return (
-    <div style={{ ...D.card, textAlign:'center', color:C.textL, padding:40 }}>
-      <i className="ti ti-chart-bar" style={{ fontSize:40, display:'block', marginBottom:12 }} />
-      Aucune donnée de rentabilité disponible.<br/>
-      <span style={{ fontSize:12 }}>Les chiffres s'afficheront ici une fois les résultats importés depuis les compagnies.</span>
-    </div>
-  )
-
-  // Totaux par compagnie
-  const byInsurer = {}
-  rentabilite.forEach(r => {
-    if (!byInsurer[r.insurer]) byInsurer[r.insurer] = { primes:0, sinistres:0, commissions:0, bonus:0 }
-    byInsurer[r.insurer].primes      += parseFloat(r.total_primes_acquises||0)
-    byInsurer[r.insurer].sinistres   += parseFloat(r.total_sinistres||0)
-    byInsurer[r.insurer].commissions += parseFloat(r.total_commissions||0)
-    byInsurer[r.insurer].bonus       += parseFloat(r.total_bonus||0)
-  })
-
-  const totalRevenu = Object.values(byInsurer).reduce((s,r)=>s+r.commissions+r.bonus,0)
+  const totalObj = sa.reduce((s, o) => s + (o.obj_com_nette_total || 0), 0)
+  const totalReel = sa.reduce((s, o) => s + (reel[o.collaborateur_code]?.com_dynassur || 0), 0)
 
   return (
     <div>
-      {/* KPIs globaux */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:14, marginBottom:24 }}>
-        <KpiCard label="Revenu total toutes compagnies" value={fmt(totalRevenu)} col='#7c3aed' />
-        <KpiCard label="Compagnies actives" value={Object.keys(byInsurer).length} col={C.cyan} />
-        <KpiCard label="Commissions acquises" value={fmt(Object.values(byInsurer).reduce((s,r)=>s+r.commissions,0))} col={C.ok} />
-        <KpiCard label="Bonus programmes" value={fmt(Object.values(byInsurer).reduce((s,r)=>s+r.bonus,0))} col={C.warn} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 24 }}>
+        <KpiCard label="Part Dynassur — tous SA" value={fmt(totalReel)} sub={`Objectif : ${fmt(totalObj)}`} pct={totalObj > 0 ? totalReel / totalObj * 100 : null} col={C.blue} icon="ti-coin" />
+        <KpiCard label="SA avec objectif" value={sa.length} col="#7c3aed" icon="ti-users" />
+        <KpiCard label="SA en difficulté (rét. < 60%)" value={sa.filter(o => (reel[o.collaborateur_code]?.retention || 100) < 60).length} col={C.danger} icon="ti-alert-triangle" />
       </div>
 
-      {/* Par compagnie */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(320px,1fr))', gap:16 }}>
-        {INSURERS.map(ins => {
-          const d = byInsurer[ins]
-          if (!d) return null
-          const sp = d.primes>0 ? d.sinistres/d.primes*100 : null
-          const col = C[ins]||C.navy
-          return (
-            <div key={ins} style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:10, overflow:'hidden' }}>
-              <div style={{ background:col, padding:'12px 16px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                <span style={{ color:'#fff', fontWeight:800, fontSize:15 }}>{ins}</span>
-                <span style={{ color:'#fff', fontWeight:700, fontSize:18 }}>{fmt(d.commissions+d.bonus)}</span>
-              </div>
-              <div style={{ padding:16 }}>
-                {[
-                  { label:'Primes acquises', value:fmt(d.primes) },
-                  { label:'Sinistres', value:fmt(d.sinistres) },
-                  { label:'S/P', value:fmtPct(sp), color: sp==null?C.textM:sp<40?C.ok:sp<55?C.warn:C.danger },
-                  { label:'Commissions', value:fmt(d.commissions), color:C.ok },
-                  { label:'Bonus programme', value:fmt(d.bonus), color:C.warn },
-                ].map(row => (
-                  <div key={row.label} style={{ display:'flex', justifyContent:'space-between', padding:'6px 0', borderBottom:`1px solid ${C.border}` }}>
-                    <span style={{ fontSize:12, color:C.textL }}>{row.label}</span>
-                    <span style={{ fontSize:13, fontWeight:600, color:row.color||C.textD }}>{row.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Détail par branche */}
-      {rentabilite.length > 0 && (
-        <div style={{ ...D.card, marginTop:16 }}>
-          <div style={{ fontSize:11, fontWeight:700, color:C.textL, textTransform:'uppercase', letterSpacing:.5, marginBottom:12 }}>Détail par compagnie et branche</div>
-          <div style={{ overflowX:'auto' }}>
-            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
-              <thead>
-                <tr>{['Compagnie','Branche','Primes','Sinistres','S/P','Commissions','Bonus','Revenu total'].map(h=><th key={h} style={D.th}>{h}</th>)}</tr>
-              </thead>
-              <tbody>
-                {rentabilite.map((r,i) => {
-                  const sp = r.sp_global
-                  return (
-                    <tr key={i} onMouseEnter={e=>e.currentTarget.style.background='#f8fafc'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                      <td style={D.td}><span style={{ ...D.badge(C[r.insurer]||C.navy) }}>{r.insurer}</span></td>
-                      <td style={{ ...D.td, color:C.textD, fontWeight:500 }}>{r.branch||'—'}</td>
-                      <td style={D.td}>{fmt(r.total_primes_acquises)}</td>
-                      <td style={D.td}>{fmt(r.total_sinistres)}</td>
-                      <td style={D.td}><span style={{ fontWeight:700, color: sp==null?C.textL:sp<40?C.ok:sp<55?C.warn:C.danger }}>{fmtPct(sp)}</span></td>
-                      <td style={{ ...D.td, color:C.ok, fontWeight:600 }}>{fmt(r.total_commissions)}</td>
-                      <td style={{ ...D.td, color:C.warn, fontWeight:600 }}>{fmt(r.total_bonus)}</td>
-                      <td style={{ ...D.td, color:'#7c3aed', fontWeight:700 }}>{fmt(r.revenu_total)}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+      <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
+        <div style={{ padding: '14px 18px', borderBottom: `1px solid ${C.border}`, fontSize: 12, fontWeight: 700, color: C.textL, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+          Part nette Dynassur par sous-agent
         </div>
-      )}
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: C.bg }}>
+                {['SA', 'Taux Dynassur', 'Part obj.', 'Part réelle', 'Avancement', 'Rét. obj.', 'Rét. réelle', 'NA réel', 'Statut'].map(h => (
+                  <th key={h} style={{ padding: '10px 14px', fontSize: 11, fontWeight: 700, color: C.textL, textAlign: 'left', borderBottom: `1px solid ${C.border}`, textTransform: 'uppercase', letterSpacing: 0.4, whiteSpace: 'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {sa.sort((a, b) => (reel[b.collaborateur_code]?.com_dynassur || 0) - (reel[a.collaborateur_code]?.com_dynassur || 0)).map(o => {
+                const r = reel[o.collaborateur_code] || {}
+                const pctCom = o.obj_com_nette_total > 0 ? (r.com_dynassur || 0) / o.obj_com_nette_total * 100 : null
+                const retReel = r.retention
+                const enDifficulte = retReel != null && retReel < 60
+
+                return (
+                  <tr key={o.collaborateur_code}
+                    onMouseEnter={e => e.currentTarget.style.background = C.bluePale}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}` }}>
+                      <div style={{ fontWeight: 700, color: C.text }}>{o.collaborateur_code}</div>
+                      <div style={{ fontSize: 11, color: C.textL }}>{o.taux_retention_dynassur}% Dynassur</div>
+                    </td>
+                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}` }}>
+                      <Badge label={`${o.taux_retention_dynassur}%`} color={o.taux_retention_dynassur >= 20 ? C.blue : C.grey} pale={C.bluePale} />
+                    </td>
+                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.textM }}>{fmt(o.obj_com_nette_total)}</td>
+                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 14, fontWeight: 700, color: pctColor(pctCom) }}>{fmt(r.com_dynassur)}</td>
+                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, minWidth: 140 }}><ProgressBar pct={pctCom} /></td>
+                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.textM }}>{fmtPct(o.obj_taux_retention)}</td>
+                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}` }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: retColor(retReel) }}>{fmtPct(retReel)}</span>
+                    </td>
+                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.text }}>{fmtN(r.na)}</td>
+                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}` }}>
+                      {enDifficulte
+                        ? <Badge label="⚠ Rétention faible" color={C.danger} pale={C.dangerPale} />
+                        : <Badge label="✓ OK" color={C.ok} pale={C.okPale} />
+                      }
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   )
 }
 
-// ══════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+// ONGLET 3 — RÉTENTION GLOBALE
+// ══════════════════════════════════════════════════════════════
+function OngletRetention({ reel, loading }) {
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: C.textL }}>Chargement…</div>
+
+  const tous = Object.entries(reel).filter(([, r]) => r.na > 0 || r.chutes > 0)
+  const totalNA = tous.reduce((s, [, r]) => s + (r.na || 0), 0)
+  const totalChutes = tous.reduce((s, [, r]) => s + (r.chutes || 0), 0)
+  const totalTFT = tous.reduce((s, [, r]) => s + (r.tft || 0), 0)
+  const retGlobal = totalNA > 0 ? (1 - totalChutes / totalNA) * 100 : null
+
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 24 }}>
+        <KpiCard label="NA 2026" value={fmtN(totalNA)} col={C.blue} icon="ti-file-plus" />
+        <KpiCard label="Chutes réelles" value={fmtN(totalChutes)} col={C.danger} icon="ti-trending-down" />
+        <KpiCard label="TFT (transferts)" value={fmtN(totalTFT)} col={C.warn} icon="ti-arrows-exchange" sub="Client gardé, CIE changée" />
+        <KpiCard label="Net (NA - chutes)" value={fmtN(totalNA - totalChutes)} col={C.ok} icon="ti-trending-up" />
+        <KpiCard label="Rétention globale 2026" value={fmtPct(retGlobal)} sub="Objectif : ≥ 70%" pct={retGlobal} col={retColor(retGlobal)} icon="ti-shield" />
+      </div>
+
+      <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
+        <div style={{ padding: '14px 18px', borderBottom: `1px solid ${C.border}`, fontSize: 12, fontWeight: 700, color: C.textL, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+          Rétention par producteur 2026
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: C.bg }}>
+                {['Producteur', 'NA', 'Chutes', 'TFT', 'Net', 'Rétention', 'Base 2025', 'Évolution'].map(h => (
+                  <th key={h} style={{ padding: '10px 14px', fontSize: 11, fontWeight: 700, color: C.textL, textAlign: 'left', borderBottom: `1px solid ${C.border}`, textTransform: 'uppercase', letterSpacing: 0.4, whiteSpace: 'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {tous.sort((a, b) => (b[1].na || 0) - (a[1].na || 0)).map(([code, r]) => {
+                const ret = r.na > 0 ? (1 - r.chutes / r.na) * 100 : null
+                const base = r.base2025
+                const evol = ret != null && base != null ? ret - base : null
+                return (
+                  <tr key={code}
+                    onMouseEnter={e => e.currentTarget.style.background = C.bluePale}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontWeight: 700, color: C.text }}>{code}</td>
+                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.text }}>{fmtN(r.na)}</td>
+                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, fontWeight: 600, color: C.danger }}>{fmtN(r.chutes)}</td>
+                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.warn }}>{fmtN(r.tft)}</td>
+                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, fontWeight: 600, color: (r.na - r.chutes) > 0 ? C.ok : C.danger }}>{fmtN(r.na - r.chutes)}</td>
+                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}` }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: retColor(ret), minWidth: 52 }}>{fmtPct(ret)}</span>
+                      </div>
+                    </td>
+                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.textM }}>{fmtPct(base)}</td>
+                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}` }}>
+                      {evol != null && (
+                        <span style={{ fontSize: 13, fontWeight: 700, color: evol >= 0 ? C.ok : C.danger }}>
+                          {evol >= 0 ? '▲' : '▼'} {Math.abs(evol).toFixed(1)} pts
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════
 // COMPOSANT PRINCIPAL
-// ══════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 export default function ObjectifsView() {
-  const [onglet, setOnglet] = useState('global')
-  const [objectifs, setObjectifs]         = useState([])
-  const [stargetResults, setStarget]      = useState([])
-  const [technicalResults, setTechnical]  = useState([])
-  const [rentabilite, setRentabilite]     = useState([])
-  const [loading, setLoading]             = useState(true)
-  const [loadingStar, setLoadingStar]     = useState(true)
+  const [onglet, setOnglet] = useState('commerciaux')
+  const [objectifs, setObjectifs] = useState([])
+  const [reel, setReel] = useState({})
+  const [loading, setLoading] = useState(true)
 
-  const DYNASSUR_BLUE = '#0080BD'
   const ONGLETS = [
-    { key:'global',      label:'Dynassur Global',  icon:'ti-target' },
-    { key:'compagnies',  label:'Compagnies',        icon:'ti-building' },
-    { key:'rentabilite', label:'Rentabilité',       icon:'ti-chart-bar' },
+    { key: 'commerciaux', label: 'Commerciaux', icon: 'ti-target' },
+    { key: 'sa', label: 'Sous-agents', icon: 'ti-users' },
+    { key: 'retention', label: 'Rétention', icon: 'ti-shield' },
   ]
 
   useEffect(() => {
     async function load() {
       setLoading(true)
-      setLoadingStar(true)
       try {
-        const [
-          { data: obj },
-          { data: star },
-          { data: tech },
-          { data: rent },
-        ] = await Promise.all([
-          supabase.from('objectives_global').select('*').eq('year', 2026),
-          supabase.from('ag_starget_results').select('*').eq('year', 2026).order('week_number', { ascending:false }),
-          supabase.from('ag_technical_results').select('*').eq('period_year', 2026),
-          supabase.from('view_rentabilite_compagnies').select('*').eq('year', 2026),
-        ])
+        // 1. Objectifs
+        const { data: obj } = await supabase.from('objectifs_2026').select('*')
+
+        // 2. Quittances 2026 — commissions réelles
+        let quittances = []
+        let offset = 0
+        while (true) {
+          const { data: rows } = await supabase.from('quittances')
+            .select('sous_agent,commission,prime_totale,domaine')
+            .gte('date_comptable', '2026-01-01')
+            .range(offset, offset + 999)
+          if (!rows || rows.length === 0) break
+          quittances = quittances.concat(rows)
+          if (rows.length < 1000) break
+          offset += 1000
+        }
+
+        // 3. Mouvements production 2026 — NA, chutes, TFT
+        let mouvements = []
+        offset = 0
+        while (true) {
+          const { data: rows } = await supabase.from('mouvements_production')
+            .select('sa_contrat,type_prod')
+            .eq('annee', 2026)
+            .range(offset, offset + 999)
+          if (!rows || rows.length === 0) break
+          mouvements = mouvements.concat(rows)
+          if (rows.length < 1000) break
+          offset += 1000
+        }
+
+        // 4. Mouvements 2025 — base rétention
+        let mouv2025 = []
+        offset = 0
+        while (true) {
+          const { data: rows } = await supabase.from('mouvements_production')
+            .select('sa_contrat,type_prod')
+            .eq('annee', 2025)
+            .range(offset, offset + 999)
+          if (!rows || rows.length === 0) break
+          mouv2025 = mouv2025.concat(rows)
+          if (rows.length < 1000) break
+          offset += 1000
+        }
+
+        // Mapping nom → code
+        const { data: collabs } = await supabase.from('collaborateurs').select('code,nom_sa_data')
+        const nameToCode = {}
+        collabs?.forEach(c => { if (c.nom_sa_data) nameToCode[c.nom_sa_data] = c.code })
+
+        // Taux SA
+        const TAUX = {}
+        obj?.forEach(o => { TAUX[o.collaborateur_code] = (o.taux_retention_dynassur || 100) / 100 })
+
+        const EMPLOYES = new Set(['GGO', 'TJA', 'PFQ', 'MTE', 'BHU', 'NGI', 'FBL', 'LDE'])
+        const EXCLURE = new Set(['Detilloux Ludovic', 'Priscilla Fernandez Quiroga'])
+        const CHUTES = new Set(['Renon', 'Résiliation Non paiement', 'Disparition de Risque', 'Mandat défaveur', 'Suspension'])
+        const TFT = new Set(['TFT CIE', 'Mandat faveur'])
+
+        function isVie(dom) {
+          const d = (dom || '').toLowerCase()
+          return d.includes('vie') || d.includes('placement')
+        }
+
+        // Agréger commissions
+        const reelMap = {}
+        const ensure = code => {
+          if (!reelMap[code]) reelMap[code] = { com_nette: 0, com_dynassur: 0, prime_vie: 0, na: 0, chutes: 0, tft: 0, base2025: null }
+        }
+
+        quittances.forEach(r => {
+          const sa = (r.sous_agent || '').trim()
+          if (!sa || sa === '-' || EXCLURE.has(sa)) return
+          const code = nameToCode[sa] || sa.substring(0, 3).toUpperCase()
+          ensure(code)
+          const com = r.commission || 0
+          const taux = TAUX[code] || (EMPLOYES.has(code) ? 1 : 0.20)
+          reelMap[code].com_nette += com
+          reelMap[code].com_dynassur += com * taux
+          if (isVie(r.domaine)) reelMap[code].prime_vie += r.prime_totale || 0
+        })
+
+        // Agréger mouvements 2026
+        mouvements.forEach(r => {
+          const sa = (r.sa_contrat || '').trim()
+          if (!sa || EXCLURE.has(sa)) return
+          const code = nameToCode[sa] || sa.split(' ')[0].toUpperCase().substring(0, 3)
+          ensure(code)
+          if (r.type_prod === 'N.A.') reelMap[code].na++
+          else if (CHUTES.has(r.type_prod)) reelMap[code].chutes++
+          else if (TFT.has(r.type_prod)) reelMap[code].tft++
+        })
+
+        // Rétention réelle 2026
+        Object.keys(reelMap).forEach(code => {
+          const r = reelMap[code]
+          r.retention = r.na > 0 ? (1 - r.chutes / r.na) * 100 : null
+        })
+
+        // Base rétention 2025
+        const base2025 = {}
+        mouv2025.forEach(r => {
+          const sa = (r.sa_contrat || '').trim()
+          if (!sa || EXCLURE.has(sa)) return
+          const code = nameToCode[sa] || sa.split(' ')[0].toUpperCase().substring(0, 3)
+          if (!base2025[code]) base2025[code] = { na: 0, chutes: 0 }
+          if (r.type_prod === 'N.A.') base2025[code].na++
+          else if (CHUTES.has(r.type_prod)) base2025[code].chutes++
+        })
+        Object.entries(base2025).forEach(([code, v]) => {
+          ensure(code)
+          reelMap[code].base2025 = v.na > 0 ? (1 - v.chutes / v.na) * 100 : null
+        })
+
         setObjectifs(obj || [])
-        setStarget(star || [])
-        setTechnical(tech || [])
-        setRentabilite(rent || [])
-      } catch(e) { console.error('ObjectifsView load error:', e) }
+        setReel(reelMap)
+      } catch (e) {
+        console.error('ObjectifsView error:', e)
+      }
       setLoading(false)
-      setLoadingStar(false)
     }
     load()
   }, [])
 
   return (
-    <div style={{ fontFamily:"'Source Sans Pro', sans-serif", padding: 0 }}>
-
+    <div style={{ fontFamily: "'Source Sans Pro', sans-serif", padding: 0 }}>
       {/* Header */}
-      <div style={{ marginBottom:24 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:4 }}>
-          <i className="ti ti-target" style={{ fontSize:22, color:DYNASSUR_BLUE }} />
-          <h1 style={{ fontSize:20, fontWeight:800, color:C.navy, margin:0 }}>Objectifs 2026</h1>
-          <span style={{ fontSize:12, background:DYNASSUR_BLUE+'18', color:DYNASSUR_BLUE, fontWeight:700, padding:'2px 10px', borderRadius:20 }}>DYNASSUR</span>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+          <i className="ti ti-target" style={{ fontSize: 20, color: C.blue }} />
+          <h1 style={{ fontSize: 18, fontWeight: 800, color: C.text, margin: 0 }}>Objectifs 2026</h1>
+          <Badge label="DYNASSUR" color={C.blue} pale={C.bluePale} />
         </div>
-        <p style={{ fontSize:13, color:C.textL, margin:0 }}>Suivi des objectifs commerciaux, programmes compagnies et rentabilité</p>
+        <p style={{ fontSize: 12, color: C.textL, margin: 0 }}>Suivi production, commissions nettes et rétention</p>
       </div>
 
       {/* Onglets */}
-      <div style={{ display:'flex', borderBottom:`1px solid ${C.border}`, marginBottom:24, background:C.white, borderRadius:'10px 10px 0 0', padding:'0 16px' }}>
-        {ONGLETS.map(o => (
-          <button key={o.key} onClick={()=>setOnglet(o.key)} style={D.tab(onglet===o.key, DYNASSUR_BLUE)}>
-            <i className={`ti ${o.icon}`} style={{ marginRight:6, fontSize:14 }} />
-            {o.label}
-          </button>
-        ))}
+      <div style={{ display: 'flex', borderBottom: `2px solid ${C.border}`, marginBottom: 20, background: C.white, borderRadius: '10px 10px 0 0', padding: '0 4px' }}>
+        {ONGLETS.map(o => {
+          const active = onglet === o.key
+          return (
+            <button key={o.key} onClick={() => setOnglet(o.key)} style={{
+              padding: '12px 18px', border: 'none', borderBottom: active ? `2px solid ${C.blue}` : '2px solid transparent',
+              background: 'transparent', cursor: 'pointer', fontSize: 13, fontWeight: active ? 700 : 400,
+              color: active ? C.blue : C.textL, marginBottom: -2, transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 6
+            }}>
+              <i className={`ti ${o.icon}`} style={{ fontSize: 15 }} />
+              {o.label}
+            </button>
+          )
+        })}
       </div>
 
       {/* Contenu */}
-      <div>
-        {onglet==='global'      && <OngletGlobal objectifs={objectifs} loading={loading} />}
-        {onglet==='compagnies'  && <OngletCompagnies stargetResults={stargetResults} technicalResults={technicalResults} loadingStar={loadingStar} />}
-        {onglet==='rentabilite' && <OngletRentabilite rentabilite={rentabilite} loading={loading} />}
-      </div>
+      {onglet === 'commerciaux' && <OngletCommerciaux objectifs={objectifs} reel={reel} loading={loading} />}
+      {onglet === 'sa' && <OngletSousAgents objectifs={objectifs} reel={reel} loading={loading} />}
+      {onglet === 'retention' && <OngletRetention reel={reel} loading={loading} />}
     </div>
   )
 }
