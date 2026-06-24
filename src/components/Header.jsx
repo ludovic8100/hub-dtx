@@ -65,7 +65,7 @@ function EntityDropdown({ activeSociete, societesDispo, onSelect, accentColor })
           border: `1px solid rgba(255,255,255,0.15)`,
           borderRadius: 8, padding: '5px 10px 5px 8px',
           cursor: 'pointer', transition: 'all 0.15s',
-          minWidth: 160,
+          minWidth: 0,
         }}
         onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.14)'}
         onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
@@ -80,8 +80,8 @@ function EntityDropdown({ activeSociete, societesDispo, onSelect, accentColor })
             : <GroupeLogo size={24} />
           }
         </div>
-        <div style={{ flex:1, textAlign:'left' }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', lineHeight: 1.1 }}>{cfg.label}</div>
+        <div style={{ flex:1, textAlign:'left', overflow:'hidden', minWidth:0 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', lineHeight: 1.1, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{cfg.label}</div>
           <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', lineHeight: 1 }}>Entité active</div>
         </div>
         <i className={`ti ${open ? 'ti-chevron-up' : 'ti-chevron-down'}`}
@@ -91,7 +91,7 @@ function EntityDropdown({ activeSociete, societesDispo, onSelect, accentColor })
       {/* Dropdown liste */}
       {open && (
         <div style={{
-          position: 'absolute', top: 'calc(100% + 6px)', left: 0,
+          position: 'fixed', top: '62px', left: '8px',
           background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)',
           borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
           minWidth: 200, zIndex: 200, overflow: 'hidden',
@@ -173,7 +173,7 @@ export default function Header({ currentPage, onToggleMenu, menuOuvert }) {
     }}>
 
       {/* Gauche : hamburger (mobile) + dropdown entité + breadcrumb */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: '100%', paddingLeft: 12, minWidth: 0, flex: '1 1 auto', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: '100%', paddingLeft: 8, minWidth: 0, flex: '1 1 auto', overflow: 'hidden' }}>
 
         {/* Bouton hamburger mobile */}
         {onToggleMenu && (
