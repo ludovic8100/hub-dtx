@@ -131,7 +131,7 @@ def extract():
             dossier = dossier_from_numero(row[0].get("qText"))
             if not dossier:
                 continue
-            rec = {"dossier": dossier, "source": "qlik_brio"}
+            rec = {"dossier": dossier}
             for i, (_, col, kind) in enumerate(MEAS):
                 v = (row[i + 1].get("qText") or "").strip()
                 if kind == "date":
