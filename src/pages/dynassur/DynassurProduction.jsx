@@ -30,6 +30,8 @@ const AGENT_NOMS = {
 }
 
 const MOIS_LABELS = ['','Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc']
+const moisNum = m => String(parseInt(m) || '').padStart(2, '0')                  // mois en chiffres : 8 -> "08"
+const fmtDateNum = v => { if (!v) return '—'; const s = String(v).slice(0, 10); const p = s.split('-'); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : s }  // 2026-12-01 -> 01/12/2026
 const fmtN = v => v==null?'—':new Intl.NumberFormat('fr-BE').format(v)
 
 // ── Composants utilitaires ──
@@ -99,7 +101,7 @@ function ContratModal({ police, onClose }) {
                     <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:10, fontSize:13 }}>
                       <Field2 l="Domaine" v={c.domaine} />
                       <Field2 l="Type production" v={c.type_production} />
-                      <Field2 l="Créé le" v={c.date_creation} />
+                      <Field2 l="Créé le" v={fmtDateNum(c.date_creation)} />
                       <Field2 l="Garantie / valeur" v={c.garantie_valeur} />
                       <Field2 l="Dossier" v={c.dossier} />
                       <Field2 l="Sous-agent" v={c.nom_sa || c.sa_code} />
@@ -119,7 +121,7 @@ function ContratModal({ police, onClose }) {
 function ActsModal({ titre, rows, onClose }) {
   const [contratNum, setContratNum] = useState(null)
   const COLS = [
-    { key:'mois',        label:'Mois',       get:d=>(d.annee||0)*100+parseInt(d.mois||0), render:d=>`${MOIS_LABELS[parseInt(d.mois)]||d.mois} ${d.annee}` },
+    { key:'mois',        label:'Mois',       get:d=>(d.annee||0)*100+parseInt(d.mois||0), render:d=>`${moisNum(d.mois)}/${d.annee}` },
     { key:'type_prod',   label:'Type',       get:d=>d.type_prod||'', render:d=>{ const cfg=TYPES_PROD[d.type_prod]||{col:'#94a3b8'}; return <Badge label={d.type_prod} col={cfg.col} /> } },
     { key:'agent_code',  label:'Agent',      get:d=>AGENT_NOMS[d.agent_code]||d.agent_code||'', render:d=>AGENT_NOMS[d.agent_code]||d.agent_code||'—' },
     { key:'client_nom',  label:'Client',     get:d=>d.client_nom||'', render:d=><span style={{ fontWeight:600, color:NAVY }}>{d.client_nom||'—'}</span> },
@@ -214,7 +216,7 @@ function ChartAnnee({ annee, rows, cats, mode, onDetail, myCode, myBase }) {
     cats.forEach(c => { seg[c.key] = val(rM.filter(d => d._dcat === c.key)) })
     const total = cats.reduce((s,c) => s + seg[c.key], 0)
     const stack = cats.reduce((s,c) => s + Math.max(0, seg[c.key]), 0)
-    return { i:i+1, mm, label:MOIS_LABELS[i+1], seg, total, stack, rM }
+    return { i:i+1, mm, label:mm, seg, total, stack, rM }
   })
   const maxStack = Math.max(...mois.map(m => m.stack), 1)
   const totalAn  = mois.reduce((s,m) => s + m.total, 0)
@@ -409,7 +411,7 @@ function OngletCollaborateurs({ data, annee, onDetail }) {
             padding:'4px 10px', borderRadius:20, border:`1px solid ${moisFilter===m?BLUE:'#e2e8f0'}`,
             background:moisFilter===m?BLUE:'#fff', color:moisFilter===m?'#fff':'#64748b',
             fontSize:12, cursor:'pointer'
-          }}>{MOIS_LABELS[parseInt(m)]}</button>
+          }}>{moisNum(m)}</button>
         ))}
       </div>
 
@@ -500,7 +502,7 @@ function OngletCollaborateurs({ data, annee, onDetail }) {
                         padding:'9px 16px', borderBottom:i<detailAgent.length-1?'1px solid #f8fafc':'none',
                         background:i%2===0?'#fff':'#fafafe' }}>
                         <div style={{ fontSize:11, color:'#94a3b8', fontWeight:600, minWidth:40 }}>
-                          {MOIS_LABELS[parseInt(d.mois)]}
+                          {moisNum(d.mois)}
                         </div>
                         <div>
                           <div style={{ fontSize:12, fontWeight:500, color:'#1e293b' }}>
@@ -559,7 +561,7 @@ function OngletDetail({ data }) {
         <select value={filters.mois} onChange={e=>{setFilters(f=>({...f,mois:e.target.value}));setPage(0)}} style={selStyle}>
           <option value="all">Tous les mois</option>
           {Array.from({length:12},(_,i)=>String(i+1).padStart(2,'0')).map(m=>(
-            <option key={m} value={m}>{MOIS_LABELS[parseInt(m)]}</option>
+            <option key={m} value={m}>{moisNum(m)}</option>
           ))}
         </select>
         <span style={{ fontSize:12, color:'#94a3b8', marginLeft:'auto' }}>
@@ -587,7 +589,7 @@ function OngletDetail({ data }) {
                       <tr key={i} style={{ background:i%2===0?'#fff':'#fafafe' }}
                         onMouseEnter={e=>e.currentTarget.style.background='#f0f9ff'}
                         onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'#fff':'#fafafe'}>
-                        <td style={{ padding:'8px 12px', borderBottom:'1px solid #f1f5f9', color:'#64748b', whiteSpace:'nowrap' }}>{MOIS_LABELS[parseInt(d.mois)]} {d.annee}</td>
+                        <td style={{ padding:'8px 12px', borderBottom:'1px solid #f1f5f9', color:'#64748b', whiteSpace:'nowrap' }}>{moisNum(d.mois)}/{d.annee}</td>
                         <td style={{ padding:'8px 12px', borderBottom:'1px solid #f1f5f9' }}><Badge label={d.type_prod} col={cfg.col} /></td>
                         <td style={{ padding:'8px 12px', borderBottom:'1px solid #f1f5f9', color:'#64748b' }}>{AGENT_NOMS[d.agent_code]||d.agent_code||'—'}</td>
                         <td style={{ padding:'8px 12px', borderBottom:'1px solid #f1f5f9', fontFamily:'monospace', fontSize:11 }}>{d.num_contrat ? <span onClick={()=>setContratNum(d.num_contrat)} style={{ color:BLUE, fontWeight:700, cursor:'pointer', textDecoration:'underline', textUnderlineOffset:2 }} title="Voir le contrat">{d.num_contrat}</span> : <span style={{ color:'#374151' }}>—</span>}</td>
