@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
 import { ENTITES } from '../../lib/entites'
 import { StatBanner } from '../../components/ui/AccountableUI'
+import { traduitGarantie } from '../../lib/garantieFr'
 
 const E = ENTITES.dynassur
 const NAVY = '#0D2F5E'
@@ -15,6 +16,17 @@ function etatStyle(etat) {
   if (e.startsWith('clôtur') || e.startsWith('clotur')) return { bg: '#dcfce7', fg: '#15803d', label: etat }
   if (e.startsWith('sans suite')) return { bg: '#f1f5f9', fg: '#64748b', label: etat }
   return { bg: '#f1f5f9', fg: '#64748b', label: etat || '—' }
+}
+
+const SORT_GET = {
+  ref: s => s.reference_sinistre || '',
+  assure: s => s.sinistre_nom || '',
+  survenance: s => s.date_survenance || '',
+  ouverture: s => s.date_ouverture || '',
+  etat: s => s.etat || '',
+  gestionnaire: s => s.gestionnaire || '',
+  domaine: s => s.domaine || '',
+  paye: s => Number(s.montant_paye) || 0,
 }
 
 function Kpi({ label, value, col, sub }) {
@@ -77,7 +89,7 @@ function SinistreDetail({ s, onClose }) {
             <Field label="Date d'ouverture" value={fmtD(s.date_ouverture)} />
             <Field label="Dernier état le" value={fmtD(s.date_etat)} />
             <Field label="Domaine" value={s.domaine} />
-            <Field label="Garantie(s)" value={s.garantie} />
+            <Field label="Garantie(s)" value={traduitGarantie(s.garantie)} />
             <Field label="Responsabilité" value={s.responsabilite} />
             <Field label="Gestionnaire" value={s.gestionnaire} />
             <Field label="Réf. producteur" value={s.reference_producteur} />
@@ -99,6 +111,7 @@ export default function DynassurSinistres() {
   const [annee, setAnnee] = useState('')
   const [q, setQ] = useState('')
   const [detail, setDetail] = useState(null)
+  const [sort, setSort] = useState({ key: 'ouverture', dir: 'desc' })
 
   async function charger() {
     setLoading(true)
@@ -106,7 +119,7 @@ export default function DynassurSinistres() {
     while (true) {
       const { data: page, error } = await supabase
         .from('sinistres')
-        .select('pointeur_sinistre,reference_sinistre,sinistre_nom,etat,gestionnaire,domaine,garantie,responsabilite,description,date_survenance,date_ouverture,montant_a_payer,montant_paye,annee')
+        .select('pointeur_sinistre,reference_sinistre,reference_producteur,police_objet_lien,sinistre_nom,etat,gestionnaire,domaine,garantie,responsabilite,description,date_survenance,date_ouverture,date_etat,montant_a_payer,montant_paye,montant_attente,montant_reserve,montant_recours,annee')
         .order('date_ouverture', { ascending: false, nullsFirst: false })
         .range(from, from + 999)
       if (error || !page || page.length === 0) break
@@ -132,13 +145,31 @@ export default function DynassurSinistres() {
       const t = q.toLowerCase()
       l = l.filter(s => `${s.reference_sinistre || ''} ${s.sinistre_nom || ''} ${s.description || ''} ${s.domaine || ''}`.toLowerCase().includes(t))
     }
+    const g = SORT_GET[sort.key] || SORT_GET.ouverture
+    l = [...l].sort((a, b) => {
+      const av = g(a), bv = g(b)
+      const r = typeof av === 'string' ? av.localeCompare(bv) : av - bv
+      return sort.dir === 'asc' ? r : -r
+    })
     return l
-  }, [data, etat, gest, annee, q])
+  }, [data, etat, gest, annee, q, sort])
 
   const enCours = useMemo(() => data.filter(s => (s.etat || '').toLowerCase().startsWith('en cours')).length, [data])
   const clotures = useMemo(() => data.filter(s => (s.etat || '').toLowerCase().startsWith('cl')).length, [data])
   const sumPaye = useMemo(() => liste.reduce((a, s) => a + Number(s.montant_paye || 0), 0), [liste])
   const sumAPayer = useMemo(() => liste.reduce((a, s) => a + Number(s.montant_a_payer || 0), 0), [liste])
+
+  const CUR = new Date().getFullYear()
+  const cur = useMemo(() => {
+    const d = data.filter(s => String(s.annee) === String(CUR))
+    return {
+      total: d.length,
+      enCours: d.filter(s => (s.etat || '').toLowerCase().startsWith('en cours')).length,
+      clotures: d.filter(s => (s.etat || '').toLowerCase().startsWith('cl')).length,
+      paye: d.reduce((a, s) => a + Number(s.montant_paye || 0), 0),
+      aPayer: d.reduce((a, s) => a + Number(s.montant_a_payer || 0), 0),
+    }
+  }, [data, CUR])
 
   const sel = { padding: '7px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, color: NAVY, background: '#fff', fontFamily: "'Source Sans Pro', sans-serif" }
 
@@ -160,6 +191,21 @@ export default function DynassurSinistres() {
         <Kpi label="Clôturés" value={clotures} col="#16a34a" />
         <Kpi label="Payé (sélection)" value={eur(sumPaye)} col="#7c3aed" />
         <Kpi label="À payer (sélection)" value={eur(sumAPayer)} col="#0d9488" />
+      </div>
+
+      {/* ── Bloc année en cours ── */}
+      <div style={{ background: `linear-gradient(135deg, ${E.color}0d, ${E.colorDark}14)`, border: `1px solid ${E.color}33`, borderRadius: 12, padding: '14px 18px', marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <i className="ti ti-calendar-stats" style={{ color: E.color, fontSize: 18 }} />
+          <span style={{ fontSize: 13, fontWeight: 800, color: NAVY, textTransform: 'uppercase', letterSpacing: '.04em' }}>Année en cours — {CUR}</span>
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 28 }}>
+          <div><div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Sinistres {CUR}</div><div style={{ fontSize: 22, fontWeight: 800, color: NAVY }}>{cur.total}</div></div>
+          <div><div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>En cours</div><div style={{ fontSize: 22, fontWeight: 800, color: '#ea580c' }}>{cur.enCours}</div></div>
+          <div><div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Clôturés</div><div style={{ fontSize: 22, fontWeight: 800, color: '#16a34a' }}>{cur.clotures}</div></div>
+          <div><div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Payé</div><div style={{ fontSize: 22, fontWeight: 800, color: '#7c3aed' }}>{eur(cur.paye)}</div></div>
+          <div><div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>À payer</div><div style={{ fontSize: 22, fontWeight: 800, color: '#0d9488' }}>{eur(cur.aPayer)}</div></div>
+        </div>
       </div>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 16, alignItems: 'center' }}>
@@ -191,14 +237,21 @@ export default function DynassurSinistres() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ background: '#f8fafc', color: '#64748b', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.04em', textAlign: 'left' }}>
-                  <th style={{ padding: '10px 14px' }}>Réf.</th>
-                  <th style={{ padding: '10px 14px' }}>Assuré</th>
-                  <th style={{ padding: '10px 14px' }}>Survenance</th>
-                  <th style={{ padding: '10px 14px' }}>Ouverture</th>
-                  <th style={{ padding: '10px 14px' }}>État</th>
-                  <th style={{ padding: '10px 14px' }}>Gestionnaire</th>
-                  <th style={{ padding: '10px 14px' }}>Domaine</th>
-                  <th style={{ padding: '10px 14px', textAlign: 'right' }}>Payé</th>
+                  {[
+                    { k: 'ref', label: 'Réf.' },
+                    { k: 'assure', label: 'Assuré' },
+                    { k: 'survenance', label: 'Survenance' },
+                    { k: 'ouverture', label: 'Ouverture' },
+                    { k: 'etat', label: 'État' },
+                    { k: 'gestionnaire', label: 'Gestionnaire' },
+                    { k: 'domaine', label: 'Domaine' },
+                    { k: 'paye', label: 'Payé', align: 'right' },
+                  ].map(c => (
+                    <th key={c.k} onClick={() => setSort(s => s.key === c.k ? { key: c.k, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: c.k, dir: 'asc' })}
+                      style={{ padding: '10px 14px', textAlign: c.align || 'left', cursor: 'pointer', userSelect: 'none', color: sort.key === c.k ? NAVY : '#64748b' }}>
+                      {c.label}{sort.key === c.k && <span style={{ marginLeft: 4 }}>{sort.dir === 'asc' ? '▲' : '▼'}</span>}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
