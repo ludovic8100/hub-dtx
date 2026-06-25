@@ -176,13 +176,14 @@ function ActsModal({ titre, rows, onClose }) {
 }
 
 // ── ONGLET 1 : Vue globale ──
-// dégradés « classe » (clair en haut → foncé en bas)
+// Palette inspirée de l'infographie « mindmap 5 étapes » (cubes dégradés clair→saturé) :
+// cyan (HQ) · violet (SA) · orange (Apporteur) · or (code perso) — magenta réservé
 const CAT_DEF = {
-  HQ:        { label:'HQ',         grad:'linear-gradient(160deg,#4895ef,#3f37c9)', solid:'#4361ee' },
-  SA:        { label:'Sous-agent', grad:'linear-gradient(160deg,#4ad6b6,#048a81)', solid:'#06d6a0' },
-  Apporteur: { label:'Apporteur',  grad:'linear-gradient(160deg,#ffd166,#f3722c)', solid:'#f8961e' },
+  HQ:        { label:'HQ',         grad:'linear-gradient(180deg,#38bdf8,#0284c7)', solid:'#0ea5e9' },
+  SA:        { label:'Sous-agent', grad:'linear-gradient(180deg,#c084fc,#7c3aed)', solid:'#9333ea' },
+  Apporteur: { label:'Apporteur',  grad:'linear-gradient(180deg,#fdba74,#ea580c)', solid:'#f97316' },
 }
-const mineDef = code => ({ key:code, label:code, grad:'linear-gradient(160deg,#f72585,#7209b7)', solid:'#b5179e' })
+const mineDef = code => ({ key:code, label:code, grad:'linear-gradient(180deg,#fcd34d,#f59e0b)', solid:'#f59e0b' })
 const POSITIFS = ['N.A.', 'Mandat faveur']
 const NEGATIFS = ['Renon', 'Résiliation Non paiement', 'Mandat défaveur']
 const MODES = [
