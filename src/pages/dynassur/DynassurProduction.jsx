@@ -411,7 +411,7 @@ export default function DynassurProduction() {
       let from = 0, all = []
       while (true) {
         const { data: rows, error } = await supabase.from('mouvements_production')
-          .select('type_prod, agent_code, annee, mois, num_contrat, client_nom, branche, compagnie')
+          .select('type_prod, annee, mois, agent_code:sa_contrat, num_contrat:police, client_nom:nom_client, branche:type_police, compagnie:cie')
           .eq('annee', annee)
           .order('mois', { ascending: false })
           .range(from, from + PAGE - 1)
@@ -421,7 +421,8 @@ export default function DynassurProduction() {
         if (r.length < PAGE) break
         from += PAGE
       }
-      setData(all); setLoading(false)
+      // mois est un entier en base -> normaliser en '01'..'12' pour le reste du code (comparaisons + tris)
+      setData(all.map(d => ({ ...d, mois: String(d.mois).padStart(2,'0') }))); setLoading(false)
     })()
   }, [annee])
 
