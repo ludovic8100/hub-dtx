@@ -102,94 +102,158 @@ function ActsModal({ titre, rows, onClose }) {
 }
 
 // ── ONGLET 1 : Vue globale ──
-function OngletGlobal({ data, annee, setAnnee, onDetail }) {
-  const ANNEES = [2024, 2025, 2026]
+// 3 catégories + dégradés « classe » (clair en haut → foncé en bas)
+const CATS = [
+  { key:'HQ',        label:'HQ',          grad:'linear-gradient(180deg,#5b9bff,#14306b)', solid:'#2f6fed' },
+  { key:'SA',        label:'Sous-agent',  grad:'linear-gradient(180deg,#5eead4,#0b6b63)', solid:'#0f9b8e' },
+  { key:'Apporteur', label:'Apporteur',   grad:'linear-gradient(180deg,#c4b5fd,#5b21b6)', solid:'#7c4dd6' },
+]
+const POSITIFS = ['N.A.', 'Mandat faveur']
+const NEGATIFS = ['Renon', 'Résiliation Non paiement', 'Mandat défaveur']
+const MODES = [
+  { key:'entrees', label:'Entrées',          types:POSITIFS },
+  { key:'sorties', label:'Sorties',          types:NEGATIFS },
+  { key:'nette',   label:'Production nette',  types:[...POSITIFS, ...NEGATIFS] },
+]
 
-  const positifs = ['N.A.', 'Mandat faveur']
-  const negatifs = ['Renon', 'Résiliation Non paiement', 'Mandat défaveur']
-  const fType = (...t) => data.filter(d=>t.includes(d.type_prod))
-
-  const totalNA      = data.filter(d=>d.type_prod==='N.A.').length
-  const totalMandFav = data.filter(d=>d.type_prod==='Mandat faveur').length
-  const totalMandDef = data.filter(d=>d.type_prod==='Mandat défaveur').length
-  const totalRenon   = data.filter(d=>['Renon','Résiliation Non paiement'].includes(d.type_prod)).length
-  const soldeNet     = totalNA + totalMandFav - totalMandDef - totalRenon
-
-  // Par mois
-  const parMois = Array.from({length:12},(_,i) => {
-    const m = String(i+1).padStart(2,'0')
-    const rows = data.filter(d=>d.mois===m)
-    const na    = rows.filter(d=>d.type_prod==='N.A.').length
-    const plus  = rows.filter(d=>positifs.includes(d.type_prod)).length
-    const moins = rows.filter(d=>negatifs.includes(d.type_prod)).length
-    return { m, label:MOIS_LABELS[i+1], na, plus, moins, net: plus-moins }
+// Un graphique empilé (12 mois) pour une année donnée
+function ChartAnnee({ annee, rows, mode, onDetail }) {
+  const isNet = mode.key === 'nette'
+  const mois = Array.from({ length:12 }, (_, i) => {
+    const mm = String(i+1).padStart(2,'0')
+    const rM = rows.filter(d => d.mois === mm)
+    const seg = {}
+    CATS.forEach(c => {
+      const rc = rM.filter(d => d._cat === c.key)
+      if (isNet) {
+        const plus  = rc.filter(d => POSITIFS.includes(d.type_prod)).length
+        const moins = rc.filter(d => NEGATIFS.includes(d.type_prod)).length
+        seg[c.key] = plus - moins
+      } else {
+        seg[c.key] = rc.filter(d => mode.types.includes(d.type_prod)).length
+      }
+    })
+    const total = CATS.reduce((s,c) => s + seg[c.key], 0)
+    const stack = CATS.reduce((s,c) => s + Math.max(0, seg[c.key]), 0) // hauteur empilable (positifs)
+    return { i:i+1, mm, label:MOIS_LABELS[i+1], seg, total, stack, rM }
   })
+  const maxStack = Math.max(...mois.map(m => m.stack), 1)
+  const totalAn  = mois.reduce((s,m) => s + m.total, 0)
+  const partCat  = CATS.map(c => {
+    const v = mois.reduce((s,m) => s + Math.max(0, m.seg[c.key]), 0)
+    return { ...c, v }
+  })
+  const totPos = partCat.reduce((s,c) => s + c.v, 0) || 1
+  const H = 150
 
-  const maxVal = Math.max(...parMois.map(m=>Math.max(m.plus,m.moins)), 1)
+  return (
+    <div style={{ background:'#fff', borderRadius:14, border:'1px solid #e8edf3', padding:'18px 20px', marginBottom:16, boxShadow:'0 1px 3px rgba(15,23,42,.04)' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:14 }}>
+        <div style={{ fontSize:16, fontWeight:800, color:NAVY }}>{annee}</div>
+        <div style={{ fontSize:12, color:'#64748b' }}>
+          {mode.label} : <strong style={{ color:NAVY }}>{totalAn>0?'+':''}{fmtN(totalAn)}</strong> actes
+          <span style={{ marginLeft:12 }}>{partCat.map(c => `${c.label} ${Math.round(c.v/totPos*100)}%`).join(' · ')}</span>
+        </div>
+      </div>
+      <div style={{ display:'flex', alignItems:'flex-end', gap:8, height:H+24 }}>
+        {mois.map(m => (
+          <div key={m.i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center' }}>
+            <div style={{ fontSize:10, fontWeight:700, color:m.total>=0?NAVY:'#dc2626', marginBottom:4, height:14 }}>{m.total?`${m.total>0&&isNet?'+':''}${m.total}`:''}</div>
+            <div style={{ width:'100%', maxWidth:34, height:H, display:'flex', flexDirection:'column', justifyContent:'flex-end', borderRadius:'6px 6px 0 0', overflow:'hidden', background:'#f1f5f9' }}>
+              {CATS.map(c => {
+                const v = Math.max(0, m.seg[c.key])
+                const h = v / maxStack * H
+                if (h <= 0) return null
+                const pct = m.stack ? Math.round(v / m.stack * 100) : 0
+                return (
+                  <div key={c.key} title={`${c.label} — ${m.label} ${annee} : ${m.seg[c.key]} (${pct}%)`}
+                    onClick={() => onDetail(
+                      `${c.label} — ${mode.label} ${m.label} ${annee}`,
+                      m.rM.filter(d => d._cat===c.key && mode.types.includes(d.type_prod))
+                    )}
+                    style={{ height:h, background:c.grad, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', borderTop:'1px solid rgba(255,255,255,.25)' }}>
+                    {h >= 16 && <span style={{ fontSize:9, fontWeight:700, color:'#fff' }}>{pct}%</span>}
+                  </div>
+                )
+              })}
+            </div>
+            <div style={{ fontSize:10, color:'#94a3b8', marginTop:6 }}>{m.label}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function OngletGlobal({ onDetail }) {
+  const [rows, setRows]   = useState(null)
+  const [mode, setMode]   = useState(MODES[0])
+
+  useEffect(() => {
+    (async () => {
+      // mapping nom -> catégorie via collaborateurs
+      const { data: collabs } = await supabase.from('collaborateurs')
+        .select('nom_sa_data,noms_repris,est_apporteur,est_sous_agent')
+      const nameToCat = {}
+      const catOf = c => c.est_apporteur ? 'Apporteur' : c.est_sous_agent ? 'SA' : 'HQ'
+      ;(collabs || []).forEach(c => {
+        const cat = catOf(c)
+        if (c.nom_sa_data) nameToCat[c.nom_sa_data.trim()] = cat
+        ;(c.noms_repris || []).forEach(n => n && (nameToCat[n.trim()] = cat))
+      })
+      // tous les mouvements, toutes années (alias compatibles ActsModal)
+      const all = []; let from = 0
+      while (true) {
+        const { data, error } = await supabase.from('mouvements_production')
+          .select('type_prod, annee, mois, agent_code:sa_contrat, num_contrat:police, client_nom:nom_client, branche:type_police, compagnie:cie')
+          .range(from, from + 999)
+        if (error || !data || !data.length) break
+        all.push(...data); if (data.length < 1000) break; from += 1000
+      }
+      const mapped = all.map(d => ({
+        ...d,
+        mois: String(d.mois).padStart(2,'0'),
+        _cat: nameToCat[(d.agent_code || '').trim()] || 'SA',
+      }))
+      setRows(mapped)
+    })()
+  }, [])
+
+  const annees = useMemo(() => {
+    if (!rows) return []
+    return [...new Set(rows.map(r => r.annee))].filter(Boolean).sort((a,b) => b - a)
+  }, [rows])
+
+  if (!rows) return <div style={{ padding:40, textAlign:'center', color:'#94a3b8' }}>Chargement de la production…</div>
 
   return (
     <div>
-      {/* Sélecteur année */}
-      <div style={{ display:'flex', gap:8, marginBottom:20 }}>
-        {ANNEES.map(a => (
-          <button key={a} onClick={()=>setAnnee(a)} style={{
-            padding:'6px 16px', borderRadius:20, border:`2px solid ${annee===a?BLUE:'#e2e8f0'}`,
-            background: annee===a?BLUE:'#fff', color:annee===a?'#fff':'#64748b',
-            fontWeight:700, fontSize:13, cursor:'pointer'
-          }}>{a}</button>
+      {/* Sélecteur de mode (remplace les années) */}
+      <div style={{ display:'flex', gap:8, marginBottom:16, flexWrap:'wrap' }}>
+        {MODES.map(m => (
+          <button key={m.key} onClick={()=>setMode(m)} style={{
+            padding:'7px 18px', borderRadius:22, border:`1.5px solid ${mode.key===m.key?BLUE:'#e2e8f0'}`,
+            background: mode.key===m.key?`linear-gradient(135deg,#0080BD,#0D2F5E)`:'#fff',
+            color: mode.key===m.key?'#fff':'#64748b', fontWeight:700, fontSize:13, cursor:'pointer',
+            boxShadow: mode.key===m.key?'0 2px 8px rgba(0,128,189,.3)':'none'
+          }}>{m.label}</button>
         ))}
       </div>
 
-      {/* KPIs */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:12, marginBottom:24 }}>
-        <KpiCard label="Nouvelles Affaires" value={fmtN(totalNA)}      col="#16a34a" onClick={()=>onDetail(`Nouvelles Affaires ${annee}`, fType('N.A.'))} />
-        <KpiCard label="Mandats faveur"     value={fmtN(totalMandFav)} col="#0080BD" onClick={()=>onDetail(`Mandats faveur ${annee}`, fType('Mandat faveur'))} />
-        <KpiCard label="Mandats défaveur"   value={fmtN(totalMandDef)} col="#f59e0b" onClick={()=>onDetail(`Mandats défaveur ${annee}`, fType('Mandat défaveur'))} />
-        <KpiCard label="Résiliations"       value={fmtN(totalRenon)}   col="#dc2626" onClick={()=>onDetail(`Résiliations ${annee}`, fType('Renon','Résiliation Non paiement'))} />
-        <KpiCard label="Solde net"
-          value={`${soldeNet>0?'+':''}${fmtN(soldeNet)}`}
-          col={soldeNet>=0?'#16a34a':'#dc2626'}
-          onClick={()=>onDetail(`Mouvements impactants ${annee} (entrées + sorties)`, fType(...positifs,...negatifs))}
-          sub="entrées − sorties" />
+      {/* Légende catégories */}
+      <div style={{ display:'flex', gap:18, marginBottom:18 }}>
+        {CATS.map(c => (
+          <span key={c.key} style={{ fontSize:12, color:'#475569', fontWeight:600, display:'flex', alignItems:'center', gap:6 }}>
+            <i style={{ display:'inline-block', width:14, height:14, borderRadius:4, background:c.grad }} />{c.label}
+          </span>
+        ))}
+        <span style={{ fontSize:11, color:'#94a3b8', marginLeft:'auto' }}>Volume brut (par producteur, sans rétention) · clique un segment pour le détail</span>
       </div>
 
-      {/* Graphe mensuel */}
-      <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', padding:20 }}>
-        <div style={{ fontSize:12, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:16 }}>
-          Évolution mensuelle {annee}
-        </div>
-        <div style={{ display:'flex', alignItems:'flex-end', gap:6, height:120, marginBottom:8 }}>
-          {parMois.map((m,i) => (
-            <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
-              <div style={{ width:'100%', display:'flex', gap:2, alignItems:'flex-end', height:100 }}>
-                <div title={`Entrées: ${m.plus}`}
-                  onClick={()=>m.plus&&onDetail(`Entrées — ${m.label} ${annee}`, data.filter(d=>d.mois===m.m&&positifs.includes(d.type_prod)))}
-                  style={{
-                  flex:1, borderRadius:'3px 3px 0 0', cursor:m.plus>0?'pointer':'default',
-                  height:`${m.plus/maxVal*100}%`, minHeight:m.plus>0?3:0,
-                  background:'#bbf7d0', transition:'height 0.3s'
-                }} />
-                <div title={`Sorties: ${m.moins}`}
-                  onClick={()=>m.moins&&onDetail(`Sorties — ${m.label} ${annee}`, data.filter(d=>d.mois===m.m&&negatifs.includes(d.type_prod)))}
-                  style={{
-                  flex:1, borderRadius:'3px 3px 0 0', cursor:m.moins>0?'pointer':'default',
-                  height:`${m.moins/maxVal*100}%`, minHeight:m.moins>0?3:0,
-                  background:'#fecaca', transition:'height 0.3s'
-                }} />
-              </div>
-              {/* Solde net */}
-              <div style={{ fontSize:9, fontWeight:700, color:m.net>=0?'#16a34a':'#dc2626' }}>
-                {m.net>0?'+':''}{m.net||''}
-              </div>
-              <div style={{ fontSize:9, color:'#94a3b8' }}>{m.label}</div>
-            </div>
-          ))}
-        </div>
-        <div style={{ display:'flex', gap:16 }}>
-          <span style={{ fontSize:11, color:'#64748b' }}><span style={{ display:'inline-block', width:10, height:10, background:'#bbf7d0', borderRadius:2, marginRight:4 }} />Entrées (NA + mandats fav.)</span>
-          <span style={{ fontSize:11, color:'#64748b' }}><span style={{ display:'inline-block', width:10, height:10, background:'#fecaca', borderRadius:2, marginRight:4 }} />Sorties (renons + mandats déf.)</span>
-        </div>
-      </div>
+      {/* Un graphique par année, l'un sous l'autre */}
+      {annees.map(an => (
+        <ChartAnnee key={an} annee={an} rows={rows.filter(r => r.annee === an)} mode={mode} onDetail={onDetail} />
+      ))}
     </div>
   )
 }
@@ -513,23 +577,38 @@ export default function DynassurProduction() {
           ))}
         </div>
 
-        {loading ? (
-          <div style={{ padding:60, textAlign:'center', color:'#94a3b8', fontSize:14 }}>
-            <i className="ti ti-loader-2" style={{ fontSize:32, display:'block', marginBottom:12, animation:'spin 1s linear infinite' }} />
-            Chargement de la production…
-            <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
-          </div>
-        ) : data.length === 0 ? (
-          <div style={{ padding:60, textAlign:'center', background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', color:'#94a3b8' }}>
-            <i className="ti ti-database-off" style={{ fontSize:40, display:'block', marginBottom:12 }} />
-            Aucune donnée de production pour {annee}.<br/>
-            <span style={{ fontSize:12 }}>Importez les données depuis Brio via n8n.</span>
-          </div>
+        {onglet === 'global' ? (
+          <OngletGlobal onDetail={onDetail} />
         ) : (
           <>
-            {onglet==='global'         && <OngletGlobal         data={data} annee={annee} setAnnee={setAnnee} onDetail={onDetail} />}
-            {onglet==='collaborateurs' && <OngletCollaborateurs data={data} annee={annee} onDetail={onDetail} />}
-            {onglet==='detail'         && <OngletDetail         data={data} />}
+            {/* Sélecteur d'année (Collaborateurs / Détail) */}
+            <div style={{ display:'flex', gap:8, marginBottom:20 }}>
+              {[2023,2024,2025,2026].map(a => (
+                <button key={a} onClick={()=>setAnnee(a)} style={{
+                  padding:'6px 16px', borderRadius:20, border:`2px solid ${annee===a?BLUE:'#e2e8f0'}`,
+                  background: annee===a?BLUE:'#fff', color:annee===a?'#fff':'#64748b',
+                  fontWeight:700, fontSize:13, cursor:'pointer'
+                }}>{a}</button>
+              ))}
+            </div>
+            {loading ? (
+              <div style={{ padding:60, textAlign:'center', color:'#94a3b8', fontSize:14 }}>
+                <i className="ti ti-loader-2" style={{ fontSize:32, display:'block', marginBottom:12, animation:'spin 1s linear infinite' }} />
+                Chargement de la production…
+                <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
+              </div>
+            ) : data.length === 0 ? (
+              <div style={{ padding:60, textAlign:'center', background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', color:'#94a3b8' }}>
+                <i className="ti ti-database-off" style={{ fontSize:40, display:'block', marginBottom:12 }} />
+                Aucune donnée de production pour {annee}.<br/>
+                <span style={{ fontSize:12 }}>Importez les données depuis Brio via n8n.</span>
+              </div>
+            ) : (
+              <>
+                {onglet==='collaborateurs' && <OngletCollaborateurs data={data} annee={annee} onDetail={onDetail} />}
+                {onglet==='detail'         && <OngletDetail         data={data} />}
+              </>
+            )}
           </>
         )}
       </div>
