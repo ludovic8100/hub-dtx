@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Component } from 'react'
 import { supabase } from '../lib/supabase'
 
 const C = {
@@ -76,7 +76,26 @@ function KpiCard({ label, value, sub, pct, col, icon, onClick }) {
 // ONGLET 1 — COMMERCIAUX
 // ══════════════════════════════════════════════════════════════
 // ── Fenêtre de détail : lignes derrière un réalisé ──
+class DetailBoundary extends Component {
+  constructor(p) { super(p); this.state = { err: null } }
+  static getDerivedStateFromError(err) { return { err } }
+  componentDidCatch(err) { console.error('DetailModal crash:', err) }
+  render() {
+    if (this.state.err) return (
+      <div onClick={this.props.onClose} style={{ position:'fixed', inset:0, background:'rgba(15,23,42,.55)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+        <div onClick={e=>e.stopPropagation()} style={{ background:'#fff', padding:24, borderRadius:12, maxWidth:600, width:'100%' }}>
+          <div style={{ fontWeight:800, color:'#dc2626', marginBottom:8, fontSize:15 }}>Erreur d'affichage du détail</div>
+          <pre style={{ fontSize:12, whiteSpace:'pre-wrap', wordBreak:'break-word', color:'#475569', background:'#f8fafc', padding:12, borderRadius:8, maxHeight:300, overflow:'auto' }}>{String(this.state.err?.stack || this.state.err?.message || this.state.err)}</pre>
+          <button onClick={this.props.onClose} style={{ marginTop:14, padding:'8px 18px', border:'none', borderRadius:8, background:'#0080BD', color:'#fff', fontWeight:700, cursor:'pointer' }}>Fermer</button>
+        </div>
+      </div>
+    )
+    return this.props.children
+  }
+}
+
 function DetailModal({ titre, kind, rows, onClose }) {
+  rows = Array.isArray(rows) ? rows : []
   const isQ = kind === 'quittances'
   const totC = rows.reduce((s, r) => s + (Number(r.commission) || 0), 0)
   const totP = rows.reduce((s, r) => s + (Number(r.prime_totale) || 0), 0)
@@ -577,7 +596,7 @@ export default function ObjectifsView() {
       {onglet === 'sa' && <OngletSousAgents objectifs={objectifs} reel={reel} loading={loading} raw={raw} onDetail={onDetail} />}
       {onglet === 'retention' && <OngletRetention reel={reel} loading={loading} raw={raw} onDetail={onDetail} />}
 
-      {detail && <DetailModal titre={detail.titre} kind={detail.kind} rows={detail.rows} onClose={() => setDetail(null)} />}
+      {detail && <DetailBoundary onClose={() => setDetail(null)}><DetailModal titre={detail.titre} kind={detail.kind} rows={detail.rows} onClose={() => setDetail(null)} /></DetailBoundary>}
     </div>
   )
 }
