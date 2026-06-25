@@ -41,23 +41,73 @@ function Badge({ label, col, bg }) {
   )
 }
 
-function KpiCard({ label, value, col, sub }) {
+function KpiCard({ label, value, col, sub, onClick }) {
   return (
-    <div style={{ background:'#fff', borderRadius:10, border:'1px solid #e2e8f0',
-      borderTop:`3px solid ${col}`, padding:'14px 18px' }}>
-      <div style={{ fontSize:10, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:6 }}>{label}</div>
+    <div onClick={onClick} style={{ background:'#fff', borderRadius:10, border:'1px solid #e2e8f0',
+      borderTop:`3px solid ${col}`, padding:'14px 18px', cursor:onClick?'pointer':'default', transition:'box-shadow .15s' }}
+      onMouseEnter={e=>{ if(onClick) e.currentTarget.style.boxShadow=`0 4px 14px ${col}25` }}
+      onMouseLeave={e=>{ e.currentTarget.style.boxShadow='none' }}>
+      <div style={{ fontSize:10, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:6, display:'flex', justifyContent:'space-between' }}>
+        <span>{label}</span>{onClick && <i className="ti ti-zoom-in" style={{ color:'#cbd5e1' }}/>}
+      </div>
       <div style={{ fontSize:24, fontWeight:800, color:'#0f172a', lineHeight:1 }}>{value}</div>
       {sub && <div style={{ fontSize:11, color:'#64748b', marginTop:4 }}>{sub}</div>}
     </div>
   )
 }
 
+// ── Fenêtre de détail : les mouvements (actes) derrière un chiffre ──
+function ActsModal({ titre, rows, onClose }) {
+  const tri = [...rows].sort((a,b)=>(b.mois||'').localeCompare(a.mois||''))
+  const show = tri.slice(0,1000)
+  return (
+    <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(15,23,42,.55)', zIndex:1000, display:'flex', justifyContent:'flex-end' }}>
+      <div onClick={e=>e.stopPropagation()} style={{ width:'min(880px,96vw)', height:'100%', background:'#fff', display:'flex', flexDirection:'column', boxShadow:'-8px 0 30px rgba(0,0,0,.2)' }}>
+        <div style={{ background:NAVY, padding:'14px 20px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <div>
+            <div style={{ color:'#fff', fontSize:15, fontWeight:800 }}>{titre}</div>
+            <div style={{ color:'#cbd5e1', fontSize:12, marginTop:2 }}>{fmtN(rows.length)} mouvement(s)</div>
+          </div>
+          <button onClick={onClose} style={{ background:'transparent', border:'none', color:'#fff', fontSize:22, cursor:'pointer' }}>✕</button>
+        </div>
+        <div style={{ flex:1, overflow:'auto' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12.5 }}>
+            <thead><tr style={{ background:'#f8fafc', position:'sticky', top:0 }}>
+              {['Mois','Type','Agent','Client','Branche','Compagnie','N° contrat'].map(h=>(
+                <th key={h} style={{ textAlign:'left', padding:'8px 12px', fontSize:10, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', whiteSpace:'nowrap' }}>{h}</th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {show.map((d,i)=>{
+                const cfg = TYPES_PROD[d.type_prod] || { col:'#94a3b8' }
+                return (
+                  <tr key={i} style={{ borderBottom:'1px solid #f1f5f9' }}>
+                    <td style={{ padding:'7px 12px', color:'#64748b', whiteSpace:'nowrap' }}>{MOIS_LABELS[parseInt(d.mois)]||d.mois} {d.annee}</td>
+                    <td style={{ padding:'7px 12px' }}><Badge label={d.type_prod} col={cfg.col} /></td>
+                    <td style={{ padding:'7px 12px', color:'#475569' }}>{AGENT_NOMS[d.agent_code]||d.agent_code||'—'}</td>
+                    <td style={{ padding:'7px 12px', fontWeight:600, color:NAVY }}>{d.client_nom||'—'}</td>
+                    <td style={{ padding:'7px 12px', color:'#475569' }}>{d.branche||'—'}</td>
+                    <td style={{ padding:'7px 12px', color:'#475569' }}>{d.compagnie||'—'}</td>
+                    <td style={{ padding:'7px 12px', color:'#64748b', whiteSpace:'nowrap' }}>{d.num_contrat||'—'}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          {tri.length>1000 && <p style={{ padding:'12px 16px', color:'#94a3b8', fontSize:12 }}>… et {fmtN(tri.length-1000)} autres lignes.</p>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── ONGLET 1 : Vue globale ──
-function OngletGlobal({ data, annee, setAnnee }) {
+function OngletGlobal({ data, annee, setAnnee, onDetail }) {
   const ANNEES = [2024, 2025, 2026]
 
   const positifs = ['N.A.', 'Mandat faveur']
   const negatifs = ['Renon', 'Résiliation Non paiement', 'Mandat défaveur']
+  const fType = (...t) => data.filter(d=>t.includes(d.type_prod))
 
   const totalNA      = data.filter(d=>d.type_prod==='N.A.').length
   const totalMandFav = data.filter(d=>d.type_prod==='Mandat faveur').length
@@ -92,13 +142,14 @@ function OngletGlobal({ data, annee, setAnnee }) {
 
       {/* KPIs */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:12, marginBottom:24 }}>
-        <KpiCard label="Nouvelles Affaires" value={fmtN(totalNA)}      col="#16a34a" />
-        <KpiCard label="Mandats faveur"     value={fmtN(totalMandFav)} col="#0080BD" />
-        <KpiCard label="Mandats défaveur"   value={fmtN(totalMandDef)} col="#f59e0b" />
-        <KpiCard label="Résiliations"       value={fmtN(totalRenon)}   col="#dc2626" />
+        <KpiCard label="Nouvelles Affaires" value={fmtN(totalNA)}      col="#16a34a" onClick={()=>onDetail(`Nouvelles Affaires ${annee}`, fType('N.A.'))} />
+        <KpiCard label="Mandats faveur"     value={fmtN(totalMandFav)} col="#0080BD" onClick={()=>onDetail(`Mandats faveur ${annee}`, fType('Mandat faveur'))} />
+        <KpiCard label="Mandats défaveur"   value={fmtN(totalMandDef)} col="#f59e0b" onClick={()=>onDetail(`Mandats défaveur ${annee}`, fType('Mandat défaveur'))} />
+        <KpiCard label="Résiliations"       value={fmtN(totalRenon)}   col="#dc2626" onClick={()=>onDetail(`Résiliations ${annee}`, fType('Renon','Résiliation Non paiement'))} />
         <KpiCard label="Solde net"
           value={`${soldeNet>0?'+':''}${fmtN(soldeNet)}`}
           col={soldeNet>=0?'#16a34a':'#dc2626'}
+          onClick={()=>onDetail(`Mouvements impactants ${annee} (entrées + sorties)`, fType(...positifs,...negatifs))}
           sub="entrées − sorties" />
       </div>
 
@@ -111,13 +162,17 @@ function OngletGlobal({ data, annee, setAnnee }) {
           {parMois.map((m,i) => (
             <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
               <div style={{ width:'100%', display:'flex', gap:2, alignItems:'flex-end', height:100 }}>
-                <div title={`Entrées: ${m.plus}`} style={{
-                  flex:1, borderRadius:'3px 3px 0 0',
+                <div title={`Entrées: ${m.plus}`}
+                  onClick={()=>m.plus&&onDetail(`Entrées — ${m.label} ${annee}`, data.filter(d=>d.mois===m.m&&positifs.includes(d.type_prod)))}
+                  style={{
+                  flex:1, borderRadius:'3px 3px 0 0', cursor:m.plus>0?'pointer':'default',
                   height:`${m.plus/maxVal*100}%`, minHeight:m.plus>0?3:0,
                   background:'#bbf7d0', transition:'height 0.3s'
                 }} />
-                <div title={`Sorties: ${m.moins}`} style={{
-                  flex:1, borderRadius:'3px 3px 0 0',
+                <div title={`Sorties: ${m.moins}`}
+                  onClick={()=>m.moins&&onDetail(`Sorties — ${m.label} ${annee}`, data.filter(d=>d.mois===m.m&&negatifs.includes(d.type_prod)))}
+                  style={{
+                  flex:1, borderRadius:'3px 3px 0 0', cursor:m.moins>0?'pointer':'default',
                   height:`${m.moins/maxVal*100}%`, minHeight:m.moins>0?3:0,
                   background:'#fecaca', transition:'height 0.3s'
                 }} />
@@ -140,7 +195,7 @@ function OngletGlobal({ data, annee, setAnnee }) {
 }
 
 // ── ONGLET 2 : Par collaborateur ──
-function OngletCollaborateurs({ data, annee }) {
+function OngletCollaborateurs({ data, annee, onDetail }) {
   const [selected, setSelected] = useState(null)
   const [moisFilter, setMoisFilter] = useState('all')
 
@@ -214,13 +269,15 @@ function OngletCollaborateurs({ data, annee }) {
                       <div style={{ fontSize:10, color:'#94a3b8' }}>{ag.code}</div>
                     </td>
                     {TYPES_DISPLAY.map(t=>(
-                      <td key={t.key} style={{ padding:'10px 8px', textAlign:'center', borderBottom:'1px solid #f1f5f9' }}>
+                      <td key={t.key} onClick={e=>{ e.stopPropagation(); if(ag[t.key]>0) onDetail(`${ag.nom} — ${t.label} ${annee}`, filtered.filter(d=>d.agent_code===ag.code && d.type_prod===t.key)) }}
+                        style={{ padding:'10px 8px', textAlign:'center', borderBottom:'1px solid #f1f5f9', cursor:(ag[t.key]||0)>0?'pointer':'default' }}>
                         <span style={{ fontWeight:700, color:(ag[t.key]||0)>0?t.col:'#e2e8f0', fontSize:14 }}>
                           {ag[t.key]||0}
                         </span>
                       </td>
                     ))}
-                    <td style={{ padding:'10px 14px', textAlign:'center', borderBottom:'1px solid #f1f5f9' }}>
+                    <td onClick={e=>{ e.stopPropagation(); onDetail(`${ag.nom} — mouvements impactants ${annee}`, filtered.filter(d=>d.agent_code===ag.code && (TYPES_PROD[d.type_prod]?.sign||0)!==0)) }}
+                      style={{ padding:'10px 14px', textAlign:'center', borderBottom:'1px solid #f1f5f9', cursor:'pointer' }}>
                       <span style={{ fontWeight:800, fontSize:14, color:ag.total>0?'#16a34a':ag.total<0?'#dc2626':'#94a3b8' }}>
                         {ag.total>0?'+':''}{ag.total}
                       </span>
@@ -235,7 +292,8 @@ function OngletCollaborateurs({ data, annee }) {
                   {TYPES_DISPLAY.map(t=>{
                     const tot = parAgent.reduce((s,a)=>s+(a[t.key]||0),0)
                     return (
-                      <td key={t.key} style={{ padding:'10px 8px', textAlign:'center', fontWeight:800, color:tot>0?t.col+'cc':'rgba(255,255,255,0.2)', fontSize:14 }}>
+                      <td key={t.key} onClick={()=>tot>0&&onDetail(`Tous — ${t.label} ${annee}`, filtered.filter(d=>d.type_prod===t.key))}
+                        style={{ padding:'10px 8px', textAlign:'center', fontWeight:800, color:tot>0?t.col+'cc':'rgba(255,255,255,0.2)', fontSize:14, cursor:tot>0?'pointer':'default' }}>
                         {tot||0}
                       </td>
                     )
@@ -397,6 +455,8 @@ export default function DynassurProduction() {
   const [annee, setAnnee]     = useState(new Date().getFullYear())
   const [data, setData]       = useState([])
   const [loading, setLoading] = useState(true)
+  const [detail, setDetail]   = useState(null)   // { titre, rows }
+  const onDetail = (titre, rows) => setDetail({ titre, rows })
 
   const ONGLETS = [
     { key:'global',         label:'Vue globale',         icon:'ti-chart-bar' },
@@ -467,12 +527,13 @@ export default function DynassurProduction() {
           </div>
         ) : (
           <>
-            {onglet==='global'         && <OngletGlobal         data={data} annee={annee} setAnnee={setAnnee} />}
-            {onglet==='collaborateurs' && <OngletCollaborateurs data={data} annee={annee} />}
+            {onglet==='global'         && <OngletGlobal         data={data} annee={annee} setAnnee={setAnnee} onDetail={onDetail} />}
+            {onglet==='collaborateurs' && <OngletCollaborateurs data={data} annee={annee} onDetail={onDetail} />}
             {onglet==='detail'         && <OngletDetail         data={data} />}
           </>
         )}
       </div>
+      {detail && <ActsModal titre={detail.titre} rows={detail.rows} onClose={()=>setDetail(null)} />}
     </Layout>
   )
 }

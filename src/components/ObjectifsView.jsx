@@ -71,7 +71,63 @@ function KpiCard({ label, value, sub, pct, col, icon }) {
 // ══════════════════════════════════════════════════════════════
 // ONGLET 1 — COMMERCIAUX
 // ══════════════════════════════════════════════════════════════
-function OngletCommerciaux({ objectifs, reel, loading }) {
+// ── Fenêtre de détail : lignes derrière un réalisé ──
+function DetailModal({ titre, kind, rows, onClose }) {
+  const isQ = kind === 'quittances'
+  const totC = rows.reduce((s, r) => s + (Number(r.commission) || 0), 0)
+  const totP = rows.reduce((s, r) => s + (Number(r.prime_totale) || 0), 0)
+  const tri = isQ
+    ? [...rows].sort((a, b) => (b.date_comptable || '').localeCompare(a.date_comptable || ''))
+    : [...rows].sort((a, b) => (b.mois || '').localeCompare(a.mois || ''))
+  const show = tri.slice(0, 1000)
+  const MO = ['', 'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
+  const cols = isQ ? ['Date', 'Client', 'Compagnie', 'Domaine', 'Prime', 'Commission'] : ['Mois', 'Type', 'Client', 'Compagnie', 'N° contrat']
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.55)', zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: 'min(880px,96vw)', height: '100%', background: '#fff', display: 'flex', flexDirection: 'column', boxShadow: '-8px 0 30px rgba(0,0,0,.2)' }}>
+        <div style={{ background: C.blueDark, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ color: '#fff', fontSize: 15, fontWeight: 800 }}>{titre}</div>
+            <div style={{ color: '#cbd5e1', fontSize: 12, marginTop: 2 }}>
+              {fmtN(rows.length)} ligne(s){isQ ? ` · Primes ${fmt(totP)} · Commissions ${fmt(totC)}` : ''}
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer' }}>✕</button>
+        </div>
+        <div style={{ flex: 1, overflow: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+            <thead><tr style={{ background: C.bg, position: 'sticky', top: 0 }}>
+              {cols.map((h, i) => <th key={h} style={{ textAlign: isQ && i >= 4 ? 'right' : 'left', padding: '8px 12px', fontSize: 10, fontWeight: 700, color: C.textL, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {show.map((r, i) => (
+                <tr key={i} style={{ borderBottom: `1px solid ${C.greyPale}` }}>
+                  {isQ ? <>
+                    <td style={{ padding: '7px 12px', color: C.textM, whiteSpace: 'nowrap' }}>{r.date_comptable || '—'}</td>
+                    <td style={{ padding: '7px 12px', fontWeight: 600, color: C.text }}>{[r.client_nom, r.client_prenom].filter(Boolean).join(' ') || '—'}</td>
+                    <td style={{ padding: '7px 12px', color: C.textM }}>{r.compagnie || '—'}</td>
+                    <td style={{ padding: '7px 12px', color: C.textM }}>{r.domaine || '—'}</td>
+                    <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700 }}>{fmt(r.prime_totale)}</td>
+                    <td style={{ padding: '7px 12px', textAlign: 'right', color: C.ok, fontWeight: 700 }}>{fmt(r.commission)}</td>
+                  </> : <>
+                    <td style={{ padding: '7px 12px', color: C.textM, whiteSpace: 'nowrap' }}>{MO[parseInt(r.mois)] || r.mois || '—'}</td>
+                    <td style={{ padding: '7px 12px', fontWeight: 600, color: C.text }}>{r.type_prod || '—'}</td>
+                    <td style={{ padding: '7px 12px', color: C.textM }}>{r.nom_client || '—'}</td>
+                    <td style={{ padding: '7px 12px', color: C.textM }}>{r.cie || '—'}</td>
+                    <td style={{ padding: '7px 12px', color: C.textM, whiteSpace: 'nowrap' }}>{r.police || '—'}</td>
+                  </>}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {tri.length > 1000 && <p style={{ padding: '12px 16px', color: C.textL, fontSize: 12 }}>… et {fmtN(tri.length - 1000)} autres lignes (totaux calculés sur l'ensemble).</p>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function OngletCommerciaux({ objectifs, reel, loading, raw, onDetail }) {
   const commerciaux = objectifs.filter(o => o.categorie === 'EMPLOYE' && o.obj_com_nette_total)
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: C.textL }}>Chargement…</div>
@@ -122,10 +178,12 @@ function OngletCommerciaux({ objectifs, reel, loading }) {
                       <div style={{ fontSize: 11, color: C.textL }}>{o.categorie}</div>
                     </td>
                     <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.textM }}>{fmt(o.obj_com_nette_total)}</td>
-                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 14, fontWeight: 700, color: pctColor(pctCom) }}>{fmt(r.com_nette)}</td>
+                    <td onClick={() => (raw[o.collaborateur_code]?.quitt?.length) && onDetail(`${o.collaborateur_code} — commissions 2026`, 'quittances', raw[o.collaborateur_code].quitt)}
+                      style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 14, fontWeight: 700, color: pctColor(pctCom), cursor: raw[o.collaborateur_code]?.quitt?.length ? 'pointer' : 'default', textDecoration: raw[o.collaborateur_code]?.quitt?.length ? 'underline dotted' : 'none' }}>{fmt(r.com_nette)}</td>
                     <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, minWidth: 160 }}><ProgressBar pct={pctCom} /></td>
                     <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.textM }}>{fmtN(o.obj_na_total)}</td>
-                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 14, fontWeight: 700, color: C.text }}>{fmtN(r.na)}</td>
+                    <td onClick={() => (raw[o.collaborateur_code]?.na?.length) && onDetail(`${o.collaborateur_code} — Nouvelles Affaires 2026`, 'mouvements', raw[o.collaborateur_code].na)}
+                      style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 14, fontWeight: 700, color: C.text, cursor: raw[o.collaborateur_code]?.na?.length ? 'pointer' : 'default', textDecoration: raw[o.collaborateur_code]?.na?.length ? 'underline dotted' : 'none' }}>{fmtN(r.na)}</td>
                     <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.textM }}>{fmt(o.obj_prime_vie)}</td>
                     <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 14, fontWeight: 700, color: C.text }}>{fmt(r.prime_vie)}</td>
                     <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.textM }}>{fmtPct(retObj)}</td>
@@ -173,7 +231,7 @@ function OngletCommerciaux({ objectifs, reel, loading }) {
 // ══════════════════════════════════════════════════════════════
 // ONGLET 2 — SOUS-AGENTS
 // ══════════════════════════════════════════════════════════════
-function OngletSousAgents({ objectifs, reel, loading }) {
+function OngletSousAgents({ objectifs, reel, loading, raw, onDetail }) {
   const sa = objectifs.filter(o => o.categorie === 'SA' && o.obj_com_nette_total)
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: C.textL }}>Chargement…</div>
@@ -221,13 +279,15 @@ function OngletSousAgents({ objectifs, reel, loading }) {
                       <Badge label={`${o.taux_retention_dynassur}%`} color={o.taux_retention_dynassur >= 20 ? C.blue : C.grey} pale={C.bluePale} />
                     </td>
                     <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.textM }}>{fmt(o.obj_com_nette_total)}</td>
-                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 14, fontWeight: 700, color: pctColor(pctCom) }}>{fmt(r.com_dynassur)}</td>
+                    <td onClick={() => (raw[o.collaborateur_code]?.quitt?.length) && onDetail(`${o.collaborateur_code} — commissions 2026`, 'quittances', raw[o.collaborateur_code].quitt)}
+                      style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 14, fontWeight: 700, color: pctColor(pctCom), cursor: raw[o.collaborateur_code]?.quitt?.length ? 'pointer' : 'default', textDecoration: raw[o.collaborateur_code]?.quitt?.length ? 'underline dotted' : 'none' }}>{fmt(r.com_dynassur)}</td>
                     <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, minWidth: 140 }}><ProgressBar pct={pctCom} /></td>
                     <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.textM }}>{fmtPct(o.obj_taux_retention)}</td>
                     <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}` }}>
                       <span style={{ fontSize: 13, fontWeight: 700, color: retColor(retReel) }}>{fmtPct(retReel)}</span>
                     </td>
-                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.text }}>{fmtN(r.na)}</td>
+                    <td onClick={() => (raw[o.collaborateur_code]?.na?.length) && onDetail(`${o.collaborateur_code} — Nouvelles Affaires 2026`, 'mouvements', raw[o.collaborateur_code].na)}
+                      style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.text, cursor: raw[o.collaborateur_code]?.na?.length ? 'pointer' : 'default', textDecoration: raw[o.collaborateur_code]?.na?.length ? 'underline dotted' : 'none' }}>{fmtN(r.na)}</td>
                     <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}` }}>
                       {enDifficulte
                         ? <Badge label="⚠ Rétention faible" color={C.danger} pale={C.dangerPale} />
@@ -248,7 +308,7 @@ function OngletSousAgents({ objectifs, reel, loading }) {
 // ══════════════════════════════════════════════════════════════
 // ONGLET 3 — RÉTENTION GLOBALE
 // ══════════════════════════════════════════════════════════════
-function OngletRetention({ reel, loading }) {
+function OngletRetention({ reel, loading, raw, onDetail }) {
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: C.textL }}>Chargement…</div>
 
   const tous = Object.entries(reel).filter(([, r]) => r.na > 0 || r.chutes > 0)
@@ -290,9 +350,12 @@ function OngletRetention({ reel, loading }) {
                     onMouseEnter={e => e.currentTarget.style.background = C.bluePale}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                     <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontWeight: 700, color: C.text }}>{code}</td>
-                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.text }}>{fmtN(r.na)}</td>
-                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, fontWeight: 600, color: C.danger }}>{fmtN(r.chutes)}</td>
-                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.warn }}>{fmtN(r.tft)}</td>
+                    <td onClick={() => (raw[code]?.na?.length) && onDetail(`${code} — Nouvelles Affaires 2026`, 'mouvements', raw[code].na)}
+                      style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.text, cursor: raw[code]?.na?.length ? 'pointer' : 'default', textDecoration: raw[code]?.na?.length ? 'underline dotted' : 'none' }}>{fmtN(r.na)}</td>
+                    <td onClick={() => (raw[code]?.chutes?.length) && onDetail(`${code} — chutes 2026`, 'mouvements', raw[code].chutes)}
+                      style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, fontWeight: 600, color: C.danger, cursor: raw[code]?.chutes?.length ? 'pointer' : 'default', textDecoration: raw[code]?.chutes?.length ? 'underline dotted' : 'none' }}>{fmtN(r.chutes)}</td>
+                    <td onClick={() => (raw[code]?.tft?.length) && onDetail(`${code} — TFT / mandats faveur 2026`, 'mouvements', raw[code].tft)}
+                      style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.warn, cursor: raw[code]?.tft?.length ? 'pointer' : 'default', textDecoration: raw[code]?.tft?.length ? 'underline dotted' : 'none' }}>{fmtN(r.tft)}</td>
                     <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, fontWeight: 600, color: (r.na - r.chutes) > 0 ? C.ok : C.danger }}>{fmtN(r.na - r.chutes)}</td>
                     <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}` }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -325,7 +388,10 @@ export default function ObjectifsView() {
   const [onglet, setOnglet] = useState('commerciaux')
   const [objectifs, setObjectifs] = useState([])
   const [reel, setReel] = useState({})
+  const [raw, setRaw] = useState({})
+  const [detail, setDetail] = useState(null)   // { titre, kind, rows }
   const [loading, setLoading] = useState(true)
+  const onDetail = (titre, kind, rows) => setDetail({ titre, kind, rows })
 
   const ONGLETS = [
     { key: 'commerciaux', label: 'Commerciaux', icon: 'ti-target' },
@@ -345,7 +411,7 @@ export default function ObjectifsView() {
         let offset = 0
         while (true) {
           const { data: rows } = await supabase.from('quittances')
-            .select('sous_agent,commission,prime_totale,domaine')
+            .select('sous_agent,commission,prime_totale,domaine,date_comptable,compagnie,client_nom,client_prenom,police')
             .gte('date_comptable', '2026-01-01')
             .range(offset, offset + 999)
           if (!rows || rows.length === 0) break
@@ -359,7 +425,7 @@ export default function ObjectifsView() {
         offset = 0
         while (true) {
           const { data: rows } = await supabase.from('mouvements_production')
-            .select('sa_contrat,type_prod')
+            .select('sa_contrat,type_prod,mois,police,nom_client,cie')
             .eq('annee', 2026)
             .range(offset, offset + 999)
           if (!rows || rows.length === 0) break
@@ -403,8 +469,10 @@ export default function ObjectifsView() {
 
         // Agréger commissions
         const reelMap = {}
+        const rawMap = {}
         const ensure = code => {
           if (!reelMap[code]) reelMap[code] = { com_nette: 0, com_dynassur: 0, prime_vie: 0, na: 0, chutes: 0, tft: 0, base2025: null }
+          if (!rawMap[code]) rawMap[code] = { quitt: [], na: [], chutes: [], tft: [] }
         }
 
         quittances.forEach(r => {
@@ -417,6 +485,7 @@ export default function ObjectifsView() {
           reelMap[code].com_nette += com
           reelMap[code].com_dynassur += com * taux
           if (isVie(r.domaine)) reelMap[code].prime_vie += r.prime_totale || 0
+          rawMap[code].quitt.push(r)
         })
 
         // Agréger mouvements 2026
@@ -425,9 +494,9 @@ export default function ObjectifsView() {
           if (!sa || EXCLURE.has(sa)) return
           const code = nameToCode[sa] || sa.split(' ')[0].toUpperCase().substring(0, 3)
           ensure(code)
-          if (r.type_prod === 'N.A.') reelMap[code].na++
-          else if (CHUTES.has(r.type_prod)) reelMap[code].chutes++
-          else if (TFT.has(r.type_prod)) reelMap[code].tft++
+          if (r.type_prod === 'N.A.') { reelMap[code].na++; rawMap[code].na.push(r) }
+          else if (CHUTES.has(r.type_prod)) { reelMap[code].chutes++; rawMap[code].chutes.push(r) }
+          else if (TFT.has(r.type_prod)) { reelMap[code].tft++; rawMap[code].tft.push(r) }
         })
 
         // Rétention réelle 2026
@@ -453,6 +522,7 @@ export default function ObjectifsView() {
 
         setObjectifs(obj || [])
         setReel(reelMap)
+        setRaw(rawMap)
       } catch (e) {
         console.error('ObjectifsView error:', e)
       }
@@ -491,9 +561,11 @@ export default function ObjectifsView() {
       </div>
 
       {/* Contenu */}
-      {onglet === 'commerciaux' && <OngletCommerciaux objectifs={objectifs} reel={reel} loading={loading} />}
-      {onglet === 'sa' && <OngletSousAgents objectifs={objectifs} reel={reel} loading={loading} />}
-      {onglet === 'retention' && <OngletRetention reel={reel} loading={loading} />}
+      {onglet === 'commerciaux' && <OngletCommerciaux objectifs={objectifs} reel={reel} loading={loading} raw={raw} onDetail={onDetail} />}
+      {onglet === 'sa' && <OngletSousAgents objectifs={objectifs} reel={reel} loading={loading} raw={raw} onDetail={onDetail} />}
+      {onglet === 'retention' && <OngletRetention reel={reel} loading={loading} raw={raw} onDetail={onDetail} />}
+
+      {detail && <DetailModal titre={detail.titre} kind={detail.kind} rows={detail.rows} onClose={() => setDetail(null)} />}
     </div>
   )
 }
