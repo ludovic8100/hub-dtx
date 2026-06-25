@@ -43,9 +43,10 @@ const TRANCHES = [
   { val:'m12', label:'6 à 12 mois',         min:183, max:365 },
   { val:'a2',  label:'1 à 2 ans',           min:365, max:730 },
   { val:'a2p', label:'Plus de 2 ans',       min:730, max:Infinity },
+  { val:'jamais', label:'Jamais contacté',  min:null, max:null },
 ]
-const trancheDe = jours => TRANCHES.find(t=>jours>=t.min&&jours<t.max)?.val || null
-const TRANCHE_COL = { m1:'#16a34a', m3:'#65a30d', m6:'#ca8a04', m12:'#ea580c', a2:'#dc2626', a2p:'#991b1b' }
+const trancheDe = jours => TRANCHES.find(t=>t.min!=null&&jours>=t.min&&jours<t.max)?.val || null
+const TRANCHE_COL = { m1:'#16a34a', m3:'#65a30d', m6:'#ca8a04', m12:'#ea580c', a2:'#dc2626', a2p:'#991b1b', jamais:'#6b7280' }
 // Âge en années (+ mois) à partir d'une date de naissance
 const calcAge = v => {
   const d=parseDate(v); if(!d) return null
@@ -837,6 +838,31 @@ export default function DynassurClients() {
   const [selected,setSelected] = useState(null)
   const [contactFilter,setContactFilter] = useState('tous')   // tous | m1 | m3 | m6 | m12 | a2 | a2p
   const [relance,setRelance]   = useState(null)               // null = pas encore chargé
+  const [kpiModal,setKpiModal] = useState(null)               // { titre, rows } | 'loading' | null
+  // Calcule la liste des clients derrière un KPI (réutilise « relance » = tous les clients)
+  const openKpi = useCallback(async(kind)=>{
+    const all = relance || []
+    if(!all.length){ return }
+    if(kind==='alerte'){
+      const rows = all.filter(c=>c.alerte && String(c.alerte).trim())
+      setKpiModal({ titre:`Clients avec alerte (${rows.length})`, rows, showAlerte:true }); return
+    }
+    setKpiModal('loading')
+    if(kind==='sans_contrat'){
+      // dossiers présents dans contrats
+      const set=new Set(); let from=0
+      while(true){ const {data}=await supabase.from('contrats').select('dossier').range(from,from+999); if(!data||!data.length) break; data.forEach(r=>r.dossier&&set.add(String(r.dossier))); if(data.length<1000) break; from+=1000 }
+      const rows = all.filter(c=>!set.has(String(c.dossier)))
+      setKpiModal({ titre:`Clients sans contrat (${rows.length})`, rows }); return
+    }
+    if(kind==='sans_comm'){
+      // dossiers ayant au moins une commission > 0 en 2026
+      const set=new Set(); let from=0
+      while(true){ const {data}=await supabase.from('quittances').select('dossier,commission,date_comptable').gte('date_comptable','2026-01-01').lte('date_comptable','2026-12-31').range(from,from+999); if(!data||!data.length) break; data.forEach(r=>{ if(r.dossier&&(Number(r.commission)||0)>0) set.add(String(r.dossier)) }); if(data.length<1000) break; from+=1000 }
+      const rows = all.filter(c=>!set.has(String(c.dossier)))
+      setKpiModal({ titre:`Clients sans commission 2026 (${rows.length})`, rows }); return
+    }
+  },[relance])
   const searchRef = useRef(null)
 
   // Init user + counts
@@ -875,17 +901,24 @@ export default function DynassurClients() {
 
   // Données de relance : dernier contact (RDV passé lié) par client
   const loadRelance = useCallback(async()=>{
-    const {data:rv}=await supabase.from('rdv').select('client_id,debut').not('client_id','is',null).range(0,4999)
+    // dernier contact = dernier RDV passé
+    const {data:rv}=await supabase.from('rdv').select('client_id,debut').not('client_id','is',null).range(0,9999)
     const now=Date.now(); const last={}
     ;(rv||[]).forEach(r=>{ const t=tsRdv(r.debut); if(t&&t<=now){ if(!last[r.client_id]||t>last[r.client_id]) last[r.client_id]=t } })
-    const ids=Object.keys(last).map(Number)
-    if(!ids.length){ setRelance([]); return }
-    const rows=[]
-    for(let i=0;i<ids.length;i+=200){
+    // TOUS les clients : ceux sans RDV passé tombent dans « jamais contacté »
+    const rows=[]; let from=0
+    while(true){
       const {data}=await supabase.from('clients')
-        .select('id,dossier,nom,prenom,cp,localite,gestionnaire_code,gestionnaire_nom,sa_code,sa_nom,bureau,gsm,tel_fixe,email')
-        .in('id',ids.slice(i,i+200))
-      ;(data||[]).forEach(c=>{ const t=last[c.id]; const jours=Math.floor((now-t)/86400000); rows.push({...c,last:t,jours,tranche:trancheDe(jours)}) })
+        .select('id,dossier,nom,prenom,cp,localite,gestionnaire_code,gestionnaire_nom,sa_code,sa_nom,bureau,gsm,tel_fixe,email,alerte')
+        .range(from,from+999)
+      if(!data||!data.length) break
+      data.forEach(c=>{
+        const t=last[c.id]
+        if(t){ const jours=Math.floor((now-t)/86400000); rows.push({...c,last:t,jours,tranche:trancheDe(jours)}) }
+        else { rows.push({...c,last:null,jours:Infinity,tranche:'jamais'}) }
+      })
+      if(data.length<1000) break
+      from+=1000
     }
     rows.sort((a,b)=>b.jours-a.jours)   // les plus anciens d'abord = priorité de relance
     setRelance(rows)
@@ -933,6 +966,7 @@ export default function DynassurClients() {
   let relanceView = relanceBase
   if(relanceActif) relanceView = relanceView.filter(c=>c.tranche===contactFilter)
   if(q.length>=2){ const s=q.toLowerCase(); relanceView = relanceView.filter(c=>`${c.nom} ${c.prenom} ${c.dossier}`.toLowerCase().includes(s)) }
+  const relanceShow = relanceView.slice(0,500)
 
   return(
     <Layout currentPage="Clients">
@@ -942,9 +976,9 @@ export default function DynassurClients() {
           color={ENTITES.dynassur.color} colorDark={ENTITES.dynassur.colorDark} logoUrl={ENTITES.dynassur.logo}
           title="Clients" subtitle={`Dynassur SRL — base clients ${new Date().getFullYear()}`}
           stats={[
-            { label: 'Avec alerte', value: kpis?.avec_alerte != null ? kpis.avec_alerte.toLocaleString('fr-BE') : '…' },
-            { label: 'Sans contrat', value: kpis?.sans_contrat != null ? kpis.sans_contrat.toLocaleString('fr-BE') : '…' },
-            { label: 'Sans comm. 2026', value: kpis?.sans_commissions != null ? kpis.sans_commissions.toLocaleString('fr-BE') : '…' },
+            { label: 'Avec alerte', value: kpis?.avec_alerte != null ? kpis.avec_alerte.toLocaleString('fr-BE') : '…', onClick: ()=>openKpi('alerte') },
+            { label: 'Sans contrat', value: kpis?.sans_contrat != null ? kpis.sans_contrat.toLocaleString('fr-BE') : '…', onClick: ()=>openKpi('sans_contrat') },
+            { label: 'Sans comm. 2026', value: kpis?.sans_commissions != null ? kpis.sans_commissions.toLocaleString('fr-BE') : '…', onClick: ()=>openKpi('sans_comm') },
           ]}
         />
 
@@ -1086,7 +1120,7 @@ export default function DynassurClients() {
                 <tbody>
                   {relance===null?(<tr><td colSpan={7} style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Chargement…</td></tr>)
                   :!relanceView.length?(<tr><td colSpan={7} style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Aucun client dans cette tranche.</td></tr>)
-                  :relanceView.map((c,i)=>{
+                  :relanceShow.map((c,i)=>{
                     const col=TRANCHE_COL[c.tranche]||'#64748b'
                     return(
                       <tr key={c.id} onClick={()=>openDossier(c.dossier)} style={{cursor:'pointer',background:i%2===0?'#fff':'#fafafe'}}
@@ -1098,13 +1132,14 @@ export default function DynassurClients() {
                           {(c.gsm||c.tel_fixe)&&<div style={{fontSize:11,color:'#94a3b8'}}>{c.gsm||c.tel_fixe}</div>}
                         </td>
                         <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{c.cp} {c.localite||'—'}</td>
-                        <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9',color:NAVY,fontWeight:600,whiteSpace:'nowrap'}}>{new Date(c.last).toLocaleDateString('fr-BE',{day:'2-digit',month:'2-digit',year:'numeric'})}</td>
-                        <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9'}}><span style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:4,background:col+'18',color:col,whiteSpace:'nowrap'}}>{ilYa(c.jours)}</span></td>
+                        <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9',color:NAVY,fontWeight:600,whiteSpace:'nowrap'}}>{c.last?new Date(c.last).toLocaleDateString('fr-BE',{day:'2-digit',month:'2-digit',year:'numeric'}):'—'}</td>
+                        <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9'}}><span style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:4,background:col+'18',color:col,whiteSpace:'nowrap'}}>{c.tranche==='jamais'?'Jamais contacté':ilYa(c.jours)}</span></td>
                         <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9',color:'#64748b',fontSize:12}}>{c.gestionnaire_nom||c.gestionnaire_code||'—'}{c.sa_nom?` · ${c.sa_nom}`:''}</td>
                         <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9',textAlign:'right'}}><span style={{fontSize:11,color:'#0d9488',fontWeight:600}}>Fiche ▼</span></td>
                       </tr>
                     )
                   })}
+                  {relanceView.length>500&&(<tr><td colSpan={7} style={{padding:'12px 14px',textAlign:'center',color:'#94a3b8',fontSize:12,background:'#fafafe'}}>500 premiers affichés (les plus anciens) sur {relanceView.length.toLocaleString('fr-BE')} — affinez avec la recherche ou le scope.</td></tr>)}
                 </tbody>
               </table>
             </div>
@@ -1113,6 +1148,46 @@ export default function DynassurClients() {
 
         {/* ── Fiche ── */}
         {selected&&<Fiche client={selected} onClose={()=>setSelected(null)} onOpenDossier={openDossier}/>}
+
+        {/* ── Modal liste KPI (avec alerte / sans contrat / sans comm.) ── */}
+        {kpiModal&&(
+          <div onClick={()=>setKpiModal(null)} style={{position:'fixed',inset:0,background:'rgba(15,23,42,.55)',zIndex:1000,display:'flex',justifyContent:'flex-end'}}>
+            <div onClick={e=>e.stopPropagation()} style={{width:'min(820px,96vw)',height:'100%',background:'#fff',display:'flex',flexDirection:'column',boxShadow:'-8px 0 30px rgba(0,0,0,.2)'}}>
+              <div style={{background:NAVY,padding:'14px 20px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                <div style={{color:'#fff',fontSize:15,fontWeight:800}}>{kpiModal==='loading'?'Calcul en cours…':kpiModal.titre}</div>
+                <button onClick={()=>setKpiModal(null)} style={{background:'transparent',border:'none',color:'#fff',fontSize:22,cursor:'pointer'}}>✕</button>
+              </div>
+              <div style={{flex:1,overflow:'auto'}}>
+                {kpiModal==='loading'?(
+                  <div style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Recherche des clients concernés…</div>
+                ):(
+                  <table style={{width:'100%',borderCollapse:'collapse',fontSize:12.5}}>
+                    <thead><tr style={{background:'#f8fafc',position:'sticky',top:0}}>
+                      {['N° Dossier','Nom & Prénom','Localité','Gestionnaire / SA',kpiModal.showAlerte?'Alerte':'Contact'].map(h=>(
+                        <th key={h} style={{textAlign:'left',padding:'8px 12px',fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',whiteSpace:'nowrap'}}>{h}</th>
+                      ))}
+                    </tr></thead>
+                    <tbody>
+                      {!kpiModal.rows.length?(<tr><td colSpan={5} style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Aucun client.</td></tr>)
+                      :kpiModal.rows.slice(0,500).map((c,i)=>(
+                        <tr key={c.id} onClick={()=>{openDossier(c.dossier);setKpiModal(null)}} style={{cursor:'pointer',borderBottom:'1px solid #f1f5f9',background:i%2===0?'#fff':'#fafafe'}}
+                          onMouseEnter={e=>e.currentTarget.style.background='#f0f9ff'}
+                          onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'#fff':'#fafafe'}>
+                          <td style={{padding:'7px 12px',fontFamily:'monospace',fontSize:11,color:NAVY,fontWeight:600}}>{c.dossier}</td>
+                          <td style={{padding:'7px 12px',fontWeight:600,color:'#1e293b'}}>{c.nom} {c.prenom}</td>
+                          <td style={{padding:'7px 12px',color:'#64748b'}}>{c.cp} {c.localite||'—'}</td>
+                          <td style={{padding:'7px 12px',color:'#64748b'}}>{c.gestionnaire_nom||c.gestionnaire_code||'—'}{c.sa_nom?` · ${c.sa_nom}`:''}</td>
+                          <td style={{padding:'7px 12px',color:kpiModal.showAlerte?'#dc2626':'#64748b'}}>{kpiModal.showAlerte?(c.alerte||'—'):(c.gsm||c.tel_fixe||c.email||'—')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+                {kpiModal!=='loading'&&kpiModal.rows.length>500&&(<p style={{padding:'12px 16px',color:'#94a3b8',fontSize:12}}>500 premiers affichés sur {kpiModal.rows.length.toLocaleString('fr-BE')}.</p>)}
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
     </Layout>
