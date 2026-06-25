@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
 import { ENTITES } from '../../lib/entites'
 import { StatBanner } from '../../components/ui/AccountableUI'
+import { useAuth } from '../../lib/auth'
 
 // ── Constantes ──
 const BLUE = '#0080BD'
@@ -102,12 +103,13 @@ function ActsModal({ titre, rows, onClose }) {
 }
 
 // ── ONGLET 1 : Vue globale ──
-// 3 catégories + dégradés « classe » (clair en haut → foncé en bas)
-const CATS = [
-  { key:'HQ',        label:'HQ',          grad:'linear-gradient(180deg,#5b9bff,#14306b)', solid:'#2f6fed' },
-  { key:'SA',        label:'Sous-agent',  grad:'linear-gradient(180deg,#5eead4,#0b6b63)', solid:'#0f9b8e' },
-  { key:'Apporteur', label:'Apporteur',   grad:'linear-gradient(180deg,#c4b5fd,#5b21b6)', solid:'#7c4dd6' },
-]
+// dégradés « classe » (clair en haut → foncé en bas)
+const CAT_DEF = {
+  HQ:        { label:'HQ',         grad:'linear-gradient(180deg,#5b9bff,#14306b)', solid:'#2f6fed' },
+  SA:        { label:'Sous-agent', grad:'linear-gradient(180deg,#5eead4,#0b6b63)', solid:'#0f9b8e' },
+  Apporteur: { label:'Apporteur',  grad:'linear-gradient(180deg,#c4b5fd,#5b21b6)', solid:'#7c4dd6' },
+}
+const mineDef = code => ({ key:code, label:code, grad:'linear-gradient(180deg,#fcd34d,#b45309)', solid:'#d97706' })
 const POSITIFS = ['N.A.', 'Mandat faveur']
 const NEGATIFS = ['Renon', 'Résiliation Non paiement', 'Mandat défaveur']
 const MODES = [
@@ -115,69 +117,88 @@ const MODES = [
   { key:'sorties', label:'Sorties',          types:NEGATIFS },
   { key:'nette',   label:'Production nette',  types:[...POSITIFS, ...NEGATIFS] },
 ]
+const cnt = (rows, types) => rows.filter(d => types.includes(d.type_prod)).length
+const netCnt = rows => cnt(rows, POSITIFS) - cnt(rows, NEGATIFS)
 
-// Un graphique empilé (12 mois) pour une année donnée
-function ChartAnnee({ annee, rows, mode, onDetail }) {
+function Legende({ cats }) {
+  return (
+    <div style={{ display:'flex', gap:14, flexWrap:'wrap' }}>
+      {cats.map(c => (
+        <span key={c.key} style={{ fontSize:11, color:'#475569', fontWeight:600, display:'flex', alignItems:'center', gap:5 }}>
+          <i style={{ display:'inline-block', width:12, height:12, borderRadius:3, background:c.grad }} />{c.label}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function ChartAnnee({ annee, rows, cats, mode, onDetail, myCode, myBase }) {
   const isNet = mode.key === 'nette'
+  const val = rc => isNet ? netCnt(rc) : cnt(rc, mode.types)
   const mois = Array.from({ length:12 }, (_, i) => {
     const mm = String(i+1).padStart(2,'0')
     const rM = rows.filter(d => d.mois === mm)
     const seg = {}
-    CATS.forEach(c => {
-      const rc = rM.filter(d => d._cat === c.key)
-      if (isNet) {
-        const plus  = rc.filter(d => POSITIFS.includes(d.type_prod)).length
-        const moins = rc.filter(d => NEGATIFS.includes(d.type_prod)).length
-        seg[c.key] = plus - moins
-      } else {
-        seg[c.key] = rc.filter(d => mode.types.includes(d.type_prod)).length
-      }
-    })
-    const total = CATS.reduce((s,c) => s + seg[c.key], 0)
-    const stack = CATS.reduce((s,c) => s + Math.max(0, seg[c.key]), 0) // hauteur empilable (positifs)
+    cats.forEach(c => { seg[c.key] = val(rM.filter(d => d._dcat === c.key)) })
+    const total = cats.reduce((s,c) => s + seg[c.key], 0)
+    const stack = cats.reduce((s,c) => s + Math.max(0, seg[c.key]), 0)
     return { i:i+1, mm, label:MOIS_LABELS[i+1], seg, total, stack, rM }
   })
   const maxStack = Math.max(...mois.map(m => m.stack), 1)
   const totalAn  = mois.reduce((s,m) => s + m.total, 0)
-  const partCat  = CATS.map(c => {
-    const v = mois.reduce((s,m) => s + Math.max(0, m.seg[c.key]), 0)
-    return { ...c, v }
-  })
-  const totPos = partCat.reduce((s,c) => s + c.v, 0) || 1
   const H = 150
 
+  let compo = null
+  if (myCode) {
+    compo = {
+      me:  val(rows.filter(d => d._code === myCode)),
+      cat: val(rows.filter(d => d._cat === myBase)),
+      all: val(rows),
+    }
+  }
+
   return (
-    <div style={{ background:'#fff', borderRadius:14, border:'1px solid #e8edf3', padding:'18px 20px', marginBottom:16, boxShadow:'0 1px 3px rgba(15,23,42,.04)' }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:14 }}>
-        <div style={{ fontSize:16, fontWeight:800, color:NAVY }}>{annee}</div>
-        <div style={{ fontSize:12, color:'#64748b' }}>
-          {mode.label} : <strong style={{ color:NAVY }}>{totalAn>0?'+':''}{fmtN(totalAn)}</strong> actes
-          <span style={{ marginLeft:12 }}>{partCat.map(c => `${c.label} ${Math.round(c.v/totPos*100)}%`).join(' · ')}</span>
-        </div>
+    <div style={{ background:'#fff', borderRadius:14, border:'1px solid #e8edf3', padding:'16px 18px', marginBottom:16, boxShadow:'0 1px 3px rgba(15,23,42,.04)' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8, gap:12, flexWrap:'wrap' }}>
+        <button onClick={() => onDetail(`Production ${annee} — toute la production`, rows)}
+          style={{ fontSize:17, fontWeight:800, color:NAVY, background:'none', border:'none', cursor:'pointer', padding:0, display:'flex', alignItems:'center', gap:6 }}>
+          {annee} <i className="ti ti-zoom-in" style={{ fontSize:14, color:'#cbd5e1' }} />
+        </button>
+        <Legende cats={cats} />
       </div>
-      <div style={{ display:'flex', alignItems:'flex-end', gap:8, height:H+24 }}>
+      {compo ? (
+        <div style={{ fontSize:11.5, color:'#64748b', marginBottom:12, background:'#f8fafc', borderRadius:8, padding:'6px 12px' }}>
+          Toi (<strong style={{ color:'#d97706' }}>{myCode}</strong>) : <strong style={{ color:NAVY }}>{compo.me}</strong>
+          <span style={{ margin:'0 8px', color:'#cbd5e1' }}>|</span>
+          Ta catégorie ({CAT_DEF[myBase]?.label || myBase}) : <strong style={{ color:NAVY }}>{compo.cat}</strong>
+          <span style={{ margin:'0 8px', color:'#cbd5e1' }}>|</span>
+          Tout Dynassur : <strong style={{ color:NAVY }}>{compo.all}</strong>
+          {compo.all > 0 && <span style={{ marginLeft:8, color:'#94a3b8' }}>· soit {Math.round(compo.me / compo.all * 100)}% du total</span>}
+        </div>
+      ) : (
+        <div style={{ fontSize:11.5, color:'#94a3b8', marginBottom:12 }}>{mode.label} {annee} : <strong style={{ color:NAVY }}>{totalAn > 0 && isNet ? '+' : ''}{totalAn}</strong> actes</div>
+      )}
+      <div style={{ display:'flex', alignItems:'flex-end', gap:3, height:H+22 }}>
         {mois.map(m => (
           <div key={m.i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center' }}>
-            <div style={{ fontSize:10, fontWeight:700, color:m.total>=0?NAVY:'#dc2626', marginBottom:4, height:14 }}>{m.total?`${m.total>0&&isNet?'+':''}${m.total}`:''}</div>
-            <div style={{ width:'100%', maxWidth:34, height:H, display:'flex', flexDirection:'column', justifyContent:'flex-end', borderRadius:'6px 6px 0 0', overflow:'hidden', background:'#f1f5f9' }}>
-              {CATS.map(c => {
+            <div style={{ fontSize:10, fontWeight:700, color:m.total>=0?NAVY:'#dc2626', marginBottom:3, height:13 }}>{m.total?`${m.total>0&&isNet?'+':''}${m.total}`:''}</div>
+            <div style={{ width:'100%', height:H, display:'flex', flexDirection:'column', justifyContent:'flex-end', borderRadius:'5px 5px 0 0', overflow:'hidden', background:'#f1f5f9' }}>
+              {cats.map(c => {
                 const v = Math.max(0, m.seg[c.key])
                 const h = v / maxStack * H
                 if (h <= 0) return null
                 const pct = m.stack ? Math.round(v / m.stack * 100) : 0
                 return (
                   <div key={c.key} title={`${c.label} — ${m.label} ${annee} : ${m.seg[c.key]} (${pct}%)`}
-                    onClick={() => onDetail(
-                      `${c.label} — ${mode.label} ${m.label} ${annee}`,
-                      m.rM.filter(d => d._cat===c.key && mode.types.includes(d.type_prod))
-                    )}
-                    style={{ height:h, background:c.grad, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', borderTop:'1px solid rgba(255,255,255,.25)' }}>
-                    {h >= 16 && <span style={{ fontSize:9, fontWeight:700, color:'#fff' }}>{pct}%</span>}
+                    onClick={() => onDetail(`${c.label} — ${mode.label} ${m.label} ${annee}`,
+                      m.rM.filter(d => d._dcat === c.key && mode.types.includes(d.type_prod)))}
+                    style={{ height:h, background:c.grad, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                    {h >= 15 && <span style={{ fontSize:9, fontWeight:700, color:'#fff' }}>{pct}%</span>}
                   </div>
                 )
               })}
             </div>
-            <div style={{ fontSize:10, color:'#94a3b8', marginTop:6 }}>{m.label}</div>
+            <div style={{ fontSize:10, color:'#94a3b8', marginTop:5 }}>{m.label}</div>
           </div>
         ))}
       </div>
@@ -186,22 +207,23 @@ function ChartAnnee({ annee, rows, mode, onDetail }) {
 }
 
 function OngletGlobal({ onDetail }) {
-  const [rows, setRows]   = useState(null)
-  const [mode, setMode]   = useState(MODES[0])
+  const { perms, isAdmin } = useAuth()
+  const [rows, setRows] = useState(null)
+  const [meta, setMeta] = useState({ commercial:new Set(), base:{} })
+  const [mode, setMode] = useState(MODES[0])
 
   useEffect(() => {
     (async () => {
-      // mapping nom -> catégorie via collaborateurs
       const { data: collabs } = await supabase.from('collaborateurs')
-        .select('nom_sa_data,noms_repris,est_apporteur,est_sous_agent')
-      const nameToCat = {}
-      const catOf = c => c.est_apporteur ? 'Apporteur' : c.est_sous_agent ? 'SA' : 'HQ'
+        .select('code,nom_sa_data,noms_repris,est_commercial,est_apporteur,est_sous_agent')
+      const baseOf = c => c.est_apporteur ? 'Apporteur' : c.est_sous_agent ? 'SA' : 'HQ'
+      const nameToCode = {}, commercial = new Set(), base = {}
       ;(collabs || []).forEach(c => {
-        const cat = catOf(c)
-        if (c.nom_sa_data) nameToCat[c.nom_sa_data.trim()] = cat
-        ;(c.noms_repris || []).forEach(n => n && (nameToCat[n.trim()] = cat))
+        base[c.code] = baseOf(c)
+        if (c.est_commercial) commercial.add(c.code)
+        if (c.nom_sa_data) nameToCode[c.nom_sa_data.trim()] = c.code
+        ;(c.noms_repris || []).forEach(n => n && (nameToCode[n.trim()] = c.code))
       })
-      // tous les mouvements, toutes années (alias compatibles ActsModal)
       const all = []; let from = 0
       while (true) {
         const { data, error } = await supabase.from('mouvements_production')
@@ -210,53 +232,65 @@ function OngletGlobal({ onDetail }) {
         if (error || !data || !data.length) break
         all.push(...data); if (data.length < 1000) break; from += 1000
       }
-      const mapped = all.map(d => ({
-        ...d,
-        mois: String(d.mois).padStart(2,'0'),
-        _cat: nameToCat[(d.agent_code || '').trim()] || 'SA',
-      }))
+      const Y = new Date().getFullYear()
+      const mapped = all
+        .filter(d => d.annee >= 2020 && d.annee <= Y)
+        .map(d => {
+          const code = nameToCode[(d.agent_code || '').trim()] || null
+          return { ...d, mois:String(d.mois).padStart(2,'0'), _code:code, _cat: code ? (base[code] || 'SA') : 'SA' }
+        })
+      setMeta({ commercial, base })
       setRows(mapped)
     })()
   }, [])
 
-  const annees = useMemo(() => {
-    if (!rows) return []
-    return [...new Set(rows.map(r => r.annee))].filter(Boolean).sort((a,b) => b - a)
-  }, [rows])
+  const view = useMemo(() => {
+    if (!rows) return null
+    const myCode = perms?.collab_code ? String(perms.collab_code).toUpperCase() : null
+    const patron = isAdmin || !myCode
+    let cats, dcat, myBase = null
+    if (patron) {
+      cats = ['HQ','SA','Apporteur'].map(k => ({ key:k, ...CAT_DEF[k] }))
+      dcat = d => d._cat
+    } else {
+      myBase = meta.base[myCode] || 'HQ'
+      if (meta.commercial.has(myCode)) {
+        cats = [mineDef(myCode), ...['HQ','SA','Apporteur'].map(k => ({ key:k, ...CAT_DEF[k] }))]
+        dcat = d => d._code === myCode ? myCode : d._cat
+      } else {
+        const others = ['HQ','SA','Apporteur'].filter(k => k !== myBase)
+        cats = [mineDef(myCode), ...others.map(k => ({ key:k, ...CAT_DEF[k] }))]
+        dcat = d => d._code === myCode ? myCode : (d._cat === myBase ? null : d._cat)
+      }
+    }
+    return { cats, rows: rows.map(d => ({ ...d, _dcat: dcat(d) })), myCode: patron ? null : myCode, myBase }
+  }, [rows, perms, isAdmin, meta])
 
-  if (!rows) return <div style={{ padding:40, textAlign:'center', color:'#94a3b8' }}>Chargement de la production…</div>
+  const annees = useMemo(() => view ? [...new Set(view.rows.map(r => r.annee))].sort((a,b) => b - a) : [], [view])
+
+  if (!view) return <div style={{ padding:40, textAlign:'center', color:'#94a3b8' }}>Chargement de la production…</div>
 
   return (
     <div>
-      {/* Sélecteur de mode (remplace les années) */}
-      <div style={{ display:'flex', gap:8, marginBottom:16, flexWrap:'wrap' }}>
+      <div style={{ display:'flex', gap:8, marginBottom:18, flexWrap:'wrap', alignItems:'center' }}>
         {MODES.map(m => (
           <button key={m.key} onClick={()=>setMode(m)} style={{
             padding:'7px 18px', borderRadius:22, border:`1.5px solid ${mode.key===m.key?BLUE:'#e2e8f0'}`,
-            background: mode.key===m.key?`linear-gradient(135deg,#0080BD,#0D2F5E)`:'#fff',
+            background: mode.key===m.key?'linear-gradient(135deg,#0080BD,#0D2F5E)':'#fff',
             color: mode.key===m.key?'#fff':'#64748b', fontWeight:700, fontSize:13, cursor:'pointer',
             boxShadow: mode.key===m.key?'0 2px 8px rgba(0,128,189,.3)':'none'
           }}>{m.label}</button>
         ))}
+        <span style={{ fontSize:11, color:'#94a3b8', marginLeft:'auto' }}>Volume brut · clique un segment (ou l'année) pour le détail</span>
       </div>
-
-      {/* Légende catégories */}
-      <div style={{ display:'flex', gap:18, marginBottom:18 }}>
-        {CATS.map(c => (
-          <span key={c.key} style={{ fontSize:12, color:'#475569', fontWeight:600, display:'flex', alignItems:'center', gap:6 }}>
-            <i style={{ display:'inline-block', width:14, height:14, borderRadius:4, background:c.grad }} />{c.label}
-          </span>
-        ))}
-        <span style={{ fontSize:11, color:'#94a3b8', marginLeft:'auto' }}>Volume brut (par producteur, sans rétention) · clique un segment pour le détail</span>
-      </div>
-
-      {/* Un graphique par année, l'un sous l'autre */}
       {annees.map(an => (
-        <ChartAnnee key={an} annee={an} rows={rows.filter(r => r.annee === an)} mode={mode} onDetail={onDetail} />
+        <ChartAnnee key={an} annee={an} rows={view.rows.filter(r => r.annee === an)}
+          cats={view.cats} mode={mode} onDetail={onDetail} myCode={view.myCode} myBase={view.myBase} />
       ))}
     </div>
   )
 }
+
 
 // ── ONGLET 2 : Par collaborateur ──
 function OngletCollaborateurs({ data, annee, onDetail }) {
@@ -556,9 +590,9 @@ export default function DynassurProduction() {
 
         <StatBanner
           color={ENTITES.dynassur.color} colorDark={ENTITES.dynassur.colorDark} logoUrl={ENTITES.dynassur.logo}
-          title={`Production ${annee}`}
+          title={onglet === 'global' ? 'Production' : `Production ${annee}`}
           subtitle="Dynassur SRL — suivi par type et collaborateur"
-          stats={!loading ? [{ label: 'Mouvements', value: fmtN(data.length) }] : []}
+          stats={[]}
         />
 
         {/* Onglets */}
