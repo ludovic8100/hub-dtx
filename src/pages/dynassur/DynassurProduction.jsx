@@ -57,8 +57,67 @@ function KpiCard({ label, value, col, sub, onClick }) {
   )
 }
 
+// ── Fenêtre de détail d'UN contrat (clic sur le n° de contrat) ──
+function Field2({ l, v }) {
+  return <div><div style={{ fontSize:10, fontWeight:700, color:'#94a3b8', textTransform:'uppercase' }}>{l}</div><div style={{ color:NAVY, marginTop:1 }}>{v || '—'}</div></div>
+}
+function ContratModal({ police, onClose }) {
+  const [rows, setRows] = useState(null)
+  useEffect(() => {
+    let alive = true
+    supabase.from('contrats')
+      .select('police,compagnie,nom_client,prenom_client,dossier,situation,date_creation,domaine,type_production,garantie_valeur,version,sa_code,nom_sa,code_postal,localite')
+      .eq('police', police)
+      .then(({ data }) => { if (alive) setRows(data || []) })
+    return () => { alive = false }
+  }, [police])
+  const SITC = { 'En cours':{bg:'#dcfce7',c:'#16a34a'}, 'Résilié':{bg:'#fee2e2',c:'#dc2626'}, 'Terminé':{bg:'#fee2e2',c:'#dc2626'}, 'Suspendu':{bg:'#fef3c7',c:'#92400e'} }
+  const main = rows && rows[0]
+  return (
+    <div onClick={e => { e.stopPropagation(); onClose() }} style={{ position:'fixed', inset:0, background:'rgba(15,23,42,.6)', zIndex:1100, display:'flex', alignItems:'flex-start', justifyContent:'center', padding:'8vh 16px' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background:'#fff', borderRadius:14, width:'100%', maxWidth:560, maxHeight:'80vh', overflow:'auto', boxShadow:'0 20px 60px rgba(0,0,0,.3)' }}>
+        <div style={{ background:`linear-gradient(135deg,${NAVY},${BLUE})`, color:'#fff', padding:'16px 20px', display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+          <div>
+            <div style={{ fontSize:12, opacity:.85 }}>Contrat</div>
+            <div style={{ fontSize:20, fontWeight:800, fontFamily:'monospace' }}>{police}</div>
+            {main && <div style={{ fontSize:13, opacity:.9, marginTop:2 }}>{[main.nom_client, main.prenom_client].filter(Boolean).join(' ')}</div>}
+          </div>
+          <button onClick={onClose} style={{ background:'rgba(255,255,255,.2)', border:'none', color:'#fff', width:30, height:30, borderRadius:8, cursor:'pointer', fontSize:16 }}>✕</button>
+        </div>
+        <div style={{ padding:20 }}>
+          {rows === null ? <p style={{ color:'#94a3b8' }}>Chargement…</p>
+            : !rows.length ? <p style={{ color:'#94a3b8' }}>Aucun contrat trouvé pour la police {police} dans la base contrats.</p>
+            : <>
+              {rows.map((c, i) => {
+                const s = SITC[c.situation] || { bg:'#f1f5f9', c:'#64748b' }
+                return (
+                  <div key={i} style={{ border:'1px solid #e2e8f0', borderRadius:10, padding:'12px 14px', marginBottom:10 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+                      <span style={{ fontWeight:700, color:NAVY }}>{c.compagnie || '—'}{c.version ? ` · v${c.version}` : ''}</span>
+                      <span style={{ fontSize:11, fontWeight:700, padding:'2px 9px', borderRadius:5, background:s.bg, color:s.c }}>{c.situation || '—'}</span>
+                    </div>
+                    <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:10, fontSize:13 }}>
+                      <Field2 l="Domaine" v={c.domaine} />
+                      <Field2 l="Type production" v={c.type_production} />
+                      <Field2 l="Créé le" v={c.date_creation} />
+                      <Field2 l="Garantie / valeur" v={c.garantie_valeur} />
+                      <Field2 l="Dossier" v={c.dossier} />
+                      <Field2 l="Sous-agent" v={c.nom_sa || c.sa_code} />
+                    </div>
+                  </div>
+                )
+              })}
+              {main?.dossier && <a href={`/dynassur/clients?dossier=${main.dossier}`} style={{ display:'inline-block', marginTop:4, padding:'8px 14px', background:BLUE, color:'#fff', borderRadius:8, textDecoration:'none', fontSize:13, fontWeight:600 }}>Ouvrir la fiche client →</a>}
+            </>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Fenêtre de détail : les mouvements (actes) derrière un chiffre ──
 function ActsModal({ titre, rows, onClose }) {
+  const [contratNum, setContratNum] = useState(null)
   const COLS = [
     { key:'mois',        label:'Mois',       get:d=>(d.annee||0)*100+parseInt(d.mois||0), render:d=>`${MOIS_LABELS[parseInt(d.mois)]||d.mois} ${d.annee}` },
     { key:'type_prod',   label:'Type',       get:d=>d.type_prod||'', render:d=>{ const cfg=TYPES_PROD[d.type_prod]||{col:'#94a3b8'}; return <Badge label={d.type_prod} col={cfg.col} /> } },
@@ -66,7 +125,7 @@ function ActsModal({ titre, rows, onClose }) {
     { key:'client_nom',  label:'Client',     get:d=>d.client_nom||'', render:d=><span style={{ fontWeight:600, color:NAVY }}>{d.client_nom||'—'}</span> },
     { key:'branche',     label:'Branche',    get:d=>d.branche||'', render:d=>d.branche||'—' },
     { key:'compagnie',   label:'Compagnie',  get:d=>d.compagnie||'', render:d=>d.compagnie||'—' },
-    { key:'num_contrat', label:'N° contrat', get:d=>d.num_contrat||'', render:d=>d.num_contrat||'—' },
+    { key:'num_contrat', label:'N° contrat', get:d=>d.num_contrat||'', render:d=>d.num_contrat ? <span onClick={e=>{ e.stopPropagation(); setContratNum(d.num_contrat) }} style={{ color:BLUE, fontWeight:700, cursor:'pointer', textDecoration:'underline', textUnderlineOffset:2 }} title="Voir le contrat">{d.num_contrat}</span> : '—' },
   ]
   const [sort, setSort] = useState({ key:'mois', dir:'desc' })
   const sorted = [...rows].sort((a,b) => {
@@ -108,6 +167,7 @@ function ActsModal({ titre, rows, onClose }) {
           </table>
           {sorted.length>1000 && <p style={{ padding:'12px 16px', color:'#94a3b8', fontSize:12 }}>… et {fmtN(sorted.length-1000)} autres lignes.</p>}
         </div>
+        {contratNum && <ContratModal police={contratNum} onClose={()=>setContratNum(null)} />}
       </div>
     </div>
   )
@@ -465,6 +525,7 @@ function OngletCollaborateurs({ data, annee, onDetail }) {
 function OngletDetail({ data }) {
   const [filters, setFilters] = useState({ agent:'all', type:'all', mois:'all' })
   const [page, setPage] = useState(0)
+  const [contratNum, setContratNum] = useState(null)
   const PER_PAGE = 50
 
   const agents  = [...new Set(data.map(d=>d.agent_code).filter(Boolean))].sort()
@@ -529,7 +590,7 @@ function OngletDetail({ data }) {
                         <td style={{ padding:'8px 12px', borderBottom:'1px solid #f1f5f9', color:'#64748b', whiteSpace:'nowrap' }}>{MOIS_LABELS[parseInt(d.mois)]} {d.annee}</td>
                         <td style={{ padding:'8px 12px', borderBottom:'1px solid #f1f5f9' }}><Badge label={d.type_prod} col={cfg.col} /></td>
                         <td style={{ padding:'8px 12px', borderBottom:'1px solid #f1f5f9', color:'#64748b' }}>{AGENT_NOMS[d.agent_code]||d.agent_code||'—'}</td>
-                        <td style={{ padding:'8px 12px', borderBottom:'1px solid #f1f5f9', fontFamily:'monospace', color:'#374151', fontSize:11 }}>{d.num_contrat||'—'}</td>
+                        <td style={{ padding:'8px 12px', borderBottom:'1px solid #f1f5f9', fontFamily:'monospace', fontSize:11 }}>{d.num_contrat ? <span onClick={()=>setContratNum(d.num_contrat)} style={{ color:BLUE, fontWeight:700, cursor:'pointer', textDecoration:'underline', textUnderlineOffset:2 }} title="Voir le contrat">{d.num_contrat}</span> : <span style={{ color:'#374151' }}>—</span>}</td>
                         <td style={{ padding:'8px 12px', borderBottom:'1px solid #f1f5f9', color:'#1e293b' }}>{d.client_nom||'—'}</td>
                         <td style={{ padding:'8px 12px', borderBottom:'1px solid #f1f5f9', color:'#64748b' }}>{d.branche||'—'}</td>
                         <td style={{ padding:'8px 12px', borderBottom:'1px solid #f1f5f9', color:'#64748b' }}>{d.compagnie||'—'}</td>
@@ -556,6 +617,7 @@ function OngletDetail({ data }) {
           </div>
         )}
       </div>
+      {contratNum && <ContratModal police={contratNum} onClose={()=>setContratNum(null)} />}
     </div>
   )
 }
