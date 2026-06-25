@@ -73,7 +73,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadingTx, setLoadingTx] = useState(false)
-  const [filtre, setFiltre] = useState({ compte: 'tous', type: 'tous', libelle: '', annee: '', categorie: 'toutes' })
+  const [filtre, setFiltre] = useState({ compte: 'tous', type: 'tous', libelle: '', annee: String(new Date().getFullYear()), categorie: 'toutes' })
   const [tri, setTri] = useState({ col: 'date', sens: 'desc' })
   const [page, setPage] = useState(1)
   const [categories, setCategories] = useState([])
@@ -85,6 +85,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
     return () => window.removeEventListener('resize', onResize)
   }, [])
   const [catExpanded, setCatExpanded] = useState(null)
+  const [moisExpanded, setMoisExpanded] = useState(null)
   const PAR_PAGE = 100
 
   const isConsolide = societeCodes.length > 1
@@ -223,6 +224,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   })
   const totalEntrees = txFiltrees.filter(t=>parseFloat(t.montant)>0).reduce((s,t)=>s+parseFloat(t.montant),0)
   const totalSorties = txFiltrees.filter(t=>parseFloat(t.montant)<0).reduce((s,t)=>s+parseFloat(t.montant),0)
+  const fluxTotal = totalEntrees + Math.abs(totalSorties)
 
   // Synthèse par catégorie (sur transactions filtrées)
   const parCategorie = {}
@@ -263,6 +265,33 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const maxFluxMois = Math.max(1, ...syntheseMensuelle.map(m => Math.max(m.recettes, Math.abs(m.depenses))))
 
   // Détail par fournisseur/contrepartie pour une catégorie donnée
+  function moisDeCategorie(catId, sens) {
+    const map = {}
+    txFiltrees.forEach(t => {
+      const key = t.categorie_id || '_none'
+      if (key !== catId) return
+      const m = parseFloat(t.montant) || 0
+      if (sens === 'recette' && m < 0) return
+      if (sens === 'depense' && m >= 0) return
+      const d = t._date || ''
+      if (d.length < 7) return
+      const mk = d.substring(0, 7)
+      if (!map[mk]) map[mk] = { total: 0, nb: 0 }
+      map[mk].total += m; map[mk].nb++
+    })
+    return Object.entries(map).map(([mk, v]) => ({ mk, ...v }))
+      .sort((a, b) => sens === 'recette' ? b.total - a.total : a.total - b.total)
+  }
+  function txDeCatMois(catId, sens, mk) {
+    return txFiltrees.filter(t => {
+      const key = t.categorie_id || '_none'
+      if (key !== catId) return false
+      const m = parseFloat(t.montant) || 0
+      if (sens === 'recette' && m < 0) return false
+      if (sens === 'depense' && m >= 0) return false
+      return (t._date || '').substring(0, 7) === mk
+    }).sort((a, b) => (b._date || '').localeCompare(a._date || ''))
+  }
   function detailFournisseurs(catId, sens) {
     const map = {}
     txFiltrees.forEach(t => {
@@ -380,7 +409,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
           <div style={{ background:'#fff', borderRadius:'12px', border:'1px solid #e2e8f0', overflow:'hidden' }}>
             <div style={{ padding:'12px 16px', background:'#f0fdf4', borderBottom:'1px solid #dcfce7', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
               <span style={{ fontSize:'12px', fontWeight:'700', color:'#16a34a', textTransform:'uppercase', letterSpacing:'0.05em' }}>▲ Recettes par catégorie</span>
-              <span style={{ fontSize:'15px', fontWeight:'800', color:'#16a34a' }}>+{fmt(totalEntrees)}</span>
+              <span style={{ fontSize:'15px', fontWeight:'800', color:'#16a34a' }}>+{fmt(totalEntrees)} <span style={{ fontSize:'12px', fontWeight:'700', color:'#16a34a99' }}>· {fluxTotal>0?Math.round(totalEntrees/fluxTotal*100):0}%</span></span>
             </div>
             <div>
               {syntheseRecettes.length === 0 ? (
@@ -402,20 +431,36 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                           <span style={{ fontSize:'13px', fontWeight:'600', color:'#1e293b' }}>{cat?.nom || 'Non catégorisé'}</span>
                           <span style={{ fontSize:'11px', color:'#cbd5e1' }}>({x.nb})</span>
                         </span>
-                        <span style={{ fontSize:'13px', fontWeight:'700', color:'#16a34a' }}>+{fmt(x.recettes)}</span>
+                        <span style={{ fontSize:'13px', fontWeight:'700', color:'#16a34a' }}>+{fmt(x.recettes)} <span style={{ fontSize:'11px', fontWeight:'600', color:'#94a3b8' }}>{pct.toFixed(0)}%</span></span>
                       </div>
                       <div style={{ height:'5px', background:'#f1f5f9', borderRadius:'3px', overflow:'hidden' }}>
                         <div style={{ height:'100%', width:`${pct}%`, background: cat?.couleur || '#94a3b8', borderRadius:'3px' }}></div>
                       </div>
                     </div>
                     {ouvert && (
-                      <div style={{ background:'#fafafa', padding:'4px 16px 10px 32px' }}>
-                        {detail.map((d, j) => (
-                          <div key={j} style={{ display:'flex', justifyContent:'space-between', padding:'5px 0', borderBottom: j<detail.length-1?'1px solid #f1f5f9':'none' }}>
-                            <span style={{ fontSize:'12px', color:'#475569', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', paddingRight:'10px' }}>{d.nom} <span style={{ color:'#cbd5e1' }}>({d.nb})</span></span>
-                            <span style={{ fontSize:'12px', fontWeight:'600', color:'#16a34a', flexShrink:0 }}>+{fmt(d.total)}</span>
-                          </div>
-                        ))}
+                      <div style={{ background:'#fafafa', padding:'4px 16px 10px 28px' }}>
+                        {moisDeCategorie(catId,'recette').map((mo, j) => {
+                          const mKey = expKey+'|'+mo.mk
+                          const mOuvert = moisExpanded === mKey
+                          return (
+                            <div key={j}>
+                              <div onClick={(e)=>{ e.stopPropagation(); setMoisExpanded(mOuvert?null:mKey) }} style={{ display:'flex', justifyContent:'space-between', padding:'5px 0', cursor:'pointer', borderBottom:'1px solid #f1f5f9' }}>
+                                <span style={{ fontSize:'12px', color:'#475569' }}>{mOuvert?'▼':'▶'} {MOIS_NOMS[parseInt(mo.mk.substring(5,7))]} {mo.mk.substring(0,4)} <span style={{ color:'#cbd5e1' }}>({mo.nb})</span></span>
+                                <span style={{ fontSize:'12px', fontWeight:'700', color:'#16a34a', flexShrink:0 }}>+{fmt(mo.total)}</span>
+                              </div>
+                              {mOuvert && (
+                                <div style={{ padding:'2px 0 8px 18px' }}>
+                                  {txDeCatMois(catId,'recette',mo.mk).map((t,k) => (
+                                    <div key={k} style={{ display:'flex', justifyContent:'space-between', padding:'3px 0' }}>
+                                      <span style={{ fontSize:'11.5px', color:'#64748b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', paddingRight:'10px' }}>{fmtDate(t._date)} · {t.contrepartie_nom||t.libelle||'—'}</span>
+                                      <span style={{ fontSize:'11.5px', fontWeight:'600', color:'#16a34a', flexShrink:0 }}>+{fmt(parseFloat(t.montant))}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
                       </div>
                     )}
                   </div>
@@ -428,7 +473,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
           <div style={{ background:'#fff', borderRadius:'12px', border:'1px solid #e2e8f0', overflow:'hidden' }}>
             <div style={{ padding:'12px 16px', background:'#fef2f2', borderBottom:'1px solid #fee2e2', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
               <span style={{ fontSize:'12px', fontWeight:'700', color:'#dc2626', textTransform:'uppercase', letterSpacing:'0.05em' }}>▼ Dépenses par catégorie</span>
-              <span style={{ fontSize:'15px', fontWeight:'800', color:'#dc2626' }}>{fmt(totalSorties)}</span>
+              <span style={{ fontSize:'15px', fontWeight:'800', color:'#dc2626' }}>{fmt(totalSorties)} <span style={{ fontSize:'12px', fontWeight:'700', color:'#dc262699' }}>· {fluxTotal>0?Math.round(Math.abs(totalSorties)/fluxTotal*100):0}%</span></span>
             </div>
             <div>
               {syntheseDepenses.length === 0 ? (
@@ -450,20 +495,36 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                           <span style={{ fontSize:'13px', fontWeight:'600', color:'#1e293b' }}>{cat?.nom || 'Non catégorisé'}</span>
                           <span style={{ fontSize:'11px', color:'#cbd5e1' }}>({x.nb})</span>
                         </span>
-                        <span style={{ fontSize:'13px', fontWeight:'700', color:'#dc2626' }}>{fmt(x.depenses)}</span>
+                        <span style={{ fontSize:'13px', fontWeight:'700', color:'#dc2626' }}>{fmt(x.depenses)} <span style={{ fontSize:'11px', fontWeight:'600', color:'#94a3b8' }}>{pct.toFixed(0)}%</span></span>
                       </div>
                       <div style={{ height:'5px', background:'#f1f5f9', borderRadius:'3px', overflow:'hidden' }}>
                         <div style={{ height:'100%', width:`${pct}%`, background: cat?.couleur || '#94a3b8', borderRadius:'3px' }}></div>
                       </div>
                     </div>
                     {ouvert && (
-                      <div style={{ background:'#fafafa', padding:'4px 16px 10px 32px' }}>
-                        {detail.map((d, j) => (
-                          <div key={j} style={{ display:'flex', justifyContent:'space-between', padding:'5px 0', borderBottom: j<detail.length-1?'1px solid #f1f5f9':'none' }}>
-                            <span style={{ fontSize:'12px', color:'#475569', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', paddingRight:'10px' }}>{d.nom} <span style={{ color:'#cbd5e1' }}>({d.nb})</span></span>
-                            <span style={{ fontSize:'12px', fontWeight:'600', color:'#dc2626', flexShrink:0 }}>{fmt(d.total)}</span>
-                          </div>
-                        ))}
+                      <div style={{ background:'#fafafa', padding:'4px 16px 10px 28px' }}>
+                        {moisDeCategorie(catId,'depense').map((mo, j) => {
+                          const mKey = expKey+'|'+mo.mk
+                          const mOuvert = moisExpanded === mKey
+                          return (
+                            <div key={j}>
+                              <div onClick={(e)=>{ e.stopPropagation(); setMoisExpanded(mOuvert?null:mKey) }} style={{ display:'flex', justifyContent:'space-between', padding:'5px 0', cursor:'pointer', borderBottom:'1px solid #f1f5f9' }}>
+                                <span style={{ fontSize:'12px', color:'#475569' }}>{mOuvert?'▼':'▶'} {MOIS_NOMS[parseInt(mo.mk.substring(5,7))]} {mo.mk.substring(0,4)} <span style={{ color:'#cbd5e1' }}>({mo.nb})</span></span>
+                                <span style={{ fontSize:'12px', fontWeight:'700', color:'#dc2626', flexShrink:0 }}>{fmt(mo.total)}</span>
+                              </div>
+                              {mOuvert && (
+                                <div style={{ padding:'2px 0 8px 18px' }}>
+                                  {txDeCatMois(catId,'depense',mo.mk).map((t,k) => (
+                                    <div key={k} style={{ display:'flex', justifyContent:'space-between', padding:'3px 0' }}>
+                                      <span style={{ fontSize:'11.5px', color:'#64748b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', paddingRight:'10px' }}>{fmtDate(t._date)} · {t.contrepartie_nom||t.libelle||'—'}</span>
+                                      <span style={{ fontSize:'11.5px', fontWeight:'600', color:'#dc2626', flexShrink:0 }}>{fmt(parseFloat(t.montant))}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
                       </div>
                     )}
                   </div>
