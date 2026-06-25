@@ -99,12 +99,30 @@ function DetailModal({ titre, kind, rows, onClose }) {
   const isQ = kind === 'quittances'
   const totC = rows.reduce((s, r) => s + (Number(r.commission) || 0), 0)
   const totP = rows.reduce((s, r) => s + (Number(r.prime_totale) || 0), 0)
-  const tri = isQ
-    ? [...rows].sort((a, b) => (b.date_comptable || '').localeCompare(a.date_comptable || ''))
-    : [...rows].sort((a, b) => (b.mois || '').localeCompare(a.mois || ''))
-  const show = tri.slice(0, 1000)
   const MO = ['', 'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
-  const cols = isQ ? ['Date', 'Client', 'Compagnie', 'Domaine', 'Prime', 'Commission'] : ['Mois', 'Type', 'Client', 'Compagnie', 'N° contrat']
+  const COLS = isQ ? [
+    { key:'date_comptable', label:'Date',       align:'left',  get:r=>r.date_comptable||'', render:r=>r.date_comptable||'—' },
+    { key:'client',         label:'Client',     align:'left',  get:r=>[r.client_nom,r.client_prenom].filter(Boolean).join(' '), render:r=>[r.client_nom,r.client_prenom].filter(Boolean).join(' ')||'—' },
+    { key:'compagnie',      label:'Compagnie',  align:'left',  get:r=>r.compagnie||'', render:r=>r.compagnie||'—' },
+    { key:'domaine',        label:'Domaine',    align:'left',  get:r=>r.domaine||'', render:r=>r.domaine||'—' },
+    { key:'prime_totale',   label:'Prime',      align:'right', get:r=>Number(r.prime_totale)||0, render:r=>fmt(r.prime_totale) },
+    { key:'commission',     label:'Commission', align:'right', get:r=>Number(r.commission)||0, render:r=><span style={{ color:C.ok, fontWeight:700 }}>{fmt(r.commission)}</span> },
+  ] : [
+    { key:'mois',        label:'Mois',       align:'left', get:r=>parseInt(r.mois)||0, render:r=>MO[parseInt(r.mois)]||r.mois||'—' },
+    { key:'type_prod',   label:'Type',       align:'left', get:r=>r.type_prod||'', render:r=>r.type_prod||'—' },
+    { key:'nom_client',  label:'Client',     align:'left', get:r=>r.nom_client||'', render:r=>r.nom_client||'—' },
+    { key:'cie',         label:'Compagnie',  align:'left', get:r=>r.cie||'', render:r=>r.cie||'—' },
+    { key:'police',      label:'N° contrat', align:'left', get:r=>r.police||'', render:r=>r.police||'—' },
+  ]
+  const [sort, setSort] = useState({ key: isQ ? 'date_comptable' : 'mois', dir: 'desc' })
+  const sorted = [...rows].sort((a, b) => {
+    const c = COLS.find(x => x.key === sort.key) || COLS[0]
+    const av = c.get(a), bv = c.get(b)
+    const r = typeof av === 'string' ? av.localeCompare(bv) : av - bv
+    return sort.dir === 'asc' ? r : -r
+  })
+  const show = sorted.slice(0, 1000)
+  const click = k => setSort(s => s.key === k ? { key:k, dir:s.dir === 'asc' ? 'desc' : 'asc' } : { key:k, dir:'asc' })
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.55)', zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
       <div onClick={e => e.stopPropagation()} style={{ width: 'min(880px,96vw)', height: '100%', background: '#fff', display: 'flex', flexDirection: 'column', boxShadow: '-8px 0 30px rgba(0,0,0,.2)' }}>
@@ -120,30 +138,23 @@ function DetailModal({ titre, kind, rows, onClose }) {
         <div style={{ flex: 1, overflow: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
             <thead><tr style={{ background: C.bg, position: 'sticky', top: 0 }}>
-              {cols.map((h, i) => <th key={h} style={{ textAlign: isQ && i >= 4 ? 'right' : 'left', padding: '8px 12px', fontSize: 10, fontWeight: 700, color: C.textL, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{h}</th>)}
+              {COLS.map(c => (
+                <th key={c.key} onClick={()=>click(c.key)} style={{ textAlign: c.align, padding: '8px 12px', fontSize: 10, fontWeight: 700, color: sort.key===c.key?C.text:C.textL, textTransform: 'uppercase', whiteSpace: 'nowrap', cursor:'pointer', userSelect:'none' }}>
+                  {c.label}{sort.key===c.key && <span style={{ marginLeft:4 }}>{sort.dir==='asc'?'▲':'▼'}</span>}
+                </th>
+              ))}
             </tr></thead>
             <tbody>
               {show.map((r, i) => (
                 <tr key={i} style={{ borderBottom: `1px solid ${C.greyPale}` }}>
-                  {isQ ? <>
-                    <td style={{ padding: '7px 12px', color: C.textM, whiteSpace: 'nowrap' }}>{r.date_comptable || '—'}</td>
-                    <td style={{ padding: '7px 12px', fontWeight: 600, color: C.text }}>{[r.client_nom, r.client_prenom].filter(Boolean).join(' ') || '—'}</td>
-                    <td style={{ padding: '7px 12px', color: C.textM }}>{r.compagnie || '—'}</td>
-                    <td style={{ padding: '7px 12px', color: C.textM }}>{r.domaine || '—'}</td>
-                    <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700 }}>{fmt(r.prime_totale)}</td>
-                    <td style={{ padding: '7px 12px', textAlign: 'right', color: C.ok, fontWeight: 700 }}>{fmt(r.commission)}</td>
-                  </> : <>
-                    <td style={{ padding: '7px 12px', color: C.textM, whiteSpace: 'nowrap' }}>{MO[parseInt(r.mois)] || r.mois || '—'}</td>
-                    <td style={{ padding: '7px 12px', fontWeight: 600, color: C.text }}>{r.type_prod || '—'}</td>
-                    <td style={{ padding: '7px 12px', color: C.textM }}>{r.nom_client || '—'}</td>
-                    <td style={{ padding: '7px 12px', color: C.textM }}>{r.cie || '—'}</td>
-                    <td style={{ padding: '7px 12px', color: C.textM, whiteSpace: 'nowrap' }}>{r.police || '—'}</td>
-                  </>}
+                  {COLS.map(c => (
+                    <td key={c.key} style={{ padding: '7px 12px', textAlign: c.align, color: C.textM, whiteSpace: (c.key==='date_comptable'||c.key==='police'||c.key==='mois')?'nowrap':'normal' }}>{c.render(r)}</td>
+                  ))}
                 </tr>
               ))}
             </tbody>
           </table>
-          {tri.length > 1000 && <p style={{ padding: '12px 16px', color: C.textL, fontSize: 12 }}>… et {fmtN(tri.length - 1000)} autres lignes (totaux calculés sur l'ensemble).</p>}
+          {sorted.length > 1000 && <p style={{ padding: '12px 16px', color: C.textL, fontSize: 12 }}>… et {fmtN(sorted.length - 1000)} autres lignes (totaux calculés sur l'ensemble).</p>}
         </div>
       </div>
     </div>
