@@ -14,6 +14,7 @@ const C = {
 const fmt = v => v == null ? '—' : new Intl.NumberFormat('fr-BE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v)
 const fmtN = v => v == null ? '—' : new Intl.NumberFormat('fr-BE').format(v)
 const fmtPct = v => v == null ? '—' : `${Number(v).toFixed(1)} %`
+const isVieDom = dom => { const d = (dom || '').toLowerCase(); return d.includes('vie') || d.includes('placement') }
 
 function pctColor(pct) {
   if (pct == null) return C.grey
@@ -53,13 +54,16 @@ function Badge({ label, color, pale }) {
 }
 
 // ── KPI Card ──────────────────────────────────────────────────
-function KpiCard({ label, value, sub, pct, col, icon }) {
+function KpiCard({ label, value, sub, pct, col, icon, onClick }) {
   const c = col || C.blue
   return (
-    <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 10, padding: '16px 18px', borderTop: `3px solid ${c}` }}>
+    <div onClick={onClick}
+      onMouseEnter={e => { if (onClick) e.currentTarget.style.boxShadow = `0 4px 14px ${c}25` }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none' }}
+      style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 10, padding: '16px 18px', borderTop: `3px solid ${c}`, cursor: onClick ? 'pointer' : 'default', transition: 'box-shadow .15s' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: C.textL, textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
-        {icon && <i className={`ti ${icon}`} style={{ fontSize: 18, color: c + '80' }} />}
+        {onClick ? <i className="ti ti-zoom-in" style={{ fontSize: 16, color: c }} /> : (icon && <i className={`ti ${icon}`} style={{ fontSize: 18, color: c + '80' }} />)}
       </div>
       <div style={{ fontSize: 24, fontWeight: 800, color: C.text, marginBottom: sub ? 4 : 0 }}>{value}</div>
       {sub && <div style={{ fontSize: 12, color: C.textM, marginBottom: pct != null ? 8 : 0 }}>{sub}</div>}
@@ -144,9 +148,12 @@ function OngletCommerciaux({ objectifs, reel, loading, raw, onDetail }) {
     <div>
       {/* KPIs globaux */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 24 }}>
-        <KpiCard label="Commission nette Dynassur" value={fmt(totalReel)} sub={`Objectif : ${fmt(totalObj)}`} pct={totalObj > 0 ? totalReel / totalObj * 100 : null} col={C.blue} icon="ti-coin" />
-        <KpiCard label="Nouvelles affaires" value={fmtN(totalReelNA)} sub={`Objectif : ${fmtN(totalObjNA)} NA`} pct={totalObjNA > 0 ? totalReelNA / totalObjNA * 100 : null} col="#7c3aed" icon="ti-file-plus" />
-        <KpiCard label="Prime VIE (capital)" value={fmt(totalReelVie)} sub={`Objectif : ${fmt(totalObjVie)}`} pct={totalObjVie > 0 ? totalReelVie / totalObjVie * 100 : null} col="#0d9488" icon="ti-heart" />
+        <KpiCard label="Commission nette Dynassur" value={fmt(totalReel)} sub={`Objectif : ${fmt(totalObj)}`} pct={totalObj > 0 ? totalReel / totalObj * 100 : null} col={C.blue} icon="ti-coin"
+          onClick={() => { const x = commerciaux.flatMap(o => raw[o.collaborateur_code]?.quitt || []); x.length && onDetail('Tous commerciaux — commissions 2026', 'quittances', x) }} />
+        <KpiCard label="Nouvelles affaires" value={fmtN(totalReelNA)} sub={`Objectif : ${fmtN(totalObjNA)} NA`} pct={totalObjNA > 0 ? totalReelNA / totalObjNA * 100 : null} col="#7c3aed" icon="ti-file-plus"
+          onClick={() => { const x = commerciaux.flatMap(o => raw[o.collaborateur_code]?.na || []); x.length && onDetail('Tous commerciaux — Nouvelles Affaires 2026', 'mouvements', x) }} />
+        <KpiCard label="Prime VIE (capital)" value={fmt(totalReelVie)} sub={`Objectif : ${fmt(totalObjVie)}`} pct={totalObjVie > 0 ? totalReelVie / totalObjVie * 100 : null} col="#0d9488" icon="ti-heart"
+          onClick={() => { const x = commerciaux.flatMap(o => (raw[o.collaborateur_code]?.quitt || []).filter(r => isVieDom(r.domaine))); x.length && onDetail('Tous commerciaux — quittances VIE 2026', 'quittances', x) }} />
       </div>
 
       {/* Tableau par commercial */}
@@ -185,7 +192,8 @@ function OngletCommerciaux({ objectifs, reel, loading, raw, onDetail }) {
                     <td onClick={() => (raw[o.collaborateur_code]?.na?.length) && onDetail(`${o.collaborateur_code} — Nouvelles Affaires 2026`, 'mouvements', raw[o.collaborateur_code].na)}
                       style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 14, fontWeight: 700, color: C.text, cursor: raw[o.collaborateur_code]?.na?.length ? 'pointer' : 'default', textDecoration: raw[o.collaborateur_code]?.na?.length ? 'underline dotted' : 'none' }}>{fmtN(r.na)}</td>
                     <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.textM }}>{fmt(o.obj_prime_vie)}</td>
-                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 14, fontWeight: 700, color: C.text }}>{fmt(r.prime_vie)}</td>
+                    <td onClick={() => { const x = (raw[o.collaborateur_code]?.quitt || []).filter(rr => isVieDom(rr.domaine)); x.length && onDetail(`${o.collaborateur_code} — quittances VIE 2026`, 'quittances', x) }}
+                      style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 14, fontWeight: 700, color: C.text, cursor: (raw[o.collaborateur_code]?.quitt || []).some(rr => isVieDom(rr.domaine)) ? 'pointer' : 'default', textDecoration: (raw[o.collaborateur_code]?.quitt || []).some(rr => isVieDom(rr.domaine)) ? 'underline dotted' : 'none' }}>{fmt(r.prime_vie)}</td>
                     <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.textM }}>{fmtPct(retObj)}</td>
                     <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}` }}>
                       <span style={{ fontSize: 13, fontWeight: 700, color: retColor(retReel) }}>{fmtPct(retReel)}</span>
@@ -242,7 +250,8 @@ function OngletSousAgents({ objectifs, reel, loading, raw, onDetail }) {
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 24 }}>
-        <KpiCard label="Part Dynassur — tous SA" value={fmt(totalReel)} sub={`Objectif : ${fmt(totalObj)}`} pct={totalObj > 0 ? totalReel / totalObj * 100 : null} col={C.blue} icon="ti-coin" />
+        <KpiCard label="Part Dynassur — tous SA" value={fmt(totalReel)} sub={`Objectif : ${fmt(totalObj)}`} pct={totalObj > 0 ? totalReel / totalObj * 100 : null} col={C.blue} icon="ti-coin"
+          onClick={() => { const x = sa.flatMap(o => raw[o.collaborateur_code]?.quitt || []); x.length && onDetail('Tous sous-agents — commissions 2026', 'quittances', x) }} />
         <KpiCard label="SA avec objectif" value={sa.length} col="#7c3aed" icon="ti-users" />
         <KpiCard label="SA en difficulté (rét. < 60%)" value={sa.filter(o => (reel[o.collaborateur_code]?.retention || 100) < 60).length} col={C.danger} icon="ti-alert-triangle" />
       </div>
@@ -320,9 +329,12 @@ function OngletRetention({ reel, loading, raw, onDetail }) {
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 24 }}>
-        <KpiCard label="NA 2026" value={fmtN(totalNA)} col={C.blue} icon="ti-file-plus" />
-        <KpiCard label="Chutes réelles" value={fmtN(totalChutes)} col={C.danger} icon="ti-trending-down" />
-        <KpiCard label="TFT (transferts)" value={fmtN(totalTFT)} col={C.warn} icon="ti-arrows-exchange" sub="Client gardé, CIE changée" />
+        <KpiCard label="NA 2026" value={fmtN(totalNA)} col={C.blue} icon="ti-file-plus"
+          onClick={() => { const x = tous.flatMap(([code]) => raw[code]?.na || []); x.length && onDetail('Tous producteurs — Nouvelles Affaires 2026', 'mouvements', x) }} />
+        <KpiCard label="Chutes réelles" value={fmtN(totalChutes)} col={C.danger} icon="ti-trending-down"
+          onClick={() => { const x = tous.flatMap(([code]) => raw[code]?.chutes || []); x.length && onDetail('Tous producteurs — chutes 2026', 'mouvements', x) }} />
+        <KpiCard label="TFT (transferts)" value={fmtN(totalTFT)} col={C.warn} icon="ti-arrows-exchange" sub="Client gardé, CIE changée"
+          onClick={() => { const x = tous.flatMap(([code]) => raw[code]?.tft || []); x.length && onDetail('Tous producteurs — TFT / mandats faveur 2026', 'mouvements', x) }} />
         <KpiCard label="Net (NA - chutes)" value={fmtN(totalNA - totalChutes)} col={C.ok} icon="ti-trending-up" />
         <KpiCard label="Rétention globale 2026" value={fmtPct(retGlobal)} sub="Objectif : ≥ 70%" pct={retGlobal} col={retColor(retGlobal)} icon="ti-shield" />
       </div>
