@@ -25,6 +25,7 @@ export default function BordereauxView() {
   const [loading, setLoading] = useState(true)
   const [filterMois, setFilterMois] = useState(String(new Date().getMonth()+1))
   const [filterAnnee, setFilterAnnee] = useState("2026")
+  const [bordSearch, setBordSearch] = useState("")
 
   useEffect(() => {
     const load = async () => {
@@ -100,6 +101,15 @@ export default function BordereauxView() {
     })
     return a
   }, [idx])
+
+  const bordResults = useMemo(() => {
+    const s = bordSearch.trim().toLowerCase()
+    if (s.length < 2) return []
+    return bRows
+      .filter(b => `${b.nom_fichier||""} ${b.compagnie||""} ${b.type||""} ${b.annee||""} ${b.mois||""} ${b.compte_producteur||""} ${b.cle_unique||""}`.toLowerCase().includes(s))
+      .sort((a,b) => (String(b.annee)+normMois(b.mois)).localeCompare(String(a.annee)+normMois(a.mois)))
+      .slice(0, 60)
+  }, [bRows, bordSearch])
 
   const fmt = (n) => Number(n).toLocaleString("fr-BE", { minimumFractionDigits:2 }) + " €"
 
@@ -244,9 +254,33 @@ export default function BordereauxView() {
             <select style={{ ...D.input, width:"auto" }} value={filterAnnee} onChange={e => setFilterAnnee(e.target.value)}>
               {["2026","2025","2024","2023","2022","2021","2020"].map(y => <option key={y} value={y}>{y}</option>)}
             </select>
-            <div style={{ marginLeft:"auto", fontSize:12, color:C.textL }}>{Object.keys(idx).length} bordereau(x) trouvé(s) en {filterAnnee}</div>
+            <input value={bordSearch} onChange={e => setBordSearch(e.target.value)} placeholder="Rechercher un bordereau (compagnie, fichier, compte…)"
+              style={{ ...D.input, flex:1, minWidth:240 }} />
+            <div style={{ fontSize:12, color:C.textL }}>{Object.keys(idx).length} bordereau(x) en {filterAnnee}</div>
           </div>
-          <div style={{ fontSize:11, color:C.textL }}>● BQT reçu · ○ BQT manquant · ▲ RCP reçu · △ RCP manquant</div>
+          <div style={{ fontSize:11, color:C.textL }}>
+            <strong style={{ color:C.ok }}>B</strong> / <strong style={{ color:C.ok }}>R</strong> en vert = bordereau reçu (cliquer pour ouvrir le PDF) · <span style={{ color:"#cbd5e1", fontWeight:700 }}>B</span> / <span style={{ color:"#cbd5e1", fontWeight:700 }}>R</span> en gris = manquant
+          </div>
+          {bordSearch.trim().length >= 2 && (
+            <div style={{ marginTop:10, border:`1px solid ${C.border}`, borderRadius:8, maxHeight:280, overflowY:"auto" }}>
+              {bordResults.length === 0
+                ? <div style={{ padding:12, fontSize:13, color:C.textL }}>Aucun bordereau ne correspond à « {bordSearch} ».</div>
+                : bordResults.map(b => {
+                    const lien = b.url_sharepoint || b.source
+                    return (
+                      <a key={b.id} href={lien||"#"} target="_blank" rel="noreferrer"
+                        style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 12px", borderBottom:`1px solid ${C.bg}`, textDecoration:"none", color:C.text, fontSize:13 }}>
+                        <span style={D.badge(b.type==="RCP"?C.navyMid:C.cyanB)}>{b.type}</span>
+                        <span style={{ fontWeight:700, color:C.navy, minWidth:90 }}>{b.compagnie}</span>
+                        <span style={{ color:C.textL }}>{MOIS_L[String(parseInt(b.mois,10))]||b.mois} {b.annee}</span>
+                        <span style={{ color:C.textL, fontSize:12 }}>{b.compte_producteur||""}</span>
+                        <span style={{ marginLeft:"auto", color:lien?C.ok:C.textL, fontSize:12 }}>{lien?"Ouvrir le PDF ↗":"— pas de fichier"}</span>
+                      </a>
+                    )
+                  })}
+              {bordResults.length === 60 && <div style={{ padding:8, fontSize:11, color:C.textL, textAlign:"center" }}>60 premiers résultats — affinez la recherche.</div>}
+            </div>
+          )}
         </div>
         <div style={D.card}><div style={{ overflowX:"auto" }}>
           <table style={D.table}><thead><tr style={{ background:C.bg }}>
@@ -261,11 +295,15 @@ export default function BordereauxView() {
                   const bqt=idx[`${norm(name)}-${m}-BQT`]; const rcp=idx[`${norm(name)}-${m}-RCP`]
                   const hasBQT=type==="BQT+RCP"||type==="BQT"; const hasRCP=type==="BQT+RCP"||type==="RCP"
                   const ok=(!hasBQT||!!bqt)&&(!hasRCP||!!rcp)
+                  const lien = b => b && (b.url_sharepoint || b.source)
                   return <td key={m} style={{ ...D.td, textAlign:"center", background:ok?"#EAF7EC":"#FDECEA", padding:"6px 4px" }}>
-                    <span style={{ fontSize:11, fontWeight:700, color:ok?C.ok:C.danger }}>
-                      {hasBQT && <span title={bqt?`${Number(bqt.montant).toLocaleString("fr-BE")} €`:"manquant"}>{bqt?"●":"○"}</span>}
-                      {hasBQT&&hasRCP&&" "}
-                      {hasRCP && <span title={rcp?`${Number(rcp.montant).toLocaleString("fr-BE")} €`:"manquant"}>{rcp?"▲":"△"}</span>}
+                    <span style={{ fontSize:13, fontWeight:800, display:"inline-flex", gap:7, justifyContent:"center" }}>
+                      {hasBQT && (bqt
+                        ? <a href={lien(bqt)||"#"} target="_blank" rel="noreferrer" title={`BQT — ${bqt.nom_fichier||""}${bqt.montant!=null?` · ${Number(bqt.montant).toLocaleString("fr-BE")} €`:""}`} style={{ color:C.ok, textDecoration:"none", cursor:"pointer" }}>B</a>
+                        : <span title="BQT manquant" style={{ color:"#cbd5e1" }}>B</span>)}
+                      {hasRCP && (rcp
+                        ? <a href={lien(rcp)||"#"} target="_blank" rel="noreferrer" title={`RCP — ${rcp.nom_fichier||""}${rcp.montant!=null?` · ${Number(rcp.montant).toLocaleString("fr-BE")} €`:""}`} style={{ color:C.ok, textDecoration:"none", cursor:"pointer" }}>R</a>
+                        : <span title="RCP manquant" style={{ color:"#cbd5e1" }}>R</span>)}
                     </span>
                   </td>
                 })}
