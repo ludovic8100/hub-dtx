@@ -485,7 +485,6 @@ async function exportExcel(type, doc, lignes) {
 // ════════════════════════════════════════════════════════════════
 //  PAGE PRINCIPALE
 // ════════════════════════════════════════════════════════════════
-const SEND_WEBHOOK = 'https://n8n.srv1082740.hstgr.cloud/webhook/lode-devis-send'
 const EVT = {
   cree:    { icon: '📝', label: 'Créé',                  col: '#64748b' },
   envoye:  { icon: '📤', label: 'Envoyé au client',      col: '#2563eb' },
@@ -531,16 +530,25 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
   }
   async function envoyerEmail() {
     if (sending) return
+    if (!doc.client_email) { alert("Ce devis n'a pas d'email client — ajoute-le d'abord (Modifier), ou copie le lien et envoie-le manuellement."); return }
     setSending(true)
-    let ok = false
+    const now = new Date(); const valid = new Date(now); valid.setDate(valid.getDate() + 15)
+    let ok = false, detail = ''
     try {
-      const r = await fetch(SEND_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ devis_id: doc.id, accept_token: doc.accept_token, numero: doc.numero }) })
-      ok = r.ok
-    } catch (e) { ok = false }
+      const { data: { session } } = await supabase.auth.getSession()
+      const r = await fetch('/api/devis-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
+        body: JSON.stringify({
+          client_nom: doc.client_nom, client_email: doc.client_email, numero: doc.numero,
+          accept_token: doc.accept_token, date_validite: valid.toISOString().slice(0, 10), base: window.location.origin,
+        }),
+      })
+      const j = await r.json().catch(() => ({})); ok = r.ok && j.ok; detail = j.detail || j.error || ''
+    } catch (e) { ok = false; detail = String(e) }
     setSending(false)
-    if (ok) { await marquerEnvoye(true); alert('Devis envoyé par email ✓') }
-    else { alert("Le service d'envoi automatique n'est pas encore actif.\nCopie le lien ci-dessous et envoie-le, puis clique « Marquer comme envoyé ».") }
+    if (ok) { await marquerEnvoye(true); alert('Devis envoyé par email ✓ (CC contact@lode-group.be)') }
+    else { alert("L'envoi automatique a échoué : " + (detail || 'erreur inconnue') + "\n\nVérifie les variables Azure dans Vercel, ou copie le lien ci-dessous et envoie-le, puis clique « Marquer envoyé ».") }
   }
   function copier() { navigator.clipboard?.writeText(lien); setCopied(true); setTimeout(() => setCopied(false), 1500) }
 
