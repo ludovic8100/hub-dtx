@@ -485,6 +485,100 @@ async function exportExcel(type, doc, lignes) {
 // ════════════════════════════════════════════════════════════════
 //  PAGE PRINCIPALE
 // ════════════════════════════════════════════════════════════════
+const SEND_WEBHOOK = 'https://n8n.srv1082740.hstgr.cloud/webhook/lode-devis-send'
+const EVT = {
+  cree:    { icon: '📝', label: 'Créé',                  col: '#64748b' },
+  envoye:  { icon: '📤', label: 'Envoyé au client',      col: '#2563eb' },
+  ouvert:  { icon: '👁️', label: 'Email ouvert par le client', col: '#7c3aed' },
+  accepte: { icon: '✅', label: 'Accepté par le client', col: '#16a34a' },
+  refuse:  { icon: '✋', label: 'Refusé par le client',   col: '#dc2626' },
+}
+
+function SuiviModal({ doc, color, onClose, onChanged }) {
+  const [events, setEvents] = useState(null)
+  const [sending, setSending] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const lien = `${window.location.origin}/devis/${doc.accept_token}`
+
+  const charge = () => supabase.from('lode_devis_events').select('*').eq('devis_id', doc.id)
+    .order('created_at', { ascending: true }).then(({ data }) => setEvents(data || []))
+  useEffect(() => { charge() }, [doc.id])
+
+  async function logEvent(type, detail) {
+    await supabase.from('lode_devis_events').insert({ devis_id: doc.id, type, detail })
+  }
+  async function marquerEnvoye(viaEmail) {
+    await supabase.from('lode_devis').update({ statut: 'envoyé', sent_at: new Date().toISOString() }).eq('id', doc.id)
+    await logEvent('envoye', viaEmail ? 'Email envoyé depuis la plateforme' : 'Marqué comme envoyé (envoi manuel)')
+    charge(); onChanged && onChanged()
+  }
+  async function envoyerEmail() {
+    if (sending) return
+    setSending(true)
+    let ok = false
+    try {
+      const r = await fetch(SEND_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ devis_id: doc.id, accept_token: doc.accept_token, numero: doc.numero }) })
+      ok = r.ok
+    } catch (e) { ok = false }
+    setSending(false)
+    if (ok) { await marquerEnvoye(true); alert('Devis envoyé par email ✓') }
+    else { alert("Le service d'envoi automatique n'est pas encore actif.\nCopie le lien ci-dessous et envoie-le, puis clique « Marquer comme envoyé ».") }
+  }
+  function copier() { navigator.clipboard?.writeText(lien); setCopied(true); setTimeout(() => setCopied(false), 1500) }
+
+  // Timeline = événements enregistrés (fallback : la date de création du devis)
+  const timeline = (events && events.length) ? events
+    : [{ type: 'cree', detail: 'Devis créé', created_at: doc.created_at }]
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.55)', zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: 'min(560px,96vw)', height: '100%', background: '#fff', display: 'flex', flexDirection: 'column', boxShadow: '-8px 0 30px rgba(0,0,0,.2)' }}>
+        <div style={{ background: `linear-gradient(135deg,${color},#7c2d12)`, padding: '16px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ color: '#fff', fontSize: 16, fontWeight: 800 }}>Suivi du devis {doc.numero}</div>
+            <div style={{ color: '#fff', opacity: .85, fontSize: 13, marginTop: 2 }}>{doc.client_nom}</div>
+          </div>
+          <button onClick={onClose} style={{ background: 'rgba(255,255,255,.2)', border: 'none', color: '#fff', width: 30, height: 30, borderRadius: 8, cursor: 'pointer', fontSize: 16 }}>✕</button>
+        </div>
+
+        <div style={{ flex: 1, overflow: 'auto', padding: 22 }}>
+          {/* Lien d'acceptation */}
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Lien d'acceptation (client)</div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+            <input readOnly value={lien} style={{ flex: 1, padding: '9px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 12, fontFamily: 'monospace', color: '#475569', background: '#f8fafc' }} />
+            <button onClick={copier} style={{ padding: '9px 14px', border: 'none', borderRadius: 8, background: color, color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>{copied ? '✓ Copié' : 'Copier'}</button>
+          </div>
+
+          {/* Actions d'envoi */}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 22 }}>
+            <button onClick={envoyerEmail} disabled={sending} style={{ flex: 1, minWidth: 180, padding: '11px 16px', border: 'none', borderRadius: 10, background: '#16a34a', color: '#fff', fontWeight: 700, fontSize: 14, cursor: sending ? 'wait' : 'pointer' }}>{sending ? '…' : '📧 Envoyer par email'}</button>
+            <button onClick={() => marquerEnvoye(false)} style={{ padding: '11px 16px', border: '1px solid #e2e8f0', borderRadius: 10, background: '#fff', color: '#64748b', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Marquer envoyé</button>
+          </div>
+
+          {/* Timeline */}
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 12 }}>Historique</div>
+          {events === null ? <p style={{ color: '#94a3b8', fontSize: 13 }}>Chargement…</p> : (
+            <div style={{ position: 'relative', paddingLeft: 26 }}>
+              <div style={{ position: 'absolute', left: 9, top: 4, bottom: 4, width: 2, background: '#e2e8f0' }} />
+              {timeline.map((ev, i) => {
+                const cfg = EVT[ev.type] || { icon: '•', label: ev.type, col: '#64748b' }
+                return (
+                  <div key={ev.id || i} style={{ position: 'relative', marginBottom: 18 }}>
+                    <div style={{ position: 'absolute', left: -26, width: 20, height: 20, borderRadius: '50%', background: '#fff', border: `2px solid ${cfg.col}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>{cfg.icon}</div>
+                    <div style={{ fontWeight: 700, color: '#1e293b', fontSize: 14 }}>{cfg.label}</div>
+                    <div style={{ fontSize: 12, color: '#94a3b8' }}>{ev.created_at ? new Date(ev.created_at).toLocaleString('fr-BE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}{ev.detail ? ` · ${ev.detail}` : ''}</div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function LodeDevisFactures() {
   const [tab, setTab] = useState('devis')
   const [devis, setDevis] = useState([])
@@ -492,6 +586,7 @@ export default function LodeDevisFactures() {
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(null) // {type, doc}
   const [busy, setBusy] = useState(null)
+  const [suivi, setSuivi] = useState(null)      // devis dont on affiche le suivi
 
   const load = async () => {
     setLoading(true)
@@ -638,6 +733,7 @@ export default function LodeDevisFactures() {
                     </div>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
                       <ActionButton tone="grey" onClick={() => setEditing({ type: t, doc })}>Modifier</ActionButton>
+                      {tab === 'devis' && <ActionButton tone="accent" color={C} onClick={() => setSuivi(doc)}>📊 Suivi</ActionButton>}
                       <ActionButton tone="pdf" disabled={busy === doc.id + 'pdf'} onClick={() => doExport('pdf', t, doc)}>{busy === doc.id + 'pdf' ? '…' : 'PDF'}</ActionButton>
                       <ActionButton tone="excel" disabled={busy === doc.id + 'excel'} onClick={() => doExport('excel', t, doc)}>{busy === doc.id + 'excel' ? '…' : 'Excel'}</ActionButton>
                       {tab === 'factures' && doc.client_tva && doc.statut !== 'payée' && doc.statut !== 'annulée' && (
@@ -675,6 +771,7 @@ export default function LodeDevisFactures() {
                         <td style={{ padding: '11px 14px' }}>
                           <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
                             <ActionButton tone="grey" onClick={() => setEditing({ type: tab === 'devis' ? 'devis' : 'facture', doc })}>Modifier</ActionButton>
+                            {tab === 'devis' && <ActionButton tone="accent" color={C} onClick={() => setSuivi(doc)}>📊 Suivi</ActionButton>}
                             <ActionButton tone="pdf" disabled={busy === doc.id + 'pdf'} onClick={() => doExport('pdf', tab === 'devis' ? 'devis' : 'facture', doc)}>{busy === doc.id + 'pdf' ? '…' : 'PDF'}</ActionButton>
                             <ActionButton tone="excel" disabled={busy === doc.id + 'excel'} onClick={() => doExport('excel', tab === 'devis' ? 'devis' : 'facture', doc)}>{busy === doc.id + 'excel' ? '…' : 'Excel'}</ActionButton>
                             {tab === 'factures' && doc.client_tva && doc.statut !== 'payée' && doc.statut !== 'annulée' && (
@@ -693,6 +790,7 @@ export default function LodeDevisFactures() {
       </div>
 
       {editing && <Editeur type={editing.type} doc={editing.doc} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load() }} />}
+      {suivi && <SuiviModal doc={suivi} color={C} onClose={() => setSuivi(null)} onChanged={() => { load() }} />}
     </Layout>
   )
 }
