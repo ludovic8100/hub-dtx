@@ -263,6 +263,7 @@ function EditeurClient({ client, onClose, onSaved }) {
 //  PAGE PRINCIPALE
 // ════════════════════════════════════════════════════════════════
 export default function LodeClientsModule() {
+  const mob = useMobile()
   const [clients, setClients] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
