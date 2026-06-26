@@ -19,13 +19,21 @@ export default function LodeDevisAccept() {
   useEffect(() => {
     let alive = true
     ;(async () => {
-      const { data, error } = await supabase.from('lode_devis').select('*').eq('accept_token', token).maybeSingle()
+      // Lecture via RPC sécurisée (n'expose qu'UN devis, par token). Repli direct si la RPC n'existe pas encore.
+      let d = null, lg = []
+      const { data: rpc, error: rpcErr } = await supabase.rpc('lode_devis_public', { p_token: token })
+      if (!rpcErr && rpc && rpc.devis) {
+        d = rpc.devis; lg = rpc.lignes || []
+      } else {
+        const { data } = await supabase.from('lode_devis').select('*').eq('accept_token', token).maybeSingle()
+        d = data
+        if (d) { const { data: l } = await supabase.from('lode_devis_lignes').select('*').eq('devis_id', d.id).order('position', { ascending: true }); lg = l || [] }
+      }
       if (!alive) return
-      if (error || !data) { setErreur('Ce devis est introuvable ou le lien n\u2019est plus valide.'); setLoading(false); return }
-      setDevis(data)
-      if (data.statut === 'accepté' || data.statut === 'refusé') setDone(data.statut)
-      const { data: lg } = await supabase.from('lode_devis_lignes').select('*').eq('devis_id', data.id).order('position', { ascending: true })
-      if (alive) { setLignes(lg || []); setLoading(false) }
+      if (!d) { setErreur('Ce devis est introuvable ou le lien n\u2019est plus valide.'); setLoading(false); return }
+      setDevis(d)
+      if (d.statut === 'accepté' || d.statut === 'refusé') setDone(d.statut)
+      setLignes(lg); setLoading(false)
     })()
     return () => { alive = false }
   }, [token])
