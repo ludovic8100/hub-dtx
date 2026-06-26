@@ -508,8 +508,25 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
     await supabase.from('lode_devis_events').insert({ devis_id: doc.id, type, detail })
   }
   async function marquerEnvoye(viaEmail) {
-    await supabase.from('lode_devis').update({ statut: 'envoyé', sent_at: new Date().toISOString() }).eq('id', doc.id)
+    const now = new Date()
+    const valid = new Date(now); valid.setDate(valid.getDate() + 15)   // validité 15 jours calendrier
+    const relance = new Date(now); relance.setDate(relance.getDate() + 7)  // rappel à mi-parcours
+    const dejaEnvoye = doc.statut && doc.statut !== 'brouillon'
+    await supabase.from('lode_devis').update({
+      statut: 'envoyé', sent_at: now.toISOString(), date_validite: valid.toISOString().slice(0, 10),
+    }).eq('id', doc.id)
     await logEvent('envoye', viaEmail ? 'Email envoyé depuis la plateforme' : 'Marqué comme envoyé (envoi manuel)')
+    // Tâche de suivi (une seule fois, au 1er envoi) — échéance à la mi-parcours pour ne pas oublier
+    if (!dejaEnvoye) {
+      await supabase.from('taches').insert({
+        titre: `Suivre le devis ${doc.numero} — ${doc.client_nom}`,
+        description: `Devis envoyé le ${now.toLocaleDateString('fr-BE')}. Valable jusqu'au ${valid.toLocaleDateString('fr-BE')} (15 j). Relance à prévoir vers le ${relance.toLocaleDateString('fr-BE')} si pas de réponse.`,
+        categorie: 'Devis', source: 'devis', statut: 'todo', priorite: 'moyenne',
+        echeance: relance.toISOString().slice(0, 10),
+        client_id: doc.client_id || null, dossier_client: doc.numero,
+        lien_url: `/devis/${doc.accept_token}`,
+      })
+    }
     charge(); onChanged && onChanged()
   }
   async function envoyerEmail() {
