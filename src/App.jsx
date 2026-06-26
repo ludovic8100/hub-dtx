@@ -34,6 +34,7 @@ import LodeClients        from './pages/lode/LodeClients'
 import LodeBanque         from './pages/lode/LodeBanque'
 import LodeComptabilite   from './pages/lode/LodeComptabilite'
 import LodeDevisFactures  from './pages/lode/LodeDevisFactures'
+import LodeDevisAccept    from './pages/lode/LodeDevisAccept'
 
 import DashboardHexagroup  from './pages/hexagroup/DashboardHexagroup'
 import HexagroupBanque     from './pages/hexagroup/HexagroupBanque'
@@ -76,6 +77,8 @@ export default function App() {
           <Route path="/login"         element={<Login />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/access-denied" element={<AccessDenied />} />
+          {/* Page publique d'acceptation d'un devis (sans login, sécurisée par token) */}
+          <Route path="/devis/:token"  element={<LodeDevisAccept />} />
 
           {/* Groupe */}
           <Route path="/groupe" element={<P><DashboardGroupe /></P>} />
