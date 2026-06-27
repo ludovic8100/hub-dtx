@@ -485,6 +485,12 @@ async function exportExcel(type, doc, lignes) {
 // ════════════════════════════════════════════════════════════════
 //  PAGE PRINCIPALE
 // ════════════════════════════════════════════════════════════════
+const STATUT_CHIPS = [
+  { key: 'brouillon', label: 'Pas envoyé', col: '#94a3b8' },
+  { key: 'envoyé',    label: 'Envoyé',     col: '#2563eb' },
+  { key: 'accepté',   label: 'Approuvé',   col: '#16a34a' },
+  { key: 'refusé',    label: 'Rejeté',     col: '#dc2626' },
+]
 const EVT = {
   cree:    { icon: '📝', label: 'Créé',                  col: '#64748b' },
   envoye:  { icon: '📤', label: 'Envoyé au client',      col: '#2563eb' },
@@ -497,6 +503,7 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
   const [events, setEvents] = useState(null)
   const [sending, setSending] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [statut, setStatut] = useState(doc.statut || 'brouillon')
   const lien = `${window.location.origin}/devis/${doc.accept_token}`
 
   const charge = () => supabase.from('lode_devis_events').select('*').eq('devis_id', doc.id)
@@ -526,7 +533,19 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
         lien_url: `/devis/${doc.accept_token}`,
       })
     }
+    setStatut('envoyé')
     charge(); onChanged && onChanged()
+  }
+  async function changeStatut(s) {
+    if (s === statut) return
+    if (s === 'envoyé') { await marquerEnvoye(false); return }
+    const patch = { statut: s }
+    let evt = null, detail = null
+    if (s === 'accepté') { patch.accepted_at = new Date().toISOString(); evt = 'accepte'; detail = 'Marqué accepté (manuel)' }
+    else if (s === 'refusé') { patch.refused_at = new Date().toISOString(); evt = 'refuse'; detail = 'Marqué refusé (manuel)' }
+    await supabase.from('lode_devis').update(patch).eq('id', doc.id)
+    if (evt) await logEvent(evt, detail)
+    setStatut(s); charge(); onChanged && onChanged()
   }
   async function envoyerEmail() {
     if (sending) return
@@ -568,6 +587,21 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
         </div>
 
         <div style={{ flex: 1, overflow: 'auto', padding: 22 }}>
+          {/* Statut (chips cliquables, façon Accountable) */}
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 8 }}>Statut</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 22 }}>
+            {STATUT_CHIPS.map(c => {
+              const actif = statut === c.key
+              return (
+                <button key={c.key} onClick={() => changeStatut(c.key)}
+                  style={{ padding: '8px 14px', borderRadius: 999, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                    border: `1.5px solid ${actif ? c.col : '#e2e8f0'}`, background: actif ? c.col : '#fff', color: actif ? '#fff' : '#64748b' }}>
+                  {c.label}
+                </button>
+              )
+            })}
+          </div>
+
           {/* Lien d'acceptation */}
           <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Lien d'acceptation (client)</div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
