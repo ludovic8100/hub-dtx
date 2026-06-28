@@ -499,8 +499,14 @@ const EVT = {
   refuse:  { icon: '✋', label: 'Refusé par le client',   col: '#dc2626' },
 }
 
+function Row2({ l, v }) {
+  return <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', color: '#64748b' }}><span>{l}</span><span>{v}</span></div>
+}
+
 function SuiviModal({ doc, color, onClose, onChanged }) {
+  const mob = useMobile()
   const [events, setEvents] = useState(null)
+  const [lignes, setLignes] = useState([])
   const [sending, setSending] = useState(false)
   const [copied, setCopied] = useState(false)
   const [statut, setStatut] = useState(doc.statut || 'brouillon')
@@ -508,7 +514,11 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
 
   const charge = () => supabase.from('lode_devis_events').select('*').eq('devis_id', doc.id)
     .order('created_at', { ascending: true }).then(({ data }) => setEvents(data || []))
-  useEffect(() => { charge() }, [doc.id])
+  useEffect(() => {
+    charge()
+    supabase.from('lode_devis_lignes').select('*').eq('devis_id', doc.id).order('position', { ascending: true })
+      .then(({ data }) => setLignes(data || []))
+  }, [doc.id])
 
   async function logEvent(type, detail) {
     await supabase.from('lode_devis_events').insert({ devis_id: doc.id, type, detail })
@@ -576,17 +586,76 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
     : [{ type: 'cree', detail: 'Devis créé', created_at: doc.created_at }]
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.55)', zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: 'min(560px,96vw)', height: '100%', background: '#fff', display: 'flex', flexDirection: 'column', boxShadow: '-8px 0 30px rgba(0,0,0,.2)' }}>
-        <div style={{ background: `linear-gradient(135deg,${color},#7c2d12)`, padding: '16px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ color: '#fff', fontSize: 16, fontWeight: 800 }}>Suivi du devis {doc.numero}</div>
-            <div style={{ color: '#fff', opacity: .85, fontSize: 13, marginTop: 2 }}>{doc.client_nom}</div>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: mob ? 0 : 20 }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: mob ? '100vw' : 'min(1080px,96vw)', height: mob ? '100vh' : 'min(92vh,900px)', background: '#fff', borderRadius: mob ? 0 : 16, overflow: 'hidden', display: 'flex', flexDirection: mob ? 'column' : 'row', boxShadow: '0 20px 60px rgba(0,0,0,.3)' }}>
+
+        {/* ── Colonne gauche : aperçu du document ── */}
+        <div style={{ flex: 1, background: '#f1f5f9', overflow: 'auto', padding: mob ? 14 : 28, order: mob ? 2 : 1 }}>
+          <div style={{ background: '#fff', maxWidth: 620, margin: '0 auto', borderRadius: 10, boxShadow: '0 2px 12px rgba(0,0,0,.08)', padding: mob ? '22px 18px' : '30px 34px', fontSize: 12, color: '#1e293b' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 22 }}>
+              {LODE.logo_url ? <img src={LODE.logo_url} alt="LODE" style={{ height: 46 }} /> : <div style={{ fontWeight: 800, fontSize: 18, color }}>{LODE.raison_sociale}</div>}
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontWeight: 800, color }}>DEVIS {doc.numero}</div>
+                <div style={{ color: '#64748b' }}>Émis le : {fmtDate(doc.date_devis)}</div>
+                {doc.date_validite && <div style={{ color: '#64748b' }}>Valide jusqu'au : {fmtDate(doc.date_validite)}</div>}
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 20, marginBottom: 20 }}>
+              <div>
+                <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>De</div>
+                <div style={{ fontWeight: 800 }}>{LODE.raison_sociale}</div>
+                <div style={{ color: '#475569' }}>{LODE.adresse}<br />{LODE.cp} {LODE.ville}<br />{LODE.pays}</div>
+                <div style={{ color: '#475569', marginTop: 4 }}>TVA : {LODE.tva}</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Pour</div>
+                <div style={{ fontWeight: 800 }}>{doc.client_nom}</div>
+                <div style={{ color: '#475569' }}>{doc.client_adresse}<br />{[doc.client_cp, doc.client_ville].filter(Boolean).join(' ')}</div>
+                {doc.client_tva && <div style={{ color: '#475569', marginTop: 4 }}>TVA : {doc.client_tva}</div>}
+              </div>
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12 }}>
+              <thead><tr style={{ background: color, color: '#fff' }}>
+                {['Description', 'Prix HTVA', 'TVA', 'Qté', 'Total'].map((h, i) => <th key={h} style={{ textAlign: i ? 'right' : 'left', padding: '6px 8px', fontSize: 10, fontWeight: 700 }}>{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {lignes.map((l, i) => (
+                  <tr key={l.id || i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '6px 8px', verticalAlign: 'top' }}>{l.description}</td>
+                    <td style={{ padding: '6px 8px', textAlign: 'right', whiteSpace: 'nowrap' }}>{eur(l.prix_unitaire)}</td>
+                    <td style={{ padding: '6px 8px', textAlign: 'right' }}>{l.tva_pct} %</td>
+                    <td style={{ padding: '6px 8px', textAlign: 'right' }}>{l.quantite}</td>
+                    <td style={{ padding: '6px 8px', textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 600 }}>{eur(l.total_ht)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <div style={{ minWidth: 220 }}>
+                <Row2 l="Sous-total HTVA" v={eur(doc.total_ht)} />
+                <Row2 l="TVA" v={eur(doc.total_tva)} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: `2px solid ${color}`, paddingTop: 6, marginTop: 4, fontWeight: 800, color }}><span>Montant</span><span>{eur(doc.total_ttc)}</span></div>
+              </div>
+            </div>
+            {doc.notes && <><div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginTop: 18 }}>Notes &amp; commentaires</div><div style={{ color: '#475569' }}>{doc.notes}</div></>}
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 22, paddingTop: 12, borderTop: '1px solid #e2e8f0', color: '#64748b', fontSize: 11 }}>
+              <div>IBAN : {LODE.iban}<br />BIC : {LODE.bic}</div>
+              <div style={{ textAlign: 'right' }}>{LODE.email}<br />{LODE.telephone}</div>
+            </div>
           </div>
-          <button onClick={onClose} style={{ background: 'rgba(255,255,255,.2)', border: 'none', color: '#fff', width: 30, height: 30, borderRadius: 8, cursor: 'pointer', fontSize: 16 }}>✕</button>
         </div>
 
-        <div style={{ flex: 1, overflow: 'auto', padding: 22 }}>
+        {/* ── Colonne droite : statut / suivi ── */}
+        <div style={{ width: mob ? '100%' : 380, borderLeft: mob ? 'none' : '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', order: mob ? 1 : 2, maxHeight: mob ? '46vh' : 'none' }}>
+          <div style={{ background: `linear-gradient(135deg,${color},#7c2d12)`, padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <div style={{ color: '#fff', fontSize: 18, fontWeight: 800 }}>Devis {doc.numero}</div>
+              <div style={{ color: '#fff', opacity: .9, fontSize: 14, marginTop: 2 }}>{eur(doc.total_ttc)} TVA incl.</div>
+            </div>
+            <button onClick={onClose} style={{ background: 'rgba(255,255,255,.2)', border: 'none', color: '#fff', width: 30, height: 30, borderRadius: 8, cursor: 'pointer', fontSize: 16 }}>✕</button>
+          </div>
+
+          <div style={{ flex: 1, overflow: 'auto', padding: 20 }}>
           {/* Statut (chips cliquables, façon Accountable) */}
           <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 8 }}>Statut</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 22 }}>
@@ -632,6 +701,7 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
               })}
             </div>
           )}
+          </div>
         </div>
       </div>
     </div>
