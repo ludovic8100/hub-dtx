@@ -1,0 +1,66 @@
+name: Qlik BRIO → Supabase
+
+# Alimente les tables Dynassur depuis Qlik Cloud (BRIO), en remplacement de
+# l'import CSV n8n. Tourne chaque matin juste après le rechargement Qlik
+# (06:30 UTC = 08:30 Bruxelles). Lançable aussi à la main, avec un mode DRY_RUN
+# par défaut pour valider l'extraction SANS rien écrire dans Supabase.
+
+on:
+  schedule:
+    - cron: '30 6 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Test sans écriture (extrait et affiche seulement)"
+        type: boolean
+        default: true
+
+concurrency:
+  group: qlik-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      QLIK_API_KEY: ${{ secrets.QLIK_API_KEY }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      # DRY_RUN=1 uniquement lors d'un lancement manuel avec la case cochée ;
+      # vide (écriture réelle) sur le cron quotidien.
+      DRY_RUN: ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '1' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install deps
+        run: pip install -r scripts/requirements.txt
+
+      - name: Verifier les secrets
+        run: |
+          if [ -z "$QLIK_API_KEY" ]; then echo "::error::Secret QLIK_API_KEY manquant"; exit 1; fi
+          if [ -z "$SUPABASE_SERVICE_KEY" ] && [ -z "$DRY_RUN" ]; then echo "::error::Secret SUPABASE_SERVICE_KEY manquant (requis hors DRY_RUN)"; exit 1; fi
+          echo "Mode: ${DRY_RUN:+DRY_RUN}${DRY_RUN:-ECRITURE REELLE}"
+
+      # Ordre : clients (base) -> contrats -> production -> quittances,
+      # puis enrichissements -> sinistres en dernier.
+      - name: Clients            
+        run: python scripts/qlik_clients.py
+      - name: Contrats           
+        run: python scripts/qlik_contrats.py
+      - name: Production         
+        run: python scripts/qlik_production.py
+      - name: Quittances         
+        run: python scripts/qlik_quittances.py
+      - name: Objets de risque   
+        run: python scripts/qlik_objets_risque.py
+      - name: Parentes           
+        run: python scripts/qlik_parentes.py
+      - name: Segmentation       
+        run: python scripts/qlik_segmentation.py
+      - name: Paiements sinistres 
+        run: python scripts/qlik_sinistre_paiements.py
+      - name: Sinistres          
+        run: python scripts/qlik_sync.py
