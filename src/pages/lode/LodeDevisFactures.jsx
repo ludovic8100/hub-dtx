@@ -95,6 +95,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
   const fk = isDevis ? 'devis_id' : 'facture_id'
 
   const [f, setF] = useState({
+    client_id: null, client_pays: 'Belgique',
     client_nom: '', client_adresse: '', client_cp: '', client_ville: '',
     client_email: '', client_telephone: '', client_tva: '',
     objet: '', notes: '', remise_pct: 0,
@@ -104,25 +105,71 @@ function Editeur({ type, doc, onClose, onSaved }) {
   })
   const [lignes, setLignes] = useState([{ description: '', quantite: 1, prix_unitaire: 0, remise_pct: 0, tva_pct: 21 }])
   const [saving, setSaving] = useState(false)
-  const [clientsList, setClientsList] = useState([])
+  const CLIENT_TABLE = 'lode_clients'
+  // colonnes texte candidates pour la recherche multi-champs (intersectees avec les colonnes reellement presentes dans la base de CETTE societe)
+  const SEARCH_CANDIDATES = ['denomination','nom','prenom','dossier','ville','localite','email','telephone','tel_fixe','gsm','tva','bce','adresse','cp','code_postal','pays']
+  const [searchCols, setSearchCols] = useState(['denomination'])
+  const [hasActif, setHasActif] = useState(true)
+  const [clientQuery, setClientQuery] = useState('')
+  const [clientResults, setClientResults] = useState([])
+  const [searching, setSearching] = useState(false)
 
+  // decouverte des colonnes reelles de la base client de cette societe (1 ligne echantillon) -> aucune hypothese de schema codee en dur
   useEffect(() => {
-    supabase.from('lode_clients').select('*').eq('actif', true).order('denomination', { nullsFirst: false })
-      .then(({ data }) => setClientsList(data || []))
+    supabase.from(CLIENT_TABLE).select('*').limit(1).then(({ data }) => {
+      const keys = data && data[0] ? Object.keys(data[0]) : []
+      if (keys.length) {
+        setSearchCols(SEARCH_CANDIDATES.filter(k => keys.includes(k)))
+        setHasActif(keys.includes('actif'))
+      }
+    })
   }, [])
 
-  const choisirClient = (id) => {
-    if (!id) return
-    const c = clientsList.find(x => x.id === id)
+  // recherche serveur, debounced, limitee -- chaque societe uniquement dans SA base
+  useEffect(() => {
+    const q = clientQuery.trim()
+    if (q.length < 2) { setClientResults([]); return }
+    const t = setTimeout(async () => {
+      setSearching(true)
+      const safe = q.replace(/[,()%]/g, ' ').trim()
+      const cols = searchCols.length ? searchCols : ['denomination']
+      const orFilter = cols.map(c => c + '.ilike.%' + safe + '%').join(',')
+      let req = supabase.from(CLIENT_TABLE).select('*')
+      if (hasActif) req = req.eq('actif', true)
+      const { data } = await req.or(orFilter).limit(30)
+      setClientResults(data || [])
+      setSearching(false)
+    }, 300)
+    return () => clearTimeout(t)
+  }, [clientQuery, searchCols, hasActif])
+
+  const labelClient = (c) => {
+    const nom = c.denomination || (((c.prenom || '') + ' ' + (c.nom || '')).trim()) || '(sans nom)'
+    const icon = c.type === 'entreprise' ? '\u{1F3E2}' : '\u{1F464}'
+    const sub = [c.dossier ? '#' + c.dossier : '', c.ville || c.localite || '', c.email || ''].filter(Boolean).join(' \u00B7 ')
+    return { icon, nom, sub }
+  }
+
+  const choisirClient = (c) => {
     if (!c) return
+    const nomComplet = c.type === 'entreprise'
+      ? (c.denomination || '')
+      : ((((c.prenom || '') + ' ' + (c.nom || '')).trim()) || c.denomination || '')
     setF(p => ({
       ...p,
       client_id: c.id,
-      client_nom: c.type === 'entreprise' ? c.denomination : `${c.prenom || ''} ${c.nom || ''}`.trim(),
-      client_adresse: c.adresse || '', client_cp: c.cp || '', client_ville: c.ville || '',
-      client_email: c.email || '', client_telephone: c.telephone || c.gsm || '', client_tva: c.tva || '',
+      client_nom: nomComplet,
+      client_adresse: c.adresse || '',
+      client_cp: c.cp || c.code_postal || '',
+      client_ville: c.ville || c.localite || '',
+      client_pays: c.pays || p.client_pays || 'Belgique',
+      client_email: c.email || '',
+      client_telephone: c.telephone || c.tel_fixe || c.gsm || '',
+      client_tva: c.tva || c.bce || '',
       langue: c.langue || p.langue || 'fr',
     }))
+    setClientQuery('')
+    setClientResults([])
   }
 
   useEffect(() => {
@@ -191,19 +238,25 @@ function Editeur({ type, doc, onClose, onSaved }) {
 
         {/* Client */}
         <div style={{ fontSize: 13, fontWeight: 800, color: ORANGE, marginBottom: 8 }}>Client</div>
-        {clientsList.length > 0 && (
-          <div style={{ marginBottom: 10 }}>
-            <label style={lbl}>Sélectionner un client encodé</label>
-            <select style={inp} value={f.client_id || ''} onChange={e => choisirClient(e.target.value)}>
-              <option value="">— Saisie manuelle ou choisir un client —</option>
-              {clientsList.map(c => (
-                <option key={c.id} value={c.id}>
-                  {c.type === 'entreprise' ? '🏢 ' + (c.denomination || '') : '👤 ' + `${c.prenom || ''} ${c.nom || ''}`.trim()}{c.ville ? ' · ' + c.ville : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+        <div style={{ marginBottom: 10, position: 'relative' }}>
+          <label style={lbl}>Rechercher un client encodé (nom, prénom, dossier, ville, email, TVA…)</label>
+          <input style={inp} value={clientQuery} placeholder="Tapez au moins 2 caractères — ou saisie manuelle ci-dessous" onChange={e => setClientQuery(e.target.value)} />
+          {clientQuery.trim().length >= 2 && (
+            <div style={{ position: 'absolute', zIndex: 20, left: 0, right: 0, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, marginTop: 4, maxHeight: 280, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,.12)' }}>
+              {searching && <div style={{ padding: 10, fontSize: 13, color: '#64748b' }}>Recherche…</div>}
+              {!searching && clientResults.length === 0 && <div style={{ padding: 10, fontSize: 13, color: '#64748b' }}>Aucun client trouvé</div>}
+              {clientResults.map(c => {
+                const L = labelClient(c)
+                return (
+                  <div key={c.id} onClick={() => choisirClient(c)} style={{ padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                    <div style={{ fontSize: 13, fontWeight: 700 }}>{L.icon} {L.nom}</div>
+                    {L.sub && <div style={{ fontSize: 11, color: '#64748b' }}>{L.sub}</div>}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: mobE ? '1fr' : '2fr 1fr', gap: 10, marginBottom: 8 }}>
           <div><label style={lbl}>Nom / société *</label><input style={inp} value={f.client_nom} onChange={e => set('client_nom', e.target.value)} /></div>
           <div><label style={lbl}>N° TVA</label><input style={inp} value={f.client_tva} onChange={e => set('client_tva', e.target.value)} /></div>
@@ -213,9 +266,10 @@ function Editeur({ type, doc, onClose, onSaved }) {
           <div><label style={lbl}>Code postal</label><input style={inp} value={f.client_cp} onChange={e => set('client_cp', e.target.value)} /></div>
           <div><label style={lbl}>Ville</label><input style={inp} value={f.client_ville} onChange={e => set('client_ville', e.target.value)} /></div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: mobE ? '1fr' : '1fr 1fr', gap: 10, marginBottom: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: mobE ? '1fr' : '1fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
           <div><label style={lbl}>Email</label><input style={inp} value={f.client_email} onChange={e => set('client_email', e.target.value)} /></div>
           <div><label style={lbl}>Téléphone</label><input style={inp} value={f.client_telephone} onChange={e => set('client_telephone', e.target.value)} /></div>
+          <div><label style={lbl}>Pays</label><input style={inp} value={f.client_pays || ''} onChange={e => set('client_pays', e.target.value)} /></div>
         </div>
 
         {/* Objet + dates */}
