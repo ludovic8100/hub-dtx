@@ -34,6 +34,8 @@ import LodeClients        from './pages/lode/LodeClients'
 import LodeBanque         from './pages/lode/LodeBanque'
 import LodeComptabilite   from './pages/lode/LodeComptabilite'
 import LodeDevisFactures  from './pages/lode/LodeDevisFactures'
+import DtxDevisFactures   from './pages/dtx/DtxDevisFactures'
+import DynDevisFactures   from './pages/dyn/DynDevisFactures'
 import LodeDevisAccept    from './pages/lode/LodeDevisAccept'
 
 import DashboardHexagroup  from './pages/hexagroup/DashboardHexagroup'
@@ -108,6 +110,8 @@ export default function App() {
           <Route path="/lode"               element={<P><DashboardLode /></P>} />
           <Route path="/lode/clients"       element={<P><LodeClients /></P>} />
           <Route path="/lode/devis-factures" element={<P><LodeDevisFactures /></P>} />
+          <Route path="/dtx/devis-factures"  element={<P><DtxDevisFactures /></P>} />
+          <Route path="/dynassur/devis-factures" element={<P><DynDevisFactures /></P>} />
           <Route path="/lode/banque"        element={<P><LodeBanque /></P>} />
           <Route path="/lode/comptabilite"  element={<P><LodeComptabilite /></P>} />
 

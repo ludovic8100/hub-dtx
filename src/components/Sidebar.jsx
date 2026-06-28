@@ -17,6 +17,7 @@ const MODULES = {
     { key: 'dyn_sinistres',    label: 'Sinistres',         icon: 'ti-alert-triangle',   path: '/dynassur/sinistres' },
     { key: 'dyn_rdv',          label: 'RDV / Agenda',      icon: 'ti-calendar',         path: '/dynassur/rdv' },
     { key: 'dyn_comptabilite', label: 'Comptabilité',      icon: 'ti-calculator',       path: '/dynassur/comptabilite' },
+    { key: 'dyn_devis',        label: 'Devis & Factures',  icon: 'ti-file-invoice',     path: '/dynassur/devis-factures' },
   ],
   dtx: [
     { key: 'dtx_dashboard',    label: 'Tableau de bord', icon: 'ti-layout-dashboard', path: '/dtx' },
@@ -24,6 +25,7 @@ const MODULES = {
     { key: 'dtx_vehicules',    label: 'Véhicules',        icon: 'ti-car',              path: '/dtx/vehicules' },
     { key: 'dtx_trading',      label: 'Trading',          icon: 'ti-trending-up',      path: '/dtx/trading' },
     { key: 'dtx_comptabilite', label: 'Comptabilité',     icon: 'ti-calculator',       path: '/dtx/comptabilite' },
+    { key: 'dtx_devis',        label: 'Devis & Factures', icon: 'ti-file-invoice',     path: '/dtx/devis-factures' },
   ],
   lode: [
     { key: 'lode_dashboard',    label: 'Tableau de bord', icon: 'ti-layout-dashboard', path: '/lode' },

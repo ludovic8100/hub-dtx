@@ -2,8 +2,16 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { LODE } from '../../lib/lodeConfig'
+import { DTX } from '../../lib/dtxConfig'
+import { DYN } from '../../lib/dynConfig'
 
-const ORANGE = LODE.couleur || '#ea580c'
+// Le token est cherché dans chaque entité (tables cloisonnées) jusqu'à trouver le devis.
+const ENTITES = [
+  { rpc: 'lode_devis_public', dec: 'lode_devis_decision', cfg: LODE },
+  { rpc: 'dtx_devis_public',  dec: 'dtx_devis_decision',  cfg: DTX },
+  { rpc: 'dyn_devis_public',  dec: 'dyn_devis_decision',  cfg: DYN },
+]
+
 const eur = v => (Number(v) || 0).toLocaleString('fr-BE', { style: 'currency', currency: 'EUR' })
 const fmtDate = d => d ? new Date(d).toLocaleDateString('fr-BE', { day: '2-digit', month: 'long', year: 'numeric' }) : '—'
 
@@ -11,44 +19,42 @@ export default function LodeDevisAccept() {
   const { token } = useParams()
   const [devis, setDevis] = useState(null)
   const [lignes, setLignes] = useState([])
+  const [ent, setEnt] = useState(null)          // entité reconnue { rpc, dec, cfg }
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
-  const [done, setDone] = useState(null)        // 'accepté' | 'refusé' | null
+  const [done, setDone] = useState(null)
   const [erreur, setErreur] = useState(null)
 
   useEffect(() => {
     let alive = true
     ;(async () => {
-      // Lecture via RPC sécurisée (n'expose qu'UN devis, par token). Repli direct si la RPC n'existe pas encore.
-      let d = null, lg = []
-      const { data: rpc, error: rpcErr } = await supabase.rpc('lode_devis_public', { p_token: token })
-      if (!rpcErr && rpc && rpc.devis) {
-        d = rpc.devis; lg = rpc.lignes || []
-      } else {
-        const { data } = await supabase.from('lode_devis').select('*').eq('accept_token', token).maybeSingle()
-        d = data
-        if (d) { const { data: l } = await supabase.from('lode_devis_lignes').select('*').eq('devis_id', d.id).order('position', { ascending: true }); lg = l || [] }
+      for (const e of ENTITES) {
+        const { data, error } = await supabase.rpc(e.rpc, { p_token: token })
+        if (!alive) return
+        if (!error && data && data.devis) {
+          setEnt(e); setDevis(data.devis); setLignes(data.lignes || [])
+          if (data.devis.statut === 'accepté' || data.devis.statut === 'refusé') setDone(data.devis.statut)
+          setLoading(false); return
+        }
       }
-      if (!alive) return
-      if (!d) { setErreur('Ce devis est introuvable ou le lien n\u2019est plus valide.'); setLoading(false); return }
-      setDevis(d)
-      if (d.statut === 'accepté' || d.statut === 'refusé') setDone(d.statut)
-      setLignes(lg); setLoading(false)
+      if (alive) { setErreur('Ce devis est introuvable ou le lien n\u2019est plus valide.'); setLoading(false) }
     })()
     return () => { alive = false }
   }, [token])
 
   async function decision(action) {
-    if (busy) return
+    if (busy || !ent) return
     if (action === 'refuse' && !confirm('Confirmer le refus de ce devis ?')) return
     setBusy(true); setErreur(null)
-    const { data, error } = await supabase.rpc('lode_devis_decision', { p_token: token, p_action: action })
+    const { data, error } = await supabase.rpc(ent.dec, { p_token: token, p_action: action })
     setBusy(false)
     if (error || !data?.ok) { setErreur('Une erreur est survenue. Merci de réessayer ou de nous contacter.'); return }
     setDone(action === 'accept' ? 'accepté' : 'refusé')
   }
 
-  const wrap = { minHeight: '100vh', background: '#f1f5f9', fontFamily: "'Source Sans Pro',-apple-system,sans-serif", padding: '24px 14px', display: 'flex', justifyContent: 'center' }
+  const cfg = ent?.cfg
+  const ORANGE = cfg?.couleur || '#475569'
+  const wrap = { minHeight: '100vh', background: '#f1f5f9', fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif", padding: '24px 14px', display: 'flex', justifyContent: 'center' }
   const card = { width: '100%', maxWidth: 720, background: '#fff', borderRadius: 16, boxShadow: '0 10px 40px rgba(0,0,0,.10)', overflow: 'hidden' }
 
   if (loading) return <div style={wrap}><div style={{ ...card, padding: 40, textAlign: 'center', color: '#94a3b8' }}>Chargement…</div></div>
@@ -64,10 +70,9 @@ export default function LodeDevisAccept() {
   return (
     <div style={wrap}>
       <div style={card}>
-        {/* En-tête brandé */}
-        <div style={{ background: `linear-gradient(135deg, ${ORANGE}, #7c2d12)`, color: '#fff', padding: '22px 26px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
+        <div style={{ background: `linear-gradient(135deg, ${ORANGE}, #1e293b)`, color: '#fff', padding: '22px 26px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            {LODE.logo_url && <img src={LODE.logo_url} alt="LODE" style={{ height: 40, background: '#fff', borderRadius: 8, padding: 4 }} />}
+            {cfg?.logo_url && <img src={cfg.logo_url} alt={cfg.raison_sociale} style={{ height: 40, background: '#fff', borderRadius: 8, padding: 4 }} />}
             <div>
               <div style={{ fontSize: 13, opacity: .9 }}>Devis</div>
               <div style={{ fontSize: 24, fontWeight: 800 }}>{devis.numero}</div>
@@ -80,22 +85,14 @@ export default function LodeDevisAccept() {
         </div>
 
         <div style={{ padding: '24px 26px' }}>
-          {/* Bandeau état si déjà décidé */}
           {done && (
             <div style={{ background: done === 'accepté' ? '#dcfce7' : '#fee2e2', color: done === 'accepté' ? '#15803d' : '#b91c1c', borderRadius: 12, padding: '16px 18px', textAlign: 'center', marginBottom: 20 }}>
               <div style={{ fontSize: 30 }}>{done === 'accepté' ? '✅' : '✋'}</div>
-              <div style={{ fontWeight: 800, fontSize: 17, marginTop: 4 }}>
-                {done === 'accepté' ? 'Devis accepté — merci !' : 'Devis refusé'}
-              </div>
-              <div style={{ fontSize: 13, marginTop: 4 }}>
-                {done === 'accepté'
-                  ? 'Nous avons bien enregistré votre acceptation et revenons vers vous rapidement.'
-                  : 'Votre réponse a bien été enregistrée. N\u2019hésitez pas à nous contacter pour en discuter.'}
-              </div>
+              <div style={{ fontWeight: 800, fontSize: 17, marginTop: 4 }}>{done === 'accepté' ? 'Devis accepté — merci !' : 'Devis refusé'}</div>
+              <div style={{ fontSize: 13, marginTop: 4 }}>{done === 'accepté' ? 'Nous avons bien enregistré votre acceptation et revenons vers vous rapidement.' : 'Votre réponse a bien été enregistrée. N\u2019hésitez pas à nous contacter pour en discuter.'}</div>
             </div>
           )}
 
-          {/* Client + objet */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 18 }}>
             <div>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Pour</div>
@@ -108,7 +105,6 @@ export default function LodeDevisAccept() {
             </div>}
           </div>
 
-          {/* Lignes */}
           <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead><tr style={{ background: '#f8fafc' }}>
@@ -130,7 +126,6 @@ export default function LodeDevisAccept() {
             </table>
           </div>
 
-          {/* Totaux */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
             <div style={{ minWidth: 240, fontSize: 14 }}>
               <Row l="Sous-total HTVA" v={eur(devis.total_ht)} />
@@ -142,10 +137,8 @@ export default function LodeDevisAccept() {
           </div>
 
           {devis.notes && <div style={{ marginTop: 18, fontSize: 13, color: '#64748b', background: '#f8fafc', borderRadius: 8, padding: '12px 14px' }}>{devis.notes}</div>}
-
           {erreur && devis && <div style={{ marginTop: 16, color: '#b91c1c', fontSize: 13 }}>{erreur}</div>}
 
-          {/* Boutons d'action */}
           {!done && (
             <div style={{ display: 'flex', gap: 12, marginTop: 26, flexWrap: 'wrap' }}>
               <button onClick={() => decision('accept')} disabled={busy}
@@ -160,9 +153,8 @@ export default function LodeDevisAccept() {
           )}
         </div>
 
-        {/* Pied */}
         <div style={{ borderTop: '1px solid #f1f5f9', padding: '16px 26px', fontSize: 12, color: '#94a3b8', textAlign: 'center' }}>
-          {LODE.nom || 'LODE SRL'} · {LODE.adresse || ''} · info@lode-group.be
+          {cfg?.raison_sociale} · {cfg?.adresse} · {cfg?.email}
         </div>
       </div>
     </div>
