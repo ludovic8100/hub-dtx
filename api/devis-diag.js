@@ -21,5 +21,16 @@ export default async function handler(req, res) {
     graph.ok = !!tj.access_token
     if (!tj.access_token) graph.error = String(tj.error_description || tj.error || 'inconnu').slice(0, 180)
   } catch (e) { graph.error = String(e).slice(0, 180) }
-  res.status(200).json({ env, graph })
+
+  // Joignabilité Supabase (URL + anon corrects ?) — on attend un statut 401/403 (= atteignable)
+  let supa = { status: null, reachable: false, error: null }
+  try {
+    const sr = await fetch(`${process.env.SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: process.env.SUPABASE_ANON_KEY || '', Authorization: `Bearer ${process.env.SUPABASE_ANON_KEY || ''}` },
+    })
+    supa.status = sr.status
+    supa.reachable = [200, 401, 403].includes(sr.status)
+  } catch (e) { supa.error = String(e).slice(0, 180) }
+
+  res.status(200).json({ env, graph, supa })
 }
