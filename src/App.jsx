@@ -21,6 +21,7 @@ import DynassurCompagnies  from './pages/dynassur/DynassurCompagnies'
 import DynassurSinistres   from './pages/dynassur/DynassurSinistres'
 import DynassurBanque      from './pages/dynassur/DynassurBanque'
 import DynassurComptabilite from './pages/dynassur/DynassurComptabilite'
+import DynassurRentabilite from './pages/dynassur/DynassurRentabilite'
 import DynassurRdv         from './pages/dynassur/DynassurRdv'
 
 import DashboardDtx       from './pages/dtx/DashboardDtx'
@@ -99,6 +100,7 @@ export default function App() {
           <Route path="/dynassur/rdv"          element={<P><DynassurRdv /></P>} />
           <Route path="/dynassur/banque"       element={<P><DynassurBanque /></P>} />
           <Route path="/dynassur/comptabilite" element={<P><DynassurComptabilite /></P>} />
+          <Route path="/dynassur/rentabilite" element={<P><DynassurRentabilite /></P>} />
 
           {/* DTX */}
           <Route path="/dtx"              element={<P><DashboardDtx /></P>} />
