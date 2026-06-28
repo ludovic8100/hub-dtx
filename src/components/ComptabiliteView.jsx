@@ -86,6 +86,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   }, [])
   const [catExpanded, setCatExpanded] = useState(null)
   const [moisExpanded, setMoisExpanded] = useState(null)
+  const [benefExpanded, setBenefExpanded] = useState(null)
   const PAR_PAGE = 100
 
   const isConsolide = societeCodes.length > 1
@@ -245,6 +246,26 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
     .filter(x => x.depenses < 0)
     .sort((a,b) => a.depenses - b.depenses)
   const nonCategorise = txFiltrees.filter(t => !t.categorie_id).length
+
+  // Synthèse par bénéficiaire (contrepartie) — « à qui je paie »
+  const parBeneficiaire = {}
+  txFiltrees.forEach(t => {
+    const nom = (t.contrepartie_nom || '').trim() || '(sans bénéficiaire)'
+    if (!parBeneficiaire[nom]) parBeneficiaire[nom] = { recettes: 0, depenses: 0, nb: 0 }
+    const m = parseFloat(t.montant) || 0
+    if (m >= 0) parBeneficiaire[nom].recettes += m
+    else parBeneficiaire[nom].depenses += m
+    parBeneficiaire[nom].nb++
+  })
+  const beneficiairesDepenses = Object.entries(parBeneficiaire)
+    .map(([nom, v]) => ({ nom, ...v }))
+    .filter(x => x.depenses < 0)
+    .sort((a, b) => a.depenses - b.depenses)
+  function txDeBeneficiaire(nom) {
+    return txFiltrees
+      .filter(t => (((t.contrepartie_nom || '').trim() || '(sans bénéficiaire)') === nom) && (parseFloat(t.montant) || 0) < 0)
+      .sort((a, b) => (b._date || '').localeCompare(a._date || ''))
+  }
 
   // Synthèse mensuelle (recettes / dépenses par mois)
   const MOIS_NOMS = ['', 'Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc']
@@ -534,6 +555,51 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
           </div>
         </div>
       )}
+
+      {/* Synthèse par bénéficiaire — à qui je paie */}
+      {beneficiairesDepenses.length > 0 && (
+        <div style={{ background:'#fff', borderRadius:'12px', border:'1px solid #e2e8f0', overflow:'hidden', marginBottom:'14px' }}>
+          <div style={{ padding:'12px 16px', background:'#fef2f2', borderBottom:'1px solid #fee2e2', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <span style={{ fontSize:'12px', fontWeight:'700', color:'#dc2626', textTransform:'uppercase', letterSpacing:'0.05em' }}>👤 Dépenses par bénéficiaire — à qui je paie</span>
+            <span style={{ fontSize:'15px', fontWeight:'800', color:'#dc2626' }}>{fmt(totalSorties)} <span style={{ fontSize:'12px', fontWeight:'700', color:'#dc262699' }}>· {beneficiairesDepenses.length} bénéf.</span></span>
+          </div>
+          <div>
+            {beneficiairesDepenses.map((x, i) => {
+              const pct = totalSorties < 0 ? (x.depenses / totalSorties * 100) : 0
+              const expKey = 'b_' + x.nom
+              const ouvert = benefExpanded === expKey
+              return (
+                <div key={i} style={{ borderBottom: i<beneficiairesDepenses.length-1?'1px solid #f8fafc':'none' }}>
+                  <div onClick={()=>setBenefExpanded(ouvert?null:expKey)} style={{ padding:'10px 16px', cursor:'pointer' }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'5px', gap:'10px' }}>
+                      <span style={{ display:'flex', alignItems:'center', gap:'7px', minWidth:0 }}>
+                        <span style={{ fontSize:'10px', color:'#cbd5e1' }}>{ouvert?'▼':'▶'}</span>
+                        <span style={{ fontSize:'13px', fontWeight:'600', color:'#1e293b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{x.nom}</span>
+                        <span style={{ fontSize:'11px', color:'#cbd5e1', flexShrink:0 }}>({x.nb})</span>
+                      </span>
+                      <span style={{ fontSize:'13px', fontWeight:'700', color:'#dc2626', flexShrink:0 }}>{fmt(x.depenses)} <span style={{ fontSize:'11px', fontWeight:'600', color:'#94a3b8' }}>{pct.toFixed(0)}%</span></span>
+                    </div>
+                    <div style={{ height:'5px', background:'#f1f5f9', borderRadius:'3px', overflow:'hidden' }}>
+                      <div style={{ height:'100%', width:`${Math.min(100, pct)}%`, background:'#dc2626', borderRadius:'3px' }}></div>
+                    </div>
+                  </div>
+                  {ouvert && (
+                    <div style={{ background:'#fafafa', padding:'4px 16px 10px 28px' }}>
+                      {txDeBeneficiaire(x.nom).map((t,k) => (
+                        <div key={k} style={{ display:'flex', justifyContent:'space-between', padding:'4px 0', borderBottom:'1px solid #f1f5f9' }}>
+                          <span style={{ fontSize:'11.5px', color:'#64748b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', paddingRight:'10px' }}>{fmtDate(t._date)} · {t.libelle || t.description || '—'}</span>
+                          <span style={{ fontSize:'11.5px', fontWeight:'600', color:'#dc2626', flexShrink:0 }}>{fmt(parseFloat(t.montant))}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {nonCategorise > 0 && (
         <div style={{ marginBottom:'14px', padding:'10px 16px', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'8px', fontSize:'13px', color:'#92400e' }}>
           ⚠️ {nonCategorise} transaction{nonCategorise>1?'s':''} non catégorisée{nonCategorise>1?'s':''} — cliquez dessus pour leur attribuer une catégorie.
