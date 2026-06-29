@@ -38,6 +38,10 @@ export default function ConfigModule() {
   const [saving, setSaving] = useState(false)
   const [flash, setFlash] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [uSearch, setUSearch] = useState('')
+  const [uStatut, setUStatut] = useState('tous')
+  const [uSoc, setUSoc] = useState('toutes')
+  const [uModule, setUModule] = useState('tous')
 
   useEffect(() => {
     if (!isAdmin) { setLoading(false); return }
@@ -96,6 +100,16 @@ export default function ConfigModule() {
       </div>
     </Layout>
   )
+
+  const usersFiltres = users.filter(u => {
+    const q = uSearch.trim().toLowerCase()
+    if (q && !((u.nom || '').toLowerCase().includes(q) || (u.user_email || '').toLowerCase().includes(q))) return false
+    if (uStatut === 'actifs' && !u.actif) return false
+    if (uStatut === 'inactifs' && u.actif) return false
+    if (uSoc !== 'toutes' && !(u.role === 'admin' || u[uSoc])) return false
+    if (uModule !== 'tous' && !(u.role === 'admin' || u[uModule])) return false
+    return true
+  })
 
   const TABS = [['societes', '🏢 Sociétés'], ['documents', '📄 Documents'], ['users', '👥 Utilisateurs & accès']]
 
@@ -182,9 +196,27 @@ export default function ConfigModule() {
 
         {/* ─────────── UTILISATEURS & ACCÈS ─────────── */}
         {tab === 'users' && !loading && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,280px) 1fr', gap: 18, alignItems: 'start' }}>
+          <div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 14, alignItems: 'center' }}>
+              <input value={uSearch} onChange={e => setUSearch(e.target.value)} placeholder="Rechercher (nom ou email)…" style={{ ...inp, maxWidth: 260 }} />
+              <select value={uStatut} onChange={e => setUStatut(e.target.value)} style={{ ...inp, width: 'auto' }}>
+                <option value="tous">Statut : tous</option>
+                <option value="actifs">Actifs</option>
+                <option value="inactifs">Inactifs</option>
+              </select>
+              <select value={uSoc} onChange={e => setUSoc(e.target.value)} style={{ ...inp, width: 'auto' }}>
+                <option value="toutes">Société : toutes</option>
+                {ACCES.map(g => <option key={g.acc} value={g.acc}>{g.label}</option>)}
+              </select>
+              <select value={uModule} onChange={e => setUModule(e.target.value)} style={{ ...inp, width: 'auto' }}>
+                <option value="tous">Module : tous</option>
+                {ACCES.flatMap(g => g.pages.map(([pg, pl]) => <option key={`${g.pfx}_${pg}`} value={`${g.pfx}_${pg}`}>{g.label} · {pl}</option>))}
+              </select>
+              <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 'auto' }}>{usersFiltres.length} / {users.length}</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,280px) 1fr', gap: 18, alignItems: 'start' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: '70vh', overflowY: 'auto' }}>
-              {users.map(u => (
+              {usersFiltres.map(u => (
                 <button key={u.id} onClick={() => setSelUser({ ...u })} style={{
                   textAlign: 'left', padding: '9px 12px', borderRadius: 9, cursor: 'pointer',
                   border: selUser?.id === u.id ? '2px solid #1e293b' : '1px solid #e2e8f0',
@@ -248,6 +280,7 @@ export default function ConfigModule() {
                 </div>
               </div>
             ) : <div style={{ color: '#94a3b8', padding: 20 }}>Sélectionne un utilisateur.</div>}
+            </div>
           </div>
         )}
 
