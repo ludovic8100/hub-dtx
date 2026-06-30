@@ -42,7 +42,7 @@ function Bar({ pct, col }) {
 }
 
 export default function DashboardDynassur() {
-  const { perms, user } = useAuth()
+  const { perms, user, isAdmin } = useAuth()
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState(null)
   const [data, setData] = useState({ stats:{clients:0,taches:0,sinistres:0,naAnnee:0,naMois:0,renonAnnee:0}, taches:[], bordereaux:[], objectifs:[], prodMois:[] })
@@ -52,6 +52,8 @@ export default function DashboardDynassur() {
   useEffect(()=>{ try{ setRecents(JSON.parse(localStorage.getItem('dyn_recent_clients')||'[]')) }catch(e){} },[])
 
   const firstName = (perms?.nom || user?.user_metadata?.full_name || '').split(' ')[0]
+  const myCode = (perms?.code || (perms?.user_email || '').split('@')[0] || '').toUpperCase()
+  const mineF = q => isAdmin ? q : q.or(`gestionnaire.eq.${myCode},cree_par.eq.${myCode}`)
   const now = new Date()
   const mois = String(now.getMonth()+1).padStart(2,'0')
   const annee = now.getFullYear()
@@ -68,9 +70,9 @@ export default function DashboardDynassur() {
         { data: obj },
       ] = await Promise.all([
         supabase.from('clients').select('*',{count:'exact',head:true}).eq('actif',true),
-        supabase.from('taches').select('*',{count:'exact',head:true}).in('statut',['todo','en_cours','en_attente']).or('entite.eq.dynassur,entite.is.null'),
+        mineF(supabase.from('taches').select('*',{count:'exact',head:true}).in('statut',['todo','en_cours','en_attente']).or('entite.eq.dynassur,entite.is.null')),
         supabase.from('sinistres').select('*',{count:'exact',head:true}).neq('statut','clos'),
-        supabase.from('taches').select('id,titre,gestionnaire,echeance,statut,code_type').in('statut',['todo','en_cours','en_attente','retard']).or('entite.eq.dynassur,entite.is.null').order('echeance',{ascending:true}).limit(10),
+        mineF(supabase.from('taches').select('id,titre,gestionnaire,echeance,statut,code_type').in('statut',['todo','en_cours','en_attente','retard']).or('entite.eq.dynassur,entite.is.null').order('echeance',{ascending:true}).limit(10)),
         supabase.from('mouvements_production').select('type_prod,mois,agent_code').eq('annee',annee),
         supabase.from('v_bordereaux_reconciliation').select('annee,mois,type,compagnie,statut_reconciliation').in('statut_reconciliation',['fichier_ok_non_encaisse','fichier_sans_chiffres','commission_sans_fichier','manquant']).eq('annee',annee),
         supabase.from('objectives_global').select('*').eq('year',annee).eq('period_type','year').eq('scope','global'),
@@ -89,7 +91,7 @@ export default function DashboardDynassur() {
       setLoading(false)
     }
     load()
-  }, [])
+  }, [perms, isAdmin])
 
   const { stats, taches, bordereaux, objectifs, prodMois } = data
 
@@ -103,7 +105,7 @@ export default function DashboardDynassur() {
       // Recharger les bordereaux et tâches
       const [{ data: bord }, { data: tsk }] = await Promise.all([
         supabase.from('v_bordereaux_reconciliation').select('annee,mois,type,compagnie,statut_reconciliation').in('statut_reconciliation',['fichier_ok_non_encaisse','fichier_sans_chiffres','commission_sans_fichier','manquant']).eq('annee',annee),
-        supabase.from('taches').select('id,titre,gestionnaire,echeance,statut,code_type').in('statut',['todo','en_cours','en_attente','retard']).or('entite.eq.dynassur,entite.is.null').order('echeance',{ascending:true}).limit(10),
+        mineF(supabase.from('taches').select('id,titre,gestionnaire,echeance,statut,code_type').in('statut',['todo','en_cours','en_attente','retard']).or('entite.eq.dynassur,entite.is.null').order('echeance',{ascending:true}).limit(10)),
       ])
       setData(d => ({ ...d, bordereaux: bord||[], taches: tsk||[] }))
     } catch(e) {
