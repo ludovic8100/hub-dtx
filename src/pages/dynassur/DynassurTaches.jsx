@@ -22,6 +22,8 @@ const STATUT_STYLE = {
 }
 const RDV_STYLE = { bg: '#ede9fe', color: '#7c3aed', label: 'RDV' }
 const SOC = { dynassur: { s: 'DYN', c: '#0080BD' }, dtx: { s: 'DTX', c: '#94a3b8' }, lode: { s: 'LODE', c: '#ea580c' }, hexagroup: { s: 'HEXA', c: '#dc2626' }, prive: { s: 'PRIVÉ', c: '#0d9488' }, groupe: { s: 'GRP', c: '#7c3aed' } }
+const TAXO = { 'RDV': [], 'Production': ['IARD', 'VIE', 'Santé/DKV', 'Placement', 'Crédit'], 'Sinistre': ['Auto', 'Incendie', 'Autre'], 'Encaissement': [], 'Administratif': [], 'Autre': [] }
+const ACC = { dynassur: 'acc_dynassur', dtx: 'acc_dtx', lode: 'acc_lode', hexagroup: 'acc_hexagroup', prive: 'acc_prive', groupe: 'acc_holding' }
 
 const pad = n => String(n).padStart(2, '0')
 const key = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
@@ -138,6 +140,7 @@ export default function DynassurTaches() {
   const { perms, isAdmin } = useAuth()
   const myCode = (perms?.code || (perms?.user_email || '').split('@')[0] || '').toUpperCase()
   const myEmail = (perms?.user_email || '').toLowerCase()
+  const myEntites = isAdmin ? ENTS.map(e => e[0]) : ENTS.map(e => e[0]).filter(k => perms?.[ACC[k]])
   const [loading, setLoading] = useState(true)
   const [taches, setTaches] = useState([])
   const [rdvs, setRdvs] = useState([])
@@ -151,12 +154,12 @@ export default function DynassurTaches() {
   const [sel, setSel] = useState(null)
   const [suivi, setSuivi] = useState([]); const [hist, setHist] = useState([]); const [note, setNote] = useState('')
   const [showCreate, setShowCreate] = useState(false)
-  const blankForm = { titre: '', description: '', echeance: '', priorite: 'moyenne', categorie: '', gestionnaire: myCode, entite: 'dynassur' }
+  const blankForm = { titre: '', description: '', echeance: '', priorite: 'moyenne', categorie: '', sousCats: [], gestionnaire: myCode, entite: myEntites[0] || 'dynassur' }
   const [form, setForm] = useState(blankForm)
   const [busy, setBusy] = useState(false)
   const [paramDone, setParamDone] = useState(false)
 
-  const TSEL = 'id,titre,description,categorie,statut,priorite,echeance,date_cloture,user_email,source,gestionnaire,cree_par,entite,updated_at,dossier_client,lien_url'
+  const TSEL = 'id,titre,description,categorie,statut,priorite,echeance,date_cloture,user_email,source,gestionnaire,cree_par,entite,updated_at,date_creation,sous_categories,dossier_client,lien_url'
   const reload = useCallback(async () => { setTaches(await loadAll('taches', TSEL, q => q.order('echeance', { ascending: true, nullsFirst: false }))) }, [])
 
   useEffect(() => {
@@ -225,7 +228,7 @@ export default function DynassurTaches() {
   async function createTask() {
     if (!form.titre.trim()) return
     setBusy(true)
-    const payload = { titre: form.titre.trim(), description: form.description || null, echeance: form.echeance || null, priorite: form.priorite, categorie: form.categorie || null, gestionnaire: (form.gestionnaire || myCode).toUpperCase(), cree_par: myCode, entite: form.entite, statut: 'todo', source: 'manuel' }
+    const payload = { titre: form.titre.trim(), description: form.description || null, echeance: form.echeance || null, priorite: form.priorite, categorie: form.categorie || null, sous_categories: form.sousCats && form.sousCats.length ? form.sousCats : null, gestionnaire: (form.gestionnaire || myCode).toUpperCase(), cree_par: myCode, entite: form.entite, statut: 'todo', source: 'manuel' }
     const { data, error } = await supabase.from('taches').insert(payload).select().single()
     setBusy(false)
     if (error) { alert('Erreur création : ' + error.message); return }
@@ -383,7 +386,8 @@ export default function DynassurTaches() {
                       <Info l="Attribué par" v={codeLabel(sel.cree_par)} />
                       <Info l="Échéance" v={fmtD(sel.echeance)} />
                       <Info l="Société" v={(ENTS.find(e => e[0] === sel.entite) || [])[1] || sel.entite || '—'} />
-                      <Info l="Catégorie" v={sel.categorie || '—'} />
+                      <Info l="Catégorie" v={sel.categorie ? sel.categorie + (sel.sous_categories && sel.sous_categories.length ? ' — ' + sel.sous_categories.join(', ') : '') : '—'} />
+                      <Info l="Créée le" v={fmtD(sel.date_creation)} />
                       <Info l="Clôturée le" v={fmtD(sel.date_cloture)} />
                       <Info l="Dernière modif." v={fmtDT(sel.updated_at)} />
                       <Info l="Priorité" v={(PRIOS.find(p => p[0] === sel.priorite) || [])[1] || sel.priorite || '—'} />
@@ -432,9 +436,24 @@ export default function DynassurTaches() {
                 <option value={myCode}>{myCode} (moi)</option>
                 {collabs.filter(c => (c.code || '').toUpperCase() !== myCode).map(c => <option key={c.code} value={c.code}>{c.code}{c.nom_sa_data ? ' · ' + c.nom_sa_data : ''}</option>)}
               </select></Field>
-              <Field l="Société"><select value={form.entite} onChange={e => setForm(f => ({ ...f, entite: e.target.value }))} style={inp}>{ENTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>
+              {myEntites.length > 1 && <Field l="Société"><select value={form.entite} onChange={e => setForm(f => ({ ...f, entite: e.target.value }))} style={inp}>{ENTS.filter(([k]) => myEntites.includes(k)).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>}
             </div>
-            <Field l="Catégorie (optionnel)"><input value={form.categorie} onChange={e => setForm(f => ({ ...f, categorie: e.target.value }))} style={inp} /></Field>
+            <Field l="Catégorie">
+              <select value={form.categorie} onChange={e => setForm(f => ({ ...f, categorie: e.target.value, sousCats: [] }))} style={inp}>
+                <option value="">— Aucune —</option>
+                {Object.keys(TAXO).map(k => <option key={k} value={k}>{k}</option>)}
+              </select>
+            </Field>
+            {(TAXO[form.categorie] || []).length > 0 && (
+              <Field l={`Sous-catégorie · ${form.categorie} (plusieurs possibles)`}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {TAXO[form.categorie].map(sc => {
+                    const on = (form.sousCats || []).includes(sc)
+                    return <button key={sc} onClick={() => setForm(f => ({ ...f, sousCats: on ? f.sousCats.filter(x => x !== sc) : [...(f.sousCats || []), sc] }))} style={{ padding: '5px 12px', borderRadius: 20, border: `2px solid ${on ? BLUE : '#e2e8f0'}`, background: on ? BLUE : '#fff', color: on ? '#fff' : '#64748b', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>{sc}</button>
+                  })}
+                </div>
+              </Field>
+            )}
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 18 }}>
             <button onClick={() => setShowCreate(false)} style={btn('#fff', '#475569', '1px solid #e2e8f0')}>Annuler</button>
