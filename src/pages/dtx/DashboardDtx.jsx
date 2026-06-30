@@ -44,7 +44,7 @@ export default function DashboardDtx() {
       const socId = socData?.id
       const [{ data: tsk }, { data: txs }] = await Promise.all([
         supabase.from('taches').select('id,titre,gestionnaire,echeance,statut')
-          .in('statut', ['en_cours', 'en_attente', 'retard']).order('echeance', { ascending: true }).limit(10),
+          .in('statut', ['todo', 'en_cours', 'en_attente', 'retard']).eq('entite', 'dtx').order('echeance', { ascending: true }).limit(10),
         socId ? supabase.from('transactions').select('montant').eq('societe_id', socId)
           .gte('date_valeur', annee + '-' + mois + '-01').lte('date_valeur', annee + '-' + mois + '-31') : { data: [] },
       ])

@@ -639,7 +639,7 @@ export default function DashboardGroupe() {
           supabase.from('comptes_bancaires').select('*, societes(code,nom)').eq('actif', true).order('banque'),
           supabase.from('v_bordereaux_reconciliation').select('annee,mois,type,compagnie,statut_reconciliation').in('statut_reconciliation',['fichier_ok_non_encaisse','fichier_sans_chiffres','commission_sans_fichier','manquant']),
           supabase.from('transactions').select('id,date,date_valeur,montant,societe_id').gte('date', new Date(new Date().setMonth(new Date().getMonth()-6)).toISOString().slice(0,10)).limit(2000),
-          supabase.from('taches').select('*').in('statut',['en_cours','en_attente','retard','urgent']).order('echeance',{ascending:true}).limit(100),
+          supabase.from('taches').select('*').in('statut',['todo','en_cours','en_attente','retard','urgent']).order('echeance',{ascending:true}).limit(100),
         ])
         setComptes(cpts || [])
         setBordereaux(bord || [])
