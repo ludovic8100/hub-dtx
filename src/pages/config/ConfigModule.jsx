@@ -29,7 +29,7 @@ const FIELDS_SOC = [
 ]
 
 export default function ConfigModule() {
-  const { isAdmin } = useAuth()
+  const { isAdmin, perms } = useAuth()
   const [tab, setTab] = useState('societes')
   const [societes, setSocietes] = useState([])
   const [users, setUsers] = useState([])
@@ -104,6 +104,7 @@ export default function ConfigModule() {
       description: `Accès au Hub envoyés à ${email}. Cette tâche se clôture automatiquement à sa première connexion.`,
       statut: 'todo', priorite: 'moyenne', categorie: 'Onboarding', source: 'acces',
       user_email: email, echeance: new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10),
+      gestionnaire: (perms?.code || (perms?.user_email || '').split('@')[0] || '').toUpperCase(),
     })
     setSelUser(u => ({ ...u, date_envoi_acces: now }))
     setUsers(prev => prev.map(u => u.id === selUser.id ? { ...u, date_envoi_acces: now } : u))

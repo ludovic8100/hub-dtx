@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
 import { ENTITES } from '../../lib/entites'
 import { StatBanner } from '../../components/ui/AccountableUI'
+import { useAuth } from '../../lib/auth'
 
 const NAVY = '#0D2F5E'
 const OUVERT = ['todo', 'en_cours', 'en_attente', 'retard']
@@ -48,28 +49,36 @@ function Badge({ ok, txt }) {
 }
 
 export default function DynassurTaches() {
+  const { perms, isAdmin } = useAuth()
+  const myCode = (perms?.code || (perms?.user_email || '').split('@')[0] || '').toUpperCase()
   const [loading, setLoading] = useState(true)
   const [taches, setTaches] = useState([])
   const [users, setUsers] = useState([])
   const [logs, setLogs] = useState([])
   const [filtreT, setFiltreT] = useState('ouvertes')
+  const [scope, setScope] = useState('mine')   // 'mine' | 'all' (toggle admin)
 
   useEffect(() => {
     let alive = true
     ;(async () => {
       setLoading(true)
-      const t = await loadAll('taches', 'id,titre,categorie,statut,echeance,date_cloture,user_email,source', q => q.order('echeance', { ascending: true, nullsFirst: false }))
-      const u = await loadAll('user_permissions', 'nom,user_email,actif,date_envoi_acces,premiere_connexion,derniere_connexion', q => q.order('nom', { nullsFirst: false }))
-      let l = []
-      try { const { data } = await supabase.from('connexions_log').select('user_email,connecte_a').order('connecte_a', { ascending: false }).limit(25); l = data || [] } catch (e) { l = [] }
+      const t = await loadAll('taches', 'id,titre,categorie,statut,echeance,date_cloture,user_email,source,gestionnaire', q => q.order('echeance', { ascending: true, nullsFirst: false }))
+      let u = [], l = []
+      if (isAdmin) {
+        u = await loadAll('user_permissions', 'nom,user_email,actif,date_envoi_acces,premiere_connexion,derniere_connexion', q => q.order('nom', { nullsFirst: false }))
+        try { const { data } = await supabase.from('connexions_log').select('user_email,connecte_a').order('connecte_a', { ascending: false }).limit(25); l = data || [] } catch (e) { l = [] }
+      }
       if (alive) { setTaches(t); setUsers(u); setLogs(l); setLoading(false) }
     })()
     return () => { alive = false }
-  }, [])
+  }, [isAdmin])
 
-  const ouvertes = taches.filter(t => OUVERT.includes(t.statut))
-  const cloturees = taches.filter(t => t.statut === 'terminee')
-  const tachesVues = filtreT === 'ouvertes' ? ouvertes : filtreT === 'cloturees' ? cloturees : taches
+  const mesTaches = (isAdmin && scope === 'all')
+    ? taches
+    : taches.filter(t => (t.gestionnaire || '').toUpperCase() === myCode)
+  const ouvertes = mesTaches.filter(t => OUVERT.includes(t.statut))
+  const cloturees = mesTaches.filter(t => t.statut === 'terminee')
+  const tachesVues = filtreT === 'ouvertes' ? ouvertes : filtreT === 'cloturees' ? cloturees : mesTaches
   const usersAcces = users.filter(u => u.date_envoi_acces || u.premiere_connexion)
   const jamais = usersAcces.filter(u => !u.premiere_connexion).length
 
@@ -77,7 +86,7 @@ export default function DynassurTaches() {
     <Layout currentPage="Tâches">
       <div style={{ fontFamily: "'Source Sans Pro', sans-serif", width: '100%' }}>
         <StatBanner color={ENTITES.dynassur.color} colorDark={ENTITES.dynassur.colorDark} logoUrl={ENTITES.dynassur.logo}
-          title="Tâches" subtitle="Suivi des tâches et des connexions utilisateurs" />
+          title="Tâches" subtitle={isAdmin ? 'Suivi des tâches et des connexions utilisateurs' : `Tes tâches${myCode ? ` — ${myCode}` : ''}`} />
 
         {loading ? (
           <div style={{ padding: 60, textAlign: 'center', color: '#94a3b8' }}>Chargement…</div>
@@ -86,66 +95,77 @@ export default function DynassurTaches() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 12, marginBottom: 24 }}>
               <Kpi label="Tâches ouvertes" value={ouvertes.length} col="#f59e0b" />
               <Kpi label="Tâches clôturées" value={cloturees.length} col="#16a34a" />
-              <Kpi label="Accès envoyés" value={usersAcces.length} col="#0080BD" />
-              <Kpi label="Pas encore connectés" value={jamais} col="#dc2626" />
+              {isAdmin && <Kpi label="Accès envoyés" value={usersAcces.length} col="#0080BD" />}
+              {isAdmin && <Kpi label="Pas encore connectés" value={jamais} col="#dc2626" />}
             </div>
 
-            <Card titre="Suivi des accès & connexions" sous="À l'envoi des accès, une tâche se crée ; elle se clôture automatiquement à la première connexion de l'utilisateur.">
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead><tr>
-                  <th style={th}>Utilisateur</th><th style={th}>Accès envoyés</th><th style={th}>1ʳᵉ connexion</th><th style={th}>Dernière connexion</th><th style={th}>Statut</th>
-                </tr></thead>
-                <tbody>
-                  {usersAcces.map(u => (
-                    <tr key={u.user_email}>
-                      <td style={td}><span style={{ fontWeight: 600, color: NAVY }}>{u.nom || u.user_email}</span><div style={{ fontSize: 11, color: '#94a3b8' }}>{u.user_email}</div></td>
-                      <td style={td}>{fmtD(u.date_envoi_acces)}</td>
-                      <td style={td}>{fmtD(u.premiere_connexion)}</td>
-                      <td style={td}>{fmtD(u.derniere_connexion)}</td>
-                      <td style={td}><Badge ok={!!u.premiere_connexion} txt={u.premiere_connexion ? 'Connecté' : 'En attente'} /></td>
-                    </tr>
-                  ))}
-                  {!usersAcces.length && <tr><td style={td} colSpan={5}>Aucun accès envoyé pour l'instant — utilise le bouton « Envoyer les accès » dans Paramètres → Utilisateurs.</td></tr>}
-                </tbody>
-              </table>
-            </Card>
-
             <Card titre="Tâches" sous={`${ouvertes.length} ouverte(s) · ${cloturees.length} clôturée(s)`}>
-              <div style={{ display: 'flex', gap: 8, padding: '10px 16px' }}>
+              <div style={{ display: 'flex', gap: 8, padding: '10px 16px', flexWrap: 'wrap', alignItems: 'center' }}>
                 {[['ouvertes', 'Ouvertes'], ['cloturees', 'Clôturées'], ['toutes', 'Toutes']].map(([k, l]) => (
                   <button key={k} onClick={() => setFiltreT(k)} style={{ padding: '5px 14px', borderRadius: 20, border: `2px solid ${filtreT === k ? '#0080BD' : '#e2e8f0'}`, background: filtreT === k ? '#0080BD' : '#fff', color: filtreT === k ? '#fff' : '#64748b', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>{l}</button>
                 ))}
+                {isAdmin && (
+                  <span style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <span style={{ fontSize: 11, color: '#94a3b8' }}>Portée :</span>
+                    {[['mine', 'Mes tâches'], ['all', 'Toutes']].map(([k, l]) => (
+                      <button key={k} onClick={() => setScope(k)} style={{ padding: '4px 12px', borderRadius: 20, border: `1px solid ${scope === k ? NAVY : '#e2e8f0'}`, background: scope === k ? NAVY : '#fff', color: scope === k ? '#fff' : '#64748b', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>{l}</button>
+                    ))}
+                  </span>
+                )}
               </div>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead><tr>
-                  <th style={th}>Tâche</th><th style={th}>Catégorie</th><th style={th}>Statut</th><th style={th}>Échéance</th><th style={th}>Clôturée le</th>
+                  <th style={th}>Tâche</th>{(isAdmin && scope === 'all') && <th style={th}>Gestionnaire</th>}<th style={th}>Catégorie</th><th style={th}>Statut</th><th style={th}>Échéance</th><th style={th}>Clôturée le</th>
                 </tr></thead>
                 <tbody>
                   {tachesVues.map(t => (
                     <tr key={t.id}>
                       <td style={td}>{t.titre}</td>
+                      {(isAdmin && scope === 'all') && <td style={td}>{t.gestionnaire || '—'}</td>}
                       <td style={td}>{t.categorie || '—'}</td>
                       <td style={td}><Badge ok={t.statut === 'terminee'} txt={t.statut === 'terminee' ? 'Clôturée' : t.statut} /></td>
                       <td style={td}>{fmtD(t.echeance)}</td>
                       <td style={td}>{fmtD(t.date_cloture)}</td>
                     </tr>
                   ))}
-                  {!tachesVues.length && <tr><td style={td} colSpan={5}>Aucune tâche.</td></tr>}
+                  {!tachesVues.length && <tr><td style={td} colSpan={6}>Aucune tâche{!isAdmin && myCode ? ` pour ${myCode}` : ''}.</td></tr>}
                 </tbody>
               </table>
             </Card>
 
-            <Card titre="Dernières connexions" sous="Journal des 25 dernières connexions au Hub.">
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead><tr><th style={th}>Utilisateur</th><th style={th}>Connexion</th></tr></thead>
-                <tbody>
-                  {logs.map((l, i) => (
-                    <tr key={i}><td style={td}>{l.user_email}</td><td style={td}>{fmtDT(l.connecte_a)}</td></tr>
-                  ))}
-                  {!logs.length && <tr><td style={td} colSpan={2}>Aucune connexion enregistrée pour l'instant (le journal se remplit dès la prochaine connexion).</td></tr>}
-                </tbody>
-              </table>
-            </Card>
+            {isAdmin && (
+              <Card titre="Suivi des accès & connexions" sous="À l'envoi des accès, une tâche se crée ; elle se clôture automatiquement à la première connexion de l'utilisateur.">
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead><tr>
+                    <th style={th}>Utilisateur</th><th style={th}>Accès envoyés</th><th style={th}>1ʳᵉ connexion</th><th style={th}>Dernière connexion</th><th style={th}>Statut</th>
+                  </tr></thead>
+                  <tbody>
+                    {usersAcces.map(u => (
+                      <tr key={u.user_email}>
+                        <td style={td}><span style={{ fontWeight: 600, color: NAVY }}>{u.nom || u.user_email}</span><div style={{ fontSize: 11, color: '#94a3b8' }}>{u.user_email}</div></td>
+                        <td style={td}>{fmtD(u.date_envoi_acces)}</td>
+                        <td style={td}>{fmtD(u.premiere_connexion)}</td>
+                        <td style={td}>{fmtD(u.derniere_connexion)}</td>
+                        <td style={td}><Badge ok={!!u.premiere_connexion} txt={u.premiere_connexion ? 'Connecté' : 'En attente'} /></td>
+                      </tr>
+                    ))}
+                    {!usersAcces.length && <tr><td style={td} colSpan={5}>Aucun accès envoyé pour l'instant — bouton « Envoyer les accès » dans Paramètres → Utilisateurs.</td></tr>}
+                  </tbody>
+                </table>
+              </Card>
+            )}
+
+            {isAdmin && (
+              <Card titre="Dernières connexions" sous="Journal des 25 dernières connexions au Hub.">
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead><tr><th style={th}>Utilisateur</th><th style={th}>Connexion</th></tr></thead>
+                  <tbody>
+                    {logs.map((l, i) => (<tr key={i}><td style={td}>{l.user_email}</td><td style={td}>{fmtDT(l.connecte_a)}</td></tr>))}
+                    {!logs.length && <tr><td style={td} colSpan={2}>Aucune connexion enregistrée pour l'instant (le journal se remplit aux prochaines connexions).</td></tr>}
+                  </tbody>
+                </table>
+              </Card>
+            )}
           </>
         )}
       </div>
