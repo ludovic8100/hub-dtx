@@ -50,6 +50,21 @@ export function AuthProvider({ children }) {
     return data
   }
 
+  // Suivi de connexion — additif, ne bloque jamais le login (fire-and-forget)
+  async function trackConnexion(email) {
+    try {
+      const now = new Date().toISOString()
+      await supabase.from('connexions_log').insert({ user_email: email })
+      const { data: up } = await supabase.from('user_permissions').select('premiere_connexion').eq('user_email', email).single()
+      if (up && !up.premiere_connexion) {
+        await supabase.from('user_permissions').update({ premiere_connexion: now, derniere_connexion: now }).eq('user_email', email)
+        await supabase.from('taches').update({ statut: 'terminee', date_cloture: now }).eq('user_email', email).eq('source', 'acces').neq('statut', 'terminee')
+      } else {
+        await supabase.from('user_permissions').update({ derniere_connexion: now }).eq('user_email', email)
+      }
+    } catch (e) { /* silencieux : ne jamais bloquer la connexion */ }
+  }
+
   function getDefaultSociete(p, admin) {
     if (!p) return null
     if (admin || p.acc_holding) return 'groupe'
@@ -74,6 +89,7 @@ export function AuthProvider({ children }) {
         const p = await loadPerms(session.user.email)
         setPerms(p)
         setActiveSociete(getDefaultSociete(p, p?.role === 'admin'))
+        if (event === 'SIGNED_IN') trackConnexion(session.user.email)
       } else { setUser(null); setPerms(null); setActiveSociete(null) }
       setLoading(false)
     })

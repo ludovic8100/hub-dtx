@@ -92,6 +92,28 @@ export default function ConfigModule() {
     notify('✓ Utilisateur enregistré')
   }
 
+  async function renvoyerAcces() {
+    if (!selUser) return
+    setSaving(true)
+    const now = new Date().toISOString()
+    const email = selUser.user_email
+    const nom = selUser.nom || email
+    await supabase.from('user_permissions').update({ date_envoi_acces: now }).eq('id', selUser.id)
+    await supabase.from('taches').insert({
+      titre: `Suivi 1ère connexion — ${nom}`,
+      description: `Accès au Hub envoyés à ${email}. Cette tâche se clôture automatiquement à sa première connexion.`,
+      statut: 'todo', priorite: 'moyenne', categorie: 'Onboarding', source: 'acces',
+      user_email: email, echeance: new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10),
+    })
+    setSelUser(u => ({ ...u, date_envoi_acces: now }))
+    setUsers(prev => prev.map(u => u.id === selUser.id ? { ...u, date_envoi_acces: now } : u))
+    setSaving(false)
+    notify('✓ Accès envoyés — tâche de suivi créée')
+    const sujet = encodeURIComponent('Vos accès au Hub DTX')
+    const corps = encodeURIComponent(`Bonjour ${selUser.nom || ''},\n\nVotre accès au Hub DTX est activé.\nConnectez-vous ici : https://hub-dtx.vercel.app\n\nUtilisez le bouton « Se connecter avec Microsoft » avec votre compte professionnel (${email}).\n\nÀ bientôt.`)
+    window.open(`mailto:${email}?subject=${sujet}&body=${corps}`)
+  }
+
   if (!isAdmin) return (
     <Layout currentPage="Configuration">
       <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>
@@ -248,6 +270,14 @@ export default function ConfigModule() {
                     </label>
                     <Toggle label="Actif" on={!!selUser.actif} onClick={() => setSelUser(u => ({ ...u, actif: !u.actif }))} />
                   </div>
+                </div>
+
+                <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <button onClick={renvoyerAcces} disabled={saving} style={{ ...btn('#0080BD'), padding: '9px 16px', fontSize: 14, opacity: saving ? .6 : 1 }}>📧 {selUser.date_envoi_acces ? 'Renvoyer' : 'Envoyer'} les accès</button>
+                  <span style={{ fontSize: 12, color: '#94a3b8' }}>
+                    {selUser.date_envoi_acces ? `Accès envoyés le ${new Date(selUser.date_envoi_acces).toLocaleDateString('fr-BE')}` : 'Accès jamais envoyés'}
+                    {selUser.premiere_connexion ? ` · 1ʳᵉ connexion le ${new Date(selUser.premiere_connexion).toLocaleDateString('fr-BE')}` : ' · pas encore connecté'}
+                  </span>
                 </div>
 
                 {selUser.role === 'admin' && (
