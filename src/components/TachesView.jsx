@@ -60,6 +60,7 @@ function periodDays(anchor, mode) {
   return Array.from({ length: 30 }, (_, i) => { const x = new Date(d0); x.setDate(d0.getDate() + i); return x })
 }
 
+const chkLabel = { display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer', userSelect: 'none', padding: '6px 12px', borderRadius: 9, border: '1px solid #e2e8f0', background: '#fff' }
 const inp = { padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 14, color: '#1e293b', width: '100%', boxSizing: 'border-box' }
 const navBtn = { width: 30, height: 30, borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 16, fontWeight: 700, color: NAVY, lineHeight: 1 }
 const btn = (bg, col = '#fff', border = 'none') => ({ padding: '9px 16px', borderRadius: 9, border, background: bg, color: col, fontSize: 14, fontWeight: 700, cursor: 'pointer' })
@@ -150,6 +151,8 @@ export default function TachesView({ entiteKey = 'dynassur' }) {
   const [collabs, setCollabs] = useState([])
   const [users, setUsers] = useState([])
   const [scope, setScope] = useState('mine')
+  const [showRdv, setShowRdv] = useState(true)
+  const [showTaches, setShowTaches] = useState(true)
   const [anchor, setAnchor] = useState(() => new Date())
   const [viewMode, setViewMode] = useState('sem7')
   const [selDay, setSelDay] = useState(null)
@@ -200,7 +203,9 @@ export default function TachesView({ entiteKey = 'dynassur' }) {
   const retard = open.filter(t => ekey(t) && ekey(t) < todayKey)
   const cloturees = mine.filter(t => t.statut === 'terminee')
   const rdvFuturs = rdvItems.filter(r => ekey(r) >= todayKey).sort((a, b) => (a.debut || '').localeCompare(b.debut || ''))
-  const calItems = [...mine, ...rdvItems]
+  const calTaches = showTaches ? mine.filter(isOpen) : []
+  const calRdv = (showRdv && rdvEnabled) ? rdvItems : []
+  const calItems = [...calTaches, ...calRdv]
   const parJour = {}; calItems.forEach(t => { const k = ekey(t); if (k) (parJour[k] = parJour[k] || []).push(t) })
 
   let liste = filtre === 'ouvertes' ? open : filtre === 'retard' ? retard : filtre === 'cloturees' ? cloturees : mine
@@ -304,6 +309,13 @@ export default function TachesView({ entiteKey = 'dynassur' }) {
             <Kpi label="En retard" value={retard.length} col="#dc2626" />
             <Kpi label="Clôturées" value={cloturees.length} col="#16a34a" />
             {rdvEnabled && <Kpi label="RDV à venir" value={rdvFuturs.length} col="#7c3aed" />}
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
+            <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em' }}>Calendrier :</span>
+            {rdvEnabled && <label style={{ ...chkLabel, borderColor: showRdv ? '#7c3aed' : '#e2e8f0' }}><input type="checkbox" checked={showRdv} onChange={e => setShowRdv(e.target.checked)} style={{ accentColor: '#7c3aed', width: 16, height: 16 }} /><span style={{ color: '#7c3aed', fontWeight: 700 }}>RDV</span></label>}
+            <label style={{ ...chkLabel, borderColor: showTaches ? BLUE : '#e2e8f0' }}><input type="checkbox" checked={showTaches} onChange={e => setShowTaches(e.target.checked)} style={{ accentColor: BLUE, width: 16, height: 16 }} /><span style={{ color: BLUE, fontWeight: 700 }}>Tâches ouvertes</span></label>
+            <span style={{ fontSize: 11, color: '#cbd5e1' }}>les tâches clôturées n'apparaissent pas dans le calendrier</span>
           </div>
 
           {isAdmin && (
