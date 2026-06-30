@@ -624,6 +624,7 @@ export default function DashboardGroupe() {
   const [bordereaux, setBordereaux]     = useState([])
   const [transactions, setTransactions] = useState([])
   const [taches, setTaches]             = useState([])
+  const [drawer, setDrawer]             = useState(null)
   const [loading, setLoading]           = useState(true)
 
   useEffect(() => {
@@ -658,8 +659,12 @@ export default function DashboardGroupe() {
   }, [])
 
   const now = new Date()
-  const nbRetard  = taches.filter(t => t.echeance && new Date(t.echeance) < now).length
-  const nbEnCours = taches.filter(t => t.statut==='en_cours').length
+  const estRetard = t => t.echeance && new Date(t.echeance) < now && t.statut !== 'terminee'
+  const tachesRetard = taches.filter(estRetard)
+  const nbRetard  = tachesRetard.length
+  const nbEnCours = taches.length
+  const drawerList = (drawer === 'retard' ? tachesRetard : taches).slice()
+    .sort((a,b) => { const ra=estRetard(a)?0:1, rb=estRetard(b)?0:1; return ra!==rb ? ra-rb : (a.echeance||'').localeCompare(b.echeance||'') })
 
   return (
     <Layout currentPage="Tableau de bord général">
@@ -680,8 +685,8 @@ export default function DashboardGroupe() {
 
         {/* 2 — KPIs */}
         <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:24 }}>
-          <KpiCard label="Tâches en cours"   value={nbEnCours} col="#f59e0b" icon="ti-checkbox"       sub={`dont ${nbRetard} en retard`}             onClick={() => navigate('/dynassur/taches')} />
-          <KpiCard label="Tâches en retard"  value={nbRetard}  col={nbRetard>0?"#dc2626":"#16a34a"} icon="ti-alert-triangle" sub={nbRetard>0?'⚠ action requise':'✓ aucun retard'} onClick={() => navigate('/dynassur/taches')} />
+          <KpiCard label="Tâches en cours"   value={nbEnCours} col="#f59e0b" icon="ti-checkbox"       sub={`dont ${nbRetard} en retard`}             onClick={() => setDrawer('cours')} />
+          <KpiCard label="Tâches en retard"  value={nbRetard}  col={nbRetard>0?"#dc2626":"#16a34a"} icon="ti-alert-triangle" sub={nbRetard>0?'⚠ action requise':'✓ aucun retard'} onClick={() => setDrawer('retard')} />
           <KpiCard label="Comptes connectés" value={comptes.length} col="#7c3aed" icon="ti-credit-card" sub="via Ponto / ING" onClick={() => navigate('/dynassur')} />
           <KpiCard label="Objectifs 2026"    value={nbObjectifs != null ? nbObjectifs : '…'} col="#0080BD" icon="ti-target" sub={nbObjectifs ? `${nbObjectifs} objectif${nbObjectifs>1?'s':''} configuré${nbObjectifs>1?'s':''}` : 'Aucun objectif — configurer'} onClick={() => navigate('/dynassur/objectifs')} />
         </div>
@@ -699,6 +704,42 @@ export default function DashboardGroupe() {
         {/* 5 — Production */}
         <BlocProduction />
 
+      </div>
+
+      {/* Panneau lateral taches (style artefact) */}
+      <div onClick={() => setDrawer(null)} style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.4)', zIndex:60, opacity: drawer?1:0, pointerEvents: drawer?'auto':'none', transition:'opacity .25s' }} />
+      <div style={{ position:'fixed', top:0, right:0, height:'100vh', width:'min(460px,93vw)', background:'#fff', zIndex:61, boxShadow:'-8px 0 40px rgba(0,0,0,0.18)', transform: drawer?'translateX(0)':'translateX(100%)', transition:'transform .28s cubic-bezier(.4,0,.2,1)', display:'flex', flexDirection:'column' }}>
+        <div style={{ padding:'16px 20px', borderBottom:'1px solid #e2e8f0', display:'flex', alignItems:'center', justifyContent:'space-between', background: drawer==='retard'?'#fef2f2':'#fffbeb' }}>
+          <div>
+            <div style={{ fontSize:11, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'.05em' }}>{drawer==='retard'?'Tâches en retard':'Tâches en cours'}</div>
+            <div style={{ fontSize:24, fontWeight:800, color: drawer==='retard'?'#dc2626':'#0D2F5E', lineHeight:1.1 }}>{drawerList.length}</div>
+          </div>
+          <button onClick={() => setDrawer(null)} style={{ width:34, height:34, borderRadius:9, border:'1px solid #e2e8f0', background:'#fff', cursor:'pointer', fontSize:18, color:'#64748b', lineHeight:1 }}>✕</button>
+        </div>
+        <div style={{ flex:1, overflowY:'auto', padding:12 }}>
+          {drawerList.length===0 && <div style={{ padding:40, textAlign:'center', color:'#94a3b8', fontSize:13 }}>Aucune tâche.</div>}
+          {drawerList.map(t => {
+            const retard = estRetard(t)
+            const socCfg = SOCIETES[(t.entite||'').toLowerCase()]
+            return (
+              <div key={t.id} onClick={() => { setDrawer(null); navigate('/dynassur/taches?tache=' + t.id) }}
+                style={{ padding:'10px 12px', borderRadius:9, border:'1px solid #eef2f7', marginBottom:6, cursor:'pointer', background: retard?'#fff5f5':'#fff' }}
+                onMouseEnter={e=>e.currentTarget.style.background = retard?'#fee2e2':'#f0f9ff'}
+                onMouseLeave={e=>e.currentTarget.style.background = retard?'#fff5f5':'#fff'}>
+                <div style={{ fontSize:13.5, fontWeight: retard?700:600, color:'#1e293b' }}>{t.titre||'—'}</div>
+                <div style={{ fontSize:11, color:'#94a3b8', marginTop:3, display:'flex', gap:8, flexWrap:'wrap' }}>
+                  {socCfg && <span style={{ background:socCfg.color+'1e', color:socCfg.color, fontWeight:700, padding:'0 5px', borderRadius:3, fontSize:10 }}>{socCfg.short}</span>}
+                  {t.gestionnaire && <span>{t.gestionnaire}</span>}
+                  {t.echeance && <span style={{ color: retard?'#dc2626':'#94a3b8' }}>{fmtDate(t.echeance)}</span>}
+                  {t.categorie && <span>• {t.categorie}</span>}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        <div style={{ padding:12, borderTop:'1px solid #e2e8f0' }}>
+          <button onClick={() => { setDrawer(null); navigate('/groupe/taches') }} style={{ width:'100%', padding:'10px', borderRadius:9, border:'none', background:'#0D2F5E', color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer' }}>Ouvrir la page Tâches</button>
+        </div>
       </div>
     </Layout>
   )

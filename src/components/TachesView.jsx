@@ -146,6 +146,7 @@ export default function TachesView({ entiteKey = 'dynassur' }) {
   const [loading, setLoading] = useState(true)
   const [taches, setTaches] = useState([])
   const [rdvs, setRdvs] = useState([])
+  const [rdvCats, setRdvCats] = useState([])
   const [collabs, setCollabs] = useState([])
   const [users, setUsers] = useState([])
   const [scope, setScope] = useState('mine')
@@ -161,6 +162,7 @@ export default function TachesView({ entiteKey = 'dynassur' }) {
   const blankForm = { titre: '', description: '', echeance: '', priorite: 'moyenne', categorie: '', sousCats: [], gestionnaire: myCode, entite: defEntite }
   const [form, setForm] = useState(blankForm)
   const [busy, setBusy] = useState(false)
+  const taxo = { ...TAXO, RDV: rdvCats.map(c => c.libelle || c.code).filter(Boolean) }
   const [paramDone, setParamDone] = useState(false)
 
   const TSEL = 'id,titre,description,categorie,statut,priorite,echeance,date_cloture,user_email,source,gestionnaire,cree_par,entite,updated_at,date_creation,sous_categories,dossier_client,lien_url'
@@ -181,9 +183,10 @@ export default function TachesView({ entiteKey = 'dynassur' }) {
         } catch (e) { r = [] }
       }
       let c = []; try { c = await loadAll('collaborateurs', 'code,nom_sa_data') } catch (e) { c = [] }
+      let rc = []; try { rc = await loadAll('rdv_categories', 'code,libelle,actif,ordre', q => q.eq('actif', true).order('ordre')) } catch (e) { rc = [] }
       let u = []
       if (isAdmin && entiteKey === 'dynassur') u = await loadAll('user_permissions', 'nom,user_email,actif,date_envoi_acces,premiere_connexion,derniere_connexion', q => q.order('nom', { nullsFirst: false }))
-      if (alive) { setTaches(t); setRdvs(r); setCollabs(c); setUsers(u); setLoading(false) }
+      if (alive) { setTaches(t); setRdvs(r); setCollabs(c); setRdvCats(rc); setUsers(u); setLoading(false) }
     })()
     return () => { alive = false }
   }, [isAdmin, myEmail, entiteKey, rdvEnabled])
@@ -430,9 +433,9 @@ export default function TachesView({ entiteKey = 'dynassur' }) {
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                         <select value={catEdit.categorie} onChange={e => setCatEdit({ categorie: e.target.value, sousCats: [] })} style={{ ...inp, width: 'auto' }}>
                           <option value="">— Aucune —</option>
-                          {Object.keys(TAXO).map(k => <option key={k} value={k}>{k}</option>)}
+                          {Object.keys(taxo).map(k => <option key={k} value={k}>{k}</option>)}
                         </select>
-                        {(TAXO[catEdit.categorie] || []).map(scn => { const on = (catEdit.sousCats || []).includes(scn); return <button key={scn} onClick={() => setCatEdit(c => ({ ...c, sousCats: on ? c.sousCats.filter(x => x !== scn) : [...(c.sousCats || []), scn] }))} style={{ padding: '4px 10px', borderRadius: 20, border: `2px solid ${on ? BLUE : '#e2e8f0'}`, background: on ? BLUE : '#fff', color: on ? '#fff' : '#64748b', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>{scn}</button> })}
+                        {(taxo[catEdit.categorie] || []).map(scn => { const on = (catEdit.sousCats || []).includes(scn); return <button key={scn} onClick={() => setCatEdit(c => ({ ...c, sousCats: on ? c.sousCats.filter(x => x !== scn) : [...(c.sousCats || []), scn] }))} style={{ padding: '4px 10px', borderRadius: 20, border: `2px solid ${on ? BLUE : '#e2e8f0'}`, background: on ? BLUE : '#fff', color: on ? '#fff' : '#64748b', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>{scn}</button> })}
                         <button onClick={updateCategorie} disabled={busy} style={{ ...btn(BLUE), padding: '7px 12px', fontSize: 12 }}>Enregistrer</button>
                       </div>
                     </div>
@@ -481,13 +484,13 @@ export default function TachesView({ entiteKey = 'dynassur' }) {
             <Field l="Catégorie">
               <select value={form.categorie} onChange={e => setForm(f => ({ ...f, categorie: e.target.value, sousCats: [] }))} style={inp}>
                 <option value="">— Aucune —</option>
-                {Object.keys(TAXO).map(k => <option key={k} value={k}>{k}</option>)}
+                {Object.keys(taxo).map(k => <option key={k} value={k}>{k}</option>)}
               </select>
             </Field>
-            {(TAXO[form.categorie] || []).length > 0 && (
+            {(taxo[form.categorie] || []).length > 0 && (
               <Field l={`Sous-catégorie · ${form.categorie} (plusieurs possibles)`}>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  {TAXO[form.categorie].map(sc => {
+                  {taxo[form.categorie].map(sc => {
                     const on = (form.sousCats || []).includes(sc)
                     return <button key={sc} onClick={() => setForm(f => ({ ...f, sousCats: on ? f.sousCats.filter(x => x !== sc) : [...(f.sousCats || []), sc] }))} style={{ padding: '5px 12px', borderRadius: 20, border: `2px solid ${on ? BLUE : '#e2e8f0'}`, background: on ? BLUE : '#fff', color: on ? '#fff' : '#64748b', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>{sc}</button>
                   })}
