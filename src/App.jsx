@@ -12,6 +12,11 @@ import DashboardGroupe    from './pages/groupe/DashboardGroupe'
 
 import DashboardDynassur   from './pages/dynassur/DashboardDynassur'
 import DynassurTaches      from './pages/dynassur/DynassurTaches'
+import DtxTaches           from './pages/dtx/DtxTaches'
+import LodeTaches          from './pages/lode/LodeTaches'
+import HexagroupTaches     from './pages/hexagroup/HexagroupTaches'
+import PriveTaches         from './pages/prive/PriveTaches'
+import GroupeTaches        from './pages/groupe/GroupeTaches'
 import DynassurClients     from './pages/dynassur/DynassurClients'
 import DynassurProduction  from './pages/dynassur/DynassurProduction'
 import DynassurBordereaux  from './pages/dynassur/DynassurBordereaux'
@@ -90,6 +95,11 @@ export default function App() {
           {/* Dynassur */}
           <Route path="/dynassur"             element={<P><DashboardDynassur /></P>} />
           <Route path="/dynassur/taches"       element={<P><DynassurTaches /></P>} />
+          <Route path="/dtx/taches"           element={<P><DtxTaches /></P>} />
+          <Route path="/lode/taches"          element={<P><LodeTaches /></P>} />
+          <Route path="/hexagroup/taches"     element={<P><HexagroupTaches /></P>} />
+          <Route path="/prive/taches"         element={<P><PriveTaches /></P>} />
+          <Route path="/groupe/taches"        element={<P><GroupeTaches /></P>} />
           <Route path="/dynassur/clients"      element={<P><DynassurClients /></P>} />
           <Route path="/dynassur/production"   element={<P><DynassurProduction /></P>} />
           <Route path="/dynassur/bordereaux"   element={<P><DynassurBordereaux /></P>} />
