@@ -267,7 +267,7 @@ function BlocTaches({ taches, bordereaux, loading }) {
             return (
               <div
                 key={t.id}
-                onClick={() => navigate('/dynassur/taches')}
+                onClick={() => navigate('/dynassur/taches?tache=' + t.id)}
                 style={{
                   display:'grid', gridTemplateColumns:'1fr auto auto',
                   alignItems:'center', gap:10,

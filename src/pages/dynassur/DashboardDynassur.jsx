@@ -236,7 +236,7 @@ export default function DashboardDynassur() {
                 {taches.map((t,i) => {
                   const retard = t.echeance && new Date(t.echeance) < now
                   return (
-                    <div key={t.id} style={{ display:'grid', gridTemplateColumns:'1fr auto auto', alignItems:'center', gap:8,
+                    <div key={t.id} onClick={()=>navigate(`/dynassur/taches?tache=${t.id}`)} style={{ display:'grid', gridTemplateColumns:'1fr auto auto', alignItems:'center', gap:8, cursor:'pointer',
                       padding:'9px 18px', borderBottom:i<taches.length-1?`1px solid ${C.bg}`:'none',
                       background:retard?'#fff5f5':i%2===0?'#fff':C.bg }}>
                       <div>

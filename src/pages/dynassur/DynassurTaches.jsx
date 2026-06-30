@@ -11,8 +11,17 @@ const JOURS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
 const MOIS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre']
 const ENTS = [['dynassur', 'Dynassur'], ['dtx', 'DTX'], ['lode', 'LODE'], ['hexagroup', 'Hexagroup'], ['prive', 'Privé'], ['groupe', 'Groupe']]
 const PRIOS = [['basse', 'Basse'], ['moyenne', 'Moyenne'], ['haute', 'Haute']]
-const VIEWS = [['mois', 'Mois'], ['sem7', '7j'], ['sem5', '5j'], ['30j', '30j']]
+const VIEWS = [['sem5', '5j'], ['sem7', '7j'], ['30j', '30j'], ['mois', 'Mois']]
 const STATUT_LBL = { todo: 'À faire', en_cours: 'En cours', en_attente: 'En attente', retard: 'En retard', terminee: 'Clôturée' }
+const STATUT_STYLE = {
+  retard: { bg: '#fee2e2', color: '#dc2626', label: 'En retard' },
+  todo: { bg: '#dbeafe', color: '#1d4ed8', label: 'À faire' },
+  en_cours: { bg: '#dbeafe', color: '#1d4ed8', label: 'En cours' },
+  en_attente: { bg: '#f1f5f9', color: '#64748b', label: 'En attente' },
+  terminee: { bg: '#dcfce7', color: '#15803d', label: 'Clôturée' },
+}
+const RDV_STYLE = { bg: '#ede9fe', color: '#7c3aed', label: 'RDV' }
+const SOC = { dynassur: { s: 'DYN', c: '#0080BD' }, dtx: { s: 'DTX', c: '#94a3b8' }, lode: { s: 'LODE', c: '#ea580c' }, hexagroup: { s: 'HEXA', c: '#dc2626' }, prive: { s: 'PRIVÉ', c: '#0d9488' }, groupe: { s: 'GRP', c: '#7c3aed' } }
 
 const pad = n => String(n).padStart(2, '0')
 const key = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
@@ -20,6 +29,7 @@ const ekey = t => (t.echeance || '').slice(0, 10)
 const fmtD = d => d ? new Date(d).toLocaleDateString('fr-BE') : '—'
 const fmtDT = d => d ? new Date(d).toLocaleString('fr-BE', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'
 const isOpen = t => OUVERT.includes(t.statut)
+const styleOf = t => t._rdv ? RDV_STYLE : (isOpen(t) && ekey(t) && ekey(t) < key(new Date())) ? STATUT_STYLE.retard : (STATUT_STYLE[t.statut] || STATUT_STYLE.todo)
 
 async function loadAll(table, select, fn) {
   let out = [], from = 0
@@ -72,10 +82,6 @@ function Kpi({ label, value, col }) {
     <div style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', lineHeight: 1 }}>{value}</div>
   </div>
 }
-function Badge({ statut }) {
-  const c = statut === 'terminee' ? ['#dcfce7', '#15803d'] : statut === 'retard' ? ['#fee2e2', '#b91c1c'] : ['#dbeafe', '#1d4ed8']
-  return <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: c[0], color: c[1] }}>{STATUT_LBL[statut] || statut}</span>
-}
 function Pill({ on, onClick, children, col = BLUE }) {
   return <button onClick={onClick} style={{ padding: '5px 13px', borderRadius: 20, border: `2px solid ${on ? col : '#e2e8f0'}`, background: on ? col : '#fff', color: on ? '#fff' : '#64748b', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>{children}</button>
 }
@@ -87,20 +93,26 @@ function Overlay({ onClose, children, w = 520 }) {
 function Info({ l, v }) { return <div><div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>{l}</div><div style={{ color: '#334155', fontWeight: 600 }}>{v}</div></div> }
 function Field({ l, children }) { return <div><div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 4 }}>{l}</div>{children}</div> }
 
-function TaskRow({ t, onClick, showDate }) {
-  const late = OUVERT.includes(t.statut) && ekey(t) && ekey(t) < key(new Date())
-  return <button onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 8, border: '1px solid #eef2f7', background: '#fff', cursor: 'pointer', marginBottom: 4 }}>
-    <span style={{ width: 8, height: 8, borderRadius: '50%', background: t.statut === 'terminee' ? '#16a34a' : late ? '#dc2626' : BLUE, flexShrink: 0 }} />
-    <span style={{ flex: 1, minWidth: 0 }}>
-      <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.titre}</span>
-      <span style={{ fontSize: 11, color: '#94a3b8' }}>{(t.gestionnaire || '—')}{showDate && t.echeance ? ` · ${fmtD(t.echeance)}` : ''}{t.categorie ? ` · ${t.categorie}` : ''}</span>
+function TaskRow({ t, onClick }) {
+  const late = !t._rdv && isOpen(t) && ekey(t) && ekey(t) < key(new Date())
+  const st = styleOf(t); const soc = t.entite ? SOC[t.entite] : null
+  return <button onClick={onClick} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center', width: '100%', textAlign: 'left', padding: '9px 12px', borderRadius: 8, border: '1px solid #eef2f7', background: late ? '#fff5f5' : '#fff', cursor: 'pointer', marginBottom: 4 }}>
+    <span style={{ minWidth: 0 }}>
+      <span style={{ display: 'block', fontSize: 13.5, fontWeight: late ? 700 : 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.titre}</span>
+      <span style={{ fontSize: 11, color: '#94a3b8', display: 'flex', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
+        {soc && <span style={{ background: soc.c + '1e', color: soc.c, fontWeight: 700, padding: '0 5px', borderRadius: 3, fontSize: 10 }}>{soc.s}</span>}
+        {t.gestionnaire && <span>{t.gestionnaire}</span>}
+        {(t._rdv ? t.debut : t.echeance) && <span>{t._rdv ? fmtDT(t.debut) : fmtD(t.echeance)}</span>}
+        {t.categorie && !t._rdv && <span>• {t.categorie}</span>}
+      </span>
     </span>
+    <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 5, background: st.bg, color: st.color, whiteSpace: 'nowrap' }}>{st.label}</span>
   </button>
 }
 function DayCell({ d, inMonth, parJour, todayKey, selDay, onPick, onTask, detailed }) {
-  const k = key(d), tasks = parJour[k] || [], openCount = tasks.filter(isOpen).length
+  const k = key(d), items = parJour[k] || [], openCount = items.filter(x => x._rdv || isOpen(x)).length
   const isToday = k === todayKey, isSel = selDay && key(selDay) === k
-  const late = tasks.some(t => isOpen(t) && k < todayKey)
+  const late = items.some(t => !t._rdv && isOpen(t) && k < todayKey)
   return (
     <div onClick={() => onPick(d)} style={{
       minHeight: detailed ? 110 : undefined, aspectRatio: detailed ? undefined : '1',
@@ -113,11 +125,11 @@ function DayCell({ d, inMonth, parJour, todayKey, selDay, onPick, onTask, detail
         <span style={{ fontSize: 12, fontWeight: isToday ? 800 : 600 }}>{d.getDate()}</span>
         {!detailed && openCount > 0 && <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', background: late ? '#dc2626' : BLUE, borderRadius: 10, padding: '0 5px', minWidth: 14, textAlign: 'center' }}>{openCount}</span>}
       </div>
-      {detailed && tasks.slice(0, 3).map(t => (
+      {detailed && items.slice(0, 3).map(t => { const st = styleOf(t); return (
         <span key={t.id} onClick={e => { e.stopPropagation(); onTask(t) }} title={t.titre}
-          style={{ fontSize: 10.5, padding: '2px 5px', borderRadius: 4, background: t.statut === 'terminee' ? '#dcfce7' : isOpen(t) && key(d) < todayKey ? '#fee2e2' : '#dbeafe', color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}>{t.titre}</span>
-      ))}
-      {detailed && tasks.length > 3 && <span style={{ fontSize: 9, color: '#94a3b8' }}>+{tasks.length - 3}</span>}
+          style={{ fontSize: 10.5, padding: '2px 5px', borderRadius: 4, background: st.bg, color: st.color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}>{t._rdv ? '📅 ' : ''}{t.titre}</span>
+      )})}
+      {detailed && items.length > 3 && <span style={{ fontSize: 9, color: '#94a3b8' }}>+{items.length - 3}</span>}
     </div>
   )
 }
@@ -125,13 +137,15 @@ function DayCell({ d, inMonth, parJour, todayKey, selDay, onPick, onTask, detail
 export default function DynassurTaches() {
   const { perms, isAdmin } = useAuth()
   const myCode = (perms?.code || (perms?.user_email || '').split('@')[0] || '').toUpperCase()
+  const myEmail = (perms?.user_email || '').toLowerCase()
   const [loading, setLoading] = useState(true)
   const [taches, setTaches] = useState([])
+  const [rdvs, setRdvs] = useState([])
   const [collabs, setCollabs] = useState([])
   const [users, setUsers] = useState([])
   const [scope, setScope] = useState('mine')
   const [anchor, setAnchor] = useState(() => new Date())
-  const [viewMode, setViewMode] = useState('mois')
+  const [viewMode, setViewMode] = useState('sem7')
   const [selDay, setSelDay] = useState(null)
   const [filtre, setFiltre] = useState('ouvertes')
   const [sel, setSel] = useState(null)
@@ -140,31 +154,40 @@ export default function DynassurTaches() {
   const blankForm = { titre: '', description: '', echeance: '', priorite: 'moyenne', categorie: '', gestionnaire: myCode, entite: 'dynassur' }
   const [form, setForm] = useState(blankForm)
   const [busy, setBusy] = useState(false)
+  const [paramDone, setParamDone] = useState(false)
 
-  const reload = useCallback(async () => {
-    const t = await loadAll('taches', 'id,titre,description,categorie,statut,priorite,echeance,date_cloture,user_email,source,gestionnaire,cree_par,entite,updated_at,dossier_client,lien_url', q => q.order('echeance', { ascending: true, nullsFirst: false }))
-    setTaches(t)
-  }, [])
+  const TSEL = 'id,titre,description,categorie,statut,priorite,echeance,date_cloture,user_email,source,gestionnaire,cree_par,entite,updated_at,dossier_client,lien_url'
+  const reload = useCallback(async () => { setTaches(await loadAll('taches', TSEL, q => q.order('echeance', { ascending: true, nullsFirst: false }))) }, [])
 
   useEffect(() => {
     let alive = true
     ;(async () => {
       setLoading(true)
-      const t = await loadAll('taches', 'id,titre,description,categorie,statut,priorite,echeance,date_cloture,user_email,source,gestionnaire,cree_par,entite,updated_at,dossier_client,lien_url', q => q.order('echeance', { ascending: true, nullsFirst: false }))
+      const t = await loadAll('taches', TSEL, q => q.order('echeance', { ascending: true, nullsFirst: false }))
+      const since = new Date(Date.now() - 31 * 864e5).toISOString()
+      let r = []
+      try {
+        let rq = supabase.from('rdv').select('id,objet,debut,categorie,user_email,client_id,web_link,lieu,dossier_client').gte('debut', since).order('debut', { ascending: true }).limit(800)
+        if (!isAdmin && myEmail) rq = rq.eq('user_email', myEmail)
+        const { data } = await rq; r = data || []
+      } catch (e) { r = [] }
       let c = []; try { c = await loadAll('collaborateurs', 'code,nom_sa_data') } catch (e) { c = [] }
       let u = []
       if (isAdmin) u = await loadAll('user_permissions', 'nom,user_email,actif,date_envoi_acces,premiere_connexion,derniere_connexion', q => q.order('nom', { nullsFirst: false }))
-      if (alive) { setTaches(t); setCollabs(c); setUsers(u); setLoading(false) }
+      if (alive) { setTaches(t); setRdvs(r); setCollabs(c); setUsers(u); setLoading(false) }
     })()
     return () => { alive = false }
-  }, [isAdmin])
+  }, [isAdmin, myEmail])
 
   const mine = (isAdmin && scope === 'all') ? taches : taches.filter(t => (t.gestionnaire || '').toUpperCase() === myCode || (t.cree_par || '').toUpperCase() === myCode)
+  const rdvItems = rdvs.map(r => ({ _rdv: true, id: 'rdv_' + r.id, titre: r.objet || 'RDV', echeance: (r.debut || '').slice(0, 10), debut: r.debut, statut: 'rdv', categorie: r.categorie || 'RDV', entite: 'dynassur', web_link: r.web_link, lieu: r.lieu, user_email: r.user_email, dossier_client: r.dossier_client }))
   const todayKey = key(new Date())
   const open = mine.filter(isOpen)
   const retard = open.filter(t => ekey(t) && ekey(t) < todayKey)
   const cloturees = mine.filter(t => t.statut === 'terminee')
-  const parJour = {}; mine.forEach(t => { const k = ekey(t); if (k) (parJour[k] = parJour[k] || []).push(t) })
+  const rdvFuturs = rdvItems.filter(r => ekey(r) >= todayKey).sort((a, b) => (a.debut || '').localeCompare(b.debut || ''))
+  const calItems = [...mine, ...rdvItems]
+  const parJour = {}; calItems.forEach(t => { const k = ekey(t); if (k) (parJour[k] = parJour[k] || []).push(t) })
 
   let liste = filtre === 'ouvertes' ? open : filtre === 'retard' ? retard : filtre === 'cloturees' ? cloturees : mine
   const grp = { 'En retard': [], 'Aujourd’hui': [], 'À venir': [], 'Sans échéance': [], 'Clôturées': [] }
@@ -182,12 +205,22 @@ export default function DynassurTaches() {
   const periodLabel = viewMode === 'mois' ? `${MOIS[anchor.getMonth()]} ${anchor.getFullYear()}`
     : days && days.length ? `${pad(days[0].getDate())}/${pad(days[0].getMonth() + 1)} – ${pad(days[days.length - 1].getDate())}/${pad(days[days.length - 1].getMonth() + 1)}/${days[days.length - 1].getFullYear()}` : ''
 
-  async function openTask(t) {
+  const openTask = useCallback(async t => {
     setSel(t); setSuivi([]); setHist([]); setNote('')
-    try { const { data } = await supabase.from('taches_suivi').select('*').eq('tache_id', t.id).order('cree_a', { ascending: false }); setSuivi(data || []) } catch (e) {}
-    try { const { data } = await supabase.from('taches_historique').select('*').eq('tache_id', t.id).order('a', { ascending: false }); setHist(data || []) } catch (e) {}
+    if (!t._rdv) {
+      try { const { data } = await supabase.from('taches_suivi').select('*').eq('tache_id', t.id).order('cree_a', { ascending: false }); setSuivi(data || []) } catch (e) {}
+      try { const { data } = await supabase.from('taches_historique').select('*').eq('tache_id', t.id).order('a', { ascending: false }); setHist(data || []) } catch (e) {}
+    }
     setTimeout(() => document.getElementById('tache-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60)
-  }
+  }, [])
+
+  // ouverture via ?tache=ID (clic depuis un dashboard)
+  useEffect(() => {
+    if (paramDone || loading || !taches.length) return
+    const id = new URLSearchParams(window.location.search).get('tache')
+    if (id) { const t = taches.find(x => String(x.id) === String(id)); if (t) { openTask(t); setParamDone(true) } }
+  }, [loading, taches, paramDone, openTask])
+
   async function logHist(tache_id, action) { try { await supabase.from('taches_historique').insert({ tache_id, action, par: myCode }) } catch (e) {} }
   async function createTask() {
     if (!form.titre.trim()) return
@@ -203,12 +236,12 @@ export default function DynassurTaches() {
     setBusy(true); const now = new Date().toISOString()
     const { error } = await supabase.from('taches').update({ statut: 'terminee', date_cloture: now, updated_at: now }).eq('id', t.id)
     setBusy(false); if (error) { alert('Erreur clôture : ' + error.message); return }
-    await logHist(t.id, 'Clôture'); setSel(s => s && s.id === t.id ? { ...s, statut: 'terminee', date_cloture: now } : s); reload()
+    await logHist(t.id, 'Clôture'); setSel(null); reload()   // ferme la fenêtre
   }
   async function reopenTask(t) {
     setBusy(true); const now = new Date().toISOString()
     await supabase.from('taches').update({ statut: 'todo', date_cloture: null, updated_at: now }).eq('id', t.id)
-    setBusy(false); await logHist(t.id, 'Réouverture'); setSel(s => s && s.id === t.id ? { ...s, statut: 'todo', date_cloture: null } : s); reload()
+    setBusy(false); await logHist(t.id, 'Réouverture'); setSel(null); reload()
   }
   async function addSuivi() {
     if (!note.trim() || !sel) return
@@ -227,10 +260,9 @@ export default function DynassurTaches() {
     <Layout currentPage="Tâches">
       <div style={{ fontFamily: "'Source Sans Pro', sans-serif", width: '100%' }}>
         <StatBanner color={ENTITES.dynassur.color} colorDark={ENTITES.dynassur.colorDark} logoUrl={ENTITES.dynassur.logo}
-          title="Tâches" subtitle={isAdmin ? 'Calendrier & suivi' : `Tes tâches${myCode ? ` — ${myCode}` : ''}`}
+          title="Tâches" subtitle={isAdmin ? 'Calendrier, RDV & suivi' : `Tes tâches${myCode ? ` — ${myCode}` : ''}`}
           action={<button onClick={() => { setForm({ ...blankForm, gestionnaire: myCode }); setShowCreate(true) }} style={{ padding: '9px 16px', borderRadius: 10, border: 'none', background: '#fff', color: NAVY, fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>+ Nouvelle tâche</button>} />
 
-        {/* Date du jour en grand */}
         <div style={{ fontSize: 26, fontWeight: 800, color: NAVY, textTransform: 'capitalize', margin: '4px 0 16px' }}>
           {auj.toLocaleDateString('fr-BE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
         </div>
@@ -240,7 +272,7 @@ export default function DynassurTaches() {
             <Kpi label="Ouvertes" value={open.length} col="#f59e0b" />
             <Kpi label="En retard" value={retard.length} col="#dc2626" />
             <Kpi label="Clôturées" value={cloturees.length} col="#16a34a" />
-            {isAdmin && <Kpi label="Accès en attente" value={usersAcces.filter(u => !u.premiere_connexion).length} col={BLUE} />}
+            <Kpi label="RDV à venir" value={rdvFuturs.length} col="#7c3aed" />
           </div>
 
           {isAdmin && (
@@ -279,9 +311,9 @@ export default function DynassurTaches() {
               </Card>
 
               {selDay && (
-                <Card titre={`Tâches du ${selDay.toLocaleDateString('fr-BE', { weekday: 'long', day: 'numeric', month: 'long' })}`} sous={`${(parJour[key(selDay)] || []).length} tâche(s)`}>
+                <Card titre={`${selDay.toLocaleDateString('fr-BE', { weekday: 'long', day: 'numeric', month: 'long' })}`} sous={`${(parJour[key(selDay)] || []).length} élément(s)`}>
                   <div style={{ padding: 8 }}>
-                    {(parJour[key(selDay)] || []).length === 0 && <div style={{ color: '#94a3b8', padding: 12, fontSize: 13 }}>Aucune tâche ce jour.</div>}
+                    {(parJour[key(selDay)] || []).length === 0 && <div style={{ color: '#94a3b8', padding: 12, fontSize: 13 }}>Rien ce jour.</div>}
                     {(parJour[key(selDay)] || []).map(t => <TaskRow key={t.id} t={t} onClick={() => openTask(t)} />)}
                   </div>
                 </Card>
@@ -300,10 +332,16 @@ export default function DynassurTaches() {
                   {Object.entries(grp).map(([sec, arr]) => arr.length === 0 ? null : (
                     <div key={sec} style={{ marginBottom: 10 }}>
                       <div style={{ fontSize: 10, fontWeight: 800, color: sec === 'En retard' ? '#dc2626' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '.05em', padding: '4px 8px' }}>{sec} · {arr.length}</div>
-                      {arr.map(t => <TaskRow key={t.id} t={t} onClick={() => openTask(t)} showDate />)}
+                      {arr.map(t => <TaskRow key={t.id} t={t} onClick={() => openTask(t)} />)}
                     </div>
                   ))}
-                  {liste.length === 0 && <div style={{ color: '#94a3b8', padding: 16, fontSize: 13 }}>Aucune tâche.</div>}
+                  {(filtre === 'ouvertes' || filtre === 'toutes') && rdvFuturs.length > 0 && (
+                    <div style={{ marginBottom: 10 }}>
+                      <div style={{ fontSize: 10, fontWeight: 800, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '.05em', padding: '4px 8px' }}>Rendez-vous · {rdvFuturs.length}</div>
+                      {rdvFuturs.slice(0, 30).map(t => <TaskRow key={t.id} t={t} onClick={() => openTask(t)} />)}
+                    </div>
+                  )}
+                  {liste.length === 0 && rdvFuturs.length === 0 && <div style={{ color: '#94a3b8', padding: 16, fontSize: 13 }}>Aucune tâche.</div>}
                 </div>
               </Card>
             </div>
@@ -321,47 +359,60 @@ export default function DynassurTaches() {
             </Card>
           )}
 
-          {/* ── Détail de la tâche (en dessous de toutes les tâches) ── */}
           {sel && (
-            <Card id="tache-detail" titre="Détail de la tâche"
+            <Card id="tache-detail" titre={sel._rdv ? 'Détail du rendez-vous' : 'Détail de la tâche'}
               right={<button onClick={() => setSel(null)} style={navBtn}>✕</button>}>
               <div style={{ padding: 18 }}>
-                <Badge statut={sel.statut} />
+                <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: styleOf(sel).bg, color: styleOf(sel).color }}>{styleOf(sel).label}</span>
                 <div style={{ fontSize: 19, fontWeight: 800, color: NAVY, marginTop: 8 }}>{sel.titre}</div>
-                {sel.description && <div style={{ fontSize: 14, color: '#475569', marginTop: 10, whiteSpace: 'pre-wrap' }}>{sel.description}</div>}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 12, marginTop: 16, fontSize: 13 }}>
-                  <Info l="Assigné à" v={codeLabel(sel.gestionnaire)} />
-                  <Info l="Attribué par" v={codeLabel(sel.cree_par)} />
-                  <Info l="Échéance" v={fmtD(sel.echeance)} />
-                  <Info l="Société" v={(ENTS.find(e => e[0] === sel.entite) || [])[1] || sel.entite || '—'} />
-                  <Info l="Catégorie" v={sel.categorie || '—'} />
-                  <Info l="Clôturée le" v={fmtD(sel.date_cloture)} />
-                  <Info l="Dernière modif." v={fmtDT(sel.updated_at)} />
-                  <Info l="Priorité" v={(PRIOS.find(p => p[0] === sel.priorite) || [])[1] || sel.priorite || '—'} />
-                </div>
-                <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
-                  {sel.statut === 'terminee'
-                    ? <button onClick={() => reopenTask(sel)} disabled={busy} style={btn('#64748b')}>Rouvrir</button>
-                    : <button onClick={() => closeTask(sel)} disabled={busy} style={btn('#16a34a')}>✓ Clôturer</button>}
-                </div>
-                <div style={{ marginTop: 20 }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: NAVY, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 8 }}>Suivi</div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <input value={note} onChange={e => setNote(e.target.value)} placeholder="Ajouter une note de suivi…" style={inp} onKeyDown={e => { if (e.key === 'Enter') addSuivi() }} />
-                    <button onClick={addSuivi} disabled={busy || !note.trim()} style={{ ...btn(BLUE), opacity: busy || !note.trim() ? .5 : 1 }}>Ajouter</button>
-                  </div>
-                  <div style={{ marginTop: 10 }}>
-                    {suivi.map(s => <div key={s.id} style={{ borderLeft: `3px solid ${BLUE}`, padding: '4px 10px', marginBottom: 6, background: '#f8fafc', borderRadius: 6 }}>
-                      <div style={{ fontSize: 13, color: '#334155' }}>{s.note}</div>
-                      <div style={{ fontSize: 10, color: '#94a3b8' }}>{s.auteur || '—'} · {fmtDT(s.cree_a)}</div>
-                    </div>)}
-                    {!suivi.length && <div style={{ fontSize: 12, color: '#94a3b8' }}>Aucun suivi pour l'instant.</div>}
-                  </div>
-                </div>
-                {hist.length > 0 && <div style={{ marginTop: 18 }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: NAVY, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 6 }}>Historique</div>
-                  {hist.map(h => <div key={h.id} style={{ fontSize: 12, color: '#64748b' }}>• {h.action} — {h.par || '—'} · {fmtDT(h.a)}</div>)}
-                </div>}
+                {sel._rdv ? (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 12, marginTop: 16, fontSize: 13 }}>
+                      <Info l="Date" v={fmtDT(sel.debut)} />
+                      <Info l="Catégorie" v={sel.categorie || '—'} />
+                      <Info l="Lieu" v={sel.lieu || '—'} />
+                      <Info l="Agenda" v={sel.user_email || '—'} />
+                    </div>
+                    {sel.web_link && <div style={{ marginTop: 16 }}><a href={sel.web_link} target="_blank" rel="noreferrer" style={{ ...btn(BLUE), textDecoration: 'none', display: 'inline-block' }}>Ouvrir dans Outlook</a></div>}
+                  </>
+                ) : (
+                  <>
+                    {sel.description && <div style={{ fontSize: 14, color: '#475569', marginTop: 10, whiteSpace: 'pre-wrap' }}>{sel.description}</div>}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 12, marginTop: 16, fontSize: 13 }}>
+                      <Info l="Assigné à" v={codeLabel(sel.gestionnaire)} />
+                      <Info l="Attribué par" v={codeLabel(sel.cree_par)} />
+                      <Info l="Échéance" v={fmtD(sel.echeance)} />
+                      <Info l="Société" v={(ENTS.find(e => e[0] === sel.entite) || [])[1] || sel.entite || '—'} />
+                      <Info l="Catégorie" v={sel.categorie || '—'} />
+                      <Info l="Clôturée le" v={fmtD(sel.date_cloture)} />
+                      <Info l="Dernière modif." v={fmtDT(sel.updated_at)} />
+                      <Info l="Priorité" v={(PRIOS.find(p => p[0] === sel.priorite) || [])[1] || sel.priorite || '—'} />
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
+                      {sel.statut === 'terminee'
+                        ? <button onClick={() => reopenTask(sel)} disabled={busy} style={btn('#64748b')}>Rouvrir</button>
+                        : <button onClick={() => closeTask(sel)} disabled={busy} style={btn('#16a34a')}>✓ Clôturer</button>}
+                    </div>
+                    <div style={{ marginTop: 20 }}>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: NAVY, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 8 }}>Suivi</div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <input value={note} onChange={e => setNote(e.target.value)} placeholder="Ajouter une note de suivi…" style={inp} onKeyDown={e => { if (e.key === 'Enter') addSuivi() }} />
+                        <button onClick={addSuivi} disabled={busy || !note.trim()} style={{ ...btn(BLUE), opacity: busy || !note.trim() ? .5 : 1 }}>Ajouter</button>
+                      </div>
+                      <div style={{ marginTop: 10 }}>
+                        {suivi.map(s => <div key={s.id} style={{ borderLeft: `3px solid ${BLUE}`, padding: '4px 10px', marginBottom: 6, background: '#f8fafc', borderRadius: 6 }}>
+                          <div style={{ fontSize: 13, color: '#334155' }}>{s.note}</div>
+                          <div style={{ fontSize: 10, color: '#94a3b8' }}>{s.auteur || '—'} · {fmtDT(s.cree_a)}</div>
+                        </div>)}
+                        {!suivi.length && <div style={{ fontSize: 12, color: '#94a3b8' }}>Aucun suivi pour l'instant.</div>}
+                      </div>
+                    </div>
+                    {hist.length > 0 && <div style={{ marginTop: 18 }}>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: NAVY, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 6 }}>Historique</div>
+                      {hist.map(h => <div key={h.id} style={{ fontSize: 12, color: '#64748b' }}>• {h.action} — {h.par || '—'} · {fmtDT(h.a)}</div>)}
+                    </div>}
+                  </>
+                )}
               </div>
             </Card>
           )}
