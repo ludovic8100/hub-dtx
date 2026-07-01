@@ -29,7 +29,9 @@ export default async function handler(req, res) {
   const name = pick('name', 'Name')
   const agent = pick('agent', 'Agent')
   const duration = pick('duration', 'Duration')
-  const start = pick('start', 'CallStartTimeUTC', 'datetime', 'DateTime') || null
+  const startRaw = pick('start', 'CallStartTimeUTC', 'datetime', 'DateTime')
+  let start = null
+  if (startRaw) { const d = new Date(startRaw); if (!isNaN(d.getTime())) start = d.toISOString() }
 
   try {
     const r = await fetch(`${process.env.SUPABASE_URL}/rest/v1/rpc/crm_log_appel`, {

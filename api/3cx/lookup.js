@@ -52,6 +52,9 @@ export default async function handler(req, res) {
       gestionnaire: c.gestionnaire || '',
       url: `${base}/dynassur/clients?dossier=${encodeURIComponent(c.dossier || '')}`,
     }))
+    // Quand un même numéro matche plusieurs fiches (gérant + ses sociétés),
+    // on présente d'abord la personne physique (prénom rempli).
+    contacts.sort((a, b) => (a.firstName ? 0 : 1) - (b.firstName ? 0 : 1))
     return res.status(200).json({ contacts })
   } catch (e) {
     return res.status(200).json({ contacts: [], error: String(e) })
