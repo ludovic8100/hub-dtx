@@ -27,6 +27,7 @@ const fmtMois = v => { const d=parseDate(v); return d?d.toLocaleDateString('fr-B
 // RDV : le debut Graph peut être sans offset → on force UTC
 const tsRdv = iso => { if(!iso) return 0; const d=new Date(String(iso).length<=19?iso+'Z':iso); return isNaN(d)?0:d.getTime() }
 const fmtRdv = iso => { const t=tsRdv(iso); return t?new Date(t).toLocaleDateString('fr-BE',{day:'2-digit',month:'2-digit',year:'numeric'}):'—' }
+const fmtAppel = iso => { if(!iso) return '—'; const d=new Date(String(iso).replace(' ','T')); return isNaN(d)?'—':d.toLocaleString('fr-BE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) }
 const ilYa = jours => {
   if(jours==null) return ''
   if(jours<31) return `il y a ${jours} j`
@@ -566,7 +567,7 @@ function ObjetsDetail({ objets, loading }) {
 }
 
 function Fiche({ client, onClose, onOpenDossier }) {
-  const [contrats,setContrats]=useState([]); const [taches,setTaches]=useState([]); const [rdvs,setRdvs]=useState([]); const [groupe,setGroupe]=useState([]); const [objets,setObjets]=useState([]); const [loadF,setLoadF]=useState(true)
+  const [contrats,setContrats]=useState([]); const [taches,setTaches]=useState([]); const [rdvs,setRdvs]=useState([]); const [groupe,setGroupe]=useState([]); const [objets,setObjets]=useState([]); const [appels,setAppels]=useState([]); const [loadF,setLoadF]=useState(true)
   const ref=useRef(null)
 
   useEffect(()=>{
@@ -580,11 +581,12 @@ function Fiche({ client, onClose, onOpenDossier }) {
         : Promise.resolve({data:[]}),
       supabase.from('parentes').select('groupe_nom,groupe_type,membre_nom,nb_polices,prime_totale').eq('dossier_principal',client.dossier),
       supabase.from('objets_risque').select('police,type_risque,garantie,situation,compagnie,domaine').eq('dossier',client.dossier),
-    ]).then(([{data:c},{data:t},{data:rv},{data:gr},{data:ob}])=>{
+      (()=>{ const nums=[client.gsm_e164,client.telfixe_e164].filter(Boolean); return nums.length ? supabase.from('appels').select('id,direction,numero_externe,numero_e164,agent,duree,debut,nom_3cx').in('numero_e164',nums).order('debut',{ascending:false}).limit(50) : Promise.resolve({data:[]}) })(),
+    ]).then(([{data:c},{data:t},{data:rv},{data:gr},{data:ob},{data:ap}])=>{
       // Dédoublonnage par police (les imports créent des lignes identiques) — on garde la plus récente
       const seen=new Set(); const uniq=[]
       ;(c||[]).forEach(r=>{ const k=r.police||JSON.stringify(r); if(!seen.has(k)){ seen.add(k); uniq.push(r) } })
-      setContrats(uniq); setTaches(t||[]); setRdvs(rv||[]); setGroupe(gr||[]); setObjets(ob||[]); setLoadF(false)
+      setContrats(uniq); setTaches(t||[]); setRdvs(rv||[]); setGroupe(gr||[]); setObjets(ob||[]); setAppels(ap||[]); setLoadF(false)
     })
   },[client.dossier,client.id])
 
@@ -751,6 +753,29 @@ function Fiche({ client, onClose, onOpenDossier }) {
           </Sec>
         )}
 
+        {/* Appels (téléphonie 3CX, liés par numéro) */}
+        <Sec icon="ti-phone" title="Appels" count={appels.length} col="#0ea5e9" open={true}>
+          {loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:!appels.length?
+            <p style={{color:'#94a3b8',fontSize:12}}>Aucun appel enregistré pour ce numéro.</p>:
+            appels.map((a,i)=>{
+              const entrant=String(a.direction||'').toLowerCase().startsWith('in')
+              return(
+                <div key={a.id} style={{display:'flex',alignItems:'center',gap:10,padding:'7px 0',borderBottom:i<appels.length-1?'1px solid #f8fafc':'none'}}>
+                  <span style={{fontSize:11,fontWeight:700,padding:'2px 7px',borderRadius:5,background:entrant?'#dcfce7':'#dbeafe',color:entrant?'#16a34a':'#1d4ed8',whiteSpace:'nowrap'}}>
+                    <i className={`ti ${entrant?'ti-phone-incoming':'ti-phone-outgoing'}`} style={{marginRight:4}}/>{entrant?'Entrant':'Sortant'}
+                  </span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,color:'#1e293b'}}>{a.numero_e164||a.numero_externe||'—'}</div>
+                    <div style={{fontSize:11,color:'#94a3b8'}}>{a.nom_3cx||'—'}{a.agent?` · poste ${a.agent}`:''}</div>
+                  </div>
+                  <span style={{fontSize:11,color:'#64748b',whiteSpace:'nowrap'}}>{a.duree||'—'}</span>
+                  <span style={{fontSize:11,color:'#64748b',whiteSpace:'nowrap'}}>{fmtAppel(a.debut)}</span>
+                </div>
+              )
+            })
+          }
+        </Sec>
+
         {/* Objets de risque (détail Qlik par garantie, lié par police) */}
         <Sec icon="ti-shield" title="Objets de risque" count={objets.length} col="#7c3aed" open={true}>
           <Analyse360 client={client} contrats={contrats}/>
@@ -892,7 +917,7 @@ export default function DynassurClients() {
 
   const load = useCallback(async(search,sc,p)=>{
     setLoading(true)
-    let qb=supabase.from('clients').select('id,dossier,nom,prenom,cp,localite,gsm,tel_fixe,email,rue,num_maison,boite,date_naissance,etat_civil,sexe,sa_code,sa_nom,gestionnaire_code,gestionnaire_nom,bureau,classe,alerte',{count:'exact'})
+    let qb=supabase.from('clients').select('id,dossier,nom,prenom,cp,localite,gsm,tel_fixe,gsm_e164,telfixe_e164,email,rue,num_maison,boite,date_naissance,etat_civil,sexe,sa_code,sa_nom,gestionnaire_code,gestionnaire_nom,bureau,classe,alerte',{count:'exact'})
     if(search.length>=2) qb=qb.or(`nom.ilike.%${search}%,prenom.ilike.%${search}%,dossier.ilike.%${search}%,email.ilike.%${search}%,gsm.ilike.%${search}%`)
     if(sc==='mine'&&myCode) qb=qb.eq('gestionnaire_code',myCode)
     else if(sc==='bureau'&&myBureau) qb=qb.eq('bureau',myBureau)
@@ -940,7 +965,7 @@ export default function DynassurClients() {
   // Ouvrir une fiche à partir d'un n° de dossier (clic sur une relation)
   const openDossier = useCallback(async(dossier)=>{
     if(!dossier) return
-    const{data}=await supabase.from('clients').select('id,dossier,nom,prenom,cp,localite,gsm,tel_fixe,email,rue,num_maison,boite,date_naissance,etat_civil,sexe,sa_code,sa_nom,gestionnaire_code,gestionnaire_nom,bureau,classe,alerte').eq('dossier',dossier).limit(1)
+    const{data}=await supabase.from('clients').select('id,dossier,nom,prenom,cp,localite,gsm,tel_fixe,gsm_e164,telfixe_e164,email,rue,num_maison,boite,date_naissance,etat_civil,sexe,sa_code,sa_nom,gestionnaire_code,gestionnaire_nom,bureau,classe,alerte').eq('dossier',dossier).limit(1)
     if(data&&data[0]){ setSelected(data[0]); pushRecentClient(data[0]); window.scrollTo({top:0,behavior:'smooth'}) }
   },[])
 
