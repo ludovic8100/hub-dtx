@@ -1,0 +1,25 @@
+name: Qlik Sample (dictionnaire de données)
+
+on:
+  workflow_dispatch:
+    inputs:
+      match_terms:
+        description: "Termes de recherche du client (dans « Nom Prénom »)"
+        required: false
+        default: "detilloux ludovic"
+
+jobs:
+  sample:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deps
+        run: pip install -r scripts/requirements.txt
+      - name: Run Qlik sample
+        env:
+          QLIK_API_KEY: ${{ secrets.QLIK_API_KEY }}
+          MATCH_TERMS: ${{ github.event.inputs.match_terms }}
+        run: python scripts/qlik_sample.py
