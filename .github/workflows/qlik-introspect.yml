@@ -1,0 +1,30 @@
+name: Qlik — Introspection modèle
+
+# Liste toutes les tables + champs de l'app Qlik BRIO (lecture seule) pour
+# vérifier s'il existe une source de tâches/agenda. N'écrit rien.
+# Lancement manuel uniquement.
+
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: qlik-introspect
+  cancel-in-progress: false
+
+jobs:
+  introspect:
+    runs-on: ubuntu-latest
+    env:
+      QLIK_API_KEY: ${{ secrets.QLIK_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install deps
+        run: pip install -r scripts/requirements.txt
+      - name: Verifier le secret
+        run: |
+          if [ -z "$QLIK_API_KEY" ]; then echo "::error::Secret QLIK_API_KEY manquant"; exit 1; fi
+      - name: Introspection Qlik
+        run: python scripts/qlik_introspect.py
