@@ -864,6 +864,8 @@ export default function DynassurClients() {
     }
   },[relance])
   const searchRef = useRef(null)
+  const deepLink = useRef(new URLSearchParams(window.location.search).get('dossier'))  // fiche à ouvrir via ?dossier= (lien 3CX / dashboard)
+  const prevQS = useRef({q:'',scope:'all'})
 
   // Init user + counts
   useEffect(()=>{
@@ -926,7 +928,10 @@ export default function DynassurClients() {
   useEffect(()=>{ loadRelance() },[loadRelance])
 
   useEffect(()=>{
-    const t=setTimeout(()=>{ setPage(0); setSelected(null); load(q,scope,0) },300)
+    const userChanged = (q!==prevQS.current.q || scope!==prevQS.current.scope)
+    prevQS.current = {q,scope}
+    if(userChanged) deepLink.current = null   // l'utilisateur cherche/filtre → on lâche le deep-link
+    const t=setTimeout(()=>{ setPage(0); if(!deepLink.current) setSelected(null); load(q,scope,0) },300)
     return ()=>clearTimeout(t)
   },[q,scope,myCode,myBureau])
 
