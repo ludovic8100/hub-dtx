@@ -83,8 +83,8 @@ def main():
     if keys:
         print("========== CLÉS D'ASSOCIATION ==========")
         for k in keys:
-            kf = k.get("qKeyFields", [])
-            tbls = [x.get("qName") for x in k.get("qTables", [])]
+            kf = k.get("qKeyFields", []) if isinstance(k, dict) else k
+            tbls = [(x.get("qName") if isinstance(x, dict) else x) for x in k.get("qTables", [])]
             print(f"      clé {kf}  relie  {tbls}")
         print()
 
