@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Crm Name="Hub DTX" Version="1" Country="BE" SupportsEmojis="false">
+  <!-- Le numero recu de 3CX est transmis tel quel : la normalisation des formats
+       belges (0479..., +32..., 0032...) vers E.164 est faite cote Hub. -->
+  <Number Prefix="AsIs" MaxLength="" />
+
+  <Connection MaxConcurrentRequests="8" />
+
+  <Parameters>
+    <Parameter Name="ApiKey" Type="Password" Title="Cle API Hub (secret partage)" Default="" />
+    <Parameter Name="BaseUrl" Type="String" Title="URL du Hub" Default="https://hub-dtx.vercel.app" />
+    <Parameter Name="ReportCallEnabled" Type="Boolean" Title="Journaliser les appels dans le Hub" Default="True" />
+  </Parameters>
+
+  <!-- Secret envoye en Basic Auth sur chaque requete : Authorization: Basic base64("hub:<ApiKey>") -->
+  <Authentication Type="Basic">
+    <Value>hub:[ApiKey]</Value>
+  </Authentication>
+
+  <Scenarios>
+    <!-- 1) Recherche de contact (appel entrant / sortant) -->
+    <Scenario Id="">
+      <Request Url="[BaseUrl]/api/3cx/lookup?number=[Number.Replace(&quot;+&quot;,&quot;%2B&quot;)]" RequestType="Get" ResponseType="Json" />
+      <Rules>
+        <Rule Type="Any">contacts</Rule>
+      </Rules>
+      <Variables>
+        <Variable Name="fn"  Path="contacts.firstName" />
+        <Variable Name="ln"  Path="contacts.lastName" />
+        <Variable Name="mob" Path="contacts.phoneMobile" />
+        <Variable Name="hom" Path="contacts.phoneHome" />
+        <Variable Name="ml"  Path="contacts.email" />
+        <Variable Name="url" Path="contacts.url" />
+      </Variables>
+      <Outputs>
+        <Output Type="FirstName"   Value="[fn]" />
+        <Output Type="LastName"    Value="[ln]" />
+        <Output Type="Email"       Value="[ml]" />
+        <Output Type="PhoneMobile" Value="[mob]" />
+        <Output Type="PhoneHome"   Value="[hom]" />
+        <Output Type="ContactUrl"  Value="[url]" />
+      </Outputs>
+    </Scenario>
+
+    <!-- 2) Journalisation d'appel (nom reserve "ReportCall") -->
+    <Scenario Id="ReportCall">
+      <Request Url="[BaseUrl]/api/3cx/call" RequestType="Post" RequestEncoding="Json" ResponseType="Json" SkipIf="[ReportCallEnabled]==false">
+        <PostValues>
+          <Value Key="callType">[CallType]</Value>
+          <Value Key="number">[Number]</Value>
+          <Value Key="name">[Name]</Value>
+          <Value Key="agent">[Agent]</Value>
+          <Value Key="duration">[Duration]</Value>
+          <Value Key="start">[CallStartTimeUTC]</Value>
+        </PostValues>
+      </Request>
+    </Scenario>
+  </Scenarios>
+</Crm>
