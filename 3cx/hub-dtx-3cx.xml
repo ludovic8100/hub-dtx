@@ -1,21 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Crm xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" Country="BE" Name="Hub DTX" Version="5">
+<Crm xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" Country="BE" Name="Hub DTX" Version="6">
   <Number Prefix="AsIs" MaxLength="" />
   <Connection MaxConcurrentRequests="8" />
   <Scenarios>
     <Scenario Id="" Type="REST">
       <Request Url="https://hub-dtx.vercel.app/api/3cx/lookup?number=[Number]&amp;key=__CLE_API_HUB__" MessagePasses="0" RequestEncoding="UrlEncoded" RequestType="Get" ResponseType="Json" />
       <Rules>
-        <Rule Type="Any">contacts</Rule>
+        <Rule Type="Any">contacts.id</Rule>
       </Rules>
       <Variables>
-        <Variable Name="fn"  Path="contacts.firstName" />
-        <Variable Name="ln"  Path="contacts.lastName" />
-        <Variable Name="mob" Path="contacts.phoneMobile" />
-        <Variable Name="ml"  Path="contacts.email" />
-        <Variable Name="url" Path="contacts.url" />
+        <Variable Name="id"  Path="contacts.id"><Filter /></Variable>
+        <Variable Name="fn"  Path="contacts.firstName"><Filter /></Variable>
+        <Variable Name="ln"  Path="contacts.lastName"><Filter /></Variable>
+        <Variable Name="mob" Path="contacts.phoneMobile"><Filter /></Variable>
+        <Variable Name="ml"  Path="contacts.email"><Filter /></Variable>
+        <Variable Name="url" Path="contacts.url"><Filter /></Variable>
       </Variables>
       <Outputs AllowEmpty="false">
+        <Output Type="ContactID"   Passes="0" Value="[id]" />
         <Output Type="FirstName"   Passes="0" Value="[fn]" />
         <Output Type="LastName"    Passes="0" Value="[ln]" />
         <Output Type="Email"       Passes="0" Value="[ml]" />
