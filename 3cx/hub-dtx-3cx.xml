@@ -1,15 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Crm xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" Country="BE" Name="Hub DTX" Version="4">
+<Crm xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" Country="BE" Name="Hub DTX" Version="5">
   <Number Prefix="AsIs" MaxLength="" />
   <Connection MaxConcurrentRequests="8" />
-  <Parameters>
-    <Parameter Name="ApiKey"  Type="String" Editor="String" Title="Cle API Hub" />
-    <Parameter Name="BaseUrl" Type="String" Editor="String" Title="URL du Hub" />
-  </Parameters>
   <Scenarios>
-    <!-- 1) Lookup. [Number] transmis brut : la normalisation E.164 est faite cote Hub. -->
     <Scenario Id="" Type="REST">
-      <Request Url="[BaseUrl]/api/3cx/lookup?number=[Number]&amp;key=[ApiKey]" MessagePasses="0" RequestEncoding="UrlEncoded" RequestType="Get" ResponseType="Json" />
+      <Request Url="https://hub-dtx.vercel.app/api/3cx/lookup?number=[Number]&amp;key=__CLE_API_HUB__" MessagePasses="0" RequestEncoding="UrlEncoded" RequestType="Get" ResponseType="Json" />
       <Rules>
         <Rule Type="Any">contacts</Rule>
       </Rules>
@@ -28,9 +23,8 @@
         <Output Type="ContactUrl"  Passes="0" Value="[url]" />
       </Outputs>
     </Scenario>
-    <!-- 2) Journalisation d'appel (ReportCall). Pas de Number.Replace. -->
     <Scenario Id="ReportCall" Type="REST">
-      <Request Url="[BaseUrl]/api/3cx/call?key=[ApiKey]" MessagePasses="0" RequestContentType="application/json" RequestEncoding="UrlEncoded" RequestType="Post" ResponseType="Json" Message="{ &quot;callType&quot;: ^^[CallType]^^, &quot;number&quot;: ^^[Number]^^, &quot;name&quot;: ^^[Name]^^, &quot;agent&quot;: ^^[Agent]^^, &quot;duration&quot;: ^^[Duration]^^, &quot;start&quot;: ^^[CallStartTimeUTC]^^ }" />
+      <Request Url="https://hub-dtx.vercel.app/api/3cx/call?key=__CLE_API_HUB__" MessagePasses="0" RequestContentType="application/json" RequestEncoding="UrlEncoded" RequestType="Post" ResponseType="Json" Message="{ &quot;callType&quot;: ^^[CallType]^^, &quot;number&quot;: ^^[Number]^^, &quot;name&quot;: ^^[Name]^^, &quot;agent&quot;: ^^[Agent]^^, &quot;duration&quot;: ^^[Duration]^^, &quot;start&quot;: ^^[CallStartTimeUTC]^^ }" />
     </Scenario>
   </Scenarios>
 </Crm>
