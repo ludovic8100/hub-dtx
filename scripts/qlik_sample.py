@@ -80,23 +80,30 @@ def main():
             out["tables"].append(entry)
             continue
         try:
+            # hauteur = autant de lignes que possible sous la limite de 10000 cellules
+            h = max(1, min(50, 10000 // max(1, len(fields))))
             obj = c("CreateSessionObject", doc, [{
                 "qInfo": {"qType": "ht"},
                 "qHyperCubeDef": {
                     "qDimensions": [{"qDef": {"qFieldDefs": [fn]}} for fn in fields],
                     "qInitialDataFetch": [{"qTop": 0, "qLeft": 0,
-                                           "qWidth": len(fields), "qHeight": 1}],
+                                           "qWidth": len(fields), "qHeight": h}],
                     "qSuppressZero": False, "qSuppressMissing": False,
                 },
             }])["qReturn"]["qHandle"]
             hl = c("GetLayout", obj, [])["qLayout"]["qHyperCube"]
             entry["n_rows"] = hl["qSize"]["qcy"]
             pages = hl.get("qDataPages", [])
-            row = pages[0]["qMatrix"][0] if pages and pages[0].get("qMatrix") else []
+            matrix = pages[0]["qMatrix"] if pages and pages[0].get("qMatrix") else []
+            # pour chaque champ : 1re valeur non-vide parmi les lignes récupérées
             for i, fn in enumerate(fields):
-                ex = row[i].get("qText") if i < len(row) else None
-                if ex in ("", "-", None):
-                    ex = None
+                ex = None
+                for r in matrix:
+                    if i < len(r):
+                        v = r[i].get("qText")
+                        if v not in ("", "-", None):
+                            ex = v
+                            break
                 entry["champs"].append({"champ": fn, "exemple": ex})
         except Exception as e:
             entry["erreur"] = str(e)
