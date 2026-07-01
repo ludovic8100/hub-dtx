@@ -1,19 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Crm xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" Name="Hub DTX" Version="2" Country="BE" SupportsEmojis="false">
-  <!-- Numero transmis tel quel : la normalisation (0479.../+32.../0032...) vers E.164 est faite cote Hub. -->
+<Crm xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" Country="BE" Name="Hub DTX" Version="3">
   <Number Prefix="AsIs" MaxLength="" />
-
   <Connection MaxConcurrentRequests="8" />
-
   <Parameters>
-    <Parameter Name="ApiKey"  Type="String" Editor="String" Parent="Configuration" Title="Cle API Hub (secret partage)" Default="" />
-    <Parameter Name="BaseUrl" Type="String" Editor="String" Parent="Configuration" Title="URL du Hub" Default="https://hub-dtx.vercel.app" />
+    <Parameter Name="ApiKey"  Type="String" Editor="String" Title="Cle API Hub" />
+    <Parameter Name="BaseUrl" Type="String" Editor="String" Title="URL du Hub" />
   </Parameters>
-
   <Scenarios>
-    <!-- 1) Recherche de contact (appel entrant / sortant). Secret passe en ?key= -->
-    <Scenario Id="">
-      <Request Url="[BaseUrl]/api/3cx/lookup?number=[Number.Replace(&quot;+&quot;,&quot;%2B&quot;)]&amp;key=[ApiKey]" RequestType="Get" ResponseType="Json" />
+    <Scenario Id="" Type="REST">
+      <Request Url="[BaseUrl]/api/3cx/lookup?number=[Number.Replace(&quot;+&quot;,&quot;%2B&quot;)]&amp;key=[ApiKey]" MessagePasses="0" RequestEncoding="UrlEncoded" RequestType="Get" ResponseType="Json" />
       <Rules>
         <Rule Type="Any">contacts</Rule>
       </Rules>
@@ -21,23 +16,16 @@
         <Variable Name="fn"  Path="contacts.firstName" />
         <Variable Name="ln"  Path="contacts.lastName" />
         <Variable Name="mob" Path="contacts.phoneMobile" />
-        <Variable Name="hom" Path="contacts.phoneHome" />
         <Variable Name="ml"  Path="contacts.email" />
         <Variable Name="url" Path="contacts.url" />
       </Variables>
       <Outputs>
-        <Output Type="FirstName"   Value="[fn]" />
-        <Output Type="LastName"    Value="[ln]" />
-        <Output Type="Email"       Value="[ml]" />
-        <Output Type="PhoneMobile" Value="[mob]" />
-        <Output Type="PhoneHome"   Value="[hom]" />
-        <Output Type="ContactUrl"  Value="[url]" />
+        <Output Type="FirstName"   Passes="0" Value="[fn]" />
+        <Output Type="LastName"    Passes="0" Value="[ln]" />
+        <Output Type="Email"       Passes="0" Value="[ml]" />
+        <Output Type="PhoneMobile" Passes="0" Value="[mob]" />
+        <Output Type="ContactUrl"  Passes="0" Value="[url]" />
       </Outputs>
-    </Scenario>
-
-    <!-- 2) Journalisation d'appel (nom reserve "ReportCall"). Corps JSON facon template eWay (^^[Var]^^ = valeur entre guillemets JSON). -->
-    <Scenario Id="ReportCall">
-      <Request Url="[BaseUrl]/api/3cx/call?key=[ApiKey]" RequestType="Post" RequestContentType="application/json" RequestEncoding="UrlEncoded" ResponseType="Json" Message="{ &quot;callType&quot;: ^^[CallType]^^, &quot;number&quot;: ^^[Number]^^, &quot;name&quot;: ^^[Name]^^, &quot;agent&quot;: ^^[Agent]^^, &quot;duration&quot;: ^^[Duration]^^, &quot;start&quot;: ^^[CallStartTimeUTC]^^ }" />
     </Scenario>
   </Scenarios>
 </Crm>
