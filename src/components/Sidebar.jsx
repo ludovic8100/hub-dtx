@@ -59,7 +59,7 @@ const MODULES_ADMIN = [
 ]
 
 // ── Recherche client universelle (Dynassur), intégrée au menu ──
-function ClientSearch({ accentColor, accentLight }) {
+function ClientSearch({ accentLight }) {
   const navigate = useNavigate()
   const [q, setQ] = useState('')
   const [res, setRes] = useState([])
@@ -79,26 +79,31 @@ function ClientSearch({ accentColor, accentLight }) {
   const go = d => { if (!d) return; navigate(`/dynassur/clients?dossier=${encodeURIComponent(d)}`); setQ(''); setRes([]) }
 
   return (
-    <div style={{ padding: '2px 4px 10px', marginBottom: 6, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+    <div style={{ margin: '12px 4px 4px', padding: '11px 11px 12px', borderRadius: 10,
+        border: '1.5px solid rgba(255,255,255,0.55)', background: 'rgba(255,255,255,0.07)' }}>
+      <style>{`.dyn-cs-input::placeholder{color:rgba(255,255,255,0.65);}`}</style>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 9 }}>
+        <i className="ti ti-search" style={{ fontSize: 15, color: '#fff' }} />
+        <span style={{ fontSize: 12.5, fontWeight: 700, color: '#fff', letterSpacing: '0.02em' }}>Recherche client</span>
+      </div>
       <div style={{ position: 'relative' }}>
-        <i className="ti ti-search" style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 14, color: 'rgba(255,255,255,0.4)' }} />
-        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher un client…"
-          style={{ width: '100%', boxSizing: 'border-box', padding: '7px 26px 7px 30px', borderRadius: 7,
-            border: `1px solid ${q ? accentColor : 'rgba(255,255,255,0.12)'}`, background: 'rgba(255,255,255,0.06)',
-            color: '#fff', fontSize: 12.5, fontFamily: "'Source Sans Pro', sans-serif", outline: 'none' }} />
-        {q && <button onClick={() => { setQ(''); setRes([]) }} style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: 14 }}>✕</button>}
+        <input className="dyn-cs-input" value={q} onChange={e => setQ(e.target.value)} placeholder="Nom, plaque, n°, localité…"
+          style={{ width: '100%', boxSizing: 'border-box', padding: '8px 26px 8px 11px', borderRadius: 7,
+            border: '1.5px solid rgba(255,255,255,0.7)', background: 'rgba(255,255,255,0.14)',
+            color: '#fff', fontSize: 13, fontFamily: "'Source Sans Pro', sans-serif", outline: 'none', fontWeight: 500 }} />
+        {q && <button onClick={() => { setQ(''); setRes([]) }} style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 15 }}>✕</button>}
       </div>
       {q.trim().length >= 2 && (
-        <div style={{ marginTop: 4, maxHeight: 320, overflowY: 'auto' }}>
-          {searching ? <div style={{ padding: '8px 10px', fontSize: 11.5, color: 'rgba(255,255,255,0.4)' }}>Recherche…</div>
-            : !res.length ? <div style={{ padding: '8px 10px', fontSize: 11.5, color: 'rgba(255,255,255,0.4)' }}>Aucun résultat</div>
+        <div style={{ marginTop: 6, maxHeight: 340, overflowY: 'auto' }}>
+          {searching ? <div style={{ padding: '8px 4px', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Recherche…</div>
+            : !res.length ? <div style={{ padding: '8px 4px', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Aucun résultat</div>
               : res.map((c, i) => (
-                <div key={c.dossier || i} onClick={() => go(c.dossier)} style={{ padding: '6px 10px', borderRadius: 6, cursor: 'pointer', marginBottom: 1 }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.07)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                  <div style={{ fontSize: 12.5, color: '#fff', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.nom} {c.prenom}</div>
-                  <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>#{c.dossier}{c.localite ? ` · ${c.localite}` : ''}</div>
-                  {c.match_info && <div style={{ fontSize: 10.5, color: accentLight, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.match_info}</div>}
+                <div key={c.dossier || i} onClick={() => go(c.dossier)} style={{ padding: '7px 9px', borderRadius: 7, cursor: 'pointer', marginBottom: 3, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.16)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}>
+                  <div style={{ fontSize: 13, color: '#fff', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.nom} {c.prenom}</div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>#{c.dossier}{c.localite ? ` · ${c.localite}` : ''}</div>
+                  {c.match_info && <div style={{ fontSize: 11, color: accentLight, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.match_info}</div>}
                 </div>
               ))}
         </div>
@@ -145,8 +150,8 @@ export default function Sidebar() {
 
   return (
     <nav style={{ flex:1, padding:'8px 8px 16px', overflowY:'auto' }}>
-      {activeSociete === 'dynassur' && <ClientSearch accentColor={accentColor} accentLight={accentLight} />}
       {currentModules.map(m => <NavItem key={m.key} item={m} />)}
+      {activeSociete === 'dynassur' && <ClientSearch accentLight={accentLight} />}
       {isAdmin && (
         <div style={{ marginTop:'8px', paddingTop:'8px', borderTop:'1px solid rgba(255,255,255,0.08)' }}>
           <div style={{ fontSize:'10px', fontWeight:'700', color:'rgba(255,255,255,0.25)', letterSpacing:'0.1em', textTransform:'uppercase', padding:'8px 12px 5px' }}>
