@@ -903,7 +903,7 @@ function Fiche({ client, onClose, onOpenDossier }) {
         <div style={{overflowX:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
           <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
             <thead style={{position:'sticky',top:0,background:'#f8fafc',zIndex:1}}>
-              <tr>{['Police','Compagnie','Domaine','Garanties','Situation','Objet de risque','Date'].map(h=>(<th key={h} style={{padding:'7px 12px',textAlign:'left',fontWeight:700,color:'#94a3b8',fontSize:10,textTransform:'uppercase',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>))}</tr>
+              <tr>{['Police','Compagnie','Objet de risque','Domaine','Garanties','Situation','Date'].map(h=>(<th key={h} style={{padding:'7px 12px',textAlign:'left',fontWeight:700,color:'#94a3b8',fontSize:10,textTransform:'uppercase',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>))}</tr>
             </thead>
             <tbody>
               {contrats.map((c,i)=>{
@@ -912,10 +912,10 @@ function Fiche({ client, onClose, onOpenDossier }) {
                   <tr key={i} onMouseEnter={()=>previewContrat(c)} onMouseLeave={leaveContrat} onClick={()=>openContrat(c)} style={{background:i%2===0?'#fff':'#fafafe',cursor:'pointer'}}>
                     <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',fontFamily:'monospace',fontSize:11}}><span title="Survoler pour aperçu · cliquer pour épingler" style={{color:BLUE,fontWeight:700,textDecoration:'underline'}}>{c.police||'—'}</span></td>
                     <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#1e293b'}}>{c.compagnie||'—'}</td>
+                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#475569',fontSize:11}}>{(()=>{ const os=objetsParPolice[c.police]?[...objetsParPolice[c.police]]:[]; if(!os.length) return <span style={{color:'#cbd5e1'}}>—</span>; return <span style={{display:'flex',flexDirection:'column',gap:2}}>{os.map((o,k)=><span key={k}>{o}</span>)}</span> })()}</td>
                     <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{c.domaine||'—'}</td>
                     <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9'}}>{(()=>{ const gs=garantiesParPolice[c.police]?[...garantiesParPolice[c.police]]:[]; if(!gs.length) return <span style={{color:'#cbd5e1'}}>—</span>; return <span style={{display:'flex',flexWrap:'wrap',gap:3}}>{gs.map((g,k)=><span key={k} style={{fontSize:10,fontWeight:600,padding:'1px 6px',borderRadius:4,background:'#f5f3ff',color:'#7c3aed',whiteSpace:'nowrap'}}>{g}</span>)}</span> })()}</td>
                     <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9'}}><span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:4,background:st.bg,color:st.col}}>{c.situation||'—'}</span></td>
-                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#475569',fontSize:11}}>{(()=>{ const os=objetsParPolice[c.police]?[...objetsParPolice[c.police]]:[]; if(!os.length) return <span style={{color:'#cbd5e1'}}>—</span>; return <span style={{display:'flex',flexDirection:'column',gap:2}}>{os.map((o,k)=><span key={k}>{o}</span>)}</span> })()}</td>
                     <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b',whiteSpace:'nowrap'}}>{fmtDate(c.date_creation)}</td>
                   </tr>
                 )
