@@ -1,5 +1,7 @@
+import { useState, useEffect } from 'react'
 import { useAuth, SOCIETES_CONFIG } from '../lib/auth'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
 
 const MODULES = {
   groupe: [
@@ -56,6 +58,55 @@ const MODULES_ADMIN = [
   { key: 'admin_rdv_cat', label: 'Catégories RDV', icon: 'ti-tags', path: '/admin/rdv-categories' },
 ]
 
+// ── Recherche client universelle (Dynassur), intégrée au menu ──
+function ClientSearch({ accentColor, accentLight }) {
+  const navigate = useNavigate()
+  const [q, setQ] = useState('')
+  const [res, setRes] = useState([])
+  const [searching, setSearching] = useState(false)
+
+  useEffect(() => {
+    const term = q.trim()
+    if (term.length < 2) { setRes([]); setSearching(false); return }
+    setSearching(true)
+    const t = setTimeout(async () => {
+      const { data, error } = await supabase.rpc('search_clients_dynassur', { q: term, lim: 8 })
+      setRes(error ? [] : (data || [])); setSearching(false)
+    }, 300)
+    return () => clearTimeout(t)
+  }, [q])
+
+  const go = d => { if (!d) return; navigate(`/dynassur/clients?dossier=${encodeURIComponent(d)}`); setQ(''); setRes([]) }
+
+  return (
+    <div style={{ padding: '2px 4px 10px', marginBottom: 6, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+      <div style={{ position: 'relative' }}>
+        <i className="ti ti-search" style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 14, color: 'rgba(255,255,255,0.4)' }} />
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher un client…"
+          style={{ width: '100%', boxSizing: 'border-box', padding: '7px 26px 7px 30px', borderRadius: 7,
+            border: `1px solid ${q ? accentColor : 'rgba(255,255,255,0.12)'}`, background: 'rgba(255,255,255,0.06)',
+            color: '#fff', fontSize: 12.5, fontFamily: "'Source Sans Pro', sans-serif", outline: 'none' }} />
+        {q && <button onClick={() => { setQ(''); setRes([]) }} style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: 14 }}>✕</button>}
+      </div>
+      {q.trim().length >= 2 && (
+        <div style={{ marginTop: 4, maxHeight: 320, overflowY: 'auto' }}>
+          {searching ? <div style={{ padding: '8px 10px', fontSize: 11.5, color: 'rgba(255,255,255,0.4)' }}>Recherche…</div>
+            : !res.length ? <div style={{ padding: '8px 10px', fontSize: 11.5, color: 'rgba(255,255,255,0.4)' }}>Aucun résultat</div>
+              : res.map((c, i) => (
+                <div key={c.dossier || i} onClick={() => go(c.dossier)} style={{ padding: '6px 10px', borderRadius: 6, cursor: 'pointer', marginBottom: 1 }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.07)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <div style={{ fontSize: 12.5, color: '#fff', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.nom} {c.prenom}</div>
+                  <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>#{c.dossier}{c.localite ? ` · ${c.localite}` : ''}</div>
+                  {c.match_info && <div style={{ fontSize: 10.5, color: accentLight, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.match_info}</div>}
+                </div>
+              ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Sidebar() {
   const { perms, isAdmin, activeSociete } = useAuth()
   const navigate = useNavigate()
@@ -94,6 +145,7 @@ export default function Sidebar() {
 
   return (
     <nav style={{ flex:1, padding:'8px 8px 16px', overflowY:'auto' }}>
+      {activeSociete === 'dynassur' && <ClientSearch accentColor={accentColor} accentLight={accentLight} />}
       {currentModules.map(m => <NavItem key={m.key} item={m} />)}
       {isAdmin && (
         <div style={{ marginTop:'8px', paddingTop:'8px', borderTop:'1px solid rgba(255,255,255,0.08)' }}>

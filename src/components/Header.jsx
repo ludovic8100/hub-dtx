@@ -147,6 +147,15 @@ export default function Header({ currentPage, onToggleMenu, menuOuvert }) {
   const { user, perms, isAdmin, switchUser, signOut, societeActive, activeSociete, societesDispo, setActiveSociete } = useAuth()
   const navigate = useNavigate()
 
+  // Taille du texte (accessibilité) — zoom global persistant. L'app utilise des px en dur,
+  // donc on agit sur le zoom du document (agrandit tout proportionnellement).
+  const [fz, setFz] = useState(() => Number(localStorage.getItem('hub_font_zoom')) || 100)
+  useEffect(() => {
+    document.documentElement.style.zoom = String(fz / 100)
+    try { localStorage.setItem('hub_font_zoom', String(fz)) } catch (e) {}
+  }, [fz])
+  const cycleFz = () => setFz(f => (f >= 130 ? 100 : f + 15))
+
   const displayName = perms?.nom || user?.user_metadata?.full_name || user?.email || ''
   const firstName = displayName.split(' ')[0]
   const mob = !!onToggleMenu   // Layout ne passe onToggleMenu qu'en mobile
@@ -242,6 +251,19 @@ export default function Header({ currentPage, onToggleMenu, menuOuvert }) {
             {!mob && 'Changer'}
           </button>
         )}
+
+        <button onClick={cycleFz} title="Taille du texte" style={{
+          display: 'flex', alignItems: 'center', gap: 4,
+          background: 'transparent', border: '1px solid rgba(255,255,255,0.2)',
+          color: 'rgba(255,255,255,0.7)', borderRadius: '6px',
+          padding: '5px 9px', cursor: 'pointer', fontSize: '12.5px',
+          fontFamily: "'Source Sans Pro', sans-serif", transition: 'all 0.15s'
+        }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.4)' }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)' }}
+        >
+          <i className="ti ti-text-size" style={{ fontSize: '15px' }} />{!mob && `${fz}%`}
+        </button>
 
         <button onClick={signOut} title="Se déconnecter" style={{
           display: 'flex', alignItems: 'center',

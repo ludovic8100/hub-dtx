@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
 import { ENTITES } from '../../lib/entites'
@@ -751,7 +752,7 @@ function Fiche({ client, onClose, onOpenDossier }) {
   return(
     <div ref={ref} style={{background:'#fff',borderRadius:14,border:`2px solid ${BLUE}25`,overflow:'hidden',boxShadow:'0 4px 24px rgba(0,128,189,0.1)'}}>
 
-      <div style={{background:`linear-gradient(135deg, ${NAVY} 0%, ${BLUE} 100%)`,padding:'14px 20px'}}>
+      <div style={{background:`linear-gradient(135deg, ${ENTITES.dynassur.color} 0%, ${ENTITES.dynassur.colorDark} 140%)`,padding:'14px 20px'}}>
         <div style={{display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
           <div style={{width:44,height:44,borderRadius:11,background:'rgba(255,255,255,0.2)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:16,fontWeight:800,color:'#fff'}}>{initiales}</div>
           <div style={{flex:1,minWidth:160}}>
@@ -957,11 +958,12 @@ export default function DynassurClients() {
     if(data&&data[0]){ setSelected(data[0]); pushRecentClient(data[0]); window.scrollTo({top:0,behavior:'smooth'}) }
   },[])
 
-  // Ouverture directe via ?dossier= (depuis le tableau de bord « derniers clients »)
+  // Ouverture directe / recherche depuis le menu : réagit à ?dossier= au montage ET aux navigations
+  const location = useLocation()
   useEffect(()=>{
-    const p=new URLSearchParams(window.location.search).get('dossier')
+    const p=new URLSearchParams(location.search).get('dossier')
     if(p) openDossier(p)
-  },[openDossier])
+  },[location.search, openDossier])
 
   const nb=Math.ceil(total/PER)
   const tot=counts.total||1
@@ -986,144 +988,83 @@ export default function DynassurClients() {
   if(q.length>=2){ const s=q.toLowerCase(); relanceView = relanceView.filter(c=>`${c.nom} ${c.prenom} ${c.dossier}`.toLowerCase().includes(s)) }
   const relanceShow = relanceView.slice(0,500)
 
-
-  // ── colonne gauche : recherche universelle + relance ──
-  const [leftMode,setLeftMode]=useState('search')
-  const [sres,setSres]=useState([])
-  const [searching,setSearching]=useState(false)
-  const [recent,setRecent]=useState([])
-  useEffect(()=>{ try{ setRecent(JSON.parse(localStorage.getItem('dyn_recent_clients')||'[]')) }catch(e){ setRecent([]) } },[selected])
-  useEffect(()=>{
-    if(leftMode!=='search'){ return }
-    const term=(q||'').trim()
-    if(term.length<2){ setSres([]); setSearching(false); return }
-    setSearching(true)
-    const t=setTimeout(async()=>{
-      const {data,error}=await supabase.rpc('search_clients_dynassur',{q:term,lim:60})
-      setSres(error?[]:(data||[])); setSearching(false)
-    },300)
-    return ()=>clearTimeout(t)
-  },[q,leftMode])
   return(
     <Layout currentPage="Clients">
       <div style={{fontFamily:"'Source Sans Pro',sans-serif",width:'100%'}}>
 
-        <StatBanner
-          color={ENTITES.dynassur.color} colorDark={ENTITES.dynassur.colorDark} logoUrl={ENTITES.dynassur.logo}
-          title="Clients" subtitle={`Dynassur SRL — base clients ${new Date().getFullYear()}`}
-          stats={[
-            { label: 'Avec alerte', value: kpis?.avec_alerte != null ? kpis.avec_alerte.toLocaleString('fr-BE') : '…', onClick: ()=>openKpi('alerte') },
-            { label: 'Sans contrat', value: kpis?.sans_contrat != null ? kpis.sans_contrat.toLocaleString('fr-BE') : '…', onClick: ()=>openKpi('sans_contrat') },
-            { label: 'Sans comm. 2026', value: kpis?.sans_commissions != null ? kpis.sans_commissions.toLocaleString('fr-BE') : '…', onClick: ()=>openKpi('sans_comm') },
-          ]}
-        />
+        {selected ? (
+          <Fiche client={selected} onClose={()=>setSelected(null)} onOpenDossier={openDossier}/>
+        ) : (
+          <>
+            <StatBanner
+              color={ENTITES.dynassur.color} colorDark={ENTITES.dynassur.colorDark} logoUrl={ENTITES.dynassur.logo}
+              title="Clients" subtitle={`Dynassur SRL — base clients ${new Date().getFullYear()}`}
+              stats={[
+                { label: 'Avec alerte', value: kpis?.avec_alerte != null ? kpis.avec_alerte.toLocaleString('fr-BE') : '…', onClick: ()=>openKpi('alerte') },
+                { label: 'Sans contrat', value: kpis?.sans_contrat != null ? kpis.sans_contrat.toLocaleString('fr-BE') : '…', onClick: ()=>openKpi('sans_contrat') },
+                { label: 'Sans comm. 2026', value: kpis?.sans_commissions != null ? kpis.sans_commissions.toLocaleString('fr-BE') : '…', onClick: ()=>openKpi('sans_comm') },
+              ]}
+            />
 
-        <div style={{display:'flex',gap:16,alignItems:'flex-start',marginTop:4}}>
-
-          {/* ── COLONNE GAUCHE : recherche / relance ── */}
-          <div style={{width:340,flexShrink:0,position:'sticky',top:12,maxHeight:'calc(100vh - 32px)',display:'flex',flexDirection:'column',background:'#fff',borderRadius:12,border:'1px solid #e2e8f0',overflow:'hidden'}}>
-            <div style={{display:'flex',padding:8,gap:6,borderBottom:'1px solid #f1f5f9'}}>
-              {[{k:'search',ic:'ti-search',l:'Recherche',c:BLUE},{k:'relance',ic:'ti-calendar-heart',l:'Relance',c:'#0d9488'}].map(m=>(
-                <button key={m.k} onClick={()=>setLeftMode(m.k)} style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:6,padding:'8px 10px',borderRadius:8,border:'none',cursor:'pointer',fontSize:13,fontWeight:700,fontFamily:'inherit',background:leftMode===m.k?m.c:'#f1f5f9',color:leftMode===m.k?'#fff':'#64748b'}}>
-                  <i className={`ti ${m.ic}`}/>{m.l}
-                </button>
-              ))}
-            </div>
-
-            <div style={{padding:10,borderBottom:'1px solid #f1f5f9'}}>
-              <div style={{position:'relative'}}>
-                <i className="ti ti-search" style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',color:'#94a3b8',fontSize:16}}/>
-                <input ref={searchRef} value={q} onChange={e=>setQ(e.target.value)} autoFocus
-                  placeholder={leftMode==='search'?'Nom, plaque, tél, police…':'Filtrer la liste…'}
-                  style={{width:'100%',padding:'10px 12px 10px 38px',borderRadius:9,border:`1.5px solid ${q?(leftMode==='search'?BLUE:'#0d9488'):'#e2e8f0'}`,fontSize:13.5,fontFamily:'inherit',outline:'none',boxSizing:'border-box',background:'#fff'}}/>
-                {q&&<button onClick={()=>setQ('')} style={{position:'absolute',right:10,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',color:'#94a3b8',fontSize:16}}>✕</button>}
-              </div>
-              {leftMode==='relance'&&(
-                <div style={{marginTop:8,display:'flex',flexDirection:'column',gap:6}}>
-                  <select value={scope} onChange={e=>setScope(e.target.value)} style={{padding:'6px 10px',borderRadius:7,border:'1px solid #e2e8f0',fontSize:12,fontFamily:'inherit',color:NAVY,background:'#fff'}}>
+            <div style={{background:'#fff',borderRadius:12,border:'1px solid #e2e8f0',overflow:'hidden'}}>
+              <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',padding:'12px 16px',borderBottom:'1px solid #f1f5f9'}}>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <i className="ti ti-calendar-heart" style={{fontSize:18,color:'#0d9488'}}/>
+                  <span style={{fontSize:15,fontWeight:800,color:NAVY}}>Relance clients</span>
+                  <span style={{fontSize:12,color:'#94a3b8'}}>· trie les clients par ancienneté du dernier contact</span>
+                </div>
+                <div style={{display:'flex',gap:8,marginLeft:'auto',flexWrap:'wrap'}}>
+                  <select value={scope} onChange={e=>setScope(e.target.value)} style={{padding:'7px 10px',borderRadius:8,border:'1px solid #e2e8f0',fontSize:13,fontFamily:'inherit',color:NAVY,background:'#fff'}}>
                     <option value="all">Tous Dynassur ({counts.total.toLocaleString('fr-BE')})</option>
                     <option value="mine">Mes clients ({counts.mine.toLocaleString('fr-BE')})</option>
                     <option value="bureau">Mon bureau ({counts.bureau.toLocaleString('fr-BE')})</option>
                   </select>
-                  <select value={contactFilter} onChange={e=>setContactFilter(e.target.value)} style={{padding:'6px 10px',borderRadius:7,border:`1px solid ${relanceActif?'#0d9488':'#e2e8f0'}`,fontSize:12,fontFamily:'inherit',color:NAVY,background:'#fff',fontWeight:relanceActif?700:400}}>
+                  <select value={contactFilter} onChange={e=>setContactFilter(e.target.value)} style={{padding:'7px 10px',borderRadius:8,border:`1px solid ${relanceActif?'#0d9488':'#e2e8f0'}`,fontSize:13,fontFamily:'inherit',color:NAVY,background:'#fff',fontWeight:relanceActif?700:400}}>
                     <option value="tous">Toutes les tranches</option>
                     {TRANCHES.map(t=><option key={t.val} value={t.val}>{t.label} ({relanceCounts[t.val]||0})</option>)}
                   </select>
+                  <div style={{position:'relative'}}>
+                    <i className="ti ti-filter" style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'#94a3b8',fontSize:14}}/>
+                    <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Filtrer…" style={{padding:'7px 10px 7px 30px',borderRadius:8,border:`1px solid ${q?'#0d9488':'#e2e8f0'}`,fontSize:13,fontFamily:'inherit',outline:'none',width:150,boxSizing:'border-box'}}/>
+                  </div>
+                </div>
+              </div>
+
+              {relance===null?(
+                <p style={{padding:30,textAlign:'center',color:'#94a3b8'}}>Chargement de la relance…</p>
+              ):!relanceView.length?(
+                <p style={{padding:30,textAlign:'center',color:'#94a3b8'}}>Aucun client pour ce filtre.</p>
+              ):(
+                <div style={{overflowX:'auto'}}>
+                  <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+                    <thead><tr style={{background:'#f8fafc'}}>
+                      {['Client','N° Dossier','Localité','Dernier contact','Gestionnaire'].map(h=>(
+                        <th key={h} style={{textAlign:'left',padding:'9px 16px',fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',whiteSpace:'nowrap',borderBottom:'1px solid #e2e8f0'}}>{h}</th>
+                      ))}
+                    </tr></thead>
+                    <tbody>
+                      {relanceShow.map((c,i)=>{
+                        const col=TRANCHE_COL[c.tranche]||'#64748b'
+                        return(
+                          <tr key={c.id} onClick={()=>openDossier(c.dossier)} style={{cursor:'pointer',borderBottom:'1px solid #f1f5f9',background:i%2===0?'#fff':'#fafafe'}}
+                            onMouseEnter={e=>e.currentTarget.style.background='#f0fdfa'}
+                            onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'#fff':'#fafafe'}>
+                            <td style={{padding:'9px 16px',fontWeight:600,color:'#1e293b'}}>{c.nom} {c.prenom}</td>
+                            <td style={{padding:'9px 16px',fontFamily:'monospace',fontSize:12,color:NAVY}}>{c.dossier}</td>
+                            <td style={{padding:'9px 16px',color:'#64748b'}}>{c.localite||'—'}</td>
+                            <td style={{padding:'9px 16px'}}><span style={{fontSize:11,fontWeight:700,padding:'2px 8px',borderRadius:5,background:col+'18',color:col,whiteSpace:'nowrap'}}>{c.tranche==='jamais'?'Jamais contacté':ilYa(c.jours)}</span></td>
+                            <td style={{padding:'9px 16px',color:'#64748b'}}>{c.gestionnaire_nom||c.gestionnaire_code||'—'}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                  {relanceView.length>relanceShow.length&&(<p style={{padding:'10px 16px',color:'#94a3b8',fontSize:12}}>{relanceShow.length} affichés sur {relanceView.length.toLocaleString('fr-BE')} — affine le filtre.</p>)}
                 </div>
               )}
             </div>
-
-            <div style={{flex:1,overflowY:'auto',padding:6}}>
-              {leftMode==='search'?(
-                searching?<p style={{padding:16,textAlign:'center',color:'#94a3b8',fontSize:13}}>Recherche…</p>
-                :(q||'').trim().length<2?(
-                  recent.length?(
-                    <div>
-                      <div style={{fontSize:10,fontWeight:800,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'.05em',padding:'6px 8px'}}>Clients récents</div>
-                      {recent.map((c,i)=>(
-                        <div key={i} onClick={()=>openDossier(c.dossier)} style={{cursor:'pointer',padding:'9px 10px',borderRadius:8,marginBottom:2}}
-                          onMouseEnter={e=>e.currentTarget.style.background='#f0f9ff'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                          <div style={{fontSize:13,fontWeight:600,color:'#1e293b'}}>{c.nom} {c.prenom}</div>
-                          <div style={{fontSize:11,color:'#94a3b8'}}>#{c.dossier}{c.localite?` · ${c.localite}`:''}</div>
-                        </div>
-                      ))}
-                    </div>
-                  ):(
-                    <div style={{padding:'24px 14px',textAlign:'center',color:'#94a3b8'}}>
-                      <i className="ti ti-search" style={{fontSize:28,opacity:.4}}/>
-                      <p style={{fontSize:13,marginTop:8,lineHeight:1.5}}>Tape un <strong>nom</strong>, une <strong>plaque</strong>, un <strong>n° de tél</strong>, une <strong>police</strong> ou un <strong>email</strong>…</p>
-                    </div>
-                  )
-                ):!sres.length?<p style={{padding:16,textAlign:'center',color:'#94a3b8',fontSize:13}}>Aucun résultat</p>
-                :sres.map((c,i)=>{
-                  const on=selected&&selected.dossier===c.dossier
-                  return(
-                    <div key={c.dossier||i} onClick={()=>openDossier(c.dossier)} style={{cursor:'pointer',padding:'9px 10px',borderRadius:8,marginBottom:2,background:on?'#e0f2fe':'transparent'}}
-                      onMouseEnter={e=>{ if(!on)e.currentTarget.style.background='#f0f9ff' }} onMouseLeave={e=>{ if(!on)e.currentTarget.style.background='transparent' }}>
-                      <div style={{fontSize:13,fontWeight:600,color:'#1e293b'}}>{c.nom} {c.prenom}</div>
-                      <div style={{fontSize:11,color:'#94a3b8'}}>#{c.dossier}{c.localite?` · ${c.cp||''} ${c.localite}`:''}</div>
-                      {c.match_info&&<div style={{fontSize:11,color:BLUE,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{c.match_info}</div>}
-                    </div>
-                  )
-                })
-              ):(
-                relance===null?<p style={{padding:16,textAlign:'center',color:'#94a3b8',fontSize:13}}>Chargement…</p>
-                :!relanceView.length?<p style={{padding:16,textAlign:'center',color:'#94a3b8',fontSize:13}}>Aucun client.</p>
-                :relanceShow.map((c,i)=>{
-                  const col=TRANCHE_COL[c.tranche]||'#64748b'
-                  const on=selected&&selected.dossier===c.dossier
-                  return(
-                    <div key={c.id} onClick={()=>openDossier(c.dossier)} style={{cursor:'pointer',padding:'9px 10px',borderRadius:8,marginBottom:2,background:on?'#f0fdfa':'transparent'}}
-                      onMouseEnter={e=>{ if(!on)e.currentTarget.style.background='#f0fdfa' }} onMouseLeave={e=>{ if(!on)e.currentTarget.style.background='transparent' }}>
-                      <div style={{display:'flex',alignItems:'center',gap:6}}>
-                        <span style={{flex:1,fontSize:13,fontWeight:600,color:'#1e293b'}}>{c.nom} {c.prenom}</span>
-                        <span style={{fontSize:9,fontWeight:800,padding:'2px 6px',borderRadius:4,background:col+'18',color:col,whiteSpace:'nowrap'}}>{c.tranche==='jamais'?'Jamais':ilYa(c.jours)}</span>
-                      </div>
-                      <div style={{fontSize:11,color:'#94a3b8'}}>#{c.dossier}{c.localite?` · ${c.localite}`:''}</div>
-                    </div>
-                  )
-                })
-              )}
-              {leftMode==='relance'&&relance!==null&&relanceView.length>relanceShow.length&&(
-                <p style={{padding:'10px',textAlign:'center',color:'#94a3b8',fontSize:11}}>{relanceShow.length} / {relanceView.length.toLocaleString('fr-BE')} affichés — affine le filtre.</p>
-              )}
-            </div>
-          </div>
-
-          {/* ── COLONNE DROITE : fiche ou état vide ── */}
-          <div style={{flex:1,minWidth:0}}>
-            {selected?(
-              <Fiche client={selected} onClose={()=>{ setSelected(null); setTimeout(()=>searchRef.current?.focus(),80) }} onOpenDossier={openDossier}/>
-            ):(
-              <div style={{background:'#fff',borderRadius:14,border:'2px dashed #e2e8f0',padding:'60px 30px',textAlign:'center',color:'#94a3b8'}}>
-                <div style={{width:64,height:64,borderRadius:16,background:`${BLUE}12`,display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 16px'}}><i className="ti ti-user-search" style={{fontSize:32,color:BLUE}}/></div>
-                <h3 style={{fontSize:18,fontWeight:800,color:NAVY,margin:'0 0 6px'}}>Recherche un client</h3>
-                <p style={{fontSize:14,maxWidth:440,margin:'0 auto',lineHeight:1.5}}>Champ à gauche : nom, prénom, n° de dossier, email, téléphone (tous formats), plaque d'immatriculation, marque/modèle ou n° de police.</p>
-              </div>
-            )}
-          </div>
-
-        </div>
+          </>
+        )}
 
         {kpiModal&&(
           <div onClick={()=>setKpiModal(null)} style={{position:'fixed',inset:0,background:'rgba(15,23,42,.55)',zIndex:1000,display:'flex',justifyContent:'flex-end'}}>
