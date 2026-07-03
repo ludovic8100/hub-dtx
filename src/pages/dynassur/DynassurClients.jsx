@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../lib/auth'
 import Layout from '../../components/Layout'
 import { ENTITES } from '../../lib/entites'
 import { StatBanner } from '../../components/ui/AccountableUI'
@@ -150,7 +151,10 @@ function Sec({ icon, title, count, children, extra, open: defOpen=true, col=BLUE
 
 // ══ Primes + commissions ══
 function Primes({ dossier }) {
+  const { perms }=useAuth()
+  const canComm=!!perms?.voir_commissions
   const [rows,setRows]=useState([]); const [load,setLoad]=useState(true); const [showC,setShowC]=useState(false)
+  const show=showC&&canComm
   useEffect(()=>{
     supabase.from('quittances').select('compagnie,date_comptable,prime_totale,commission,commission_sa,sous_agent').eq('dossier',dossier).order('date_comptable',{ascending:false}).limit(50)
       .then(({data})=>{ setRows(data||[]); setLoad(false) })
@@ -167,7 +171,7 @@ function Primes({ dossier }) {
           <div style={{fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',marginBottom:2}}>Primes TTC</div>
           <div style={{fontSize:18,fontWeight:800,color:NAVY}}>{fmt(tP)}</div>
         </div>
-        {showC&&<>
+        {show&&<>
           <div style={{background:'#f0fdf4',borderRadius:8,padding:'8px 14px',border:'1px solid #bbf7d0'}}>
             <div style={{fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',marginBottom:2}}>Comm. DYN</div>
             <div style={{fontSize:18,fontWeight:800,color:'#16a34a'}}>{fmt(tC)}</div>
@@ -177,14 +181,14 @@ function Primes({ dossier }) {
             <div style={{fontSize:18,fontWeight:800,color:'#7c3aed'}}>{fmt(tS)}</div>
           </div>
         </>}
-        <button onClick={()=>setShowC(s=>!s)} style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:6,fontSize:12,color:showC?'#16a34a':'#64748b',background:showC?'#f0fdf4':'#f8fafc',border:`1px solid ${showC?'#bbf7d0':'#e2e8f0'}`,borderRadius:7,padding:'5px 12px',cursor:'pointer',fontWeight:600}}>
+        {canComm&&<button onClick={()=>setShowC(s=>!s)} style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:6,fontSize:12,color:showC?'#16a34a':'#64748b',background:showC?'#f0fdf4':'#f8fafc',border:`1px solid ${showC?'#bbf7d0':'#e2e8f0'}`,borderRadius:7,padding:'5px 12px',cursor:'pointer',fontWeight:600}}>
           <i className={`ti ${showC?'ti-eye-off':'ti-eye'}`}/>{showC?'Masquer commissions':'Voir commissions'}
-        </button>
+        </button>}
       </div>
       <div style={{overflowX:'auto',maxHeight:200,overflowY:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
           <thead style={{position:'sticky',top:0,background:'#f8fafc',zIndex:1}}>
-            <tr>{['Période','Compagnie','Prime TTC',...(showC?['Comm. DYN','Comm. SA']:[])].map(h=>(
+            <tr>{['Période','Compagnie','Prime TTC',...(show?['Comm. DYN','Comm. SA']:[])].map(h=>(
               <th key={h} style={{padding:'6px 12px',textAlign:'left',fontWeight:700,color:'#94a3b8',fontSize:10,textTransform:'uppercase',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>
             ))}</tr>
           </thead>
@@ -194,7 +198,7 @@ function Primes({ dossier }) {
                 <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b',whiteSpace:'nowrap'}}>{fmtMois(r.date_comptable)}</td>
                 <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',color:'#374151'}}>{r.compagnie||'—'}</td>
                 <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',fontWeight:600,color:NAVY}}>{fmt(r.prime_totale)}</td>
-                {showC&&<><td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',fontWeight:600,color:'#16a34a'}}>{fmt(r.commission)}</td>
+                {show&&<><td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',fontWeight:600,color:'#16a34a'}}>{fmt(r.commission)}</td>
                 <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',fontWeight:600,color:'#7c3aed'}}>{fmt(r.commission_sa)}</td></>}
               </tr>
             ))}
@@ -581,7 +585,7 @@ const normAdr = (...parts) => parts.map(x => x==null?'':String(x)).join(' ')
   .toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'')
 
 // ── Modal détail contrat (garanties, objets couverts, primes/mensualités, sinistres) ──
-function ContratModal({ contrat, dossier, objets, onClose }) {
+function ContratModal({ contrat, dossier, objets, onClose, preview }) {
   const [quit,setQuit]=useState([]); const [ld,setLd]=useState(true)
   useEffect(()=>{
     setLd(true)
@@ -607,20 +611,21 @@ function ContratModal({ contrat, dossier, objets, onClose }) {
     </div>
   )
   return (
-    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.55)',zIndex:1000,display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'40px 16px',overflowY:'auto'}}>
-      <div onClick={e=>e.stopPropagation()} style={{background:'#fff',borderRadius:14,maxWidth:720,width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.35)',overflow:'hidden'}}>
+    <div onClick={preview?undefined:onClose} style={{position:'fixed',inset:0,background:preview?'transparent':'rgba(15,23,42,0.55)',zIndex:1000,display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'40px 16px',overflowY:'auto',pointerEvents:preview?'none':'auto'}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:'#fff',borderRadius:14,maxWidth:720,width:'100%',boxShadow:preview?'0 24px 70px rgba(15,23,42,0.28)':'0 20px 60px rgba(0,0,0,0.35)',overflow:'hidden',border:preview?`1px solid ${BLUE}55`:'none'}}>
         <div style={{background:`linear-gradient(135deg, ${BLUE} 0%, ${NAVY} 140%)`,padding:'16px 20px',display:'flex',alignItems:'flex-start',gap:12}}>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:10,color:'rgba(255,255,255,0.75)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.05em'}}>Contrat</div>
             <div style={{fontSize:21,fontWeight:800,color:'#fff',fontFamily:'monospace',lineHeight:1.1}}>{contrat.police||'—'}</div>
             <div style={{fontSize:12.5,color:'rgba(255,255,255,0.9)',marginTop:3}}>{[contrat.compagnie,contrat.domaine].filter(Boolean).join(' · ')||'—'}</div>
           </div>
-          <button onClick={onClose} style={{background:'rgba(255,255,255,0.15)',border:'1px solid rgba(255,255,255,0.3)',borderRadius:8,padding:'6px 11px',cursor:'pointer',color:'#fff',fontSize:13,fontWeight:600,flexShrink:0}}><i className="ti ti-x"/></button>
+          {preview
+            ? <span style={{alignSelf:'center',background:'rgba(255,255,255,0.18)',border:'1px solid rgba(255,255,255,0.3)',borderRadius:8,padding:'5px 10px',color:'#fff',fontSize:11,fontWeight:700,flexShrink:0,whiteSpace:'nowrap'}}><i className="ti ti-pin"/> Cliquer pour épingler</span>
+            : <button onClick={onClose} style={{background:'rgba(255,255,255,0.15)',border:'1px solid rgba(255,255,255,0.3)',borderRadius:8,padding:'6px 11px',cursor:'pointer',color:'#fff',fontSize:13,fontWeight:600,flexShrink:0}}><i className="ti ti-x"/></button>}
         </div>
         <div style={{padding:'18px 20px',maxHeight:'72vh',overflowY:'auto'}}>
           <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:18}}>
             <span style={{fontSize:11,fontWeight:700,padding:'3px 10px',borderRadius:6,background:st.bg,color:st.col}}>{contrat.situation||'—'}</span>
-            {contrat.type_production&&<span style={{fontSize:11,fontWeight:600,padding:'3px 10px',borderRadius:6,background:'#f1f5f9',color:'#475569'}}>{contrat.type_production}</span>}
             {contrat.date_creation&&<span style={{fontSize:11,fontWeight:600,padding:'3px 10px',borderRadius:6,background:'#f1f5f9',color:'#475569'}}>Depuis {fmtDate(contrat.date_creation)}</span>}
             {contrat.garantie_valeur?<span style={{fontSize:11,fontWeight:600,padding:'3px 10px',borderRadius:6,background:'#eff6ff',color:'#1d4ed8'}}>Valeur assurée {fmt(contrat.garantie_valeur)}</span>:null}
           </div>
@@ -808,9 +813,17 @@ function Fiche({ client, onClose, onOpenDossier }) {
   const SIT={  'En cours':{bg:'#dcfce7',col:'#16a34a'},'Résilié':{bg:'#fee2e2',col:'#dc2626'},'Terminé':{bg:'#fee2e2',col:'#dc2626'},'Suspendu':{bg:'#fef3c7',col:'#92400e'} }
 
   const [openSec,setOpenSec]=useState('contrats')
-  const [detailContrat,setDetailContrat]=useState(null)
+  const [pinnedContrat,setPinnedContrat]=useState(null)
+  const [hoverContrat,setHoverContrat]=useState(null)
+  const hoverTimer=useRef(null); const closeTimer=useRef(null)
+  const detail=pinnedContrat||hoverContrat
+  const openContrat=c=>{ clearTimeout(hoverTimer.current); clearTimeout(closeTimer.current); setPinnedContrat(c); setHoverContrat(null) }
+  const previewContrat=c=>{ clearTimeout(closeTimer.current); if(pinnedContrat) return; clearTimeout(hoverTimer.current); hoverTimer.current=setTimeout(()=>setHoverContrat(c),180) }
+  const leaveContrat=()=>{ clearTimeout(hoverTimer.current); if(pinnedContrat) return; closeTimer.current=setTimeout(()=>setHoverContrat(null),160) }
+  const closeContrat=()=>{ clearTimeout(hoverTimer.current); clearTimeout(closeTimer.current); setPinnedContrat(null); setHoverContrat(null) }
   const garantiesParPolice={}
-  objets.forEach(o=>{ if(o.police){ const set=(garantiesParPolice[o.police]=garantiesParPolice[o.police]||new Set()); if(o.garantie) set.add(o.garantie) } })
+  const objetsParPolice={}
+  objets.forEach(o=>{ if(o.police){ const gset=(garantiesParPolice[o.police]=garantiesParPolice[o.police]||new Set()); if(o.garantie) gset.add(o.garantie); const oset=(objetsParPolice[o.police]=objetsParPolice[o.police]||new Set()); if(o.description) oset.add(o.description) } })
 
   const SECTIONS=[
     { key:'contacts', icon:'ti-address-book', title:'Contacts', col:'#0d9488', count:contactsUnifies.length, body:(
@@ -887,22 +900,22 @@ function Fiche({ client, onClose, onOpenDossier }) {
     { key:'objets', icon:'ti-shield', title:'Objets de risque', col:'#7c3aed', count:objets.length, body:(<div><Analyse360 client={client} contrats={contrats}/><ObjetsDetail objets={objets} loading={loadF}/></div>) },
     { key:'contrats', icon:'ti-file-text', title:'Contrats', col:BLUE, count:contrats.length, body:(
       loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:!contrats.length?<p style={{color:'#94a3b8',fontSize:12}}>Aucun contrat</p>:
-        <div style={{overflowX:'auto',maxHeight:300,overflowY:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
+        <div style={{overflowX:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
           <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
             <thead style={{position:'sticky',top:0,background:'#f8fafc',zIndex:1}}>
-              <tr>{['Police','Compagnie','Domaine','Garanties','Situation','Type','Date'].map(h=>(<th key={h} style={{padding:'7px 12px',textAlign:'left',fontWeight:700,color:'#94a3b8',fontSize:10,textTransform:'uppercase',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>))}</tr>
+              <tr>{['Police','Compagnie','Domaine','Garanties','Situation','Objet de risque','Date'].map(h=>(<th key={h} style={{padding:'7px 12px',textAlign:'left',fontWeight:700,color:'#94a3b8',fontSize:10,textTransform:'uppercase',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>))}</tr>
             </thead>
             <tbody>
               {contrats.map((c,i)=>{
                 const st=SIT[c.situation]||{bg:'#f1f5f9',col:'#64748b'}
                 return(
-                  <tr key={i} style={{background:i%2===0?'#fff':'#fafafe'}}>
-                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',fontFamily:'monospace',fontSize:11}}><span onClick={()=>setDetailContrat(c)} title="Voir le détail du contrat" style={{cursor:'pointer',color:BLUE,fontWeight:700,textDecoration:'underline'}}>{c.police||'—'}</span></td>
+                  <tr key={i} onMouseEnter={()=>previewContrat(c)} onMouseLeave={leaveContrat} onClick={()=>openContrat(c)} style={{background:i%2===0?'#fff':'#fafafe',cursor:'pointer'}}>
+                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',fontFamily:'monospace',fontSize:11}}><span title="Survoler pour aperçu · cliquer pour épingler" style={{color:BLUE,fontWeight:700,textDecoration:'underline'}}>{c.police||'—'}</span></td>
                     <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#1e293b'}}>{c.compagnie||'—'}</td>
                     <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{c.domaine||'—'}</td>
-                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9'}}>{(()=>{ const gs=garantiesParPolice[c.police]?[...garantiesParPolice[c.police]]:[]; if(!gs.length) return <span style={{color:'#cbd5e1'}}>—</span>; return <span style={{display:'inline-flex',flexWrap:'wrap',gap:3}}>{gs.slice(0,2).map((g,k)=><span key={k} style={{fontSize:10,fontWeight:600,padding:'1px 6px',borderRadius:4,background:'#f5f3ff',color:'#7c3aed',whiteSpace:'nowrap'}}>{g}</span>)}{gs.length>2&&<span style={{fontSize:10,fontWeight:700,color:'#94a3b8',alignSelf:'center'}}>+{gs.length-2}</span>}</span> })()}</td>
+                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9'}}>{(()=>{ const gs=garantiesParPolice[c.police]?[...garantiesParPolice[c.police]]:[]; if(!gs.length) return <span style={{color:'#cbd5e1'}}>—</span>; return <span style={{display:'flex',flexWrap:'wrap',gap:3}}>{gs.map((g,k)=><span key={k} style={{fontSize:10,fontWeight:600,padding:'1px 6px',borderRadius:4,background:'#f5f3ff',color:'#7c3aed',whiteSpace:'nowrap'}}>{g}</span>)}</span> })()}</td>
                     <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9'}}><span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:4,background:st.bg,color:st.col}}>{c.situation||'—'}</span></td>
-                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{c.type_production||'—'}</td>
+                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#475569',fontSize:11}}>{(()=>{ const os=objetsParPolice[c.police]?[...objetsParPolice[c.police]]:[]; if(!os.length) return <span style={{color:'#cbd5e1'}}>—</span>; return <span style={{display:'flex',flexDirection:'column',gap:2}}>{os.map((o,k)=><span key={k}>{o}</span>)}</span> })()}</td>
                     <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b',whiteSpace:'nowrap'}}>{fmtDate(c.date_creation)}</td>
                   </tr>
                 )
@@ -1027,7 +1040,7 @@ function Fiche({ client, onClose, onOpenDossier }) {
             {active.count!=null&&active.count>0&&<span style={{fontSize:11,fontWeight:800,padding:'1px 8px',borderRadius:20,background:`${active.col}18`,color:active.col}}>{active.count}</span>}
           </div>
           {active.body}
-          {detailContrat&&<ContratModal contrat={detailContrat} dossier={client.dossier} objets={objets} onClose={()=>setDetailContrat(null)}/>}
+          {detail&&<ContratModal contrat={detail} dossier={client.dossier} objets={objets} preview={!pinnedContrat} onClose={closeContrat}/>}
         </div>
       </div>
     </div>

@@ -270,6 +270,7 @@ export default function ConfigModule() {
                       </select>
                     </label>
                     <Toggle label="Actif" on={!!selUser.actif} onClick={() => setSelUser(u => ({ ...u, actif: !u.actif }))} />
+                    <Toggle label="Voir les commissions" on={!!selUser.voir_commissions} onClick={() => setSelUser(u => ({ ...u, voir_commissions: !u.voir_commissions }))} />
                   </div>
                 </div>
 
