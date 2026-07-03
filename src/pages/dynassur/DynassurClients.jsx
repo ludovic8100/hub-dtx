@@ -589,7 +589,7 @@ function ContratModal({ contrat, dossier, objets, onClose, preview }) {
   const [quit,setQuit]=useState([]); const [ld,setLd]=useState(true)
   useEffect(()=>{
     setLd(true)
-    supabase.from('quittances').select('prime_totale,periodicite,date_comptable,type_quittance,commission,compagnie')
+    supabase.from('quittances').select('prime_totale,periodicite,date_comptable,type_quittance,commission,compagnie,compte_producteur,gestionnaire,etat')
       .eq('dossier',dossier).eq('police',contrat.police).order('date_comptable',{ascending:false})
       .then(({data})=>{ setQuit(data||[]); setLd(false) })
   },[dossier,contrat.police])
@@ -599,6 +599,7 @@ function ContratModal({ contrat, dossier, objets, onClose, preview }) {
   obj.forEach(o=>{ const k=o.description||o.type_risque||'—'; (parObjet[k]=parObjet[k]||{type:o.type_risque,descr:o.description,gars:new Set()}); if(o.garantie) parObjet[k].gars.add(o.garantie) })
   const objList=Object.values(parObjet)
   const derniere=quit[0]||null
+  const qval=f=>{ const r=quit.find(x=>x[f]!=null&&x[f]!=='' ); return r?r[f]:null }
   const SIT={'En cours':{bg:'#dcfce7',col:'#16a34a'},'Résilié':{bg:'#fee2e2',col:'#dc2626'},'Terminé':{bg:'#fee2e2',col:'#dc2626'},'Suspendu':{bg:'#fef3c7',col:'#92400e'}}
   const st=SIT[contrat.situation]||{bg:'#f1f5f9',col:'#64748b'}
   const Bloc=({icon,titre,col,children})=>(
@@ -608,6 +609,12 @@ function ContratModal({ contrat, dossier, objets, onClose, preview }) {
         <span style={{fontSize:13,fontWeight:800,color:NAVY}}>{titre}</span>
       </div>
       {children}
+    </div>
+  )
+  const Row=({k,v})=> (v==null||v==='')?null:(
+    <div style={{display:'flex',gap:10,fontSize:12.5,padding:'3px 0',borderBottom:'1px solid #f8fafc'}}>
+      <span style={{color:'#94a3b8',minWidth:140,flexShrink:0}}>{k}</span>
+      <span style={{color:'#1e293b',fontWeight:600,wordBreak:'break-word'}}>{v}</span>
     </div>
   )
   return (
@@ -629,6 +636,26 @@ function ContratModal({ contrat, dossier, objets, onClose, preview }) {
             {contrat.date_creation&&<span style={{fontSize:11,fontWeight:600,padding:'3px 10px',borderRadius:6,background:'#f1f5f9',color:'#475569'}}>Depuis {fmtDate(contrat.date_creation)}</span>}
             {contrat.garantie_valeur?<span style={{fontSize:11,fontWeight:600,padding:'3px 10px',borderRadius:6,background:'#eff6ff',color:'#1d4ed8'}}>Valeur assurée {fmt(contrat.garantie_valeur)}</span>:null}
           </div>
+
+          <Bloc icon="ti-file-info" titre="Détails du contrat" col={BLUE}>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0 24px'}}>
+              <Row k="Police" v={contrat.police}/>
+              <Row k="Compagnie" v={contrat.compagnie}/>
+              <Row k="Domaine" v={contrat.domaine}/>
+              <Row k="Type de police" v={contrat.type_production}/>
+              <Row k="État" v={contrat.situation}/>
+              <Row k="Version" v={contrat.version}/>
+              <Row k="Producteur" v={contrat.nom_sa?`${contrat.nom_sa}${contrat.sa_code?` (${contrat.sa_code})`:''}`:null}/>
+              <Row k="Date de création" v={contrat.date_creation?fmtDate(contrat.date_creation):null}/>
+              <Row k="Valeur assurée" v={contrat.garantie_valeur?fmt(contrat.garantie_valeur):null}/>
+              <Row k="Compte producteur" v={qval('compte_producteur')}/>
+              <Row k="Gestionnaire" v={qval('gestionnaire')}/>
+              <Row k="Périodicité" v={derniere?.periodicite}/>
+              <Row k="Dernière quittance" v={derniere?`${fmtMois(derniere.date_comptable)} · ${fmt(derniere.prime_totale)}`:null}/>
+              <Row k="État quittance" v={derniere?.etat}/>
+            </div>
+            <p style={{color:'#cbd5e1',fontSize:10.5,margin:'8px 0 0',fontStyle:'italic'}}>Seuls les champs présents dans la base sont affichés. Le reste de la fiche Brio (dates d'effet/échéance, avenants, fractionnement, documents…) n'est pas encore importé.</p>
+          </Bloc>
 
           <Bloc icon="ti-shield-check" titre="Garanties & objets couverts" col="#7c3aed">
             {!objList.length?<p style={{color:'#94a3b8',fontSize:12,margin:0}}>Aucun objet de risque détaillé pour cette police.</p>:
@@ -762,7 +789,7 @@ function Fiche({ client, onClose, onOpenDossier }) {
     ref.current?.scrollIntoView({behavior:'smooth',block:'start'})
     setLoadF(true)
     Promise.all([
-      supabase.from('contrats').select('police,compagnie,nom_client,situation,date_creation,domaine,type_production,garantie_valeur,version').eq('dossier',client.dossier).order('date_creation',{ascending:false}),
+      supabase.from('contrats').select('police,compagnie,nom_client,situation,date_creation,domaine,type_production,garantie_valeur,version,nom_sa,sa_code').eq('dossier',client.dossier).order('date_creation',{ascending:false}),
       supabase.from('taches').select('*').eq('dossier_client',client.dossier).order('echeance',{ascending:true}).limit(20),
       client.id
         ? supabase.from('rdv').select('id,objet,debut,categorie,user_email,web_link,journee_entiere,lieu').eq('client_id',client.id).order('debut',{ascending:false})
