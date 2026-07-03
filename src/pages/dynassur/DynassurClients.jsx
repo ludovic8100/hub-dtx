@@ -616,231 +616,225 @@ function Fiche({ client, onClose, onOpenDossier }) {
   })
   const SIT={  'En cours':{bg:'#dcfce7',col:'#16a34a'},'Résilié':{bg:'#fee2e2',col:'#dc2626'},'Terminé':{bg:'#fee2e2',col:'#dc2626'},'Suspendu':{bg:'#fef3c7',col:'#92400e'} }
 
-  return(
-    <div ref={ref} style={{marginTop:20,background:'#fff',borderRadius:14,border:`2px solid ${BLUE}25`,overflow:'hidden',boxShadow:'0 4px 24px rgba(0,128,189,0.1)'}}>
+  const [openSec,setOpenSec]=useState('contrats')
 
-      {/* ── Header compact : nom mis en avant ── */}
-      <div style={{background:`linear-gradient(135deg, ${NAVY} 0%, ${BLUE} 100%)`,padding:'12px 20px',display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
-        <div style={{width:42,height:42,borderRadius:11,background:'rgba(255,255,255,0.2)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:16,fontWeight:800,color:'#fff'}}>{initiales}</div>
-        <div style={{flex:1,minWidth:160}}>
-          <h2 style={{fontSize:24,fontWeight:800,color:'#fff',margin:0,lineHeight:1.1}}>{client.prenom} {client.nom}</h2>
-          <div style={{fontSize:11,color:'rgba(255,255,255,0.65)',display:'flex',gap:12,flexWrap:'wrap',marginTop:2}}>
-            <span>#{client.dossier}</span>
-            {client.etat_civil&&<span>{client.etat_civil}</span>}
-            {client.bureau&&<span>{client.bureau}</span>}
+  const SECTIONS=[
+    { key:'contacts', icon:'ti-calendar-heart', title:'Dernier contact', col:'#0d9488', count:rdvs.length, body:(
+      loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:!rdvs.length?
+        <p style={{color:'#94a3b8',fontSize:12}}>Aucun RDV lié à ce client. <span style={{color:'#cbd5e1'}}>(Lie un RDV depuis la page RDV / Agenda.)</span></p>:(
+        <div>
+          <div style={{display:'flex',gap:12,flexWrap:'wrap',marginBottom:(rdvPasses.length>1||prochain)?12:0}}>
+            {dernier&&(
+              <div style={{flex:'1 1 220px',background:'#f0fdfa',border:'1px solid #99f6e4',borderRadius:10,padding:'12px 16px'}}>
+                <div style={{fontSize:10,fontWeight:800,color:'#0d9488',textTransform:'uppercase',letterSpacing:'.05em'}}>Dernier contact</div>
+                <div style={{fontSize:20,fontWeight:800,color:NAVY,lineHeight:1.1,marginTop:3}}>{fmtRdv(dernier.debut)}</div>
+                <div style={{fontSize:12,color:'#0d9488',fontWeight:600}}>{ilYa(joursDernier)}</div>
+                <div style={{fontSize:12,color:'#64748b',marginTop:4}}>{dernier.objet}</div>
+              </div>
+            )}
+            {prochain&&(
+              <div style={{flex:'1 1 220px',background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:10,padding:'12px 16px'}}>
+                <div style={{fontSize:10,fontWeight:800,color:'#2563eb',textTransform:'uppercase',letterSpacing:'.05em'}}>Prochain RDV</div>
+                <div style={{fontSize:20,fontWeight:800,color:NAVY,lineHeight:1.1,marginTop:3}}>{fmtRdv(prochain.debut)}</div>
+                <div style={{fontSize:12,color:'#64748b',marginTop:4}}>{prochain.objet}</div>
+              </div>
+            )}
+          </div>
+          <div style={{maxHeight:220,overflowY:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
+            {rdvs.map((r,i)=>{
+              const futur=tsRdv(r.debut)>nowTs
+              return(
+                <div key={r.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',borderBottom:i<rdvs.length-1?'1px solid #f8fafc':'none',background:futur?'#f8fbff':'#fff'}}>
+                  <span style={{fontSize:12,fontWeight:700,color:NAVY,whiteSpace:'nowrap',minWidth:78}}>{fmtRdv(r.debut)}</span>
+                  <span style={{flex:1,fontSize:12,color:'#1e293b'}}>
+                    {r.web_link?<a href={r.web_link} target="_blank" rel="noreferrer" style={{color:'#1e293b',textDecoration:'none'}}>{r.objet||'—'}</a>:(r.objet||'—')}
+                    {r.lieu&&<span style={{fontSize:11,color:'#94a3b8'}}> · {r.lieu}</span>}
+                  </span>
+                  <span style={{fontSize:10,fontWeight:700,color:'#64748b'}}>{(r.user_email||'').replace('@dynassur.be','')}</span>
+                  {futur&&<span style={{fontSize:9,fontWeight:800,padding:'2px 6px',borderRadius:4,background:'#dbeafe',color:'#2563eb'}}>À VENIR</span>}
+                </div>
+              )
+            })}
           </div>
         </div>
-        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-          {[{v:actifs,l:'Actifs'},{v:contrats.length,l:'Contrats'}].map(k=>(
-            <div key={k.l} style={{textAlign:'center',background:'rgba(255,255,255,0.15)',borderRadius:8,padding:'5px 12px'}}>
-              <div style={{fontSize:18,fontWeight:800,color:'#fff',lineHeight:1}}>{k.v}</div>
-              <div style={{fontSize:9,color:'rgba(255,255,255,0.65)',fontWeight:600,marginTop:2}}>{k.l}</div>
+      )
+    )},
+    { key:'relations', icon:'ti-users-group', title:'Relations', col:'#ec4899', count:null, body:(<Relations client={client} onOpenDossier={onOpenDossier}/>) },
+    ...(groupe.length>0?[{ key:'groupe', icon:'ti-home-2', title:'Groupe / Ménage', col:'#0d9488', count:groupe.length, body:(
+      <div>
+        <div style={{fontSize:12,color:'#64748b',marginBottom:8,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+          <strong style={{color:NAVY}}>{groupe[0].groupe_nom||'Groupe'}</strong>
+          {groupe[0].groupe_type&&<span style={{fontSize:10,fontWeight:800,padding:'2px 7px',borderRadius:5,background:'#f0fdfa',color:'#0d9488',border:'1px solid #99f6e4'}}>{groupe[0].groupe_type}</span>}
+          {(groupe[0].nb_polices||groupe[0].prime_totale)?<span style={{color:'#94a3b8'}}>· {Math.round(groupe[0].nb_polices||0)} police(s) · {Math.round(groupe[0].prime_totale||0).toLocaleString('fr-BE')} € de prime</span>:null}
+        </div>
+        <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+          {groupe.map((m,i)=>(<span key={i} style={{fontSize:12,padding:'5px 10px',borderRadius:7,background:'#f8fafc',border:'1px solid #e2e8f0',color:'#1e293b'}}>{m.membre_nom}</span>))}
+        </div>
+      </div>
+    )}]:[]),
+    { key:'appels', icon:'ti-phone', title:'Appels', col:'#0ea5e9', count:appels.length, body:(
+      loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:!appels.length?
+        <p style={{color:'#94a3b8',fontSize:12}}>Aucun appel enregistré pour ce numéro.</p>:
+        appels.map((a,i)=>{
+          const entrant=String(a.direction||'').toLowerCase().startsWith('in')
+          return(
+            <div key={a.id} style={{display:'flex',alignItems:'center',gap:10,padding:'7px 0',borderBottom:i<appels.length-1?'1px solid #f8fafc':'none'}}>
+              <span style={{fontSize:11,fontWeight:700,padding:'2px 7px',borderRadius:5,background:entrant?'#dcfce7':'#dbeafe',color:entrant?'#16a34a':'#1d4ed8',whiteSpace:'nowrap'}}>
+                <i className={`ti ${entrant?'ti-phone-incoming':'ti-phone-outgoing'}`} style={{marginRight:4}}/>{entrant?'Entrant':'Sortant'}
+              </span>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:13,color:'#1e293b'}}>{a.numero_e164||a.numero_externe||'—'}</div>
+                <div style={{fontSize:11,color:'#94a3b8'}}>{a.nom_3cx||'—'}{a.agent?` · poste ${a.agent}`:''}</div>
+              </div>
+              <span style={{fontSize:11,color:'#64748b',whiteSpace:'nowrap'}}>{a.duree||'—'}</span>
+              <span style={{fontSize:11,color:'#64748b',whiteSpace:'nowrap'}}>{fmtAppel(a.debut)}</span>
+            </div>
+          )
+        })
+    )},
+    { key:'objets', icon:'ti-shield', title:'Objets de risque', col:'#7c3aed', count:objets.length, body:(<div><Analyse360 client={client} contrats={contrats}/><ObjetsDetail objets={objets} loading={loadF}/></div>) },
+    { key:'contrats', icon:'ti-file-text', title:'Contrats', col:BLUE, count:contrats.length, body:(
+      loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:!contrats.length?<p style={{color:'#94a3b8',fontSize:12}}>Aucun contrat</p>:
+        <div style={{overflowX:'auto',maxHeight:300,overflowY:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+            <thead style={{position:'sticky',top:0,background:'#f8fafc',zIndex:1}}>
+              <tr>{['Police','Compagnie','Domaine','Situation','Type','Date','Garantie'].map(h=>(<th key={h} style={{padding:'7px 12px',textAlign:'left',fontWeight:700,color:'#94a3b8',fontSize:10,textTransform:'uppercase',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>))}</tr>
+            </thead>
+            <tbody>
+              {contrats.map((c,i)=>{
+                const st=SIT[c.situation]||{bg:'#f1f5f9',col:'#64748b'}
+                return(
+                  <tr key={i} style={{background:i%2===0?'#fff':'#fafafe'}}>
+                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',fontFamily:'monospace',fontSize:11,fontWeight:600,color:NAVY}}>{c.police||'—'}</td>
+                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#1e293b'}}>{c.compagnie||'—'}</td>
+                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{c.domaine||'—'}</td>
+                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9'}}><span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:4,background:st.bg,color:st.col}}>{c.situation||'—'}</span></td>
+                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{c.type_production||'—'}</td>
+                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b',whiteSpace:'nowrap'}}>{fmtDate(c.date_creation)}</td>
+                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{c.garantie_valeur?fmt(c.garantie_valeur):'—'}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+    )},
+    { key:'primes', icon:'ti-cash', title:'Primes & commissions', col:'#16a34a', count:null, body:(<Primes dossier={client.dossier}/>) },
+    { key:'taches', icon:'ti-checkbox', title:'Tâches', col:'#f59e0b', count:taches.length, body:(
+      loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:!taches.length?
+        <p style={{color:'#16a34a',fontSize:12}}>✓ Aucune tâche en cours</p>:
+        taches.map((t,i)=>{
+          const ret=t.echeance&&new Date(t.echeance)<new Date()
+          return(
+            <div key={t.id} style={{display:'flex',alignItems:'center',gap:10,padding:'7px 0',borderBottom:i<taches.length-1?'1px solid #f8fafc':'none'}}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:13,color:'#1e293b'}}>{t.titre||'—'}</div>
+                <div style={{fontSize:11,color:'#94a3b8'}}>{t.gestionnaire}{t.code_type?` · ${t.code_type}`:''}</div>
+              </div>
+              <span style={{fontSize:11,color:ret?'#dc2626':'#64748b',fontWeight:ret?700:400}}>{fmtDate(t.echeance)}</span>
+              <span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:4,background:ret?'#fee2e2':'#dbeafe',color:ret?'#dc2626':'#1d4ed8'}}>{t.statut}</span>
+            </div>
+          )
+        })
+    )},
+  ]
+  const active = SECTIONS.find(s=>s.key===openSec) || SECTIONS.find(s=>s.key==='contrats') || SECTIONS[0]
+  const coordItems=[
+    {icon:'ti-device-mobile',l:'GSM',v:gsm||'—'},
+    {icon:'ti-phone',l:'Fixe',v:fixe||'—'},
+    {icon:'ti-mail',l:'Email',v:client.email||'—'},
+    {icon:'ti-calendar',l:'Naissance',v:client.date_naissance?`${fmtDateLong(client.date_naissance)}${age?` · ${age.ans} ans`:''}`:'—'},
+    {icon:'ti-user',l:'Gestionnaire',v:client.gestionnaire_nom||'—'},
+    {icon:'ti-user-star',l:'Sous-agent',v:client.sa_nom||'—'},
+  ]
+
+  return(
+    <div ref={ref} style={{background:'#fff',borderRadius:14,border:`2px solid ${BLUE}25`,overflow:'hidden',boxShadow:'0 4px 24px rgba(0,128,189,0.1)'}}>
+
+      <div style={{background:`linear-gradient(135deg, ${NAVY} 0%, ${BLUE} 100%)`,padding:'14px 20px'}}>
+        <div style={{display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
+          <div style={{width:44,height:44,borderRadius:11,background:'rgba(255,255,255,0.2)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:16,fontWeight:800,color:'#fff'}}>{initiales}</div>
+          <div style={{flex:1,minWidth:160}}>
+            <h2 style={{fontSize:23,fontWeight:800,color:'#fff',margin:0,lineHeight:1.1}}>{client.prenom} {client.nom}</h2>
+            <div style={{fontSize:11,color:'rgba(255,255,255,0.7)',display:'flex',gap:12,flexWrap:'wrap',marginTop:2}}>
+              <span>#{client.dossier}</span>
+              {client.etat_civil&&<span>{client.etat_civil}</span>}
+              {client.sexe&&<span>{client.sexe}</span>}
+              {client.bureau&&<span>{client.bureau}</span>}
+            </div>
+          </div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            {[{v:actifs,l:'Actifs'},{v:contrats.length,l:'Contrats'}].map(k=>(
+              <div key={k.l} style={{textAlign:'center',background:'rgba(255,255,255,0.15)',borderRadius:8,padding:'5px 12px'}}>
+                <div style={{fontSize:18,fontWeight:800,color:'#fff',lineHeight:1}}>{k.v}</div>
+                <div style={{fontSize:9,color:'rgba(255,255,255,0.65)',fontWeight:600,marginTop:2}}>{k.l}</div>
+              </div>
+            ))}
+          </div>
+          <button onClick={onClose} style={{background:'rgba(255,255,255,0.15)',border:'1px solid rgba(255,255,255,0.3)',borderRadius:8,padding:'6px 12px',cursor:'pointer',color:'#fff',fontSize:13,fontWeight:600,display:'flex',alignItems:'center',gap:5}}>
+            <i className="ti ti-x"/>Fermer
+          </button>
+        </div>
+
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:'8px 18px',marginTop:12,paddingTop:12,borderTop:'1px solid rgba(255,255,255,0.18)'}}>
+          <div style={{display:'flex',alignItems:'flex-start',gap:8,gridColumn:'1 / -1'}}>
+            <i className="ti ti-map-pin" style={{fontSize:14,color:'rgba(255,255,255,0.6)',marginTop:2,flexShrink:0}}/>
+            <div style={{minWidth:0}}>
+              <div style={{fontSize:9,color:'rgba(255,255,255,0.55)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.05em'}}>Adresse</div>
+              {adresseComplete?(
+                <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+                  <span style={{fontSize:13,color:'#fff'}}>{adresseComplete}</span>
+                  <a href={mapsUrl} target="_blank" rel="noreferrer" style={{fontSize:11,color:'#fff',background:'rgba(255,255,255,0.18)',padding:'2px 8px',borderRadius:6,fontWeight:600,textDecoration:'none',display:'inline-flex',alignItems:'center',gap:3}}><i className="ti ti-brand-google-maps" style={{fontSize:12}}/>Maps</a>
+                  <a href={wazeUrl} target="_blank" rel="noreferrer" style={{fontSize:11,color:'#fff',background:'rgba(255,255,255,0.18)',padding:'2px 8px',borderRadius:6,fontWeight:600,textDecoration:'none',display:'inline-flex',alignItems:'center',gap:3}}><i className="ti ti-navigation" style={{fontSize:12}}/>Waze</a>
+                </div>
+              ):<div style={{fontSize:13,color:'#fff'}}>—</div>}
+            </div>
+          </div>
+          {coordItems.map(r=>(
+            <div key={r.l} style={{display:'flex',alignItems:'flex-start',gap:8}}>
+              <i className={`ti ${r.icon}`} style={{fontSize:14,color:'rgba(255,255,255,0.6)',marginTop:2,flexShrink:0}}/>
+              <div style={{minWidth:0}}>
+                <div style={{fontSize:9,color:'rgba(255,255,255,0.55)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.05em'}}>{r.l}</div>
+                <div style={{fontSize:13,color:'#fff',wordBreak:'break-word'}}>{r.v}</div>
+              </div>
             </div>
           ))}
         </div>
-        <button onClick={onClose} style={{background:'rgba(255,255,255,0.15)',border:'1px solid rgba(255,255,255,0.3)',borderRadius:8,padding:'6px 12px',cursor:'pointer',color:'#fff',fontSize:13,fontWeight:600,display:'flex',alignItems:'center',gap:5}}>
-          <i className="ti ti-x"/>Fermer
-        </button>
       </div>
 
-      <div style={{padding:'18px 22px'}}>
+      <div style={{padding:'16px 20px'}}>
         {client.alerte&&(
           <div style={{background:'#fff7ed',border:'1px solid #fed7aa',borderRadius:8,padding:'8px 14px',marginBottom:12,display:'flex',gap:8,fontSize:13,color:'#c2410c',alignItems:'center'}}>
             <i className="ti ti-alert-triangle" style={{fontSize:16}}/><strong>Alerte :</strong>{client.alerte}
           </div>
         )}
 
-        {/* Coordonnées inline compact */}
-        <Sec icon="ti-user" title="Coordonnées" col="#64748b" open={true} count={0}>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(210px,1fr))',gap:10}}>
-            {/* Adresse cliquable */}
-            <div style={{display:'flex',alignItems:'flex-start',gap:8}}>
-              <i className="ti ti-map-pin" style={{fontSize:13,color:'#94a3b8',marginTop:2,flexShrink:0}}/>
-              <div style={{minWidth:0}}>
-                <div style={{fontSize:10,color:'#94a3b8',fontWeight:700,textTransform:'uppercase',letterSpacing:'.04em'}}>Adresse</div>
-                {adresseComplete?(
-                  <div>
-                    <div style={{fontSize:13,color:'#1e293b'}}>{adresseComplete}</div>
-                    <div style={{display:'flex',gap:10,marginTop:3}}>
-                      <a href={mapsUrl} target="_blank" rel="noreferrer" style={{fontSize:11,color:BLUE,fontWeight:600,textDecoration:'none',display:'inline-flex',alignItems:'center',gap:3}}><i className="ti ti-brand-google-maps" style={{fontSize:12}}/>Maps</a>
-                      <a href={wazeUrl} target="_blank" rel="noreferrer" style={{fontSize:11,color:'#0d9488',fontWeight:600,textDecoration:'none',display:'inline-flex',alignItems:'center',gap:3}}><i className="ti ti-navigation" style={{fontSize:12}}/>Waze</a>
-                    </div>
-                  </div>
-                ):<div style={{fontSize:13,color:'#1e293b'}}>—</div>}
-              </div>
-            </div>
-            {[
-              {icon:'ti-device-mobile',l:'GSM',       v:gsm||'—'},
-              {icon:'ti-phone',    l:'Fixe',          v:fixe||'—'},
-              {icon:'ti-mail',     l:'Email',         v:client.email||'—'},
-              {icon:'ti-calendar', l:'Naissance',     v:client.date_naissance?`${fmtDateLong(client.date_naissance)}${age?` · ${age.ans} ans`:''}`:'—'},
-              {icon:'ti-heart',    l:'État civil',    v:client.etat_civil||'—'},
-              {icon:'ti-gender-bigender',l:'Sexe',    v:client.sexe||'—'},
-              {icon:'ti-user',     l:'Gestionnaire',  v:client.gestionnaire_nom||'—'},
-              {icon:'ti-user-star',l:'Sous-agent',    v:client.sa_nom||'—'},
-            ].map(r=>(
-              <div key={r.l} style={{display:'flex',alignItems:'flex-start',gap:8}}>
-                <i className={`ti ${r.icon}`} style={{fontSize:13,color:'#94a3b8',marginTop:2,flexShrink:0}}/>
-                <div style={{minWidth:0}}>
-                  <div style={{fontSize:10,color:'#94a3b8',fontWeight:700,textTransform:'uppercase',letterSpacing:'.04em'}}>{r.l}</div>
-                  <div style={{fontSize:13,color:'#1e293b'}}>{r.v}</div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(132px,1fr))',gap:10,marginBottom:16}}>
+          {SECTIONS.map(s=>{
+            const on=active.key===s.key
+            return(
+              <button key={s.key} onClick={()=>setOpenSec(s.key)} style={{textAlign:'left',cursor:'pointer',borderRadius:11,padding:'11px 12px',border:on?`2px solid ${s.col}`:'1.5px solid #e2e8f0',background:on?`${s.col}0d`:'#fff',boxShadow:on?`0 3px 12px ${s.col}22`:'0 1px 3px rgba(0,0,0,0.03)',transition:'all .15s',fontFamily:'inherit'}}
+                onMouseEnter={e=>{ if(!on){e.currentTarget.style.borderColor=s.col+'70'} }}
+                onMouseLeave={e=>{ if(!on){e.currentTarget.style.borderColor='#e2e8f0'} }}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
+                  <div style={{width:30,height:30,borderRadius:8,background:`${s.col}18`,display:'flex',alignItems:'center',justifyContent:'center'}}><i className={`ti ${s.icon}`} style={{fontSize:16,color:s.col}}/></div>
+                  {s.count!=null&&s.count>0&&<span style={{fontSize:12,fontWeight:800,color:s.col}}>{s.count}</span>}
                 </div>
-              </div>
-            ))}
+                <div style={{fontSize:12.5,fontWeight:700,color:on?s.col:NAVY,lineHeight:1.15}}>{s.title}</div>
+              </button>
+            )
+          })}
+        </div>
+
+        <div style={{borderTop:'1px solid #f1f5f9',paddingTop:14}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+            <i className={`ti ${active.icon}`} style={{fontSize:17,color:active.col}}/>
+            <span style={{fontSize:15,fontWeight:800,color:NAVY}}>{active.title}</span>
+            {active.count!=null&&active.count>0&&<span style={{fontSize:11,fontWeight:800,padding:'1px 8px',borderRadius:20,background:`${active.col}18`,color:active.col}}>{active.count}</span>}
+            {active.key==='contrats'&&<span style={{marginLeft:'auto'}}><EnDev label="Contrats des relations à venir" mini/></span>}
           </div>
-        </Sec>
-
-        {/* Dernier contact / RDV */}
-        <Sec icon="ti-calendar-heart" title="Dernier contact" count={rdvs.length} col="#0d9488" open={true}>
-          {loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:!rdvs.length?
-            <p style={{color:'#94a3b8',fontSize:12}}>Aucun RDV lié à ce client. <span style={{color:'#cbd5e1'}}>(Lie un RDV depuis la page RDV / Agenda.)</span></p>:(
-            <div>
-              <div style={{display:'flex',gap:12,flexWrap:'wrap',marginBottom:rdvPasses.length>1||prochain?12:0}}>
-                {dernier&&(
-                  <div style={{flex:'1 1 220px',background:'#f0fdfa',border:'1px solid #99f6e4',borderRadius:10,padding:'12px 16px'}}>
-                    <div style={{fontSize:10,fontWeight:800,color:'#0d9488',textTransform:'uppercase',letterSpacing:'.05em'}}>Dernier contact</div>
-                    <div style={{fontSize:20,fontWeight:800,color:NAVY,lineHeight:1.1,marginTop:3}}>{fmtRdv(dernier.debut)}</div>
-                    <div style={{fontSize:12,color:'#0d9488',fontWeight:600}}>{ilYa(joursDernier)}</div>
-                    <div style={{fontSize:12,color:'#64748b',marginTop:4}}>{dernier.objet}</div>
-                  </div>
-                )}
-                {prochain&&(
-                  <div style={{flex:'1 1 220px',background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:10,padding:'12px 16px'}}>
-                    <div style={{fontSize:10,fontWeight:800,color:'#2563eb',textTransform:'uppercase',letterSpacing:'.05em'}}>Prochain RDV</div>
-                    <div style={{fontSize:20,fontWeight:800,color:NAVY,lineHeight:1.1,marginTop:3}}>{fmtRdv(prochain.debut)}</div>
-                    <div style={{fontSize:12,color:'#64748b',marginTop:4}}>{prochain.objet}</div>
-                  </div>
-                )}
-              </div>
-              <div style={{maxHeight:200,overflowY:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
-                {rdvs.map((r,i)=>{
-                  const futur=tsRdv(r.debut)>nowTs
-                  return(
-                    <div key={r.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',borderBottom:i<rdvs.length-1?'1px solid #f8fafc':'none',background:futur?'#f8fbff':'#fff'}}>
-                      <span style={{fontSize:12,fontWeight:700,color:NAVY,whiteSpace:'nowrap',minWidth:78}}>{fmtRdv(r.debut)}</span>
-                      <span style={{flex:1,fontSize:12,color:'#1e293b'}}>
-                        {r.web_link?<a href={r.web_link} target="_blank" rel="noreferrer" style={{color:'#1e293b',textDecoration:'none'}}>{r.objet||'—'}</a>:(r.objet||'—')}
-                        {r.lieu&&<span style={{fontSize:11,color:'#94a3b8'}}> · {r.lieu}</span>}
-                      </span>
-                      <span style={{fontSize:10,fontWeight:700,color:'#64748b'}}>{(r.user_email||'').replace('@dynassur.be','')}</span>
-                      {futur&&<span style={{fontSize:9,fontWeight:800,padding:'2px 6px',borderRadius:4,background:'#dbeafe',color:'#2563eb'}}>À VENIR</span>}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-        </Sec>
-
-        {/* Relations familiales ET sociétés */}
-        <Sec icon="ti-users-group" title="Relations & sociétés" col="#ec4899" open={true} count={0}>
-          <Relations client={client} onOpenDossier={onOpenDossier}/>
-        </Sec>
-
-        {/* Groupe / Ménage (vue Qlik GroupePreneur) */}
-        {groupe.length>0 && (
-          <Sec icon="ti-home-2" title="Groupe / Ménage" col="#0d9488" open={true} count={groupe.length}>
-            <div style={{fontSize:12,color:'#64748b',marginBottom:8,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-              <strong style={{color:NAVY}}>{groupe[0].groupe_nom||'Groupe'}</strong>
-              {groupe[0].groupe_type&&<span style={{fontSize:10,fontWeight:800,padding:'2px 7px',borderRadius:5,background:'#f0fdfa',color:'#0d9488',border:'1px solid #99f6e4'}}>{groupe[0].groupe_type}</span>}
-              {(groupe[0].nb_polices||groupe[0].prime_totale)?<span style={{color:'#94a3b8'}}>· {Math.round(groupe[0].nb_polices||0)} police(s) · {Math.round(groupe[0].prime_totale||0).toLocaleString('fr-BE')} € de prime</span>:null}
-            </div>
-            <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
-              {groupe.map((m,i)=>(
-                <span key={i} style={{fontSize:12,padding:'5px 10px',borderRadius:7,background:'#f8fafc',border:'1px solid #e2e8f0',color:'#1e293b'}}>{m.membre_nom}</span>
-              ))}
-            </div>
-          </Sec>
-        )}
-
-        {/* Appels (téléphonie 3CX, liés par numéro) */}
-        <Sec icon="ti-phone" title="Appels" count={appels.length} col="#0ea5e9" open={true}>
-          {loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:!appels.length?
-            <p style={{color:'#94a3b8',fontSize:12}}>Aucun appel enregistré pour ce numéro.</p>:
-            appels.map((a,i)=>{
-              const entrant=String(a.direction||'').toLowerCase().startsWith('in')
-              return(
-                <div key={a.id} style={{display:'flex',alignItems:'center',gap:10,padding:'7px 0',borderBottom:i<appels.length-1?'1px solid #f8fafc':'none'}}>
-                  <span style={{fontSize:11,fontWeight:700,padding:'2px 7px',borderRadius:5,background:entrant?'#dcfce7':'#dbeafe',color:entrant?'#16a34a':'#1d4ed8',whiteSpace:'nowrap'}}>
-                    <i className={`ti ${entrant?'ti-phone-incoming':'ti-phone-outgoing'}`} style={{marginRight:4}}/>{entrant?'Entrant':'Sortant'}
-                  </span>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:13,color:'#1e293b'}}>{a.numero_e164||a.numero_externe||'—'}</div>
-                    <div style={{fontSize:11,color:'#94a3b8'}}>{a.nom_3cx||'—'}{a.agent?` · poste ${a.agent}`:''}</div>
-                  </div>
-                  <span style={{fontSize:11,color:'#64748b',whiteSpace:'nowrap'}}>{a.duree||'—'}</span>
-                  <span style={{fontSize:11,color:'#64748b',whiteSpace:'nowrap'}}>{fmtAppel(a.debut)}</span>
-                </div>
-              )
-            })
-          }
-        </Sec>
-
-        {/* Objets de risque (détail Qlik par garantie, lié par police) */}
-        <Sec icon="ti-shield" title="Objets de risque" count={objets.length} col="#7c3aed" open={true}>
-          <Analyse360 client={client} contrats={contrats}/>
-          <ObjetsDetail objets={objets} loading={loadF}/>
-        </Sec>
-
-        {/* Contrats */}
-        <Sec icon="ti-file-text" title="Contrats" count={contrats.length} col={BLUE} open={true}
-          extra={<EnDev label="Contrats des relations à venir" mini />}>
-          {loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:!contrats.length?<p style={{color:'#94a3b8',fontSize:12}}>Aucun contrat</p>:
-            <div style={{overflowX:'auto',maxHeight:240,overflowY:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
-              <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
-                <thead style={{position:'sticky',top:0,background:'#f8fafc',zIndex:1}}>
-                  <tr>{['Police','Compagnie','Domaine','Situation','Type','Date','Garantie'].map(h=>(
-                    <th key={h} style={{padding:'7px 12px',textAlign:'left',fontWeight:700,color:'#94a3b8',fontSize:10,textTransform:'uppercase',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>
-                  ))}</tr>
-                </thead>
-                <tbody>
-                  {contrats.map((c,i)=>{
-                    const s=SIT[c.situation]||{bg:'#f1f5f9',col:'#64748b'}
-                    return(
-                      <tr key={i} title="Fiche contrat détaillée — en cours de développement" style={{background:i%2===0?'#fff':'#fafafe'}}>
-                        <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',fontFamily:'monospace',fontSize:11,fontWeight:600,color:NAVY}}>{c.police||'—'}</td>
-                        <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#1e293b'}}>{c.compagnie||'—'}</td>
-                        <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{c.domaine||'—'}</td>
-                        <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9'}}><span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:4,background:s.bg,color:s.col}}>{c.situation||'—'}</span></td>
-                        <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{c.type_production||'—'}</td>
-                        <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b',whiteSpace:'nowrap'}}>{fmtDate(c.date_creation)}</td>
-                        <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}} title="Détail des garanties — en cours de développement">
-                          {c.garantie_valeur?fmt(c.garantie_valeur):'—'}
-                          <i className="ti ti-tools" style={{fontSize:11,color:'#fb923c',marginLeft:5,verticalAlign:'middle'}}/>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          }
-        </Sec>
-
-        {/* Primes & commissions */}
-        <Sec icon="ti-cash" title="Primes & commissions" count={0} col="#16a34a" open={true}>
-          <Primes dossier={client.dossier}/>
-        </Sec>
-
-        {/* Tâches */}
-        <Sec icon="ti-checkbox" title="Tâches" count={taches.length} col="#f59e0b" open={false}>
-          {loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:!taches.length?
-            <p style={{color:'#16a34a',fontSize:12}}>✓ Aucune tâche en cours</p>:
-            taches.map((t,i)=>{
-              const ret=t.echeance&&new Date(t.echeance)<new Date()
-              return(
-                <div key={t.id} style={{display:'flex',alignItems:'center',gap:10,padding:'7px 0',borderBottom:i<taches.length-1?'1px solid #f8fafc':'none',background:ret?'#fff5f510':''}} >
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:13,color:'#1e293b'}}>{t.titre||'—'}</div>
-                    <div style={{fontSize:11,color:'#94a3b8'}}>{t.gestionnaire}{t.code_type?` · ${t.code_type}`:''}</div>
-                  </div>
-                  <span style={{fontSize:11,color:ret?'#dc2626':'#64748b',fontWeight:ret?700:400}}>{fmtDate(t.echeance)}</span>
-                  <span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:4,background:ret?'#fee2e2':'#dbeafe',color:ret?'#dc2626':'#1d4ed8'}}>{t.statut}</span>
-                </div>
-              )
-            })
-          }
-        </Sec>
+          {active.body}
+        </div>
       </div>
     </div>
   )
@@ -952,15 +946,9 @@ export default function DynassurClients() {
   },[])
   useEffect(()=>{ loadRelance() },[loadRelance])
 
-  useEffect(()=>{
-    const userChanged = (q!==prevQS.current.q || scope!==prevQS.current.scope)
-    prevQS.current = {q,scope}
-    if(userChanged) deepLink.current = null   // l'utilisateur cherche/filtre → on lâche le deep-link
-    const t=setTimeout(()=>{ setPage(0); if(!deepLink.current) setSelected(null); load(q,scope,0) },300)
-    return ()=>clearTimeout(t)
-  },[q,scope,myCode,myBureau])
+  // recherche liste classique retirée — remplacée par la recherche universelle (colonne gauche)
 
-  useEffect(()=>{ load(q,scope,page) },[page])
+  // pagination liste retirée
 
   // Ouvrir une fiche à partir d'un n° de dossier (clic sur une relation)
   const openDossier = useCallback(async(dossier)=>{
@@ -998,6 +986,24 @@ export default function DynassurClients() {
   if(q.length>=2){ const s=q.toLowerCase(); relanceView = relanceView.filter(c=>`${c.nom} ${c.prenom} ${c.dossier}`.toLowerCase().includes(s)) }
   const relanceShow = relanceView.slice(0,500)
 
+
+  // ── colonne gauche : recherche universelle + relance ──
+  const [leftMode,setLeftMode]=useState('search')
+  const [sres,setSres]=useState([])
+  const [searching,setSearching]=useState(false)
+  const [recent,setRecent]=useState([])
+  useEffect(()=>{ try{ setRecent(JSON.parse(localStorage.getItem('dyn_recent_clients')||'[]')) }catch(e){ setRecent([]) } },[selected])
+  useEffect(()=>{
+    if(leftMode!=='search'){ return }
+    const term=(q||'').trim()
+    if(term.length<2){ setSres([]); setSearching(false); return }
+    setSearching(true)
+    const t=setTimeout(async()=>{
+      const {data,error}=await supabase.rpc('search_clients_dynassur',{q:term,lim:60})
+      setSres(error?[]:(data||[])); setSearching(false)
+    },300)
+    return ()=>clearTimeout(t)
+  },[q,leftMode])
   return(
     <Layout currentPage="Clients">
       <div style={{fontFamily:"'Source Sans Pro',sans-serif",width:'100%'}}>
@@ -1012,174 +1018,113 @@ export default function DynassurClients() {
           ]}
         />
 
-        {/* ── Barre de recherche en HAUT ── */}
-        {!selected&&(
-          <div style={{position:'relative',marginBottom:18}}>
-            <i className="ti ti-search" style={{position:'absolute',left:14,top:'50%',transform:'translateY(-50%)',color:'#94a3b8',fontSize:18}}/>
-            <input ref={searchRef} value={q} onChange={e=>setQ(e.target.value)}
-              placeholder="Rechercher par nom, prénom, n° dossier, email, téléphone…"
-              style={{width:'100%',padding:'12px 14px 12px 42px',borderRadius:10,border:`1.5px solid ${q?BLUE:'#e2e8f0'}`,fontSize:14,fontFamily:"'Source Sans Pro',sans-serif",outline:'none',boxSizing:'border-box',transition:'border-color 0.15s',background:'#fff',boxShadow:'0 2px 8px rgba(0,0,0,0.04)'}}
-            />
-            {q&&<button onClick={()=>setQ('')} style={{position:'absolute',right:12,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',color:'#94a3b8',fontSize:18}}>✕</button>}
-          </div>
-        )}
+        <div style={{display:'flex',gap:16,alignItems:'flex-start',marginTop:4}}>
 
-        {/* ── Filtre relance : dernier contact ── */}
-        {!selected&&(
-          <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:18}}>
-            <span style={{fontSize:13,color:'#64748b',fontWeight:600}}><i className="ti ti-calendar-heart" style={{marginRight:5,color:'#0d9488'}}/>Dernier contact :</span>
-            <select value={contactFilter} onChange={e=>setContactFilter(e.target.value)}
-              style={{padding:'7px 12px',borderRadius:8,border:`1.5px solid ${relanceActif?'#0d9488':'#e2e8f0'}`,fontSize:13,color:NAVY,background:'#fff',fontFamily:"'Source Sans Pro',sans-serif",fontWeight:relanceActif?700:400}}>
-              <option value="tous">Tous les clients (base complète)</option>
-              {TRANCHES.map(t=><option key={t.val} value={t.val}>{t.label} ({relanceCounts[t.val]||0})</option>)}
-            </select>
-            {relance===null
-              ? <span style={{fontSize:12,color:'#94a3b8'}}>chargement des contacts…</span>
-              : relanceActif && <span style={{fontSize:12,color:'#0d9488',fontWeight:600}}>{relanceView.length} client(s) — du plus ancien au plus récent</span>}
-          </div>
-        )}
-
-        {/* ── 3 cartes de scope ── */}
-        {!selected&&(
-          <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:14,marginBottom:20}}>
-            {SCOPES.map(s=>{
-              const isSel=scope===s.val
-              const barW=s.pct==='100'?100:parseFloat(s.pct)||0
-              return(
-                <div key={s.val} onClick={()=>setScope(s.val)} style={{
-                  background:'#fff',borderRadius:12,padding:'16px 18px',cursor:'pointer',
-                  border:isSel?`2px solid ${s.col}`:'2px solid #e2e8f0',
-                  boxShadow:isSel?`0 4px 16px ${s.col}25`:'0 1px 4px rgba(0,0,0,0.04)',
-                  transition:'all 0.15s',
-                }}
-                  onMouseEnter={e=>{ if(!isSel){e.currentTarget.style.borderColor=s.col+'80';e.currentTarget.style.boxShadow=`0 3px 12px ${s.col}15`} }}
-                  onMouseLeave={e=>{ if(!isSel){e.currentTarget.style.borderColor='#e2e8f0';e.currentTarget.style.boxShadow='0 1px 4px rgba(0,0,0,0.04)'} }}
-                >
-                  <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
-                    <i className={`ti ${s.icon}`} style={{fontSize:18,color:s.col}}/>
-                    <span style={{fontSize:13,fontWeight:700,color:isSel?s.col:NAVY}}>{s.label}</span>
-                    {s.note&&<span style={{fontSize:10,color:'#94a3b8',marginLeft:'auto'}}>{s.note}</span>}
-                  </div>
-                  <div style={{fontSize:30,fontWeight:900,color:isSel?s.col:'#0f172a',lineHeight:1,marginBottom:4}}>{s.nb.toLocaleString('fr-BE')}</div>
-                  <div style={{fontSize:12,color:'#64748b',marginBottom:10}}>{s.pct}% du total Dynassur</div>
-                  <div style={{background:'#f1f5f9',borderRadius:4,height:5,overflow:'hidden'}}>
-                    <div style={{width:`${barW}%`,height:'100%',background:s.col,borderRadius:4,transition:'width 0.4s'}}/>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-
-        {/* ── Si client sélectionné : mini barre compacte ── */}
-        {selected&&(
-          <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16,background:'#f0f9ff',borderRadius:10,padding:'10px 16px',border:`1px solid ${BLUE}30`}}>
-            <button onClick={()=>{ setSelected(null); setTimeout(()=>searchRef.current?.focus(),100) }}
-              style={{display:'flex',alignItems:'center',gap:5,background:'transparent',border:'none',cursor:'pointer',color:BLUE,fontSize:13,fontWeight:600,padding:0}}>
-              <i className="ti ti-search" style={{fontSize:15}}/>Nouvelle recherche
-            </button>
-            <span style={{color:'#94a3b8'}}>·</span>
-            <span style={{fontSize:13,color:'#64748b'}}>Fiche : <strong style={{color:NAVY}}>{selected.prenom} {selected.nom}</strong></span>
-            <button onClick={()=>setSelected(null)} style={{marginLeft:'auto',background:'transparent',border:'none',cursor:'pointer',color:'#94a3b8',fontSize:18}}>✕</button>
-          </div>
-        )}
-
-        {/* ── Tableau ── */}
-        {!selected&&!relanceActif&&(
-          <div style={{background:'#fff',borderRadius:12,border:'1px solid #e2e8f0',overflow:'hidden',marginBottom:4}}>
-            <div style={{overflowX:'auto'}}>
-              <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-                <thead>
-                  <tr style={{background:'#f8fafc'}}>
-                    {['N° Dossier','Nom & Prénom','Localité','GSM / Tél','Gestionnaire','SA',''].map(h=>(
-                      <th key={h} style={{padding:'9px 14px',textAlign:'left',fontWeight:700,color:'#94a3b8',fontSize:10,textTransform:'uppercase',letterSpacing:'.05em',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading&&!clients.length?(<tr><td colSpan={7} style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Chargement…</td></tr>)
-                  :!clients.length?(<tr><td colSpan={7} style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Aucun client trouvé</td></tr>)
-                  :clients.map((c,i)=>(
-                    <tr key={c.dossier||i} onClick={()=>{ setSelected(c); pushRecentClient(c) }} style={{cursor:'pointer',background:i%2===0?'#fff':'#fafafe',transition:'background 0.1s'}}
-                      onMouseEnter={e=>e.currentTarget.style.background='#f0f9ff'}
-                      onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'#fff':'#fafafe'}>
-                      <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9',fontFamily:'monospace',fontSize:11,color:NAVY,fontWeight:600}}>{c.dossier}</td>
-                      <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9'}}>
-                        <div style={{fontWeight:600,color:'#1e293b'}}>{c.nom} {c.prenom}</div>
-                        {c.email&&<div style={{fontSize:11,color:'#94a3b8'}}>{c.email}</div>}
-                      </td>
-                      <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{c.cp} {c.localite||'—'}</td>
-                      <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9',color:'#374151',fontSize:12}}>
-                        {c.gsm||c.tel_fixe||'—'}
-                      </td>
-                      <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9',color:'#64748b',fontSize:12}}>{c.gestionnaire_nom||'—'}</td>
-                      <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9',color:'#64748b',fontSize:12}}>{c.sa_nom||'—'}</td>
-                      <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9',textAlign:'right'}}>
-                        <div style={{display:'flex',gap:4,alignItems:'center',justifyContent:'flex-end'}}>
-                          {c.alerte&&<i className="ti ti-alert-triangle" style={{fontSize:13,color:'#f59e0b'}} title={c.alerte}/>}
-                          <span style={{fontSize:11,color:BLUE,fontWeight:600}}>Fiche ▼</span>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {/* ── COLONNE GAUCHE : recherche / relance ── */}
+          <div style={{width:340,flexShrink:0,position:'sticky',top:12,maxHeight:'calc(100vh - 32px)',display:'flex',flexDirection:'column',background:'#fff',borderRadius:12,border:'1px solid #e2e8f0',overflow:'hidden'}}>
+            <div style={{display:'flex',padding:8,gap:6,borderBottom:'1px solid #f1f5f9'}}>
+              {[{k:'search',ic:'ti-search',l:'Recherche',c:BLUE},{k:'relance',ic:'ti-calendar-heart',l:'Relance',c:'#0d9488'}].map(m=>(
+                <button key={m.k} onClick={()=>setLeftMode(m.k)} style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:6,padding:'8px 10px',borderRadius:8,border:'none',cursor:'pointer',fontSize:13,fontWeight:700,fontFamily:'inherit',background:leftMode===m.k?m.c:'#f1f5f9',color:leftMode===m.k?'#fff':'#64748b'}}>
+                  <i className={`ti ${m.ic}`}/>{m.l}
+                </button>
+              ))}
             </div>
-            {nb>1&&(
-              <div style={{padding:'10px 18px',borderTop:'1px solid #f1f5f9',display:'flex',alignItems:'center',justifyContent:'space-between',background:'#fafafe'}}>
-                <button onClick={()=>setPage(p=>Math.max(0,p-1))} disabled={page===0} style={{padding:'5px 14px',borderRadius:6,border:'1px solid #e2e8f0',background:page===0?'#f8fafc':'#fff',cursor:page===0?'not-allowed':'pointer',fontSize:12,color:page===0?'#94a3b8':'#374151'}}>← Précédent</button>
-                <span style={{fontSize:12,color:'#64748b'}}>Page {page+1} / {nb} — ≈ {total.toLocaleString('fr-BE')} clients</span>
-                <button onClick={()=>setPage(p=>Math.min(nb-1,p+1))} disabled={page===nb-1} style={{padding:'5px 14px',borderRadius:6,border:'1px solid #e2e8f0',background:page===nb-1?'#f8fafc':'#fff',cursor:page===nb-1?'not-allowed':'pointer',fontSize:12,color:page===nb-1?'#94a3b8':'#374151'}}>Suivant →</button>
+
+            <div style={{padding:10,borderBottom:'1px solid #f1f5f9'}}>
+              <div style={{position:'relative'}}>
+                <i className="ti ti-search" style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',color:'#94a3b8',fontSize:16}}/>
+                <input ref={searchRef} value={q} onChange={e=>setQ(e.target.value)} autoFocus
+                  placeholder={leftMode==='search'?'Nom, plaque, tél, police…':'Filtrer la liste…'}
+                  style={{width:'100%',padding:'10px 12px 10px 38px',borderRadius:9,border:`1.5px solid ${q?(leftMode==='search'?BLUE:'#0d9488'):'#e2e8f0'}`,fontSize:13.5,fontFamily:'inherit',outline:'none',boxSizing:'border-box',background:'#fff'}}/>
+                {q&&<button onClick={()=>setQ('')} style={{position:'absolute',right:10,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',color:'#94a3b8',fontSize:16}}>✕</button>}
+              </div>
+              {leftMode==='relance'&&(
+                <div style={{marginTop:8,display:'flex',flexDirection:'column',gap:6}}>
+                  <select value={scope} onChange={e=>setScope(e.target.value)} style={{padding:'6px 10px',borderRadius:7,border:'1px solid #e2e8f0',fontSize:12,fontFamily:'inherit',color:NAVY,background:'#fff'}}>
+                    <option value="all">Tous Dynassur ({counts.total.toLocaleString('fr-BE')})</option>
+                    <option value="mine">Mes clients ({counts.mine.toLocaleString('fr-BE')})</option>
+                    <option value="bureau">Mon bureau ({counts.bureau.toLocaleString('fr-BE')})</option>
+                  </select>
+                  <select value={contactFilter} onChange={e=>setContactFilter(e.target.value)} style={{padding:'6px 10px',borderRadius:7,border:`1px solid ${relanceActif?'#0d9488':'#e2e8f0'}`,fontSize:12,fontFamily:'inherit',color:NAVY,background:'#fff',fontWeight:relanceActif?700:400}}>
+                    <option value="tous">Toutes les tranches</option>
+                    {TRANCHES.map(t=><option key={t.val} value={t.val}>{t.label} ({relanceCounts[t.val]||0})</option>)}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            <div style={{flex:1,overflowY:'auto',padding:6}}>
+              {leftMode==='search'?(
+                searching?<p style={{padding:16,textAlign:'center',color:'#94a3b8',fontSize:13}}>Recherche…</p>
+                :(q||'').trim().length<2?(
+                  recent.length?(
+                    <div>
+                      <div style={{fontSize:10,fontWeight:800,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'.05em',padding:'6px 8px'}}>Clients récents</div>
+                      {recent.map((c,i)=>(
+                        <div key={i} onClick={()=>openDossier(c.dossier)} style={{cursor:'pointer',padding:'9px 10px',borderRadius:8,marginBottom:2}}
+                          onMouseEnter={e=>e.currentTarget.style.background='#f0f9ff'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                          <div style={{fontSize:13,fontWeight:600,color:'#1e293b'}}>{c.nom} {c.prenom}</div>
+                          <div style={{fontSize:11,color:'#94a3b8'}}>#{c.dossier}{c.localite?` · ${c.localite}`:''}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ):(
+                    <div style={{padding:'24px 14px',textAlign:'center',color:'#94a3b8'}}>
+                      <i className="ti ti-search" style={{fontSize:28,opacity:.4}}/>
+                      <p style={{fontSize:13,marginTop:8,lineHeight:1.5}}>Tape un <strong>nom</strong>, une <strong>plaque</strong>, un <strong>n° de tél</strong>, une <strong>police</strong> ou un <strong>email</strong>…</p>
+                    </div>
+                  )
+                ):!sres.length?<p style={{padding:16,textAlign:'center',color:'#94a3b8',fontSize:13}}>Aucun résultat</p>
+                :sres.map((c,i)=>{
+                  const on=selected&&selected.dossier===c.dossier
+                  return(
+                    <div key={c.dossier||i} onClick={()=>openDossier(c.dossier)} style={{cursor:'pointer',padding:'9px 10px',borderRadius:8,marginBottom:2,background:on?'#e0f2fe':'transparent'}}
+                      onMouseEnter={e=>{ if(!on)e.currentTarget.style.background='#f0f9ff' }} onMouseLeave={e=>{ if(!on)e.currentTarget.style.background='transparent' }}>
+                      <div style={{fontSize:13,fontWeight:600,color:'#1e293b'}}>{c.nom} {c.prenom}</div>
+                      <div style={{fontSize:11,color:'#94a3b8'}}>#{c.dossier}{c.localite?` · ${c.cp||''} ${c.localite}`:''}</div>
+                      {c.match_info&&<div style={{fontSize:11,color:BLUE,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{c.match_info}</div>}
+                    </div>
+                  )
+                })
+              ):(
+                relance===null?<p style={{padding:16,textAlign:'center',color:'#94a3b8',fontSize:13}}>Chargement…</p>
+                :!relanceView.length?<p style={{padding:16,textAlign:'center',color:'#94a3b8',fontSize:13}}>Aucun client.</p>
+                :relanceShow.map((c,i)=>{
+                  const col=TRANCHE_COL[c.tranche]||'#64748b'
+                  const on=selected&&selected.dossier===c.dossier
+                  return(
+                    <div key={c.id} onClick={()=>openDossier(c.dossier)} style={{cursor:'pointer',padding:'9px 10px',borderRadius:8,marginBottom:2,background:on?'#f0fdfa':'transparent'}}
+                      onMouseEnter={e=>{ if(!on)e.currentTarget.style.background='#f0fdfa' }} onMouseLeave={e=>{ if(!on)e.currentTarget.style.background='transparent' }}>
+                      <div style={{display:'flex',alignItems:'center',gap:6}}>
+                        <span style={{flex:1,fontSize:13,fontWeight:600,color:'#1e293b'}}>{c.nom} {c.prenom}</span>
+                        <span style={{fontSize:9,fontWeight:800,padding:'2px 6px',borderRadius:4,background:col+'18',color:col,whiteSpace:'nowrap'}}>{c.tranche==='jamais'?'Jamais':ilYa(c.jours)}</span>
+                      </div>
+                      <div style={{fontSize:11,color:'#94a3b8'}}>#{c.dossier}{c.localite?` · ${c.localite}`:''}</div>
+                    </div>
+                  )
+                })
+              )}
+              {leftMode==='relance'&&relance!==null&&relanceView.length>relanceShow.length&&(
+                <p style={{padding:'10px',textAlign:'center',color:'#94a3b8',fontSize:11}}>{relanceShow.length} / {relanceView.length.toLocaleString('fr-BE')} affichés — affine le filtre.</p>
+              )}
+            </div>
+          </div>
+
+          {/* ── COLONNE DROITE : fiche ou état vide ── */}
+          <div style={{flex:1,minWidth:0}}>
+            {selected?(
+              <Fiche client={selected} onClose={()=>{ setSelected(null); setTimeout(()=>searchRef.current?.focus(),80) }} onOpenDossier={openDossier}/>
+            ):(
+              <div style={{background:'#fff',borderRadius:14,border:'2px dashed #e2e8f0',padding:'60px 30px',textAlign:'center',color:'#94a3b8'}}>
+                <div style={{width:64,height:64,borderRadius:16,background:`${BLUE}12`,display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 16px'}}><i className="ti ti-user-search" style={{fontSize:32,color:BLUE}}/></div>
+                <h3 style={{fontSize:18,fontWeight:800,color:NAVY,margin:'0 0 6px'}}>Recherche un client</h3>
+                <p style={{fontSize:14,maxWidth:440,margin:'0 auto',lineHeight:1.5}}>Champ à gauche : nom, prénom, n° de dossier, email, téléphone (tous formats), plaque d'immatriculation, marque/modèle ou n° de police.</p>
               </div>
             )}
           </div>
-        )}
 
-        {/* ── Tableau relance (dernier contact) ── */}
-        {!selected&&relanceActif&&(
-          <div style={{background:'#fff',borderRadius:12,border:'1px solid #e2e8f0',overflow:'hidden',marginBottom:4}}>
-            <div style={{overflowX:'auto'}}>
-              <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-                <thead>
-                  <tr style={{background:'#f8fafc'}}>
-                    {['N° Dossier','Nom & Prénom','Localité','Dernier contact','Ancienneté','Gestionnaire / SA',''].map(h=>(
-                      <th key={h} style={{padding:'9px 14px',textAlign:'left',fontWeight:700,color:'#94a3b8',fontSize:10,textTransform:'uppercase',letterSpacing:'.05em',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {relance===null?(<tr><td colSpan={7} style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Chargement…</td></tr>)
-                  :!relanceView.length?(<tr><td colSpan={7} style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Aucun client dans cette tranche.</td></tr>)
-                  :relanceShow.map((c,i)=>{
-                    const col=TRANCHE_COL[c.tranche]||'#64748b'
-                    return(
-                      <tr key={c.id} onClick={()=>openDossier(c.dossier)} style={{cursor:'pointer',background:i%2===0?'#fff':'#fafafe'}}
-                        onMouseEnter={e=>e.currentTarget.style.background='#f0fdfa'}
-                        onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'#fff':'#fafafe'}>
-                        <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9',fontFamily:'monospace',fontSize:11,color:NAVY,fontWeight:600}}>{c.dossier}</td>
-                        <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9'}}>
-                          <div style={{fontWeight:600,color:'#1e293b'}}>{c.nom} {c.prenom}</div>
-                          {(c.gsm||c.tel_fixe)&&<div style={{fontSize:11,color:'#94a3b8'}}>{c.gsm||c.tel_fixe}</div>}
-                        </td>
-                        <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{c.cp} {c.localite||'—'}</td>
-                        <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9',color:NAVY,fontWeight:600,whiteSpace:'nowrap'}}>{c.last?new Date(c.last).toLocaleDateString('fr-BE',{day:'2-digit',month:'2-digit',year:'numeric'}):'—'}</td>
-                        <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9'}}><span style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:4,background:col+'18',color:col,whiteSpace:'nowrap'}}>{c.tranche==='jamais'?'Jamais contacté':ilYa(c.jours)}</span></td>
-                        <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9',color:'#64748b',fontSize:12}}>{c.gestionnaire_nom||c.gestionnaire_code||'—'}{c.sa_nom?` · ${c.sa_nom}`:''}</td>
-                        <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9',textAlign:'right'}}><span style={{fontSize:11,color:'#0d9488',fontWeight:600}}>Fiche ▼</span></td>
-                      </tr>
-                    )
-                  })}
-                  {relanceView.length>500&&(<tr><td colSpan={7} style={{padding:'12px 14px',textAlign:'center',color:'#94a3b8',fontSize:12,background:'#fafafe'}}>500 premiers affichés (les plus anciens) sur {relanceView.length.toLocaleString('fr-BE')} — affinez avec la recherche ou le scope.</td></tr>)}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+        </div>
 
-        {/* ── Fiche ── */}
-        {selected&&<Fiche client={selected} onClose={()=>setSelected(null)} onOpenDossier={openDossier}/>}
-
-        {/* ── Modal liste KPI (avec alerte / sans contrat / sans comm.) ── */}
         {kpiModal&&(
           <div onClick={()=>setKpiModal(null)} style={{position:'fixed',inset:0,background:'rgba(15,23,42,.55)',zIndex:1000,display:'flex',justifyContent:'flex-end'}}>
             <div onClick={e=>e.stopPropagation()} style={{width:'min(820px,96vw)',height:'100%',background:'#fff',display:'flex',flexDirection:'column',boxShadow:'-8px 0 30px rgba(0,0,0,.2)'}}>
