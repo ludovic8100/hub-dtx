@@ -979,8 +979,8 @@ function Fiche({ client, onClose, onOpenDossier }) {
               {contrats.map((c,i)=>{
                 const st=SIT[c.situation]||{bg:'#f1f5f9',col:'#64748b'}
                 return(
-                  <tr key={i} onMouseEnter={()=>previewContrat(c)} onMouseLeave={leaveContrat} onClick={()=>openContrat(c)} style={{background:i%2===0?'#fff':'#fafafe',cursor:'pointer'}}>
-                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',fontFamily:'monospace',fontSize:11}}><span title="Survoler pour aperçu · cliquer pour épingler" style={{color:BLUE,fontWeight:700,textDecoration:'underline'}}>{c.police||'—'}</span></td>
+                  <tr key={i} style={{background:i%2===0?'#fff':'#fafafe'}}>
+                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',fontFamily:'monospace',fontSize:11}}><span onMouseEnter={()=>previewContrat(c)} onMouseLeave={leaveContrat} onClick={()=>openContrat(c)} title="Survoler pour aperçu · cliquer pour épingler" style={{cursor:'pointer',color:BLUE,fontWeight:700,textDecoration:'underline'}}>{c.police||'—'}</span></td>
                     <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#1e293b'}}>{c.compagnie||'—'}</td>
                     <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#475569',fontSize:11}}>{(()=>{ const os=objetsParPolice[c.police]?[...objetsParPolice[c.police]]:[]; if(!os.length) return <span style={{color:'#cbd5e1'}}>—</span>; return <span style={{display:'flex',flexDirection:'column',gap:2}}>{os.map((o,k)=><span key={k}>{o}</span>)}</span> })()}</td>
                     <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{c.domaine||'—'}</td>
