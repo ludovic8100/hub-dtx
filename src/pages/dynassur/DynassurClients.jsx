@@ -576,6 +576,179 @@ function ObjetsDetail({ objets, loading }) {
   )
 }
 
+// ── Normalisation d'adresse (pour comparer "même adresse de résidence") ──
+const normAdr = (...parts) => parts.map(x => x==null?'':String(x)).join(' ')
+  .toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'')
+
+// ── Modal détail contrat (garanties, objets couverts, primes/mensualités, sinistres) ──
+function ContratModal({ contrat, dossier, objets, onClose }) {
+  const [quit,setQuit]=useState([]); const [ld,setLd]=useState(true)
+  useEffect(()=>{
+    setLd(true)
+    supabase.from('quittances').select('prime_totale,periodicite,date_comptable,type_quittance,commission,compagnie')
+      .eq('dossier',dossier).eq('police',contrat.police).order('date_comptable',{ascending:false})
+      .then(({data})=>{ setQuit(data||[]); setLd(false) })
+  },[dossier,contrat.police])
+
+  const obj=objets.filter(o=>o.police===contrat.police)
+  const parObjet={}
+  obj.forEach(o=>{ const k=o.description||o.type_risque||'—'; (parObjet[k]=parObjet[k]||{type:o.type_risque,descr:o.description,gars:new Set()}); if(o.garantie) parObjet[k].gars.add(o.garantie) })
+  const objList=Object.values(parObjet)
+  const derniere=quit[0]||null
+  const SIT={'En cours':{bg:'#dcfce7',col:'#16a34a'},'Résilié':{bg:'#fee2e2',col:'#dc2626'},'Terminé':{bg:'#fee2e2',col:'#dc2626'},'Suspendu':{bg:'#fef3c7',col:'#92400e'}}
+  const st=SIT[contrat.situation]||{bg:'#f1f5f9',col:'#64748b'}
+  const Bloc=({icon,titre,col,children})=>(
+    <div style={{marginBottom:16}}>
+      <div style={{display:'flex',alignItems:'center',gap:7,marginBottom:8}}>
+        <i className={`ti ${icon}`} style={{fontSize:16,color:col}}/>
+        <span style={{fontSize:13,fontWeight:800,color:NAVY}}>{titre}</span>
+      </div>
+      {children}
+    </div>
+  )
+  return (
+    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.55)',zIndex:1000,display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'40px 16px',overflowY:'auto'}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:'#fff',borderRadius:14,maxWidth:720,width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.35)',overflow:'hidden'}}>
+        <div style={{background:`linear-gradient(135deg, ${BLUE} 0%, ${NAVY} 140%)`,padding:'16px 20px',display:'flex',alignItems:'flex-start',gap:12}}>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:10,color:'rgba(255,255,255,0.75)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.05em'}}>Contrat</div>
+            <div style={{fontSize:21,fontWeight:800,color:'#fff',fontFamily:'monospace',lineHeight:1.1}}>{contrat.police||'—'}</div>
+            <div style={{fontSize:12.5,color:'rgba(255,255,255,0.9)',marginTop:3}}>{[contrat.compagnie,contrat.domaine].filter(Boolean).join(' · ')||'—'}</div>
+          </div>
+          <button onClick={onClose} style={{background:'rgba(255,255,255,0.15)',border:'1px solid rgba(255,255,255,0.3)',borderRadius:8,padding:'6px 11px',cursor:'pointer',color:'#fff',fontSize:13,fontWeight:600,flexShrink:0}}><i className="ti ti-x"/></button>
+        </div>
+        <div style={{padding:'18px 20px',maxHeight:'72vh',overflowY:'auto'}}>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:18}}>
+            <span style={{fontSize:11,fontWeight:700,padding:'3px 10px',borderRadius:6,background:st.bg,color:st.col}}>{contrat.situation||'—'}</span>
+            {contrat.type_production&&<span style={{fontSize:11,fontWeight:600,padding:'3px 10px',borderRadius:6,background:'#f1f5f9',color:'#475569'}}>{contrat.type_production}</span>}
+            {contrat.date_creation&&<span style={{fontSize:11,fontWeight:600,padding:'3px 10px',borderRadius:6,background:'#f1f5f9',color:'#475569'}}>Depuis {fmtDate(contrat.date_creation)}</span>}
+            {contrat.garantie_valeur?<span style={{fontSize:11,fontWeight:600,padding:'3px 10px',borderRadius:6,background:'#eff6ff',color:'#1d4ed8'}}>Valeur assurée {fmt(contrat.garantie_valeur)}</span>:null}
+          </div>
+
+          <Bloc icon="ti-shield-check" titre="Garanties & objets couverts" col="#7c3aed">
+            {!objList.length?<p style={{color:'#94a3b8',fontSize:12,margin:0}}>Aucun objet de risque détaillé pour cette police.</p>:
+              <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                {objList.map((o,i)=>{
+                  const tl=(o.type||'').toLowerCase()
+                  const ic=tl.includes('hicule')?'ti-car':(tl.includes('timent')||tl.includes('immeuble')?'ti-building':(tl.includes('individu')||tl.includes('personne')?'ti-user':'ti-point'))
+                  return(
+                    <div key={i} style={{border:'1px solid #ede9fe',borderRadius:9,padding:'9px 12px',background:'#fbfaff'}}>
+                      <div style={{fontSize:12.5,fontWeight:700,color:'#334155',display:'flex',alignItems:'center',gap:6,marginBottom:6}}><i className={`ti ${ic}`} style={{fontSize:14,color:'#7c3aed'}}/>{o.descr||o.type||'Objet'}</div>
+                      <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                        {[...o.gars].length?[...o.gars].map((g,j)=><span key={j} style={{fontSize:11,fontWeight:600,padding:'3px 9px',borderRadius:6,background:'#dcfce7',color:'#15803d',border:'1px solid #86efac'}}>{g}</span>):<span style={{fontSize:11,color:'#94a3b8'}}>—</span>}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>}
+          </Bloc>
+
+          <Bloc icon="ti-cash" titre="Primes & mensualités" col="#16a34a">
+            {ld?<p style={{color:'#94a3b8',fontSize:12,margin:0}}>Chargement…</p>:!quit.length?<p style={{color:'#94a3b8',fontSize:12,margin:0}}>Aucune quittance pour cette police.</p>:
+              <div>
+                {derniere&&<div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:10}}>
+                  <div style={{background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:8,padding:'8px 14px'}}>
+                    <div style={{fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase'}}>Dernière prime</div>
+                    <div style={{fontSize:17,fontWeight:800,color:NAVY}}>{fmt(derniere.prime_totale)}</div>
+                  </div>
+                  {derniere.periodicite&&<div style={{background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:8,padding:'8px 14px'}}>
+                    <div style={{fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase'}}>Périodicité</div>
+                    <div style={{fontSize:15,fontWeight:800,color:'#1d4ed8'}}>{derniere.periodicite}</div>
+                  </div>}
+                </div>}
+                <div style={{maxHeight:180,overflowY:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
+                  <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+                    <thead style={{position:'sticky',top:0,background:'#f8fafc'}}><tr>{['Période','Prime','Périodicité','Type'].map(h=><th key={h} style={{padding:'6px 12px',textAlign:'left',fontWeight:700,color:'#94a3b8',fontSize:10,textTransform:'uppercase',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
+                    <tbody>
+                      {quit.map((r,i)=>(
+                        <tr key={i} style={{background:i%2===0?'#fff':'#fafafe'}}>
+                          <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b',whiteSpace:'nowrap'}}>{fmtMois(r.date_comptable)}</td>
+                          <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',fontWeight:600,color:NAVY}}>{fmt(r.prime_totale)}</td>
+                          <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{r.periodicite||'—'}</td>
+                          <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{r.type_quittance||'—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>}
+          </Bloc>
+
+          <Bloc icon="ti-alert-triangle" titre="Sinistres" col="#dc2626">
+            <p style={{color:'#94a3b8',fontSize:12,margin:0,fontStyle:'italic'}}>Les sinistres ne sont pas rattachés au n° de police dans les données actuelles (identifiant interne Brio distinct). À raccorder via un mapping dédié.</p>
+          </Bloc>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Contrats du foyer : contrats des relations vivant à la MÊME adresse ──
+function ContratsFoyer({ client }) {
+  const [groupes,setGroupes]=useState([]); const [ld,setLd]=useState(true)
+  useEffect(()=>{
+    if(!client?.dossier){ setGroupes([]); setLd(false); return }
+    setLd(true)
+    ;(async()=>{
+      const NOM=(client.nom||'').toUpperCase().trim(); const PRENOM=(client.prenom||'').trim()
+      const SEL='dossier,nom_principal,prenom_principal,nom_lie,prenom_lie'
+      const [{data:dir},{data:inv}]=await Promise.all([
+        supabase.from('famille').select(SEL).eq('dossier',client.dossier),
+        supabase.from('famille').select(SEL).ilike('nom_lie',NOM).ilike('prenom_lie',PRENOM),
+      ])
+      const relNoms=new Set(); const relDossiers=new Set()
+      ;(dir||[]).forEach(r=>{ if(r.nom_lie) relNoms.add(`${(r.nom_lie||'').toUpperCase()}|${(r.prenom_lie||'').toUpperCase()}`) })
+      ;(inv||[]).forEach(r=>{ if(r.dossier) relDossiers.add(r.dossier); if(r.nom_principal) relNoms.add(`${(r.nom_principal||'').toUpperCase()}|${(r.prenom_principal||'').toUpperCase()}`) })
+      const nomsList=[...new Set([...relNoms].map(k=>k.split('|')[0]).filter(Boolean))]
+      let candidats=[]
+      if(nomsList.length){
+        const {data:cl}=await supabase.from('clients').select('dossier,nom,prenom,rue,num_maison,cp,localite').in('nom',nomsList).not('dossier','is',null)
+        candidats=(cl||[]).filter(c=>relNoms.has(`${(c.nom||'').toUpperCase()}|${(c.prenom||'').toUpperCase()}`))
+      }
+      if(relDossiers.size){
+        const {data:cl2}=await supabase.from('clients').select('dossier,nom,prenom,rue,num_maison,cp,localite').in('dossier',[...relDossiers])
+        candidats=[...candidats,...(cl2||[])]
+      }
+      const byDoss={}
+      candidats.forEach(c=>{ if(c.dossier&&c.dossier!==client.dossier) byDoss[c.dossier]=c })
+      const cle=normAdr(client.rue,client.num_maison,client.cp)
+      const memeAdr=Object.values(byDoss).filter(c=> cle && normAdr(c.rue,c.num_maison,c.cp)===cle )
+      if(!memeAdr.length){ setGroupes([]); setLd(false); return }
+      const {data:ctr}=await supabase.from('contrats').select('dossier,police,compagnie,domaine,situation').in('dossier',memeAdr.map(c=>c.dossier))
+      const parDoss={}
+      ;(ctr||[]).forEach(c=>{ const k=c.police||JSON.stringify(c); const g=(parDoss[c.dossier]=parDoss[c.dossier]||{seen:new Set(),list:[]}); if(!g.seen.has(k)){ g.seen.add(k); g.list.push(c) } })
+      const out=memeAdr.map(c=>({...c,contrats:(parDoss[c.dossier]&&parDoss[c.dossier].list)||[]})).filter(x=>x.contrats.length)
+      setGroupes(out); setLd(false)
+    })()
+  },[client?.dossier])
+
+  if(ld) return <p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>
+  if(!groupes.length) return <div style={{color:'#94a3b8',fontSize:12,fontStyle:'italic'}}>Aucune relation à la même adresse de résidence (avec contrats).</div>
+  const SIT={'En cours':{bg:'#dcfce7',col:'#16a34a'},'Résilié':{bg:'#fee2e2',col:'#dc2626'},'Terminé':{bg:'#fee2e2',col:'#dc2626'},'Suspendu':{bg:'#fef3c7',col:'#92400e'}}
+  return(
+    <div style={{display:'flex',flexDirection:'column',gap:12}}>
+      <div style={{fontSize:11,color:'#94a3b8',fontStyle:'italic'}}>Personnes liées vivant à la même adresse ({[client.rue,client.num_maison].filter(Boolean).join(' ')||'—'}).</div>
+      {groupes.map((g,i)=>(
+        <div key={i} style={{border:'1px solid #e2e8f0',borderRadius:10,padding:'10px 13px'}}>
+          <div style={{fontSize:13,fontWeight:800,color:NAVY,marginBottom:7}}>{[g.prenom,g.nom].filter(Boolean).join(' ')||'—'} <span style={{fontSize:11,fontWeight:600,color:'#94a3b8'}}>#{g.dossier} · {g.contrats.length} contrat(s)</span></div>
+          <div style={{display:'flex',flexDirection:'column',gap:5}}>
+            {g.contrats.map((c,j)=>{
+              const st=SIT[c.situation]||{bg:'#f1f5f9',col:'#64748b'}
+              return(
+                <div key={j} style={{display:'flex',alignItems:'center',gap:8,fontSize:12}}>
+                  <span style={{fontFamily:'monospace',fontWeight:600,color:NAVY,minWidth:82}}>{c.police||'—'}</span>
+                  <span style={{color:'#1e293b',flex:1,minWidth:0}}>{[c.compagnie,c.domaine].filter(Boolean).join(' · ')||'—'}</span>
+                  <span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:4,background:st.bg,color:st.col,whiteSpace:'nowrap'}}>{c.situation||'—'}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function Fiche({ client, onClose, onOpenDossier }) {
   const [contrats,setContrats]=useState([]); const [taches,setTaches]=useState([]); const [rdvs,setRdvs]=useState([]); const [groupe,setGroupe]=useState([]); const [objets,setObjets]=useState([]); const [appels,setAppels]=useState([]); const [loadF,setLoadF]=useState(true)
   const ref=useRef(null)
@@ -635,6 +808,9 @@ function Fiche({ client, onClose, onOpenDossier }) {
   const SIT={  'En cours':{bg:'#dcfce7',col:'#16a34a'},'Résilié':{bg:'#fee2e2',col:'#dc2626'},'Terminé':{bg:'#fee2e2',col:'#dc2626'},'Suspendu':{bg:'#fef3c7',col:'#92400e'} }
 
   const [openSec,setOpenSec]=useState('contrats')
+  const [detailContrat,setDetailContrat]=useState(null)
+  const garantiesParPolice={}
+  objets.forEach(o=>{ if(o.police){ const set=(garantiesParPolice[o.police]=garantiesParPolice[o.police]||new Set()); if(o.garantie) set.add(o.garantie) } })
 
   const SECTIONS=[
     { key:'contacts', icon:'ti-address-book', title:'Contacts', col:'#0d9488', count:contactsUnifies.length, body:(
@@ -695,6 +871,7 @@ function Fiche({ client, onClose, onOpenDossier }) {
       )
     )},
     { key:'relations', icon:'ti-users-group', title:'Relations', col:'#ec4899', count:null, body:(<Relations client={client} onOpenDossier={onOpenDossier}/>) },
+    { key:'foyer', icon:'ti-home', title:'Contrats du foyer', col:'#0891b2', count:null, body:(<ContratsFoyer client={client}/>) },
     ...(groupe.length>0?[{ key:'groupe', icon:'ti-home-2', title:'Groupe / Ménage', col:'#0d9488', count:groupe.length, body:(
       <div>
         <div style={{fontSize:12,color:'#64748b',marginBottom:8,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
@@ -713,20 +890,20 @@ function Fiche({ client, onClose, onOpenDossier }) {
         <div style={{overflowX:'auto',maxHeight:300,overflowY:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
           <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
             <thead style={{position:'sticky',top:0,background:'#f8fafc',zIndex:1}}>
-              <tr>{['Police','Compagnie','Domaine','Situation','Type','Date','Garantie'].map(h=>(<th key={h} style={{padding:'7px 12px',textAlign:'left',fontWeight:700,color:'#94a3b8',fontSize:10,textTransform:'uppercase',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>))}</tr>
+              <tr>{['Police','Compagnie','Domaine','Garanties','Situation','Type','Date'].map(h=>(<th key={h} style={{padding:'7px 12px',textAlign:'left',fontWeight:700,color:'#94a3b8',fontSize:10,textTransform:'uppercase',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>))}</tr>
             </thead>
             <tbody>
               {contrats.map((c,i)=>{
                 const st=SIT[c.situation]||{bg:'#f1f5f9',col:'#64748b'}
                 return(
                   <tr key={i} style={{background:i%2===0?'#fff':'#fafafe'}}>
-                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',fontFamily:'monospace',fontSize:11,fontWeight:600,color:NAVY}}>{c.police||'—'}</td>
+                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',fontFamily:'monospace',fontSize:11}}><span onClick={()=>setDetailContrat(c)} title="Voir le détail du contrat" style={{cursor:'pointer',color:BLUE,fontWeight:700,textDecoration:'underline'}}>{c.police||'—'}</span></td>
                     <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#1e293b'}}>{c.compagnie||'—'}</td>
                     <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{c.domaine||'—'}</td>
+                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9'}}>{(()=>{ const gs=garantiesParPolice[c.police]?[...garantiesParPolice[c.police]]:[]; if(!gs.length) return <span style={{color:'#cbd5e1'}}>—</span>; return <span style={{display:'inline-flex',flexWrap:'wrap',gap:3}}>{gs.slice(0,2).map((g,k)=><span key={k} style={{fontSize:10,fontWeight:600,padding:'1px 6px',borderRadius:4,background:'#f5f3ff',color:'#7c3aed',whiteSpace:'nowrap'}}>{g}</span>)}{gs.length>2&&<span style={{fontSize:10,fontWeight:700,color:'#94a3b8',alignSelf:'center'}}>+{gs.length-2}</span>}</span> })()}</td>
                     <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9'}}><span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:4,background:st.bg,color:st.col}}>{c.situation||'—'}</span></td>
                     <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{c.type_production||'—'}</td>
                     <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b',whiteSpace:'nowrap'}}>{fmtDate(c.date_creation)}</td>
-                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{c.garantie_valeur?fmt(c.garantie_valeur):'—'}</td>
                   </tr>
                 )
               })}
@@ -848,9 +1025,9 @@ function Fiche({ client, onClose, onOpenDossier }) {
             <i className={`ti ${active.icon}`} style={{fontSize:17,color:active.col}}/>
             <span style={{fontSize:15,fontWeight:800,color:NAVY}}>{active.title}</span>
             {active.count!=null&&active.count>0&&<span style={{fontSize:11,fontWeight:800,padding:'1px 8px',borderRadius:20,background:`${active.col}18`,color:active.col}}>{active.count}</span>}
-            {active.key==='contrats'&&<span style={{marginLeft:'auto'}}><EnDev label="Contrats des relations à venir" mini/></span>}
           </div>
           {active.body}
+          {detailContrat&&<ContratModal contrat={detailContrat} dossier={client.dossier} objets={objets} onClose={()=>setDetailContrat(null)}/>}
         </div>
       </div>
     </div>
