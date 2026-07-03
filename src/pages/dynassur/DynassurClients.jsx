@@ -716,6 +716,49 @@ function ContratModal({ contrat, dossier, objets, onClose, preview }) {
 }
 
 // ── Contrats du foyer : contrats des relations vivant à la MÊME adresse ──
+function CouverturesAcquises({ client, onOpenDossier }) {
+  const [rows,setRows]=useState([]); const [ld,setLd]=useState(true)
+  useEffect(()=>{
+    if(!client?.dossier||!client?.nom){ setRows([]); setLd(false); return }
+    setLd(true)
+    ;(async()=>{
+      const { data }=await supabase.rpc('couvertures_acquises',{ p_dossier:client.dossier, p_nom:client.nom||'', p_prenom:client.prenom||'' })
+      setRows(data||[]); setLd(false)
+    })()
+  },[client?.dossier,client?.nom,client?.prenom])
+  if(ld) return <p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>
+  if(!rows.length) return <div style={{color:'#94a3b8',fontSize:12,fontStyle:'italic'}}>Cette personne n'est couverte dans aucun autre contrat dont elle n'est pas le preneur.</div>
+  const SIT={'En cours':{bg:'#dcfce7',col:'#16a34a'},'Résilié':{bg:'#fee2e2',col:'#dc2626'},'Terminé':{bg:'#fee2e2',col:'#dc2626'},'Suspendu':{bg:'#fef3c7',col:'#92400e'}}
+  const byDoss={}
+  rows.forEach(r=>{ const g=(byDoss[r.dossier]=byDoss[r.dossier]||{dossier:r.dossier,preneur:r.preneur,list:[]}); g.list.push(r) })
+  const groupes=Object.values(byDoss)
+  return(
+    <div style={{display:'flex',flexDirection:'column',gap:12}}>
+      <div style={{fontSize:11,color:'#94a3b8',fontStyle:'italic'}}>Contrats d'autres dossiers où {[client.prenom,client.nom].filter(Boolean).join(' ')||'cette personne'} figure comme personne assurée sans en être le preneur. Rapprochement par nom + prénom.</div>
+      {groupes.map((g,i)=>(
+        <div key={i} style={{border:'1px solid #e2e8f0',borderRadius:10,padding:'10px 13px'}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:7}}>
+            <div style={{fontSize:13,fontWeight:800,color:NAVY}}>Preneur : {g.preneur||'—'} <span style={{fontSize:11,fontWeight:600,color:'#94a3b8'}}>#{g.dossier} · {g.list.length} contrat(s)</span></div>
+            {onOpenDossier&&<button onClick={()=>onOpenDossier(g.dossier)} style={{marginLeft:'auto',fontSize:11,fontWeight:600,color:BLUE,background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:6,padding:'3px 9px',cursor:'pointer'}}>Ouvrir</button>}
+          </div>
+          <div style={{display:'flex',flexDirection:'column',gap:5}}>
+            {g.list.map((c,j)=>{
+              const st=SIT[c.situation]||{bg:'#f1f5f9',col:'#64748b'}
+              return(
+                <div key={j} style={{display:'flex',alignItems:'center',gap:8,fontSize:12}}>
+                  <span style={{fontFamily:'monospace',fontWeight:600,color:NAVY,minWidth:82}}>{c.police||'—'}</span>
+                  <span style={{color:'#1e293b',flex:1,minWidth:0}}>{[c.compagnie,c.domaine].filter(Boolean).join(' · ')||'—'}</span>
+                  <span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:4,background:st.bg,color:st.col,whiteSpace:'nowrap'}}>{c.situation||'—'}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function ContratsFoyer({ client }) {
   const [groupes,setGroupes]=useState([]); const [ld,setLd]=useState(true)
   useEffect(()=>{
@@ -951,6 +994,7 @@ function Fiche({ client, onClose, onOpenDossier }) {
           </table>
         </div>
     )},
+    { key:'couvertures', icon:'ti-shield-half', title:'Couvertures acquises', col:'#0891b2', count:null, body:(<CouverturesAcquises client={client} onOpenDossier={onOpenDossier}/>) },
     { key:'primes', icon:'ti-cash', title:'Primes & commissions', col:'#16a34a', count:null, body:(<Primes dossier={client.dossier}/>) },
     { key:'taches', icon:'ti-checkbox', title:'Tâches', col:'#f59e0b', count:taches.length, body:(
       loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:!taches.length?
