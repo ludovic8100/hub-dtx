@@ -154,7 +154,7 @@ export default function Header({ currentPage, onToggleMenu, menuOuvert }) {
     document.documentElement.style.zoom = String(fz / 100)
     try { localStorage.setItem('hub_font_zoom', String(fz)) } catch (e) {}
   }, [fz])
-  const cycleFz = () => setFz(f => (f >= 130 ? 100 : f + 15))
+  const bumpFz = d => setFz(f => Math.max(75, Math.min(200, f + d)))
 
   const displayName = perms?.nom || user?.user_metadata?.full_name || user?.email || ''
   const firstName = displayName.split(' ')[0]
@@ -252,18 +252,18 @@ export default function Header({ currentPage, onToggleMenu, menuOuvert }) {
           </button>
         )}
 
-        <button onClick={cycleFz} title="Taille du texte" style={{
-          display: 'flex', alignItems: 'center', gap: 4,
+        <div title="Taille du texte (75 %–200 %)" style={{
+          display: 'flex', alignItems: 'center', gap: 2,
           background: 'transparent', border: '1px solid rgba(255,255,255,0.2)',
           color: 'rgba(255,255,255,0.7)', borderRadius: '6px',
-          padding: '5px 9px', cursor: 'pointer', fontSize: '12.5px',
-          fontFamily: "'Source Sans Pro', sans-serif", transition: 'all 0.15s'
-        }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.4)' }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)' }}
-        >
-          <i className="ti ti-text-size" style={{ fontSize: '15px' }} />{!mob && `${fz}%`}
-        </button>
+          padding: '2px 3px', fontFamily: "'Source Sans Pro', sans-serif"
+        }}>
+          <button onClick={() => bumpFz(-15)} disabled={fz <= 75} title="Réduire" style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: fz <= 75 ? 'default' : 'pointer', opacity: fz <= 75 ? 0.35 : 1, fontSize: '17px', lineHeight: 1, padding: '2px 7px', fontWeight: 700 }}>−</button>
+          <span onClick={() => setFz(100)} title="Rétablir 100 %" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '12.5px', cursor: 'pointer', minWidth: mob ? 'auto' : '40px', justifyContent: 'center' }}>
+            <i className="ti ti-text-size" style={{ fontSize: '14px' }} />{!mob && `${fz}%`}
+          </span>
+          <button onClick={() => bumpFz(15)} disabled={fz >= 200} title="Agrandir" style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: fz >= 200 ? 'default' : 'pointer', opacity: fz >= 200 ? 0.35 : 1, fontSize: '17px', lineHeight: 1, padding: '2px 7px', fontWeight: 700 }}>+</button>
+        </div>
 
         <button onClick={signOut} title="Se déconnecter" style={{
           display: 'flex', alignItems: 'center',

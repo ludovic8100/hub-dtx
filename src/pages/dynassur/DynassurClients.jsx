@@ -538,7 +538,7 @@ function ObjetsDetail({ objets, loading }) {
   if(!objets.length) return <div style={{color:'#94a3b8',fontSize:12,fontStyle:'italic'}}>Aucun objet de risque détaillé pour ce dossier.</div>
   // regrouper par police
   const parPolice={}
-  objets.forEach(o=>{ (parPolice[o.police]=parPolice[o.police]||{police:o.police,type:o.type_risque,compagnie:o.compagnie,domaine:o.domaine,gars:[]}).gars.push({g:o.garantie,s:o.situation}) })
+  objets.forEach(o=>{ const gp=(parPolice[o.police]=parPolice[o.police]||{police:o.police,type:o.type_risque,compagnie:o.compagnie,domaine:o.domaine,descrs:new Set(),gars:[]}); gp.gars.push({g:o.garantie,s:o.situation}); if(o.description) gp.descrs.add(o.description) })
   const groupes=Object.values(parPolice).sort((a,b)=>{
     const ac=a.gars.some(x=>x.s==='En cours'), bc=b.gars.some(x=>x.s==='En cours'); return (bc-ac)
   })
@@ -554,6 +554,15 @@ function ObjetsDetail({ objets, loading }) {
               {p.compagnie&&<span style={{fontSize:11,color:'#64748b'}}>· {p.compagnie}</span>}
               {p.domaine&&<span style={{fontSize:10,fontWeight:700,padding:'1px 7px',borderRadius:5,background:'#f5f3ff',color:'#7c3aed'}}>{p.domaine}</span>}
             </div>
+            {p.descrs&&p.descrs.size>0&&(
+              <div style={{display:'flex',flexDirection:'column',gap:3,marginBottom:8}}>
+                {[...p.descrs].map((d,k)=>{
+                  const tl=(p.type||'').toLowerCase()
+                  const ic=tl.includes('hicule')?'ti-car':(tl.includes('timent')||tl.includes('immeuble')?'ti-building':(tl.includes('individu')||tl.includes('personne')?'ti-user':'ti-point'))
+                  return <div key={k} style={{fontSize:12.5,fontWeight:700,color:'#334155',display:'flex',alignItems:'center',gap:6}}><i className={`ti ${ic}`} style={{fontSize:14,color:'#7c3aed'}}/>{d}</div>
+                })}
+              </div>
+            )}
             <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
               {p.gars.map((x,j)=>{
                 const enc=x.s==='En cours'
@@ -581,7 +590,7 @@ function Fiche({ client, onClose, onOpenDossier }) {
         ? supabase.from('rdv').select('id,objet,debut,categorie,user_email,web_link,journee_entiere,lieu').eq('client_id',client.id).order('debut',{ascending:false})
         : Promise.resolve({data:[]}),
       supabase.from('parentes').select('groupe_nom,groupe_type,membre_nom,nb_polices,prime_totale').eq('dossier_principal',client.dossier),
-      supabase.from('objets_risque').select('police,type_risque,garantie,situation,compagnie,domaine').eq('dossier',client.dossier),
+      supabase.from('objets_risque').select('police,type_risque,garantie,situation,compagnie,domaine,description,date_effet').eq('dossier',client.dossier),
       (()=>{ const nums=[client.gsm_e164,client.telfixe_e164].filter(Boolean); return nums.length ? supabase.from('appels').select('id,direction,numero_externe,numero_e164,agent,duree,debut,nom_3cx').in('numero_e164',nums).order('debut',{ascending:false}).limit(50) : Promise.resolve({data:[]}) })(),
     ]).then(([{data:c},{data:t},{data:rv},{data:gr},{data:ob},{data:ap}])=>{
       // Dédoublonnage par police (les imports créent des lignes identiques) — on garde la plus récente
@@ -607,6 +616,14 @@ function Fiche({ client, onClose, onOpenDossier }) {
   const dernier=rdvPasses[0]||null
   const joursDernier=dernier?Math.floor((nowTs-tsRdv(dernier.debut))/86400000):null
   const prochain=rdvFuturs[0]||null
+  // Contacts unifiés = RDV + appels (une seule notion de « contact »)
+  const appelTs=a=>{ const t=new Date(a.debut).getTime(); return isNaN(t)?0:t }
+  const contactsUnifies=[
+    ...rdvs.map(r=>({kind:'rdv',ts:tsRdv(r.debut),data:r})),
+    ...appels.map(a=>({kind:'appel',ts:appelTs(a),data:a})),
+  ].sort((a,b)=>b.ts-a.ts)
+  const dernierContact=contactsUnifies.find(c=>c.ts<=nowTs)||null
+  const joursDernierC=dernierContact?Math.floor((nowTs-dernierContact.ts)/86400000):null
 
   // Risques (dérivés des domaines de contrats actifs)
   const risques={}
@@ -620,17 +637,17 @@ function Fiche({ client, onClose, onOpenDossier }) {
   const [openSec,setOpenSec]=useState('contrats')
 
   const SECTIONS=[
-    { key:'contacts', icon:'ti-calendar-heart', title:'Dernier contact', col:'#0d9488', count:rdvs.length, body:(
-      loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:!rdvs.length?
-        <p style={{color:'#94a3b8',fontSize:12}}>Aucun RDV lié à ce client. <span style={{color:'#cbd5e1'}}>(Lie un RDV depuis la page RDV / Agenda.)</span></p>:(
+    { key:'contacts', icon:'ti-address-book', title:'Contacts', col:'#0d9488', count:contactsUnifies.length, body:(
+      loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:!contactsUnifies.length?
+        <p style={{color:'#94a3b8',fontSize:12}}>Aucun contact enregistré (ni RDV, ni appel).</p>:(
         <div>
-          <div style={{display:'flex',gap:12,flexWrap:'wrap',marginBottom:(rdvPasses.length>1||prochain)?12:0}}>
-            {dernier&&(
+          <div style={{display:'flex',gap:12,flexWrap:'wrap',marginBottom:12}}>
+            {dernierContact&&(
               <div style={{flex:'1 1 220px',background:'#f0fdfa',border:'1px solid #99f6e4',borderRadius:10,padding:'12px 16px'}}>
                 <div style={{fontSize:10,fontWeight:800,color:'#0d9488',textTransform:'uppercase',letterSpacing:'.05em'}}>Dernier contact</div>
-                <div style={{fontSize:20,fontWeight:800,color:NAVY,lineHeight:1.1,marginTop:3}}>{fmtRdv(dernier.debut)}</div>
-                <div style={{fontSize:12,color:'#0d9488',fontWeight:600}}>{ilYa(joursDernier)}</div>
-                <div style={{fontSize:12,color:'#64748b',marginTop:4}}>{dernier.objet}</div>
+                <div style={{fontSize:20,fontWeight:800,color:NAVY,lineHeight:1.1,marginTop:3}}>{dernierContact.kind==='rdv'?fmtRdv(dernierContact.data.debut):fmtAppel(dernierContact.data.debut)}</div>
+                <div style={{fontSize:12,color:'#0d9488',fontWeight:600}}>{ilYa(joursDernierC)}</div>
+                <div style={{fontSize:12,color:'#64748b',marginTop:4}}>{dernierContact.kind==='rdv'?(dernierContact.data.objet||'RDV'):`${String(dernierContact.data.direction||'').toLowerCase().startsWith('in')?'Appel entrant':'Appel sortant'}${dernierContact.data.nom_3cx?` · ${dernierContact.data.nom_3cx}`:''}`}</div>
               </div>
             )}
             {prochain&&(
@@ -641,18 +658,35 @@ function Fiche({ client, onClose, onOpenDossier }) {
               </div>
             )}
           </div>
-          <div style={{maxHeight:220,overflowY:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
-            {rdvs.map((r,i)=>{
-              const futur=tsRdv(r.debut)>nowTs
+          <div style={{maxHeight:280,overflowY:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
+            {contactsUnifies.map((c,i)=>{
+              const last=i===contactsUnifies.length-1
+              if(c.kind==='rdv'){
+                const r=c.data; const futur=c.ts>nowTs
+                return(
+                  <div key={'r'+r.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',borderBottom:last?'none':'1px solid #f8fafc',background:futur?'#f8fbff':'#fff'}}>
+                    <span style={{fontSize:10,fontWeight:800,padding:'2px 7px',borderRadius:5,background:'#f0fdfa',color:'#0d9488',whiteSpace:'nowrap'}}><i className="ti ti-calendar" style={{marginRight:4}}/>RDV</span>
+                    <span style={{fontSize:12,fontWeight:700,color:NAVY,whiteSpace:'nowrap',minWidth:74}}>{fmtRdv(r.debut)}</span>
+                    <span style={{flex:1,fontSize:12,color:'#1e293b',minWidth:0}}>
+                      {r.web_link?<a href={r.web_link} target="_blank" rel="noreferrer" style={{color:'#1e293b',textDecoration:'none'}}>{r.objet||'—'}</a>:(r.objet||'—')}
+                      {r.lieu&&<span style={{fontSize:11,color:'#94a3b8'}}> · {r.lieu}</span>}
+                    </span>
+                    <span style={{fontSize:10,fontWeight:700,color:'#64748b'}}>{(r.user_email||'').replace('@dynassur.be','')}</span>
+                    {futur&&<span style={{fontSize:9,fontWeight:800,padding:'2px 6px',borderRadius:4,background:'#dbeafe',color:'#2563eb'}}>À VENIR</span>}
+                  </div>
+                )
+              }
+              const a=c.data; const entrant=String(a.direction||'').toLowerCase().startsWith('in')
               return(
-                <div key={r.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',borderBottom:i<rdvs.length-1?'1px solid #f8fafc':'none',background:futur?'#f8fbff':'#fff'}}>
-                  <span style={{fontSize:12,fontWeight:700,color:NAVY,whiteSpace:'nowrap',minWidth:78}}>{fmtRdv(r.debut)}</span>
-                  <span style={{flex:1,fontSize:12,color:'#1e293b'}}>
-                    {r.web_link?<a href={r.web_link} target="_blank" rel="noreferrer" style={{color:'#1e293b',textDecoration:'none'}}>{r.objet||'—'}</a>:(r.objet||'—')}
-                    {r.lieu&&<span style={{fontSize:11,color:'#94a3b8'}}> · {r.lieu}</span>}
+                <div key={'a'+a.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',borderBottom:last?'none':'1px solid #f8fafc'}}>
+                  <span style={{fontSize:10,fontWeight:800,padding:'2px 7px',borderRadius:5,background:entrant?'#dcfce7':'#dbeafe',color:entrant?'#16a34a':'#1d4ed8',whiteSpace:'nowrap'}}><i className={`ti ${entrant?'ti-phone-incoming':'ti-phone-outgoing'}`} style={{marginRight:4}}/>{entrant?'Entrant':'Sortant'}</span>
+                  <span style={{fontSize:12,fontWeight:700,color:NAVY,whiteSpace:'nowrap',minWidth:74}}>{fmtAppel(a.debut)}</span>
+                  <span style={{flex:1,fontSize:12,color:'#1e293b',minWidth:0}}>
+                    {a.numero_e164||a.numero_externe||'—'}
+                    {a.nom_3cx&&<span style={{fontSize:11,color:'#94a3b8'}}> · {a.nom_3cx}</span>}
                   </span>
-                  <span style={{fontSize:10,fontWeight:700,color:'#64748b'}}>{(r.user_email||'').replace('@dynassur.be','')}</span>
-                  {futur&&<span style={{fontSize:9,fontWeight:800,padding:'2px 6px',borderRadius:4,background:'#dbeafe',color:'#2563eb'}}>À VENIR</span>}
+                  {a.agent&&<span style={{fontSize:10,fontWeight:700,color:'#64748b'}}>poste {a.agent}</span>}
+                  <span style={{fontSize:11,color:'#64748b',whiteSpace:'nowrap'}}>{a.duree||''}</span>
                 </div>
               )
             })}
@@ -673,26 +707,6 @@ function Fiche({ client, onClose, onOpenDossier }) {
         </div>
       </div>
     )}]:[]),
-    { key:'appels', icon:'ti-phone', title:'Appels', col:'#0ea5e9', count:appels.length, body:(
-      loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:!appels.length?
-        <p style={{color:'#94a3b8',fontSize:12}}>Aucun appel enregistré pour ce numéro.</p>:
-        appels.map((a,i)=>{
-          const entrant=String(a.direction||'').toLowerCase().startsWith('in')
-          return(
-            <div key={a.id} style={{display:'flex',alignItems:'center',gap:10,padding:'7px 0',borderBottom:i<appels.length-1?'1px solid #f8fafc':'none'}}>
-              <span style={{fontSize:11,fontWeight:700,padding:'2px 7px',borderRadius:5,background:entrant?'#dcfce7':'#dbeafe',color:entrant?'#16a34a':'#1d4ed8',whiteSpace:'nowrap'}}>
-                <i className={`ti ${entrant?'ti-phone-incoming':'ti-phone-outgoing'}`} style={{marginRight:4}}/>{entrant?'Entrant':'Sortant'}
-              </span>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:13,color:'#1e293b'}}>{a.numero_e164||a.numero_externe||'—'}</div>
-                <div style={{fontSize:11,color:'#94a3b8'}}>{a.nom_3cx||'—'}{a.agent?` · poste ${a.agent}`:''}</div>
-              </div>
-              <span style={{fontSize:11,color:'#64748b',whiteSpace:'nowrap'}}>{a.duree||'—'}</span>
-              <span style={{fontSize:11,color:'#64748b',whiteSpace:'nowrap'}}>{fmtAppel(a.debut)}</span>
-            </div>
-          )
-        })
-    )},
     { key:'objets', icon:'ti-shield', title:'Objets de risque', col:'#7c3aed', count:objets.length, body:(<div><Analyse360 client={client} contrats={contrats}/><ObjetsDetail objets={objets} loading={loadF}/></div>) },
     { key:'contrats', icon:'ti-file-text', title:'Contrats', col:BLUE, count:contrats.length, body:(
       loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:!contrats.length?<p style={{color:'#94a3b8',fontSize:12}}>Aucun contrat</p>:
@@ -741,8 +755,8 @@ function Fiche({ client, onClose, onOpenDossier }) {
   ]
   const active = SECTIONS.find(s=>s.key===openSec) || SECTIONS.find(s=>s.key==='contrats') || SECTIONS[0]
   const coordItems=[
-    {icon:'ti-device-mobile',l:'GSM',v:gsm||'—'},
-    {icon:'ti-phone',l:'Fixe',v:fixe||'—'},
+    {icon:'ti-device-mobile',l:'GSM',v:gsm||'—',tel:client.gsm_e164||gsm},
+    {icon:'ti-phone',l:'Fixe',v:fixe||'—',tel:client.telfixe_e164||fixe},
     {icon:'ti-mail',l:'Email',v:client.email||'—'},
     {icon:'ti-calendar',l:'Naissance',v:client.date_naissance?`${fmtDateLong(client.date_naissance)}${age?` · ${age.ans} ans`:''}`:'—'},
     {icon:'ti-user',l:'Gestionnaire',v:client.gestionnaire_nom||'—'},
@@ -796,7 +810,9 @@ function Fiche({ client, onClose, onOpenDossier }) {
               <i className={`ti ${r.icon}`} style={{fontSize:14,color:'rgba(255,255,255,0.6)',marginTop:2,flexShrink:0}}/>
               <div style={{minWidth:0}}>
                 <div style={{fontSize:9,color:'rgba(255,255,255,0.55)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.05em'}}>{r.l}</div>
-                <div style={{fontSize:13,color:'#fff',wordBreak:'break-word'}}>{r.v}</div>
+                {r.tel&&r.v!=='—'
+                  ?<a href={`tel:${r.tel}`} title="Appeler" style={{fontSize:13,color:'#fff',wordBreak:'break-word',textDecoration:'none',borderBottom:'1px dotted rgba(255,255,255,0.6)'}}>{r.v}</a>
+                  :<div style={{fontSize:13,color:'#fff',wordBreak:'break-word'}}>{r.v}</div>}
               </div>
             </div>
           ))}
