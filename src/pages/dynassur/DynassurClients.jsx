@@ -561,7 +561,7 @@ const objetCle = (o) => {
 }
 
 // ── Couvertures par objet (cross-dossier) : pour chaque objet du client, TOUS les contrats qui le couvrent ──
-function CouverturesParObjet({ client, objets, cies, onOpenDossier }) {
+function VueContrats({ client, objets, contratsClient, garantiesParPolice, cies, onOpenDossier, loadF, previewContrat, openContrat, leaveContrat }) {
   const [rows,setRows]=useState(null); const [loading,setLoading]=useState(true)
   const [liesFam,setLiesFam]=useState(new Set()); const [relsFam,setRelsFam]=useState([])
   const [manuels,setManuels]=useState([]); const [preneurs,setPreneurs]=useState({})
@@ -645,22 +645,29 @@ function CouverturesParObjet({ client, objets, cies, onOpenDossier }) {
 
   const dossiersLies=new Set([...liesFam,...manuels.map(m=>m.autreDossier)])
   const catOf=d=> d===client.dossier?'perso':(dossiersLies.has(d)?'lie':'autre')
-  const objMap={}, polMap={}
+
+  const objMap={}, mapPolObjs={}
   ;[...(objets||[]),...(rows||[])].forEach(o=>{
     const k=objetCle(o); if(!k) return
     const g=objMap[k]||(objMap[k]={key:k,type:o.type_risque,label:o.description||''})
     if((o.description||'').length>(g.label||'').length) g.label=o.description
-    const p=polMap[o.police]||(polMap[o.police]={police:o.police,compagnie:o.compagnie,dossier:o.dossier,situation:o.situation,gars:new Set(),objs:new Set()})
-    if(o.garantie) p.gars.add(o.garantie); if(o.situation==='En cours') p.situation='En cours'; p.objs.add(k)
+    ;(mapPolObjs[o.police]=mapPolObjs[o.police]||new Set()).add(k)
   })
-  const contrats=Object.values(polMap).map(p=>({...p,gars:[...p.gars],objs:[...p.objs],enc:p.situation==='En cours',externe:p.dossier!==client.dossier,cat:catOf(p.dossier)}))
-  const objetsList=Object.values(objMap).map(g=>({...g,enc:contrats.filter(c=>c.enc&&c.objs.includes(g.key)).length,tot:contrats.filter(c=>c.objs.includes(g.key)).length}))
-    .sort((a,b)=>(b.enc-a.enc)||(b.tot-a.tot))
-  const nbTermines=contrats.filter(c=>!c.enc).length
-  let visContrats=contrats.filter(c=>showTermines||c.enc); if(selObj) visContrats=visContrats.filter(c=>c.objs.includes(selObj))
+  const objsOf=pol=> mapPolObjs[pol]?[...mapPolObjs[pol]]:[]
 
-  if(loading&&rows===null) return <p style={{color:'#94a3b8',fontSize:12,marginTop:8}}>Recherche des couvertures liées…</p>
-  if(!objetsList.length) return <div style={{color:'#94a3b8',fontSize:12,fontStyle:'italic',marginTop:8}}>Aucun véhicule ni bâtiment exploitable pour ce dossier.</div>
+  const persoList=(contratsClient||[]).map(c=>({police:c.police,compagnie:c.compagnie,domaine:c.domaine,situation:c.situation,enc:c.situation==='En cours',gars:(garantiesParPolice&&garantiesParPolice[c.police])?[...garantiesParPolice[c.police]]:[],objs:objsOf(c.police),dossier:client.dossier,externe:false,cat:'perso',raw:c}))
+  const persoPol=new Set(persoList.map(p=>p.police))
+  const polMap={}
+  ;(rows||[]).forEach(o=>{ if(o.dossier===client.dossier||persoPol.has(o.police)) return
+    const p=polMap[o.police]||(polMap[o.police]={police:o.police,compagnie:o.compagnie,dossier:o.dossier,domaine:o.domaine,situation:o.situation,gars:new Set(),objs:new Set()})
+    if(o.garantie) p.gars.add(o.garantie); if(o.situation==='En cours') p.situation='En cours'; const k=objetCle(o); if(k) p.objs.add(k)
+  })
+  const crossList=Object.values(polMap).map(p=>({...p,gars:[...p.gars],objs:[...p.objs],enc:p.situation==='En cours',externe:true,cat:catOf(p.dossier)}))
+  const allC=[...persoList,...crossList]
+
+  const objetsList=Object.values(objMap).map(g=>({...g,enc:allC.filter(c=>c.enc&&c.objs.includes(g.key)).length,tot:allC.filter(c=>c.objs.includes(g.key)).length})).sort((a,b)=>(b.enc-a.enc)||(b.tot-a.tot))
+  const nbTermines=allC.filter(c=>!c.enc).length
+  let visC=allC.filter(c=>showTermines||c.enc); if(selObj) visC=visC.filter(c=>c.objs.includes(selObj))
 
   const CATS=[
     {key:'perso',label:'Contrats personnels',col:'#7c3aed',bg:'#f5f3ff',bd:'#e9d5ff'},
@@ -668,36 +675,38 @@ function CouverturesParObjet({ client, objets, cies, onOpenDossier }) {
     {key:'autre',label:'Autres preneurs',col:'#b45309',bg:'#fffbeb',bd:'#fde68a'},
   ]
   const TYPES=['Conjoint','Cohabitant','Enfant','Parent','Frère / Sœur','Société / gérance','Apporteur','Autre']
+  const SEC='9.5px'
   const liensAff=[]
   relsFam.forEach(r=>{ const nom=`${r.nom||''} ${r.prenom||''}`.trim(); liensAff.push({nom:nom||('Dossier '+(r.dossier||'?')),type:r.type,dossier:r.dossier,source:'famille'}) })
   manuels.forEach(m=>{ liensAff.push({nom:preneurs[m.autreDossier]||('Dossier '+m.autreDossier),type:m.type,dossier:m.autreDossier,source:'manuel',id:m.id}) })
-  const SEC='9.5px'
+
+  if(loadF) return <p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>
 
   return (
-    <div style={{display:'flex',flexDirection:'column',gap:14,marginTop:10}}>
-      {/* BLOC 1 — objets de risque en vignettes responsives */}
-      <div>
-        <div style={{fontSize:SEC,fontWeight:800,letterSpacing:.3,textTransform:'uppercase',color:'#7c3aed',marginBottom:6}}>Objets de risque</div>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(190px,1fr))',gap:8}}>
-          {objetsList.map((g,i)=>{
-            const ic=_isVeh(g.type)?'ti-car':(_isBat(g.type)?'ti-building':'ti-point'); const sel=selObj===g.key
-            return (
-              <div key={i} onClick={()=>setSelObj(sel?null:g.key)} title="Filtrer les contrats de cet objet"
-                style={{border:'1px solid '+(sel?'#7c3aed':'#e9d5ff'),borderRadius:10,padding:'9px 11px',background:sel?'#f5f3ff':'#fdfcff',cursor:'pointer',display:'flex',alignItems:'center',gap:8}}>
-                <i className={`ti ${ic}`} style={{fontSize:18,color:'#7c3aed',flexShrink:0}}/>
-                <div style={{minWidth:0,flex:1}}>
-                  <div style={{fontSize:12.5,fontWeight:800,color:'#1e293b',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{_firstSeg(g.label)||'—'}</div>
-                  <div style={{fontSize:10,color:'#94a3b8',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(g.label||'').split(' - ').slice(1).join(' · ')||'\u00A0'}</div>
+    <div style={{display:'flex',flexDirection:'column',gap:14}}>
+      {objetsList.length>0&&(
+        <div>
+          <div style={{fontSize:SEC,fontWeight:800,letterSpacing:.3,textTransform:'uppercase',color:'#7c3aed',marginBottom:6}}>Objets de risque</div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(190px,1fr))',gap:8}}>
+            {objetsList.map((g,i)=>{
+              const ic=_isVeh(g.type)?'ti-car':(_isBat(g.type)?'ti-building':'ti-point'); const sel=selObj===g.key
+              return (
+                <div key={i} onClick={()=>setSelObj(sel?null:g.key)} title="Filtrer les contrats de cet objet"
+                  style={{border:'1px solid '+(sel?'#7c3aed':'#e9d5ff'),borderRadius:10,padding:'9px 11px',background:sel?'#f5f3ff':'#fdfcff',cursor:'pointer',display:'flex',alignItems:'center',gap:8}}>
+                  <i className={`ti ${ic}`} style={{fontSize:18,color:'#7c3aed',flexShrink:0}}/>
+                  <div style={{minWidth:0,flex:1}}>
+                    <div style={{fontSize:12.5,fontWeight:800,color:'#1e293b',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{_firstSeg(g.label)||'—'}</div>
+                    <div style={{fontSize:10,color:'#94a3b8',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(g.label||'').split(' - ').slice(1).join(' · ')||'\u00A0'}</div>
+                  </div>
+                  <span style={{fontSize:10,fontWeight:700,padding:'1px 6px',borderRadius:5,background:g.enc?'#dcfce7':'#f1f5f9',color:g.enc?'#15803d':'#94a3b8',flexShrink:0}}>{g.enc}</span>
                 </div>
-                <span style={{fontSize:10,fontWeight:700,padding:'1px 6px',borderRadius:5,background:g.enc?'#dcfce7':'#f1f5f9',color:g.enc?'#15803d':'#94a3b8',flexShrink:0}}>{g.enc}</span>
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
+          {selObj&&<button onClick={()=>setSelObj(null)} style={{marginTop:6,fontSize:10.5,fontWeight:700,color:'#7c3aed',background:'none',border:'none',cursor:'pointer',padding:0}}>← Voir tous les contrats</button>}
         </div>
-        {selObj&&<button onClick={()=>setSelObj(null)} style={{marginTop:6,fontSize:10.5,fontWeight:700,color:'#7c3aed',background:'none',border:'none',cursor:'pointer',padding:0}}>← Voir tous les contrats</button>}
-      </div>
+      )}
 
-      {/* BLOC 2 — liens (famille, sociétés) + édition manuelle */}
       <div>
         <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
           <span style={{fontSize:SEC,fontWeight:800,letterSpacing:.3,textTransform:'uppercase',color:'#0d9488'}}>Liens (famille, sociétés…)</span>
@@ -744,14 +753,14 @@ function CouverturesParObjet({ client, objets, cies, onOpenDossier }) {
         )}
       </div>
 
-      {/* BLOC 3 — contrats scindés par type de preneur */}
       <div>
         <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,flexWrap:'wrap'}}>
           <span style={{fontSize:SEC,fontWeight:800,letterSpacing:.3,textTransform:'uppercase',color:'#7c3aed'}}>Contrats{selObj?` · ${_firstSeg((objMap[selObj]||{}).label||'')}`:''}</span>
+          {loading&&<span style={{fontSize:10,color:'#cbd5e1'}}>recherche des couvertures liées…</span>}
           {nbTermines>0&&<button onClick={()=>setShowTermines(s=>!s)} style={{marginLeft:'auto',fontSize:11,fontWeight:700,padding:'4px 10px',borderRadius:7,cursor:'pointer',border:'1px solid '+(showTermines?'#cbd5e1':'#e2e8f0'),background:showTermines?'#f1f5f9':'#fff',color:'#475569',whiteSpace:'nowrap'}}><i className={`ti ${showTermines?'ti-eye-off':'ti-eye'}`} style={{marginRight:5}}/>{showTermines?'Masquer les terminés':`Afficher les ${nbTermines} terminé${nbTermines>1?'s':''}`}</button>}
         </div>
         {CATS.map(cat=>{
-          const cs=visContrats.filter(c=>c.cat===cat.key); if(!cs.length) return null
+          const cs=visC.filter(c=>c.cat===cat.key); if(!cs.length) return null
           return (
             <div key={cat.key} style={{marginBottom:9}}>
               <div style={{display:'flex',alignItems:'center',gap:6,margin:'2px 0 5px'}}>
@@ -764,9 +773,14 @@ function CouverturesParObjet({ client, objets, cies, onOpenDossier }) {
                   return (
                     <div key={j} style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',padding:'6px 8px',borderRadius:7,background:enc?'#fff':'#fafafa',border:'1px solid #f1f5f9',opacity:enc?1:.6}}>
                       <Cie nom={c.compagnie} cies={cies} size={18}/>
-                      <span onClick={()=>c.externe&&onOpenDossier&&onOpenDossier(c.dossier)} title={c.externe?`Ouvrir le dossier ${c.dossier}`:undefined} style={{fontFamily:'monospace',fontSize:11,color:'#64748b',cursor:c.externe?'pointer':'default',textDecoration:c.externe?'underline':'none'}}>n° {c.police}</span>
+                      {c.externe
+                        ? <span onClick={()=>onOpenDossier&&onOpenDossier(c.dossier)} title={`Ouvrir le dossier ${c.dossier}`} style={{fontFamily:'monospace',fontSize:11,color:'#64748b',cursor:'pointer',textDecoration:'underline'}}>n° {c.police}</span>
+                        : (c.raw&&previewContrat
+                            ? <span onMouseEnter={()=>previewContrat(c.raw)} onMouseLeave={leaveContrat} onClick={()=>openContrat&&openContrat(c.raw)} title="Survoler pour aperçu · cliquer pour épingler" style={{fontFamily:'monospace',fontSize:11,color:BLUE,fontWeight:700,cursor:'pointer',textDecoration:'underline'}}>n° {c.police}</span>
+                            : <span style={{fontFamily:'monospace',fontSize:11,color:'#64748b'}}>n° {c.police||'—'}</span>)}
                       {c.externe&&<span onClick={()=>onOpenDossier&&onOpenDossier(c.dossier)} title={`Ouvrir le dossier ${c.dossier}`} style={{fontSize:10,fontWeight:700,padding:'1px 6px',borderRadius:5,background:cat.bg,color:cat.col,cursor:'pointer'}}>{pren} · {c.dossier}</span>}
-                      {!selObj&&<span style={{display:'flex',flexWrap:'wrap',gap:3}}>{c.objs.map((k,z)=><span key={z} style={{fontSize:9.5,fontWeight:700,padding:'1px 5px',borderRadius:4,background:'#eef2ff',color:'#4338ca',whiteSpace:'nowrap'}}>{_firstSeg((objMap[k]||{}).label||k)}</span>)}</span>}
+                      {c.domaine&&<span style={{fontSize:10,color:'#64748b'}}>{c.domaine}</span>}
+                      {!selObj&&c.objs.length>0&&<span style={{display:'flex',flexWrap:'wrap',gap:3}}>{c.objs.map((k,z)=><span key={z} style={{fontSize:9.5,fontWeight:700,padding:'1px 5px',borderRadius:4,background:'#eef2ff',color:'#4338ca',whiteSpace:'nowrap'}}>{_firstSeg((objMap[k]||{}).label||k)}</span>)}</span>}
                       <span style={{display:'flex',flexWrap:'wrap',gap:3,flex:1,minWidth:0}}>{c.gars.map((gr,k)=><span key={k} style={{fontSize:10,fontWeight:600,padding:'1px 6px',borderRadius:4,background:'#f5f3ff',color:'#7c3aed',whiteSpace:'nowrap'}}>{gr}</span>)}</span>
                       <span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:4,background:enc?'#dcfce7':'#f1f5f9',color:enc?'#15803d':'#94a3b8'}}>{c.situation||'—'}</span>
                     </div>
@@ -776,7 +790,7 @@ function CouverturesParObjet({ client, objets, cies, onOpenDossier }) {
             </div>
           )
         })}
-        {!visContrats.length&&<div style={{fontSize:11.5,color:'#94a3b8',fontStyle:'italic'}}>Aucun contrat {showTermines?'':'en cours '}{selObj?'pour cet objet':''}.</div>}
+        {!visC.length&&<div style={{fontSize:11.5,color:'#94a3b8',fontStyle:'italic'}}>Aucun contrat {showTermines?'':'en cours '}{selObj?'pour cet objet':''}.</div>}
       </div>
     </div>
   )
@@ -1156,7 +1170,6 @@ function Fiche({ client, onClose, onOpenDossier }) {
       )
     )},
     { key:'relations', icon:'ti-users-group', title:'Relations', col:'#ec4899', count:null, body:(<Relations client={client} onOpenDossier={onOpenDossier}/>) },
-    { key:'foyer', icon:'ti-home', title:'Foyer', col:'#0891b2', count:null, body:(<Foyer client={client} onOpenDossier={onOpenDossier}/>) },
     ...(groupe.length>0?[{ key:'groupe', icon:'ti-home-2', title:'Groupe / Ménage', col:'#0d9488', count:groupe.length, body:(
       <div>
         <div style={{fontSize:12,color:'#64748b',marginBottom:8,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
@@ -1170,33 +1183,7 @@ function Fiche({ client, onClose, onOpenDossier }) {
       </div>
     )}]:[]),
     { key:'objets', icon:'ti-shield', title:'Objets de risque', col:'#7c3aed', count:objets.length, body:(<div><Analyse360 client={client} contrats={contrats}/><ObjetsDetail objets={objets} loading={loadF} cies={cies}/></div>) },
-    { key:'couvertures', icon:'ti-shield-check', title:'Couvertures par objet', col:'#7c3aed', body:(<CouverturesParObjet client={client} objets={objets} cies={cies} onOpenDossier={onOpenDossier}/>) },
-    { key:'contrats', icon:'ti-file-text', title:'Contrats', col:BLUE, count:contrats.length, body:(
-      loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:!contrats.length?<p style={{color:'#94a3b8',fontSize:12}}>Aucun contrat</p>:
-        <div style={{overflowX:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
-          <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
-            <thead style={{position:'sticky',top:0,background:'#f8fafc',zIndex:1}}>
-              <tr>{['Police','CIE','Objet de risque','Domaine','Garanties','Situation','Date'].map(h=>(<th key={h} style={{padding:'7px 12px',textAlign:'left',fontWeight:700,color:'#94a3b8',fontSize:10,textTransform:'uppercase',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>))}</tr>
-            </thead>
-            <tbody>
-              {contrats.map((c,i)=>{
-                const st=SIT[c.situation]||{bg:'#f1f5f9',col:'#64748b'}
-                return(
-                  <tr key={i} style={{background:i%2===0?'#fff':'#fafafe'}}>
-                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',fontFamily:'monospace',fontSize:11}}><span onMouseEnter={()=>previewContrat(c)} onMouseLeave={leaveContrat} onClick={()=>openContrat(c)} title="Survoler pour aperçu · cliquer pour épingler" style={{cursor:'pointer',color:BLUE,fontWeight:700,textDecoration:'underline'}}>{c.police||'—'}</span></td>
-                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9'}}><Cie nom={c.compagnie} cies={cies} size={16}/></td>
-                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#475569',fontSize:11}}>{(()=>{ const os=objetsParPolice[c.police]?[...objetsParPolice[c.police]]:[]; if(!os.length) return <span style={{color:'#cbd5e1'}}>—</span>; return <span style={{display:'flex',flexDirection:'column',gap:2}}>{os.map((o,k)=><span key={k}>{o}</span>)}</span> })()}</td>
-                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{c.domaine||'—'}</td>
-                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9'}}>{(()=>{ const gs=garantiesParPolice[c.police]?[...garantiesParPolice[c.police]]:[]; if(!gs.length) return <span style={{color:'#cbd5e1'}}>—</span>; return <span style={{display:'flex',flexWrap:'wrap',gap:3}}>{gs.map((g,k)=><span key={k} style={{fontSize:10,fontWeight:600,padding:'1px 6px',borderRadius:4,background:'#f5f3ff',color:'#7c3aed',whiteSpace:'nowrap'}}>{g}</span>)}</span> })()}</td>
-                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9'}}><span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:4,background:st.bg,color:st.col}}>{c.situation||'—'}</span></td>
-                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b',whiteSpace:'nowrap'}}>{fmtDate(c.date_creation)}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-    )},
+    { key:'contrats', icon:'ti-file-text', title:'Contrats', col:BLUE, count:contrats.length, body:(<VueContrats client={client} objets={objets} contratsClient={contrats} garantiesParPolice={garantiesParPolice} cies={cies} onOpenDossier={onOpenDossier} loadF={loadF} previewContrat={previewContrat} openContrat={openContrat} leaveContrat={leaveContrat}/>) },
     { key:'primes', icon:'ti-cash', title:'Primes & commissions', col:'#16a34a', count:null, body:(<Primes dossier={client.dossier}/>) },
     { key:'taches', icon:'ti-checkbox', title:'Tâches', col:'#f59e0b', count:taches.length, body:(
       loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:!taches.length?
