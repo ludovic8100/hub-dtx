@@ -562,15 +562,27 @@ const objetCle = (o) => {
 
 // ── Couvertures par objet (cross-dossier) : pour chaque objet du client, TOUS les contrats qui le couvrent ──
 function CouverturesParObjet({ client, objets, cies, onOpenDossier }) {
-  const [rows,setRows]=useState(null)
-  const [lies,setLies]=useState(new Set())
-  const [preneurs,setPreneurs]=useState({})
-  const [loading,setLoading]=useState(true)
-  const [showTermines,setShowTermines]=useState(false)
+  const [rows,setRows]=useState(null); const [loading,setLoading]=useState(true)
+  const [liesFam,setLiesFam]=useState(new Set()); const [relsFam,setRelsFam]=useState([])
+  const [manuels,setManuels]=useState([]); const [preneurs,setPreneurs]=useState({})
+  const [showTermines,setShowTermines]=useState(false); const [selObj,setSelObj]=useState(null)
+  const [editOpen,setEditOpen]=useState(false)
+  const [q,setQ]=useState(''); const [qres,setQres]=useState([]); const [qSel,setQSel]=useState(null)
+  const [qType,setQType]=useState('Société / gérance'); const [saving,setSaving]=useState(false)
+  const NOM=(client.nom||'').toUpperCase().trim(); const PRENOM=(client.prenom||'').trim()
+
+  const resolveNames=async(dossiers)=>{ const need=[...new Set(dossiers.filter(Boolean))]; if(!need.length) return {}
+    const{data}=await supabase.from('clients').select('dossier,nom,prenom').in('dossier',need)
+    const m={}; (data||[]).forEach(c=>{ m[c.dossier]=`${c.nom||''} ${c.prenom||''}`.trim() }); return m }
+
+  const reloadManuels=async()=>{
+    const{data}=await supabase.from('liens_preneurs').select('id,dossier_a,dossier_b,type_lien').or(`dossier_a.eq.${client.dossier},dossier_b.eq.${client.dossier}`)
+    const list=(data||[]).map(r=>({id:r.id,autreDossier:r.dossier_a===client.dossier?r.dossier_b:r.dossier_a,type:r.type_lien}))
+    const names=await resolveNames(list.map(l=>l.autreDossier))
+    setManuels(list); setPreneurs(p=>({...p,...names})) }
 
   useEffect(()=>{
-    let alive=true; setLoading(true); setRows(null); setShowTermines(false)
-    const NOM=(client.nom||'').toUpperCase().trim(); const PRENOM=(client.prenom||'').trim()
+    let alive=true; setLoading(true); setRows(null); setShowTermines(false); setSelObj(null); setEditOpen(false); setQ(''); setQres([]); setQSel(null)
     const veh=new Set(), bat=new Set()
     ;(objets||[]).forEach(o=>{
       if(_isVeh(o.type_risque)){ const p=_firstSeg(o.description).replace(/[^a-z0-9]/gi,'').toUpperCase(); if(p) veh.add(p) }
@@ -578,127 +590,194 @@ function CouverturesParObjet({ client, objets, cies, onOpenDossier }) {
     })
     const cols='dossier,police,compagnie,domaine,type_risque,garantie,description,situation,etat_contrat'
     ;(async()=>{
-      // 1) couvertures cross-dossier (par plaque / par adresse)
       const queries=[]
       if(veh.size) queries.push(supabase.from('objets_risque').select(cols).or([...veh].map(p=>`description.ilike.*${p}*`).join(',')))
       ;[...bat].forEach(a=>queries.push(supabase.from('objets_risque').select(cols).ilike('description',`%${a}%`)))
       const res=queries.length?await Promise.all(queries):[]
       const all=[]; res.forEach(({data})=>{(data||[]).forEach(r=>all.push(r))})
 
-      // 2) dossiers liés (mêmes règles que Relations : famille directes + inverses)
-      const liesSet=new Set()
+      const relsList=[]; const famSet=new Set()
       try{
         const [{data:dir},{data:inv}]=await Promise.all([
-          supabase.from('famille').select('nom_lie,prenom_lie').eq('dossier',client.dossier),
-          supabase.from('famille').select('dossier').ilike('nom_lie',NOM).ilike('prenom_lie',PRENOM),
+          supabase.from('famille').select('nom_lie,prenom_lie,type_relation_libelle,physique_morale_libelle').eq('dossier',client.dossier),
+          supabase.from('famille').select('dossier,nom_principal,prenom_principal,type_relation_libelle').ilike('nom_lie',NOM).ilike('prenom_lie',PRENOM),
         ])
-        ;(inv||[]).forEach(r=>{ if(r.dossier) liesSet.add(r.dossier) })
-        const nomsDir=[...new Set((dir||[]).map(r=>(r.nom_lie||'').toUpperCase()).filter(Boolean))]
+        ;(inv||[]).forEach(r=>{ if(r.dossier) famSet.add(r.dossier); relsList.push({nom:r.nom_principal,prenom:r.prenom_principal,type:r.type_relation_libelle,dossier:r.dossier}) })
+        const dirRows=(dir||[]).map(r=>({nom:r.nom_lie,prenom:r.prenom_lie,type:r.type_relation_libelle,dossier:null}))
+        const nomsDir=[...new Set(dirRows.map(r=>(r.nom||'').toUpperCase()).filter(Boolean))]
         if(nomsDir.length){
           const{data:cl}=await supabase.from('clients').select('dossier,nom,prenom').in('nom',nomsDir).not('dossier','is',null)
-          const idx={}
-          ;(cl||[]).forEach(c=>{ const k=`${(c.nom||'').toUpperCase()}|${(c.prenom||'').toUpperCase()}`; if(!idx[k]) idx[k]=c.dossier })
-          ;(dir||[]).forEach(r=>{ const k=`${(r.nom_lie||'').toUpperCase()}|${(r.prenom_lie||'').toUpperCase()}`; if(idx[k]) liesSet.add(idx[k]) })
+          const idx={}; (cl||[]).forEach(c=>{const k=`${(c.nom||'').toUpperCase()}|${(c.prenom||'').toUpperCase()}`; if(!idx[k]) idx[k]=c.dossier})
+          dirRows.forEach(r=>{ const k=`${(r.nom||'').toUpperCase()}|${(r.prenom||'').toUpperCase()}`; if(idx[k]){ r.dossier=idx[k]; famSet.add(idx[k]) } })
         }
+        dirRows.forEach(r=>relsList.push(r))
       }catch(e){}
-      liesSet.delete(client.dossier)
+      famSet.delete(client.dossier)
 
-      // 3) noms des preneurs des dossiers externes (pour l'affichage)
-      const extern=[...new Set(all.map(r=>r.dossier).filter(d=>d&&d!==client.dossier))]
-      const prMap={}
-      if(extern.length){
-        const{data:cp}=await supabase.from('clients').select('dossier,nom,prenom').in('dossier',extern)
-        ;(cp||[]).forEach(c=>{ prMap[c.dossier]=`${c.nom||''} ${c.prenom||''}`.trim() })
-      }
+      let manuList=[]
+      try{
+        const{data:lp}=await supabase.from('liens_preneurs').select('id,dossier_a,dossier_b,type_lien').or(`dossier_a.eq.${client.dossier},dossier_b.eq.${client.dossier}`)
+        manuList=(lp||[]).map(r=>({id:r.id,autreDossier:r.dossier_a===client.dossier?r.dossier_b:r.dossier_a,type:r.type_lien}))
+      }catch(e){}
+
+      const dossiersExt=[...new Set([...all.map(r=>r.dossier).filter(d=>d&&d!==client.dossier),...relsList.map(r=>r.dossier).filter(Boolean),...manuList.map(m=>m.autreDossier).filter(Boolean)])]
+      const prMap=await resolveNames(dossiersExt)
       if(!alive) return
-      setRows(all); setLies(liesSet); setPreneurs(prMap); setLoading(false)
+      setRows(all); setLiesFam(famSet); setRelsFam(relsList); setManuels(manuList); setPreneurs(prMap); setLoading(false)
     })()
     return ()=>{ alive=false }
   },[objets,client.dossier])
 
-  // regroupement objet -> police
-  const groups={}
-  const add=o=>{ const k=objetCle(o); if(!k) return
-    const g=(groups[k]=groups[k]||{key:k,type:o.type_risque,label:o.description||'',contrats:{}})
+  useEffect(()=>{
+    if(!editOpen||q.trim().length<2){ setQres([]); return }
+    let alive=true; const t=setTimeout(async()=>{
+      const term=q.trim()
+      const{data}=await supabase.from('clients').select('dossier,nom,prenom').or(`nom.ilike.%${term}%,prenom.ilike.%${term}%`).not('dossier','is',null).limit(8)
+      if(alive) setQres((data||[]).filter(c=>c.dossier!==client.dossier))
+    },300)
+    return ()=>{ alive=false; clearTimeout(t) }
+  },[q,editOpen,client.dossier])
+
+  const ajouterLien=async()=>{ if(!qSel) return; setSaving(true)
+    await supabase.from('liens_preneurs').insert({dossier_a:client.dossier,dossier_b:qSel.dossier,type_lien:qType})
+    setQ(''); setQres([]); setQSel(null); setSaving(false); await reloadManuels() }
+  const supprimerLien=async(id)=>{ await supabase.from('liens_preneurs').delete().eq('id',id); await reloadManuels() }
+
+  const dossiersLies=new Set([...liesFam,...manuels.map(m=>m.autreDossier)])
+  const catOf=d=> d===client.dossier?'perso':(dossiersLies.has(d)?'lie':'autre')
+  const objMap={}, polMap={}
+  ;[...(objets||[]),...(rows||[])].forEach(o=>{
+    const k=objetCle(o); if(!k) return
+    const g=objMap[k]||(objMap[k]={key:k,type:o.type_risque,label:o.description||''})
     if((o.description||'').length>(g.label||'').length) g.label=o.description
-    const c=(g.contrats[o.police]=g.contrats[o.police]||{police:o.police,compagnie:o.compagnie,dossier:o.dossier,domaine:o.domaine,situation:o.situation,gars:new Set()})
-    if(o.garantie) c.gars.add(o.garantie); if(o.situation==='En cours') c.situation='En cours'
-  }
-  ;(objets||[]).forEach(add); ;(rows||[]).forEach(add)
-
-  const catOf=d=> d===client.dossier?'perso':(lies.has(d)?'lie':'autre')
-  const list=Object.values(groups).map(g=>({ ...g,
-    contrats:Object.values(g.contrats).map(c=>({...c,gars:[...c.gars],externe:c.dossier!==client.dossier,cat:catOf(c.dossier),enc:c.situation==='En cours'})) }))
-  const nbTermines=list.reduce((n,g)=>n+g.contrats.filter(c=>!c.enc).length,0)
-
-  const visList=list.map(g=>({ ...g, contrats:g.contrats.filter(c=>showTermines||c.enc) }))
-    .filter(g=>g.contrats.length>0)
-    .sort((a,b)=>(b.contrats.filter(c=>c.enc).length-a.contrats.filter(c=>c.enc).length)||(b.contrats.length-a.contrats.length))
+    const p=polMap[o.police]||(polMap[o.police]={police:o.police,compagnie:o.compagnie,dossier:o.dossier,situation:o.situation,gars:new Set(),objs:new Set()})
+    if(o.garantie) p.gars.add(o.garantie); if(o.situation==='En cours') p.situation='En cours'; p.objs.add(k)
+  })
+  const contrats=Object.values(polMap).map(p=>({...p,gars:[...p.gars],objs:[...p.objs],enc:p.situation==='En cours',externe:p.dossier!==client.dossier,cat:catOf(p.dossier)}))
+  const objetsList=Object.values(objMap).map(g=>({...g,enc:contrats.filter(c=>c.enc&&c.objs.includes(g.key)).length,tot:contrats.filter(c=>c.objs.includes(g.key)).length}))
+    .sort((a,b)=>(b.enc-a.enc)||(b.tot-a.tot))
+  const nbTermines=contrats.filter(c=>!c.enc).length
+  let visContrats=contrats.filter(c=>showTermines||c.enc); if(selObj) visContrats=visContrats.filter(c=>c.objs.includes(selObj))
 
   if(loading&&rows===null) return <p style={{color:'#94a3b8',fontSize:12,marginTop:8}}>Recherche des couvertures liées…</p>
-  if(!list.length) return <div style={{color:'#94a3b8',fontSize:12,fontStyle:'italic',marginTop:8}}>Aucun véhicule ni bâtiment exploitable pour ce dossier.</div>
+  if(!objetsList.length) return <div style={{color:'#94a3b8',fontSize:12,fontStyle:'italic',marginTop:8}}>Aucun véhicule ni bâtiment exploitable pour ce dossier.</div>
 
   const CATS=[
     {key:'perso',label:'Contrats personnels',col:'#7c3aed',bg:'#f5f3ff',bd:'#e9d5ff'},
-    {key:'lie',label:'Via une société / relation liée',col:'#0d9488',bg:'#f0fdfa',bd:'#99f6e4'},
-    {key:'autre',label:'Chez un autre preneur',col:'#b45309',bg:'#fffbeb',bd:'#fde68a'},
+    {key:'lie',label:'Famille & sociétés',col:'#0d9488',bg:'#f0fdfa',bd:'#99f6e4'},
+    {key:'autre',label:'Autres preneurs',col:'#b45309',bg:'#fffbeb',bd:'#fde68a'},
   ]
+  const TYPES=['Conjoint','Cohabitant','Enfant','Parent','Frère / Sœur','Société / gérance','Apporteur','Autre']
+  const liensAff=[]
+  relsFam.forEach(r=>{ const nom=`${r.nom||''} ${r.prenom||''}`.trim(); liensAff.push({nom:nom||('Dossier '+(r.dossier||'?')),type:r.type,dossier:r.dossier,source:'famille'}) })
+  manuels.forEach(m=>{ liensAff.push({nom:preneurs[m.autreDossier]||('Dossier '+m.autreDossier),type:m.type,dossier:m.autreDossier,source:'manuel',id:m.id}) })
+  const SEC='9.5px'
 
   return (
-    <div style={{display:'flex',flexDirection:'column',gap:10,marginTop:10}}>
-      <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-        <p style={{fontSize:11.5,color:'#94a3b8',margin:0,flex:1,minWidth:180}}>Chaque objet (véhicule = plaque, bâtiment = adresse) et les contrats qui le couvrent — d'abord au nom du client, puis via une société / relation liée, puis chez un autre preneur. Rapprochement des bâtiments par adresse : approximatif.</p>
-        {nbTermines>0&&(
-          <button onClick={()=>setShowTermines(s=>!s)} style={{fontSize:11,fontWeight:700,padding:'5px 11px',borderRadius:7,cursor:'pointer',border:'1px solid '+(showTermines?'#cbd5e1':'#e2e8f0'),background:showTermines?'#f1f5f9':'#fff',color:'#475569',whiteSpace:'nowrap'}}>
-            <i className={`ti ${showTermines?'ti-eye-off':'ti-eye'}`} style={{marginRight:5}}/>
-            {showTermines?'Masquer les contrats terminés':`Afficher les ${nbTermines} contrat${nbTermines>1?'s':''} terminé${nbTermines>1?'s':''}`}
-          </button>
+    <div style={{display:'flex',flexDirection:'column',gap:14,marginTop:10}}>
+      {/* BLOC 1 — objets de risque en vignettes responsives */}
+      <div>
+        <div style={{fontSize:SEC,fontWeight:800,letterSpacing:.3,textTransform:'uppercase',color:'#7c3aed',marginBottom:6}}>Objets de risque</div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(190px,1fr))',gap:8}}>
+          {objetsList.map((g,i)=>{
+            const ic=_isVeh(g.type)?'ti-car':(_isBat(g.type)?'ti-building':'ti-point'); const sel=selObj===g.key
+            return (
+              <div key={i} onClick={()=>setSelObj(sel?null:g.key)} title="Filtrer les contrats de cet objet"
+                style={{border:'1px solid '+(sel?'#7c3aed':'#e9d5ff'),borderRadius:10,padding:'9px 11px',background:sel?'#f5f3ff':'#fdfcff',cursor:'pointer',display:'flex',alignItems:'center',gap:8}}>
+                <i className={`ti ${ic}`} style={{fontSize:18,color:'#7c3aed',flexShrink:0}}/>
+                <div style={{minWidth:0,flex:1}}>
+                  <div style={{fontSize:12.5,fontWeight:800,color:'#1e293b',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{_firstSeg(g.label)||'—'}</div>
+                  <div style={{fontSize:10,color:'#94a3b8',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(g.label||'').split(' - ').slice(1).join(' · ')||'\u00A0'}</div>
+                </div>
+                <span style={{fontSize:10,fontWeight:700,padding:'1px 6px',borderRadius:5,background:g.enc?'#dcfce7':'#f1f5f9',color:g.enc?'#15803d':'#94a3b8',flexShrink:0}}>{g.enc}</span>
+              </div>
+            )
+          })}
+        </div>
+        {selObj&&<button onClick={()=>setSelObj(null)} style={{marginTop:6,fontSize:10.5,fontWeight:700,color:'#7c3aed',background:'none',border:'none',cursor:'pointer',padding:0}}>← Voir tous les contrats</button>}
+      </div>
+
+      {/* BLOC 2 — liens (famille, sociétés) + édition manuelle */}
+      <div>
+        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+          <span style={{fontSize:SEC,fontWeight:800,letterSpacing:.3,textTransform:'uppercase',color:'#0d9488'}}>Liens (famille, sociétés…)</span>
+          <button onClick={()=>setEditOpen(o=>!o)} style={{fontSize:10.5,fontWeight:700,padding:'3px 9px',borderRadius:6,cursor:'pointer',border:'1px solid #99f6e4',background:editOpen?'#f0fdfa':'#fff',color:'#0d9488'}}><i className="ti ti-edit" style={{marginRight:4}}/>Modifier</button>
+        </div>
+        {liensAff.length? (
+          <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+            {liensAff.map((l,i)=>(
+              <span key={i} style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:11,padding:'3px 9px',borderRadius:7,background:l.source==='manuel'?'#eff6ff':'#f8fafc',border:'1px solid '+(l.source==='manuel'?'#bfdbfe':'#e2e8f0'),color:'#1e293b'}}>
+                {l.dossier&&onOpenDossier? <span onClick={()=>onOpenDossier(l.dossier)} style={{cursor:'pointer',fontWeight:700,textDecoration:'underline'}}>{l.nom}</span> : <span style={{fontWeight:700}}>{l.nom}</span>}
+                {l.type&&<span style={{color:'#94a3b8'}}>· {l.type}</span>}
+                {l.source==='manuel'&&<i className="ti ti-x" onClick={()=>supprimerLien(l.id)} title="Supprimer ce lien" style={{cursor:'pointer',color:'#ef4444',fontSize:13}}/>}
+              </span>
+            ))}
+          </div>
+        ) : <div style={{fontSize:11.5,color:'#94a3b8',fontStyle:'italic'}}>Aucun lien connu pour ce dossier.</div>}
+        {editOpen&&(
+          <div style={{marginTop:8,padding:'10px 12px',border:'1px dashed #99f6e4',borderRadius:9,background:'#f0fdfa'}}>
+            <div style={{fontSize:11,color:'#0f766e',marginBottom:6}}>Ajoutez un lien vers un autre preneur : recherchez-le, choisissez le type, validez. Ses contrats couvrant les mêmes objets remonteront alors en « Famille & sociétés ».</div>
+            {qSel? (
+              <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                <span style={{fontSize:12,fontWeight:700,color:'#1e293b'}}>{`${qSel.nom||''} ${qSel.prenom||''}`.trim()} <span style={{color:'#94a3b8',fontWeight:400}}>· {qSel.dossier}</span></span>
+                <select value={qType} onChange={e=>setQType(e.target.value)} style={{fontSize:12,padding:'4px 8px',borderRadius:6,border:'1px solid #cbd5e1'}}>{TYPES.map(t=><option key={t} value={t}>{t}</option>)}</select>
+                <button disabled={saving} onClick={ajouterLien} style={{fontSize:11,fontWeight:700,padding:'5px 11px',borderRadius:6,cursor:'pointer',border:'none',background:'#0d9488',color:'#fff'}}>{saving?'…':'Ajouter'}</button>
+                <button onClick={()=>{setQSel(null);setQ('')}} style={{fontSize:11,fontWeight:700,padding:'5px 9px',borderRadius:6,cursor:'pointer',border:'1px solid #cbd5e1',background:'#fff',color:'#64748b'}}>Annuler</button>
+              </div>
+            ):(
+              <div>
+                <input autoFocus value={q} onChange={e=>setQ(e.target.value)} placeholder="Rechercher un preneur (nom, prénom, société)…" style={{width:'100%',boxSizing:'border-box',fontSize:12,padding:'6px 10px',borderRadius:7,border:'1px solid #cbd5e1'}}/>
+                {qres.length>0&&(
+                  <div style={{marginTop:6,display:'flex',flexDirection:'column',gap:3,maxHeight:180,overflowY:'auto'}}>
+                    {qres.map((c,i)=>(
+                      <div key={i} onClick={()=>setQSel(c)} style={{fontSize:12,padding:'5px 9px',borderRadius:6,background:'#fff',border:'1px solid #e2e8f0',cursor:'pointer',display:'flex',gap:8,alignItems:'center'}}>
+                        <span style={{fontWeight:700,color:'#1e293b'}}>{`${c.nom||''} ${c.prenom||''}`.trim()}</span>
+                        <span style={{color:'#94a3b8',fontFamily:'monospace',fontSize:11}}>{c.dossier}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {q.trim().length>=2&&!qres.length&&<div style={{fontSize:11,color:'#94a3b8',marginTop:5}}>Aucun résultat.</div>}
+              </div>
+            )}
+          </div>
         )}
       </div>
-      {visList.map((g,i)=>{
-        const ic=_isVeh(g.type)?'ti-car':(_isBat(g.type)?'ti-building':'ti-point')
-        const enCours=g.contrats.filter(c=>c.enc).length
-        const term=g.contrats.filter(c=>!c.enc).length
-        return (
-          <div key={i} style={{border:'1px solid #e9d5ff',borderRadius:10,padding:'11px 13px',background:'#fdfcff'}}>
-            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,flexWrap:'wrap'}}>
-              <i className={`ti ${ic}`} style={{fontSize:16,color:'#7c3aed'}}/>
-              <span style={{fontSize:13.5,fontWeight:800,color:'#1e293b'}}>{g.label||'—'}</span>
-              <span style={{fontSize:10,fontWeight:700,padding:'1px 7px',borderRadius:5,background:'#dcfce7',color:'#15803d'}}>{enCours} en cours</span>
-              {showTermines&&term>0&&<span style={{fontSize:10,fontWeight:700,padding:'1px 7px',borderRadius:5,background:'#f1f5f9',color:'#94a3b8'}}>{term} terminé{term>1?'s':''}</span>}
+
+      {/* BLOC 3 — contrats scindés par type de preneur */}
+      <div>
+        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,flexWrap:'wrap'}}>
+          <span style={{fontSize:SEC,fontWeight:800,letterSpacing:.3,textTransform:'uppercase',color:'#7c3aed'}}>Contrats{selObj?` · ${_firstSeg((objMap[selObj]||{}).label||'')}`:''}</span>
+          {nbTermines>0&&<button onClick={()=>setShowTermines(s=>!s)} style={{marginLeft:'auto',fontSize:11,fontWeight:700,padding:'4px 10px',borderRadius:7,cursor:'pointer',border:'1px solid '+(showTermines?'#cbd5e1':'#e2e8f0'),background:showTermines?'#f1f5f9':'#fff',color:'#475569',whiteSpace:'nowrap'}}><i className={`ti ${showTermines?'ti-eye-off':'ti-eye'}`} style={{marginRight:5}}/>{showTermines?'Masquer les terminés':`Afficher les ${nbTermines} terminé${nbTermines>1?'s':''}`}</button>}
+        </div>
+        {CATS.map(cat=>{
+          const cs=visContrats.filter(c=>c.cat===cat.key); if(!cs.length) return null
+          return (
+            <div key={cat.key} style={{marginBottom:9}}>
+              <div style={{display:'flex',alignItems:'center',gap:6,margin:'2px 0 5px'}}>
+                <span style={{fontSize:SEC,fontWeight:800,letterSpacing:.3,textTransform:'uppercase',padding:'2px 7px',borderRadius:5,background:cat.bg,color:cat.col,border:`1px solid ${cat.bd}`}}>{cat.label}</span>
+                <span style={{fontSize:10,color:'#cbd5e1'}}>{cs.length}</span>
+              </div>
+              <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                {cs.sort((a,b)=>(b.enc?1:0)-(a.enc?1:0)).map((c,j)=>{
+                  const enc=c.enc; const pren=c.externe?(preneurs[c.dossier]||`Dossier ${c.dossier}`):null
+                  return (
+                    <div key={j} style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',padding:'6px 8px',borderRadius:7,background:enc?'#fff':'#fafafa',border:'1px solid #f1f5f9',opacity:enc?1:.6}}>
+                      <Cie nom={c.compagnie} cies={cies} size={18}/>
+                      <span onClick={()=>c.externe&&onOpenDossier&&onOpenDossier(c.dossier)} title={c.externe?`Ouvrir le dossier ${c.dossier}`:undefined} style={{fontFamily:'monospace',fontSize:11,color:'#64748b',cursor:c.externe?'pointer':'default',textDecoration:c.externe?'underline':'none'}}>n° {c.police}</span>
+                      {c.externe&&<span onClick={()=>onOpenDossier&&onOpenDossier(c.dossier)} title={`Ouvrir le dossier ${c.dossier}`} style={{fontSize:10,fontWeight:700,padding:'1px 6px',borderRadius:5,background:cat.bg,color:cat.col,cursor:'pointer'}}>{pren} · {c.dossier}</span>}
+                      {!selObj&&<span style={{display:'flex',flexWrap:'wrap',gap:3}}>{c.objs.map((k,z)=><span key={z} style={{fontSize:9.5,fontWeight:700,padding:'1px 5px',borderRadius:4,background:'#eef2ff',color:'#4338ca',whiteSpace:'nowrap'}}>{_firstSeg((objMap[k]||{}).label||k)}</span>)}</span>}
+                      <span style={{display:'flex',flexWrap:'wrap',gap:3,flex:1,minWidth:0}}>{c.gars.map((gr,k)=><span key={k} style={{fontSize:10,fontWeight:600,padding:'1px 6px',borderRadius:4,background:'#f5f3ff',color:'#7c3aed',whiteSpace:'nowrap'}}>{gr}</span>)}</span>
+                      <span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:4,background:enc?'#dcfce7':'#f1f5f9',color:enc?'#15803d':'#94a3b8'}}>{c.situation||'—'}</span>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
-            {CATS.map(cat=>{
-              const cs=g.contrats.filter(c=>c.cat===cat.key)
-              if(!cs.length) return null
-              return (
-                <div key={cat.key} style={{marginBottom:8}}>
-                  <div style={{display:'flex',alignItems:'center',gap:6,margin:'2px 0 5px'}}>
-                    <span style={{fontSize:9.5,fontWeight:800,letterSpacing:.3,textTransform:'uppercase',padding:'2px 7px',borderRadius:5,background:cat.bg,color:cat.col,border:`1px solid ${cat.bd}`}}>{cat.label}</span>
-                    <span style={{fontSize:10,color:'#cbd5e1'}}>{cs.length}</span>
-                  </div>
-                  <div style={{display:'flex',flexDirection:'column',gap:6}}>
-                    {cs.map((c,j)=>{
-                      const enc=c.enc
-                      const pren=c.externe?(preneurs[c.dossier]||`Dossier ${c.dossier}`):null
-                      return (
-                        <div key={j} style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',padding:'6px 8px',borderRadius:7,background:enc?'#fff':'#fafafa',border:'1px solid #f1f5f9',opacity:enc?1:.6}}>
-                          <Cie nom={c.compagnie} cies={cies} size={18}/>
-                          <span onClick={()=>c.externe&&onOpenDossier&&onOpenDossier(c.dossier)} title={c.externe?`Ouvrir le dossier ${c.dossier}`:undefined} style={{fontFamily:'monospace',fontSize:11,color:'#64748b',cursor:c.externe?'pointer':'default',textDecoration:c.externe?'underline':'none'}}>n° {c.police}</span>
-                          {c.externe&&<span onClick={()=>onOpenDossier&&onOpenDossier(c.dossier)} title={`Ouvrir le dossier ${c.dossier}`} style={{fontSize:10,fontWeight:700,padding:'1px 6px',borderRadius:5,background:cat.bg,color:cat.col,cursor:'pointer'}}>{pren} · {c.dossier}</span>}
-                          <span style={{display:'flex',flexWrap:'wrap',gap:3,flex:1,minWidth:0}}>
-                            {c.gars.map((gr,k)=><span key={k} style={{fontSize:10,fontWeight:600,padding:'1px 6px',borderRadius:4,background:'#f5f3ff',color:'#7c3aed',whiteSpace:'nowrap'}}>{gr}</span>)}
-                          </span>
-                          <span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:4,background:enc?'#dcfce7':'#f1f5f9',color:enc?'#15803d':'#94a3b8'}}>{c.situation||'—'}</span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )
-      })}
+          )
+        })}
+        {!visContrats.length&&<div style={{fontSize:11.5,color:'#94a3b8',fontStyle:'italic'}}>Aucun contrat {showTermines?'':'en cours '}{selObj?'pour cet objet':''}.</div>}
+      </div>
     </div>
   )
 }
