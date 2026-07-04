@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""HUB DTX — Sonde Qlik (LECTURE SEULE) sur ObjetDeRisque (grain police × garantie).
-Deux modes :
-  - PROBE_DOSSIER défini  -> renvoie TOUS les objets/garanties de ce dossier.
-  - sinon                 -> renvoie les objets dont la Description contient PROBE_TERMS.
+"""HUB DTX — Sonde Qlik (LECTURE SEULE) sur ObjetDeRisque.
+Grain (PoliceUnique × Description × Guarantee.FR) : Description est une DIMENSION,
+donc jamais écrasée même quand un contrat couvre plusieurs objets sous une même garantie
+(cas des contrats DAS/flotte de protection juridique).
+Modes : PROBE_DOSSIER défini -> tout le dossier ; sinon -> Description contient PROBE_TERMS.
 Sortie JSON entre ===JSON_START=== / ===JSON_END===.
-Env : QLIK_API_KEY [requis], PROBE_DOSSIER (ex "2441/00"), PROBE_TERMS (def "2ahs210").
+Env : QLIK_API_KEY [requis], PROBE_DOSSIER (ex "575/00"), PROBE_TERMS (def "2ahs210").
 """
 import os, json, ssl, sys
 from websocket import create_connection
@@ -14,17 +15,17 @@ KEY=os.environ.get("QLIK_API_KEY","")
 DOSSIER=os.environ.get("PROBE_DOSSIER","").strip()
 TERMS=[t for t in os.environ.get("PROBE_TERMS","2ahs210").lower().split() if t]
 
-DIMS=["PoliceUnique","Guarantee.FR"]
+DIMS=["PoliceUnique","Description","Guarantee.FR"]      # 3 dimensions
 ONLY=lambda f:f"=Only([{f}])"
 MEAS=[("Police","police"),("DossierUnique","dossier"),("Compagnie","compagnie"),
  ("Domain.FR","domaine"),("Policy.Type.FR","type_police"),("RiskType.FR","type_risque"),
- ("Description","description"),("Situation.FR","situation"),("Etat contrat","etat_contrat"),
+ ("Situation.FR","situation"),("Etat contrat","etat_contrat"),
  ("Sous-agent (nom)","sous_agent"),("Gestionnaire","gestionnaire"),("Dossier_Lié_Type","lien_type")]
 
 def main():
     if not KEY: sys.exit("QLIK_API_KEY manquant")
     ws=create_connection(f"wss://{HOST}/app/{APPID}",header=[f"Authorization: Bearer {KEY}"],
-                         timeout=240,sslopt={"cert_reqs":ssl.CERT_NONE})
+                         timeout=300,sslopt={"cert_reqs":ssl.CERT_NONE})
     _id=[0]
     def c(m,h,p):
         _id[0]+=1
@@ -42,20 +43,21 @@ def main():
         "qInitialDataFetch":[{"qTop":0,"qLeft":0,"qWidth":W,"qHeight":1}],
         "qSuppressZero":False,"qSuppressMissing":False}}])["qReturn"]["qHandle"]
     total=c("GetLayout",obj,[])["qLayout"]["qHyperCube"]["qSize"]["qcy"]
-    didx_desc=[m[1] for m in MEAS].index("description")
     page=max(1,10000//W); top=0; hits=[]; scanned=0
     while top<total:
         mtx=c("GetHyperCubeData",obj,["/qHyperCubeDef",[{"qTop":top,"qLeft":0,"qWidth":W,"qHeight":page}]])["qDataPages"][0]["qMatrix"]
         if not mtx: break
         for row in mtx:
-            rec={}
+            rec={"police_unique":(row[0].get("qText") or "").strip() or None,
+                 "description":(row[1].get("qText") or "").strip() or None,
+                 "garantie":(row[2].get("qText") or "").strip() or None}
             for j,(_,col) in enumerate(MEAS):
                 rec[col]=(row[len(DIMS)+j].get("qText") or "").strip() or None
-            rec["garantie"]=(row[1].get("qText") or "").strip() or None
+            desc=(rec.get("description") or "").lower()
             if DOSSIER:
                 keep=((rec.get("dossier") or "")==DOSSIER)
             else:
-                keep=all(t in (rec.get("description") or "").lower() for t in TERMS)
+                keep=all(t in desc for t in TERMS)
             if keep: hits.append(rec)
         scanned+=len(mtx); top+=len(mtx)
     ws.close()
