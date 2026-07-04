@@ -301,12 +301,12 @@ function Analyse360({ client, contrats }) {
         <i className="ti ti-radar" style={{color:'#7c3aed'}}/>Analyse 360 — couverture
         {loadExt&&<span style={{fontSize:10,color:'#94a3b8',fontWeight:500,textTransform:'none'}}>· analyse des relations…</span>}
       </div>
-      <div style={{display:'flex',flexWrap:'wrap',gap:7}}>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(165px,1fr))',gap:7}}>
         {couv.map((e,i)=>{
           const s=STY[e.etat]
           return(
             <div key={i} title={e.etat==='relation'?`Couvert via ${e.src.via} (${e.src.type})`:e.etat==='direct'?'Couvert par un contrat du client':'Non couvert — opportunité'}
-              style={{display:'flex',alignItems:'center',gap:6,padding:'5px 11px',borderRadius:20,fontSize:12,fontWeight:600,background:s.bg,color:s.col,border:`1px solid ${s.bd}`}}>
+              style={{display:'flex',alignItems:'center',gap:6,padding:'6px 11px',borderRadius:10,fontSize:12,fontWeight:600,background:s.bg,color:s.col,border:`1px solid ${s.bd}`}}>
               <span style={{fontSize:14,filter:e.etat==='absent'?'grayscale(1)':'none',opacity:e.etat==='absent'?0.6:1}}>{e.icon}</span>
               {e.label}
               {e.etat==='relation'&&<span style={{fontSize:9,background:'#dbeafe',padding:'1px 5px',borderRadius:8}}>via relation</span>}
