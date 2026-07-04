@@ -198,19 +198,37 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
     alert(`✅ ${nb} transaction(s) de "${contrepartie}" catégorisées. Les futures le seront automatiquement.`)
   }
 
-  // Marquer/démarquer une transaction comme rapprochée (facture trouvée)
-  async function toggleRapproche(txId, valeurActuelle) {
-    const nouvelle = !valeurActuelle
-    await supabase.from('transactions').update({ rapproche: nouvelle }).eq('id', txId)
-    setTransactions(prev => prev.map(t => t.id === txId ? { ...t, rapproche: nouvelle } : t))
-    setTxSelection(prev => prev && prev.id === txId ? { ...prev, rapproche: nouvelle } : prev)
+  // Cliquer le "V" vert : ouvrir la facture liée dans SharePoint
+  function ouvrirFactureLiee(tx) {
+    if (tx.facture_url) window.open(tx.facture_url, '_blank', 'noopener,noreferrer')
   }
 
-  // Ouvrir le dossier SharePoint des factures de la société (dans le navigateur)
-  function ouvrirFacture(tx) {
+  // Cliquer la croix rouge : ouvrir le dossier SharePoint pour trouver/copier la facture
+  function ouvrirDossierFactures(tx) {
     const code = tx.comptes_bancaires?.societes?.code || societeCodes[0]
     const url = SHAREPOINT_FACTURES[code] || SHAREPOINT_FACTURES.DYNASSUR
     window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
+  // Lier manuellement une facture : coller son URL SharePoint
+  async function lierFactureManuelle(tx) {
+    const code = tx.comptes_bancaires?.societes?.code || societeCodes[0]
+    const dossier = SHAREPOINT_FACTURES[code] || SHAREPOINT_FACTURES.DYNASSUR
+    // ouvrir le dossier pour que l'utilisateur copie le lien
+    window.open(dossier, '_blank', 'noopener,noreferrer')
+    const url = window.prompt("Collez ici le lien SharePoint de la facture (clic droit sur le fichier > Copier le lien) :", tx.facture_url || '')
+    if (url === null) return // annulé
+    const clean = url.trim()
+    await supabase.from('transactions').update({ facture_url: clean || null, rapproche: !!clean }).eq('id', tx.id)
+    setTransactions(prev => prev.map(t => t.id === tx.id ? { ...t, facture_url: clean || null, rapproche: !!clean } : t))
+    setTxSelection(prev => prev && prev.id === tx.id ? { ...prev, facture_url: clean || null, rapproche: !!clean } : prev)
+  }
+
+  // Retirer le lien facture (repasse en croix rouge)
+  async function retirerLienFacture(tx) {
+    await supabase.from('transactions').update({ facture_url: null, rapproche: false }).eq('id', tx.id)
+    setTransactions(prev => prev.map(t => t.id === tx.id ? { ...t, facture_url: null, rapproche: false } : t))
+    setTxSelection(prev => prev && prev.id === tx.id ? { ...prev, facture_url: null, rapproche: false } : prev)
   }
 
   if (loading) return <div style={{ padding:'60px', textAlign:'center', color:'#94a3b8', fontFamily:"'Source Sans Pro', sans-serif" }}>Chargement…</div>
@@ -394,7 +412,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                   <div key={t.id} onClick={() => setTxSelection(t)} style={{
                     padding:'12px 14px', cursor:'pointer',
                     borderBottom: i < txPage.length-1 ? '1px solid #f1f5f9' : 'none',
-                    background: t.rapproche ? '#f0fdf4' : '#fff'
+                    background: t.facture_url ? '#f0fdf4' : '#fff'
                   }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:'10px' }}>
                       <div style={{ minWidth:0, flex:1 }}>
@@ -416,13 +434,17 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                         <span style={{ fontSize:'11px', color:'#cbd5e1' }}>Sans catégorie</span>
                       )}
                       <div style={{ display:'flex', alignItems:'center', gap:'8px' }} onClick={e=>e.stopPropagation()}>
-                        <input type="checkbox" checked={!!t.rapproche} onChange={()=>toggleRapproche(t.id, t.rapproche)}
-                          title="Facture rapprochée" style={{ width:'18px', height:'18px', cursor:'pointer', accentColor:'#16a34a' }} />
-                        <button onClick={()=>ouvrirFacture(t)} title="Ouvrir factures SharePoint" style={{
-                          display:'flex', alignItems:'center', justifyContent:'center', width:'26px', height:'26px',
-                          borderRadius:'6px', border:'none', background: t.rapproche?'#16a34a':'#e2e8f0',
-                          color: t.rapproche?'#fff':'#64748b', cursor:'pointer', fontSize:'14px', fontWeight:'700'
-                        }}>✓</button>
+                        {t.facture_url ? (
+                          <button onClick={()=>ouvrirFactureLiee(t)} title="Facture liée — ouvrir" style={{
+                            display:'flex', alignItems:'center', justifyContent:'center', width:'30px', height:'30px',
+                            borderRadius:'7px', border:'none', background:'#16a34a', color:'#fff', cursor:'pointer', fontSize:'16px', fontWeight:'700'
+                          }}>✓</button>
+                        ) : (
+                          <button onClick={()=>lierFactureManuelle(t)} title="Pas de facture — ajouter le lien" style={{
+                            display:'flex', alignItems:'center', justifyContent:'center', width:'30px', height:'30px',
+                            borderRadius:'7px', border:'none', background:'#fee2e2', color:'#dc2626', cursor:'pointer', fontSize:'16px', fontWeight:'700'
+                          }}>✕</button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -433,16 +455,20 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                 display:'grid', gridTemplateColumns:'70px 100px 110px 1fr 170px 140px 110px',
                 padding:'9px 16px', alignItems:'center', cursor:'pointer',
                 borderBottom: i < txPage.length-1 ? '1px solid #f8fafc' : 'none',
-                background: t.rapproche ? '#f0fdf4' : (i%2===0 ? '#fff' : '#fafafa')
+                background: t.facture_url ? '#f0fdf4' : (i%2===0 ? '#fff' : '#fafafa')
               }}>
-                <div style={{ display:'flex', alignItems:'center', gap:'8px', justifyContent:'center' }} onClick={e=>e.stopPropagation()}>
-                  <input type="checkbox" checked={!!t.rapproche} onChange={()=>toggleRapproche(t.id, t.rapproche)}
-                    title="Facture rapprochée" style={{ width:'16px', height:'16px', cursor:'pointer', accentColor:'#16a34a' }} />
-                  <button onClick={()=>ouvrirFacture(t)} title="Ouvrir les factures dans SharePoint" style={{
-                    display:'flex', alignItems:'center', justifyContent:'center', width:'22px', height:'22px',
-                    borderRadius:'5px', border:'none', background: t.rapproche?'#16a34a':'#e2e8f0',
-                    color: t.rapproche?'#fff':'#64748b', cursor:'pointer', fontSize:'13px', fontWeight:'700'
-                  }}>✓</button>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'center' }} onClick={e=>e.stopPropagation()}>
+                  {t.facture_url ? (
+                    <button onClick={()=>ouvrirFactureLiee(t)} title="Facture liée — cliquer pour l'ouvrir dans SharePoint" style={{
+                      display:'flex', alignItems:'center', justifyContent:'center', width:'26px', height:'26px',
+                      borderRadius:'6px', border:'none', background:'#16a34a', color:'#fff', cursor:'pointer', fontSize:'15px', fontWeight:'700'
+                    }}>✓</button>
+                  ) : (
+                    <button onClick={()=>lierFactureManuelle(t)} title="Aucune facture liée — cliquer pour ajouter le lien" style={{
+                      display:'flex', alignItems:'center', justifyContent:'center', width:'26px', height:'26px',
+                      borderRadius:'6px', border:'none', background:'#fee2e2', color:'#dc2626', cursor:'pointer', fontSize:'15px', fontWeight:'700'
+                    }}>✕</button>
+                  )}
                 </div>
                 <div style={{ fontSize:'12px', color:'#64748b' }}>{fmtDate(t._date)}</div>
                 <div style={{ fontSize:'11px', color:'#94a3b8', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
@@ -550,17 +576,37 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
               </div>
               <div style={{ padding:'20px 24px' }}>
                 {/* Rapprochement facture */}
-                <div style={{ marginBottom:'18px', padding:'14px', border:`1px solid ${t.rapproche?'#bbf7d0':'#e2e8f0'}`, borderRadius:'10px', background: t.rapproche?'#f0fdf4':'#f8fafc' }}>
+                <div style={{ marginBottom:'18px', padding:'14px', border:`1px solid ${t.facture_url?'#bbf7d0':'#fecaca'}`, borderRadius:'10px', background: t.facture_url?'#f0fdf4':'#fef2f2' }}>
                   <div style={{ fontSize:'12px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'10px' }}>Facture</div>
-                  <div style={{ display:'flex', gap:'10px', alignItems:'center' }}>
-                    <label style={{ display:'flex', alignItems:'center', gap:'8px', cursor:'pointer', fontSize:'14px', color:'#1e293b', fontWeight:'600' }}>
-                      <input type="checkbox" checked={!!t.rapproche} onChange={()=>toggleRapproche(t.id, t.rapproche)} style={{ width:'18px', height:'18px', cursor:'pointer', accentColor:'#16a34a' }} />
-                      {t.rapproche ? 'Facture rapprochée' : 'Marquer comme rapprochée'}
-                    </label>
-                    <button onClick={()=>ouvrirFacture(t)} style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', borderRadius:'8px', border:'none', background:color, color:'#fff', cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
-                      📄 Ouvrir dans SharePoint
-                    </button>
-                  </div>
+                  {t.facture_url ? (
+                    <div>
+                      <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'10px' }}>
+                        <span style={{ display:'flex', alignItems:'center', justifyContent:'center', width:'22px', height:'22px', borderRadius:'6px', background:'#16a34a', color:'#fff', fontSize:'13px', fontWeight:'700' }}>✓</span>
+                        <span style={{ fontSize:'14px', color:'#16a34a', fontWeight:'700' }}>Facture liée</span>
+                      </div>
+                      <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
+                        <button onClick={()=>ouvrirFactureLiee(t)} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', borderRadius:'8px', border:'none', background:'#16a34a', color:'#fff', cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                          📄 Ouvrir la facture
+                        </button>
+                        <button onClick={()=>lierFactureManuelle(t)} style={{ padding:'8px 14px', borderRadius:'8px', border:'1px solid #cbd5e1', background:'#fff', color:'#475569', cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                          Changer le lien
+                        </button>
+                        <button onClick={()=>retirerLienFacture(t)} style={{ padding:'8px 14px', borderRadius:'8px', border:'1px solid #fecaca', background:'#fff', color:'#dc2626', cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                          Retirer
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'10px' }}>
+                        <span style={{ display:'flex', alignItems:'center', justifyContent:'center', width:'22px', height:'22px', borderRadius:'6px', background:'#fee2e2', color:'#dc2626', fontSize:'13px', fontWeight:'700' }}>✕</span>
+                        <span style={{ fontSize:'14px', color:'#dc2626', fontWeight:'700' }}>Aucune facture liée</span>
+                      </div>
+                      <button onClick={()=>lierFactureManuelle(t)} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', borderRadius:'8px', border:'none', background:color, color:'#fff', cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                        🔗 Ajouter le lien de la facture
+                      </button>
+                    </div>
+                  )}
                 </div>
                 {/* Sélecteur catégorie */}
                 <div style={{ marginBottom:'18px' }}>
