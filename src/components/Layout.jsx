@@ -4,6 +4,7 @@ import Header from './Header'
 import Sidebar from './Sidebar'
 import ErrorBoundary from './ErrorBoundary'
 import { useAuth } from '../lib/auth'
+import { bootstrapConfigs } from '../lib/bootstrapConfigs'
 
 // Préfixe d'URL → code entité
 const PATH_TO_SOCIETE = [
@@ -20,6 +21,9 @@ export default function Layout({ children, currentPage }) {
   const [menuOuvert, setMenuOuvert] = useState(false)
   const location = useLocation()
   const { activeSociete, setActiveSociete } = useAuth()
+
+  // Charge les coordonnées des sociétés depuis la base (une fois) pour les documents devis/factures
+  useEffect(() => { bootstrapConfigs() }, [])
 
   // Synchronise l'entité active du menu avec l'URL courante
   useEffect(() => {

@@ -169,10 +169,15 @@ export default function DynassurRdv() {
     () => Object.values(cats).filter(c => (c.entite || '').toUpperCase() === 'DYNASSUR').map(c => c.code),
     [cats]
   )
+  // catégories explicitement rattachées à une AUTRE entité → à exclure ; tout le reste (Dynassur + non catégorisé + inconnu) est affiché
+  const codesAutres = useMemo(
+    () => Object.values(cats).filter(c => c.entite && c.entite.toUpperCase() !== 'DYNASSUR').map(c => c.code),
+    [cats]
+  )
 
   const now = Date.now()
   const liste = useMemo(() => {
-    let l = rdv.filter(r => codesDyn.length === 0 || codesDyn.includes(r.categorie))
+    let l = rdv.filter(r => !codesAutres.includes(r.categorie))
     if (filtreCat) l = l.filter(r => r.categorie === filtreCat)
     if (periode === 'avenir') l = l.filter(r => tsOf(r.debut) >= now - 86400000)
     if (periode === 'passes') l = l.filter(r => tsOf(r.debut) < now - 86400000)
@@ -186,9 +191,9 @@ export default function DynassurRdv() {
       })
     }
     return l.sort((a, b) => periode === 'passes' ? tsOf(b.debut) - tsOf(a.debut) : tsOf(a.debut) - tsOf(b.debut))
-  }, [rdv, codesDyn, filtreCat, periode, recherche, now, clientsById])
+  }, [rdv, codesAutres, filtreCat, periode, recherche, now, clientsById])
 
-  const totalDyn = useMemo(() => rdv.filter(r => codesDyn.includes(r.categorie)), [rdv, codesDyn])
+  const totalDyn = useMemo(() => rdv.filter(r => !codesAutres.includes(r.categorie)), [rdv, codesAutres])
   const avenir = totalDyn.filter(r => tsOf(r.debut) >= now - 86400000).length
   const lies = useMemo(() => totalDyn.filter(r => r.client_id).length, [totalDyn])
   const parCat = useMemo(() => {

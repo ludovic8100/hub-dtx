@@ -61,9 +61,11 @@ export function StatBanner({ color, colorDark, title, subtitle, stats = [], acti
       {stats.length > 0 && (
         <div style={{ position: 'relative', display: 'flex', gap: mob ? 20 : 36, marginTop: mob ? 14 : 18, flexWrap: 'wrap' }}>
           {stats.map((s, i) => (
-            <div key={i}>
-              <div style={{ fontSize: mob ? 10 : 11, fontWeight: 700, opacity: 0.8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{s.label}</div>
-              <div style={{ fontSize: mob ? 19 : 24, fontWeight: 800, marginTop: 2 }}>{s.value}</div>
+            <div key={i} onClick={s.onClick} style={{ cursor: s.onClick ? 'pointer' : 'default', transition: 'opacity .15s' }}
+              onMouseEnter={e => { if (s.onClick) e.currentTarget.style.opacity = 0.75 }}
+              onMouseLeave={e => { if (s.onClick) e.currentTarget.style.opacity = 1 }}>
+              <div style={{ fontSize: mob ? 10 : 11, fontWeight: 700, opacity: 0.8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{s.label}{s.onClick && <span style={{ marginLeft: 5, opacity: 0.7 }}>▸</span>}</div>
+              <div style={{ fontSize: mob ? 19 : 24, fontWeight: 800, marginTop: 2, textDecoration: s.onClick ? 'underline' : 'none', textUnderlineOffset: 3, textDecorationThickness: 1, textDecorationColor: 'rgba(255,255,255,0.35)' }}>{s.value}</div>
             </div>
           ))}
         </div>

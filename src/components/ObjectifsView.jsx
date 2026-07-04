@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Component } from 'react'
 import { supabase } from '../lib/supabase'
 
 const C = {
@@ -14,6 +14,7 @@ const C = {
 const fmt = v => v == null ? '—' : new Intl.NumberFormat('fr-BE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v)
 const fmtN = v => v == null ? '—' : new Intl.NumberFormat('fr-BE').format(v)
 const fmtPct = v => v == null ? '—' : `${Number(v).toFixed(1)} %`
+const isVieDom = dom => { const d = (dom || '').toLowerCase(); return d.includes('vie') || d.includes('placement') }
 
 function pctColor(pct) {
   if (pct == null) return C.grey
@@ -53,13 +54,16 @@ function Badge({ label, color, pale }) {
 }
 
 // ── KPI Card ──────────────────────────────────────────────────
-function KpiCard({ label, value, sub, pct, col, icon }) {
+function KpiCard({ label, value, sub, pct, col, icon, onClick }) {
   const c = col || C.blue
   return (
-    <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 10, padding: '16px 18px', borderTop: `3px solid ${c}` }}>
+    <div onClick={onClick}
+      onMouseEnter={e => { if (onClick) e.currentTarget.style.boxShadow = `0 4px 14px ${c}25` }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none' }}
+      style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 10, padding: '16px 18px', borderTop: `3px solid ${c}`, cursor: onClick ? 'pointer' : 'default', transition: 'box-shadow .15s' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: C.textL, textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
-        {icon && <i className={`ti ${icon}`} style={{ fontSize: 18, color: c + '80' }} />}
+        {onClick ? <i className="ti ti-zoom-in" style={{ fontSize: 16, color: c }} /> : (icon && <i className={`ti ${icon}`} style={{ fontSize: 18, color: c + '80' }} />)}
       </div>
       <div style={{ fontSize: 24, fontWeight: 800, color: C.text, marginBottom: sub ? 4 : 0 }}>{value}</div>
       {sub && <div style={{ fontSize: 12, color: C.textM, marginBottom: pct != null ? 8 : 0 }}>{sub}</div>}
@@ -71,7 +75,93 @@ function KpiCard({ label, value, sub, pct, col, icon }) {
 // ══════════════════════════════════════════════════════════════
 // ONGLET 1 — COMMERCIAUX
 // ══════════════════════════════════════════════════════════════
-function OngletCommerciaux({ objectifs, reel, loading }) {
+// ── Fenêtre de détail : lignes derrière un réalisé ──
+class DetailBoundary extends Component {
+  constructor(p) { super(p); this.state = { err: null } }
+  static getDerivedStateFromError(err) { return { err } }
+  componentDidCatch(err) { console.error('DetailModal crash:', err) }
+  render() {
+    if (this.state.err) return (
+      <div onClick={this.props.onClose} style={{ position:'fixed', inset:0, background:'rgba(15,23,42,.55)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+        <div onClick={e=>e.stopPropagation()} style={{ background:'#fff', padding:24, borderRadius:12, maxWidth:600, width:'100%' }}>
+          <div style={{ fontWeight:800, color:'#dc2626', marginBottom:8, fontSize:15 }}>Erreur d'affichage du détail</div>
+          <pre style={{ fontSize:12, whiteSpace:'pre-wrap', wordBreak:'break-word', color:'#475569', background:'#f8fafc', padding:12, borderRadius:8, maxHeight:300, overflow:'auto' }}>{String(this.state.err?.stack || this.state.err?.message || this.state.err)}</pre>
+          <button onClick={this.props.onClose} style={{ marginTop:14, padding:'8px 18px', border:'none', borderRadius:8, background:'#0080BD', color:'#fff', fontWeight:700, cursor:'pointer' }}>Fermer</button>
+        </div>
+      </div>
+    )
+    return this.props.children
+  }
+}
+
+function DetailModal({ titre, kind, rows, onClose }) {
+  rows = Array.isArray(rows) ? rows : []
+  const isQ = kind === 'quittances'
+  const totC = rows.reduce((s, r) => s + (Number(r.commission) || 0), 0)
+  const totP = rows.reduce((s, r) => s + (Number(r.prime_totale) || 0), 0)
+  const MO = ['', 'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
+  const COLS = isQ ? [
+    { key:'date_comptable', label:'Date',       align:'left',  get:r=>r.date_comptable||'', render:r=>r.date_comptable||'—' },
+    { key:'client',         label:'Client',     align:'left',  get:r=>[r.client_nom,r.client_prenom].filter(Boolean).join(' '), render:r=>[r.client_nom,r.client_prenom].filter(Boolean).join(' ')||'—' },
+    { key:'compagnie',      label:'Compagnie',  align:'left',  get:r=>r.compagnie||'', render:r=>r.compagnie||'—' },
+    { key:'domaine',        label:'Domaine',    align:'left',  get:r=>r.domaine||'', render:r=>r.domaine||'—' },
+    { key:'prime_totale',   label:'Prime',      align:'right', get:r=>Number(r.prime_totale)||0, render:r=>fmt(r.prime_totale) },
+    { key:'commission',     label:'Commission', align:'right', get:r=>Number(r.commission)||0, render:r=><span style={{ color:C.ok, fontWeight:700 }}>{fmt(r.commission)}</span> },
+  ] : [
+    { key:'mois',        label:'Mois',       align:'left', get:r=>parseInt(r.mois)||0, render:r=>MO[parseInt(r.mois)]||r.mois||'—' },
+    { key:'type_prod',   label:'Type',       align:'left', get:r=>r.type_prod||'', render:r=>r.type_prod||'—' },
+    { key:'nom_client',  label:'Client',     align:'left', get:r=>r.nom_client||'', render:r=>r.nom_client||'—' },
+    { key:'cie',         label:'Compagnie',  align:'left', get:r=>r.cie||'', render:r=>r.cie||'—' },
+    { key:'police',      label:'N° contrat', align:'left', get:r=>r.police||'', render:r=>r.police||'—' },
+  ]
+  const [sort, setSort] = useState({ key: isQ ? 'date_comptable' : 'mois', dir: 'desc' })
+  const sorted = [...rows].sort((a, b) => {
+    const c = COLS.find(x => x.key === sort.key) || COLS[0]
+    const av = c.get(a), bv = c.get(b)
+    const r = typeof av === 'string' ? av.localeCompare(bv) : av - bv
+    return sort.dir === 'asc' ? r : -r
+  })
+  const show = sorted.slice(0, 1000)
+  const click = k => setSort(s => s.key === k ? { key:k, dir:s.dir === 'asc' ? 'desc' : 'asc' } : { key:k, dir:'asc' })
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.55)', zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: 'min(880px,96vw)', height: '100%', background: '#fff', display: 'flex', flexDirection: 'column', boxShadow: '-8px 0 30px rgba(0,0,0,.2)' }}>
+        <div style={{ background: C.blueDark, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ color: '#fff', fontSize: 15, fontWeight: 800 }}>{titre}</div>
+            <div style={{ color: '#cbd5e1', fontSize: 12, marginTop: 2 }}>
+              {fmtN(rows.length)} ligne(s){isQ ? ` · Primes ${fmt(totP)} · Commissions ${fmt(totC)}` : ''}
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer' }}>✕</button>
+        </div>
+        <div style={{ flex: 1, overflow: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+            <thead><tr style={{ background: C.bg, position: 'sticky', top: 0 }}>
+              {COLS.map(c => (
+                <th key={c.key} onClick={()=>click(c.key)} style={{ textAlign: c.align, padding: '8px 12px', fontSize: 10, fontWeight: 700, color: sort.key===c.key?C.text:C.textL, textTransform: 'uppercase', whiteSpace: 'nowrap', cursor:'pointer', userSelect:'none' }}>
+                  {c.label}{sort.key===c.key && <span style={{ marginLeft:4 }}>{sort.dir==='asc'?'▲':'▼'}</span>}
+                </th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {show.map((r, i) => (
+                <tr key={i} style={{ borderBottom: `1px solid ${C.greyPale}` }}>
+                  {COLS.map(c => (
+                    <td key={c.key} style={{ padding: '7px 12px', textAlign: c.align, color: C.textM, whiteSpace: (c.key==='date_comptable'||c.key==='police'||c.key==='mois')?'nowrap':'normal' }}>{c.render(r)}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {sorted.length > 1000 && <p style={{ padding: '12px 16px', color: C.textL, fontSize: 12 }}>… et {fmtN(sorted.length - 1000)} autres lignes (totaux calculés sur l'ensemble).</p>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function OngletCommerciaux({ objectifs, reel, loading, raw, onDetail }) {
   const commerciaux = objectifs.filter(o => o.categorie === 'EMPLOYE' && o.obj_com_nette_total)
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: C.textL }}>Chargement…</div>
@@ -88,9 +178,12 @@ function OngletCommerciaux({ objectifs, reel, loading }) {
     <div>
       {/* KPIs globaux */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 24 }}>
-        <KpiCard label="Commission nette Dynassur" value={fmt(totalReel)} sub={`Objectif : ${fmt(totalObj)}`} pct={totalObj > 0 ? totalReel / totalObj * 100 : null} col={C.blue} icon="ti-coin" />
-        <KpiCard label="Nouvelles affaires" value={fmtN(totalReelNA)} sub={`Objectif : ${fmtN(totalObjNA)} NA`} pct={totalObjNA > 0 ? totalReelNA / totalObjNA * 100 : null} col="#7c3aed" icon="ti-file-plus" />
-        <KpiCard label="Prime VIE (capital)" value={fmt(totalReelVie)} sub={`Objectif : ${fmt(totalObjVie)}`} pct={totalObjVie > 0 ? totalReelVie / totalObjVie * 100 : null} col="#0d9488" icon="ti-heart" />
+        <KpiCard label="Commission nette Dynassur" value={fmt(totalReel)} sub={`Objectif : ${fmt(totalObj)}`} pct={totalObj > 0 ? totalReel / totalObj * 100 : null} col={C.blue} icon="ti-coin"
+          onClick={() => { const x = commerciaux.flatMap(o => raw[o.collaborateur_code]?.quitt || []); x.length && onDetail('Tous commerciaux — commissions 2026', 'quittances', x) }} />
+        <KpiCard label="Nouvelles affaires" value={fmtN(totalReelNA)} sub={`Objectif : ${fmtN(totalObjNA)} NA`} pct={totalObjNA > 0 ? totalReelNA / totalObjNA * 100 : null} col="#7c3aed" icon="ti-file-plus"
+          onClick={() => { const x = commerciaux.flatMap(o => raw[o.collaborateur_code]?.na || []); x.length && onDetail('Tous commerciaux — Nouvelles Affaires 2026', 'mouvements', x) }} />
+        <KpiCard label="Prime VIE (capital)" value={fmt(totalReelVie)} sub={`Objectif : ${fmt(totalObjVie)}`} pct={totalObjVie > 0 ? totalReelVie / totalObjVie * 100 : null} col="#0d9488" icon="ti-heart"
+          onClick={() => { const x = commerciaux.flatMap(o => (raw[o.collaborateur_code]?.quitt || []).filter(r => isVieDom(r.domaine))); x.length && onDetail('Tous commerciaux — quittances VIE 2026', 'quittances', x) }} />
       </div>
 
       {/* Tableau par commercial */}
@@ -122,12 +215,15 @@ function OngletCommerciaux({ objectifs, reel, loading }) {
                       <div style={{ fontSize: 11, color: C.textL }}>{o.categorie}</div>
                     </td>
                     <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.textM }}>{fmt(o.obj_com_nette_total)}</td>
-                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 14, fontWeight: 700, color: pctColor(pctCom) }}>{fmt(r.com_nette)}</td>
+                    <td onClick={() => (raw[o.collaborateur_code]?.quitt?.length) && onDetail(`${o.collaborateur_code} — commissions 2026`, 'quittances', raw[o.collaborateur_code].quitt)}
+                      style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 14, fontWeight: 700, color: pctColor(pctCom), cursor: raw[o.collaborateur_code]?.quitt?.length ? 'pointer' : 'default', textDecoration: raw[o.collaborateur_code]?.quitt?.length ? 'underline dotted' : 'none' }}>{fmt(r.com_nette)}</td>
                     <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, minWidth: 160 }}><ProgressBar pct={pctCom} /></td>
                     <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.textM }}>{fmtN(o.obj_na_total)}</td>
-                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 14, fontWeight: 700, color: C.text }}>{fmtN(r.na)}</td>
+                    <td onClick={() => (raw[o.collaborateur_code]?.na?.length) && onDetail(`${o.collaborateur_code} — Nouvelles Affaires 2026`, 'mouvements', raw[o.collaborateur_code].na)}
+                      style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 14, fontWeight: 700, color: C.text, cursor: raw[o.collaborateur_code]?.na?.length ? 'pointer' : 'default', textDecoration: raw[o.collaborateur_code]?.na?.length ? 'underline dotted' : 'none' }}>{fmtN(r.na)}</td>
                     <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.textM }}>{fmt(o.obj_prime_vie)}</td>
-                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 14, fontWeight: 700, color: C.text }}>{fmt(r.prime_vie)}</td>
+                    <td onClick={() => { const x = (raw[o.collaborateur_code]?.quitt || []).filter(rr => isVieDom(rr.domaine)); x.length && onDetail(`${o.collaborateur_code} — quittances VIE 2026`, 'quittances', x) }}
+                      style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 14, fontWeight: 700, color: C.text, cursor: (raw[o.collaborateur_code]?.quitt || []).some(rr => isVieDom(rr.domaine)) ? 'pointer' : 'default', textDecoration: (raw[o.collaborateur_code]?.quitt || []).some(rr => isVieDom(rr.domaine)) ? 'underline dotted' : 'none' }}>{fmt(r.prime_vie)}</td>
                     <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.textM }}>{fmtPct(retObj)}</td>
                     <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}` }}>
                       <span style={{ fontSize: 13, fontWeight: 700, color: retColor(retReel) }}>{fmtPct(retReel)}</span>
@@ -173,7 +269,7 @@ function OngletCommerciaux({ objectifs, reel, loading }) {
 // ══════════════════════════════════════════════════════════════
 // ONGLET 2 — SOUS-AGENTS
 // ══════════════════════════════════════════════════════════════
-function OngletSousAgents({ objectifs, reel, loading }) {
+function OngletSousAgents({ objectifs, reel, loading, raw, onDetail }) {
   const sa = objectifs.filter(o => o.categorie === 'SA' && o.obj_com_nette_total)
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: C.textL }}>Chargement…</div>
@@ -184,7 +280,8 @@ function OngletSousAgents({ objectifs, reel, loading }) {
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 24 }}>
-        <KpiCard label="Part Dynassur — tous SA" value={fmt(totalReel)} sub={`Objectif : ${fmt(totalObj)}`} pct={totalObj > 0 ? totalReel / totalObj * 100 : null} col={C.blue} icon="ti-coin" />
+        <KpiCard label="Part Dynassur — tous SA" value={fmt(totalReel)} sub={`Objectif : ${fmt(totalObj)}`} pct={totalObj > 0 ? totalReel / totalObj * 100 : null} col={C.blue} icon="ti-coin"
+          onClick={() => { const x = sa.flatMap(o => raw[o.collaborateur_code]?.quitt || []); x.length && onDetail('Tous sous-agents — commissions 2026', 'quittances', x) }} />
         <KpiCard label="SA avec objectif" value={sa.length} col="#7c3aed" icon="ti-users" />
         <KpiCard label="SA en difficulté (rét. < 60%)" value={sa.filter(o => (reel[o.collaborateur_code]?.retention || 100) < 60).length} col={C.danger} icon="ti-alert-triangle" />
       </div>
@@ -221,13 +318,15 @@ function OngletSousAgents({ objectifs, reel, loading }) {
                       <Badge label={`${o.taux_retention_dynassur}%`} color={o.taux_retention_dynassur >= 20 ? C.blue : C.grey} pale={C.bluePale} />
                     </td>
                     <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.textM }}>{fmt(o.obj_com_nette_total)}</td>
-                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 14, fontWeight: 700, color: pctColor(pctCom) }}>{fmt(r.com_dynassur)}</td>
+                    <td onClick={() => (raw[o.collaborateur_code]?.quitt?.length) && onDetail(`${o.collaborateur_code} — commissions 2026`, 'quittances', raw[o.collaborateur_code].quitt)}
+                      style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 14, fontWeight: 700, color: pctColor(pctCom), cursor: raw[o.collaborateur_code]?.quitt?.length ? 'pointer' : 'default', textDecoration: raw[o.collaborateur_code]?.quitt?.length ? 'underline dotted' : 'none' }}>{fmt(r.com_dynassur)}</td>
                     <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, minWidth: 140 }}><ProgressBar pct={pctCom} /></td>
                     <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.textM }}>{fmtPct(o.obj_taux_retention)}</td>
                     <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}` }}>
                       <span style={{ fontSize: 13, fontWeight: 700, color: retColor(retReel) }}>{fmtPct(retReel)}</span>
                     </td>
-                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.text }}>{fmtN(r.na)}</td>
+                    <td onClick={() => (raw[o.collaborateur_code]?.na?.length) && onDetail(`${o.collaborateur_code} — Nouvelles Affaires 2026`, 'mouvements', raw[o.collaborateur_code].na)}
+                      style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.text, cursor: raw[o.collaborateur_code]?.na?.length ? 'pointer' : 'default', textDecoration: raw[o.collaborateur_code]?.na?.length ? 'underline dotted' : 'none' }}>{fmtN(r.na)}</td>
                     <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}` }}>
                       {enDifficulte
                         ? <Badge label="⚠ Rétention faible" color={C.danger} pale={C.dangerPale} />
@@ -248,7 +347,7 @@ function OngletSousAgents({ objectifs, reel, loading }) {
 // ══════════════════════════════════════════════════════════════
 // ONGLET 3 — RÉTENTION GLOBALE
 // ══════════════════════════════════════════════════════════════
-function OngletRetention({ reel, loading }) {
+function OngletRetention({ reel, loading, raw, onDetail }) {
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: C.textL }}>Chargement…</div>
 
   const tous = Object.entries(reel).filter(([, r]) => r.na > 0 || r.chutes > 0)
@@ -260,9 +359,12 @@ function OngletRetention({ reel, loading }) {
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 24 }}>
-        <KpiCard label="NA 2026" value={fmtN(totalNA)} col={C.blue} icon="ti-file-plus" />
-        <KpiCard label="Chutes réelles" value={fmtN(totalChutes)} col={C.danger} icon="ti-trending-down" />
-        <KpiCard label="TFT (transferts)" value={fmtN(totalTFT)} col={C.warn} icon="ti-arrows-exchange" sub="Client gardé, CIE changée" />
+        <KpiCard label="NA 2026" value={fmtN(totalNA)} col={C.blue} icon="ti-file-plus"
+          onClick={() => { const x = tous.flatMap(([code]) => raw[code]?.na || []); x.length && onDetail('Tous producteurs — Nouvelles Affaires 2026', 'mouvements', x) }} />
+        <KpiCard label="Chutes réelles" value={fmtN(totalChutes)} col={C.danger} icon="ti-trending-down"
+          onClick={() => { const x = tous.flatMap(([code]) => raw[code]?.chutes || []); x.length && onDetail('Tous producteurs — chutes 2026', 'mouvements', x) }} />
+        <KpiCard label="TFT (transferts)" value={fmtN(totalTFT)} col={C.warn} icon="ti-arrows-exchange" sub="Client gardé, CIE changée"
+          onClick={() => { const x = tous.flatMap(([code]) => raw[code]?.tft || []); x.length && onDetail('Tous producteurs — TFT / mandats faveur 2026', 'mouvements', x) }} />
         <KpiCard label="Net (NA - chutes)" value={fmtN(totalNA - totalChutes)} col={C.ok} icon="ti-trending-up" />
         <KpiCard label="Rétention globale 2026" value={fmtPct(retGlobal)} sub="Objectif : ≥ 70%" pct={retGlobal} col={retColor(retGlobal)} icon="ti-shield" />
       </div>
@@ -290,9 +392,12 @@ function OngletRetention({ reel, loading }) {
                     onMouseEnter={e => e.currentTarget.style.background = C.bluePale}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                     <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontWeight: 700, color: C.text }}>{code}</td>
-                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.text }}>{fmtN(r.na)}</td>
-                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, fontWeight: 600, color: C.danger }}>{fmtN(r.chutes)}</td>
-                    <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.warn }}>{fmtN(r.tft)}</td>
+                    <td onClick={() => (raw[code]?.na?.length) && onDetail(`${code} — Nouvelles Affaires 2026`, 'mouvements', raw[code].na)}
+                      style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.text, cursor: raw[code]?.na?.length ? 'pointer' : 'default', textDecoration: raw[code]?.na?.length ? 'underline dotted' : 'none' }}>{fmtN(r.na)}</td>
+                    <td onClick={() => (raw[code]?.chutes?.length) && onDetail(`${code} — chutes 2026`, 'mouvements', raw[code].chutes)}
+                      style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, fontWeight: 600, color: C.danger, cursor: raw[code]?.chutes?.length ? 'pointer' : 'default', textDecoration: raw[code]?.chutes?.length ? 'underline dotted' : 'none' }}>{fmtN(r.chutes)}</td>
+                    <td onClick={() => (raw[code]?.tft?.length) && onDetail(`${code} — TFT / mandats faveur 2026`, 'mouvements', raw[code].tft)}
+                      style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.warn, cursor: raw[code]?.tft?.length ? 'pointer' : 'default', textDecoration: raw[code]?.tft?.length ? 'underline dotted' : 'none' }}>{fmtN(r.tft)}</td>
                     <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, fontWeight: 600, color: (r.na - r.chutes) > 0 ? C.ok : C.danger }}>{fmtN(r.na - r.chutes)}</td>
                     <td style={{ padding: '12px 14px', borderBottom: `1px solid ${C.border}` }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -325,7 +430,10 @@ export default function ObjectifsView() {
   const [onglet, setOnglet] = useState('commerciaux')
   const [objectifs, setObjectifs] = useState([])
   const [reel, setReel] = useState({})
+  const [raw, setRaw] = useState({})
+  const [detail, setDetail] = useState(null)   // { titre, kind, rows }
   const [loading, setLoading] = useState(true)
+  const onDetail = (titre, kind, rows) => setDetail({ titre, kind, rows })
 
   const ONGLETS = [
     { key: 'commerciaux', label: 'Commerciaux', icon: 'ti-target' },
@@ -345,7 +453,7 @@ export default function ObjectifsView() {
         let offset = 0
         while (true) {
           const { data: rows } = await supabase.from('quittances')
-            .select('sous_agent,commission,prime_totale,domaine')
+            .select('sous_agent,commission,prime_totale,domaine,date_comptable,compagnie,client_nom,client_prenom,police')
             .gte('date_comptable', '2026-01-01')
             .range(offset, offset + 999)
           if (!rows || rows.length === 0) break
@@ -359,7 +467,7 @@ export default function ObjectifsView() {
         offset = 0
         while (true) {
           const { data: rows } = await supabase.from('mouvements_production')
-            .select('sa_contrat,type_prod')
+            .select('sa_contrat,type_prod,mois,police,nom_client,cie')
             .eq('annee', 2026)
             .range(offset, offset + 999)
           if (!rows || rows.length === 0) break
@@ -403,8 +511,10 @@ export default function ObjectifsView() {
 
         // Agréger commissions
         const reelMap = {}
+        const rawMap = {}
         const ensure = code => {
           if (!reelMap[code]) reelMap[code] = { com_nette: 0, com_dynassur: 0, prime_vie: 0, na: 0, chutes: 0, tft: 0, base2025: null }
+          if (!rawMap[code]) rawMap[code] = { quitt: [], na: [], chutes: [], tft: [] }
         }
 
         quittances.forEach(r => {
@@ -417,6 +527,7 @@ export default function ObjectifsView() {
           reelMap[code].com_nette += com
           reelMap[code].com_dynassur += com * taux
           if (isVie(r.domaine)) reelMap[code].prime_vie += r.prime_totale || 0
+          rawMap[code].quitt.push(r)
         })
 
         // Agréger mouvements 2026
@@ -425,9 +536,9 @@ export default function ObjectifsView() {
           if (!sa || EXCLURE.has(sa)) return
           const code = nameToCode[sa] || sa.split(' ')[0].toUpperCase().substring(0, 3)
           ensure(code)
-          if (r.type_prod === 'N.A.') reelMap[code].na++
-          else if (CHUTES.has(r.type_prod)) reelMap[code].chutes++
-          else if (TFT.has(r.type_prod)) reelMap[code].tft++
+          if (r.type_prod === 'N.A.') { reelMap[code].na++; rawMap[code].na.push(r) }
+          else if (CHUTES.has(r.type_prod)) { reelMap[code].chutes++; rawMap[code].chutes.push(r) }
+          else if (TFT.has(r.type_prod)) { reelMap[code].tft++; rawMap[code].tft.push(r) }
         })
 
         // Rétention réelle 2026
@@ -453,6 +564,7 @@ export default function ObjectifsView() {
 
         setObjectifs(obj || [])
         setReel(reelMap)
+        setRaw(rawMap)
       } catch (e) {
         console.error('ObjectifsView error:', e)
       }
@@ -491,9 +603,11 @@ export default function ObjectifsView() {
       </div>
 
       {/* Contenu */}
-      {onglet === 'commerciaux' && <OngletCommerciaux objectifs={objectifs} reel={reel} loading={loading} />}
-      {onglet === 'sa' && <OngletSousAgents objectifs={objectifs} reel={reel} loading={loading} />}
-      {onglet === 'retention' && <OngletRetention reel={reel} loading={loading} />}
+      {onglet === 'commerciaux' && <OngletCommerciaux objectifs={objectifs} reel={reel} loading={loading} raw={raw} onDetail={onDetail} />}
+      {onglet === 'sa' && <OngletSousAgents objectifs={objectifs} reel={reel} loading={loading} raw={raw} onDetail={onDetail} />}
+      {onglet === 'retention' && <OngletRetention reel={reel} loading={loading} raw={raw} onDetail={onDetail} />}
+
+      {detail && <DetailBoundary onClose={() => setDetail(null)}><DetailModal titre={detail.titre} kind={detail.kind} rows={detail.rows} onClose={() => setDetail(null)} /></DetailBoundary>}
     </div>
   )
 }

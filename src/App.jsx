@@ -12,6 +12,11 @@ import DashboardGroupe    from './pages/groupe/DashboardGroupe'
 
 import DashboardDynassur   from './pages/dynassur/DashboardDynassur'
 import DynassurTaches      from './pages/dynassur/DynassurTaches'
+import DtxTaches           from './pages/dtx/DtxTaches'
+import LodeTaches          from './pages/lode/LodeTaches'
+import HexagroupTaches     from './pages/hexagroup/HexagroupTaches'
+import PriveTaches         from './pages/prive/PriveTaches'
+import GroupeTaches        from './pages/groupe/GroupeTaches'
 import DynassurClients     from './pages/dynassur/DynassurClients'
 import DynassurProduction  from './pages/dynassur/DynassurProduction'
 import DynassurBordereaux  from './pages/dynassur/DynassurBordereaux'
@@ -21,7 +26,9 @@ import DynassurCompagnies  from './pages/dynassur/DynassurCompagnies'
 import DynassurSinistres   from './pages/dynassur/DynassurSinistres'
 import DynassurBanque      from './pages/dynassur/DynassurBanque'
 import DynassurComptabilite from './pages/dynassur/DynassurComptabilite'
+import DynassurRentabilite from './pages/dynassur/DynassurRentabilite'
 import DynassurRdv         from './pages/dynassur/DynassurRdv'
+import DynassurAppels      from './pages/dynassur/DynassurAppels'
 
 import DashboardDtx       from './pages/dtx/DashboardDtx'
 import DtxImmobilier      from './pages/dtx/DtxImmobilier'
@@ -34,6 +41,10 @@ import LodeClients        from './pages/lode/LodeClients'
 import LodeBanque         from './pages/lode/LodeBanque'
 import LodeComptabilite   from './pages/lode/LodeComptabilite'
 import LodeDevisFactures  from './pages/lode/LodeDevisFactures'
+import DtxDevisFactures   from './pages/dtx/DtxDevisFactures'
+import DynDevisFactures   from './pages/dyn/DynDevisFactures'
+import ConfigModule       from './pages/config/ConfigModule'
+import LodeDevisAccept    from './pages/lode/LodeDevisAccept'
 
 import DashboardHexagroup  from './pages/hexagroup/DashboardHexagroup'
 import HexagroupBanque     from './pages/hexagroup/HexagroupBanque'
@@ -76,6 +87,8 @@ export default function App() {
           <Route path="/login"         element={<Login />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/access-denied" element={<AccessDenied />} />
+          {/* Page publique d'acceptation d'un devis (sans login, sécurisée par token) */}
+          <Route path="/devis/:token"  element={<LodeDevisAccept />} />
 
           {/* Groupe */}
           <Route path="/groupe" element={<P><DashboardGroupe /></P>} />
@@ -83,6 +96,11 @@ export default function App() {
           {/* Dynassur */}
           <Route path="/dynassur"             element={<P><DashboardDynassur /></P>} />
           <Route path="/dynassur/taches"       element={<P><DynassurTaches /></P>} />
+          <Route path="/dtx/taches"           element={<P><DtxTaches /></P>} />
+          <Route path="/lode/taches"          element={<P><LodeTaches /></P>} />
+          <Route path="/hexagroup/taches"     element={<P><HexagroupTaches /></P>} />
+          <Route path="/prive/taches"         element={<P><PriveTaches /></P>} />
+          <Route path="/groupe/taches"        element={<P><GroupeTaches /></P>} />
           <Route path="/dynassur/clients"      element={<P><DynassurClients /></P>} />
           <Route path="/dynassur/production"   element={<P><DynassurProduction /></P>} />
           <Route path="/dynassur/bordereaux"   element={<P><DynassurBordereaux /></P>} />
@@ -91,8 +109,10 @@ export default function App() {
           <Route path="/dynassur/compagnies"   element={<P><DynassurCompagnies /></P>} />
           <Route path="/dynassur/sinistres"    element={<P><DynassurSinistres /></P>} />
           <Route path="/dynassur/rdv"          element={<P><DynassurRdv /></P>} />
+          <Route path="/dynassur/appels"       element={<P><DynassurAppels /></P>} />
           <Route path="/dynassur/banque"       element={<P><DynassurBanque /></P>} />
           <Route path="/dynassur/comptabilite" element={<P><DynassurComptabilite /></P>} />
+          <Route path="/dynassur/rentabilite" element={<P><DynassurRentabilite /></P>} />
 
           {/* DTX */}
           <Route path="/dtx"              element={<P><DashboardDtx /></P>} />
@@ -105,6 +125,9 @@ export default function App() {
           <Route path="/lode"               element={<P><DashboardLode /></P>} />
           <Route path="/lode/clients"       element={<P><LodeClients /></P>} />
           <Route path="/lode/devis-factures" element={<P><LodeDevisFactures /></P>} />
+          <Route path="/dtx/devis-factures"  element={<P><DtxDevisFactures /></P>} />
+          <Route path="/dynassur/devis-factures" element={<P><DynDevisFactures /></P>} />
+          <Route path="/config" element={<P><ConfigModule /></P>} />
           <Route path="/lode/banque"        element={<P><LodeBanque /></P>} />
           <Route path="/lode/comptabilite"  element={<P><LodeComptabilite /></P>} />
 

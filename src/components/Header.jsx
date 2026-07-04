@@ -147,6 +147,15 @@ export default function Header({ currentPage, onToggleMenu, menuOuvert }) {
   const { user, perms, isAdmin, switchUser, signOut, societeActive, activeSociete, societesDispo, setActiveSociete } = useAuth()
   const navigate = useNavigate()
 
+  // Taille du texte (accessibilité) — zoom global persistant. L'app utilise des px en dur,
+  // donc on agit sur le zoom du document (agrandit tout proportionnellement).
+  const [fz, setFz] = useState(() => Number(localStorage.getItem('hub_font_zoom')) || 100)
+  useEffect(() => {
+    document.documentElement.style.zoom = String(fz / 100)
+    try { localStorage.setItem('hub_font_zoom', String(fz)) } catch (e) {}
+  }, [fz])
+  const bumpFz = d => setFz(f => Math.max(75, Math.min(200, f + d)))
+
   const displayName = perms?.nom || user?.user_metadata?.full_name || user?.email || ''
   const firstName = displayName.split(' ')[0]
   const mob = !!onToggleMenu   // Layout ne passe onToggleMenu qu'en mobile
@@ -242,6 +251,19 @@ export default function Header({ currentPage, onToggleMenu, menuOuvert }) {
             {!mob && 'Changer'}
           </button>
         )}
+
+        <div title="Taille du texte (75 %–200 %)" style={{
+          display: 'flex', alignItems: 'center', gap: 2,
+          background: 'transparent', border: '1px solid rgba(255,255,255,0.2)',
+          color: 'rgba(255,255,255,0.7)', borderRadius: '6px',
+          padding: '2px 3px', fontFamily: "'Source Sans Pro', sans-serif"
+        }}>
+          <button onClick={() => bumpFz(-15)} disabled={fz <= 75} title="Réduire" style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: fz <= 75 ? 'default' : 'pointer', opacity: fz <= 75 ? 0.35 : 1, fontSize: '17px', lineHeight: 1, padding: '2px 7px', fontWeight: 700 }}>−</button>
+          <span onClick={() => setFz(100)} title="Rétablir 100 %" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '12.5px', cursor: 'pointer', minWidth: mob ? 'auto' : '40px', justifyContent: 'center' }}>
+            <i className="ti ti-text-size" style={{ fontSize: '14px' }} />{!mob && `${fz}%`}
+          </span>
+          <button onClick={() => bumpFz(15)} disabled={fz >= 200} title="Agrandir" style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: fz >= 200 ? 'default' : 'pointer', opacity: fz >= 200 ? 0.35 : 1, fontSize: '17px', lineHeight: 1, padding: '2px 7px', fontWeight: 700 }}>+</button>
+        </div>
 
         <button onClick={signOut} title="Se déconnecter" style={{
           display: 'flex', alignItems: 'center',

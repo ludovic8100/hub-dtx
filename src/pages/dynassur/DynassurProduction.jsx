@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
 import { ENTITES } from '../../lib/entites'
 import { StatBanner } from '../../components/ui/AccountableUI'
+import { useAuth } from '../../lib/auth'
 
 // ── Constantes ──
 const BLUE = '#0080BD'
@@ -29,6 +30,8 @@ const AGENT_NOMS = {
 }
 
 const MOIS_LABELS = ['','Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc']
+const moisNum = m => String(parseInt(m) || '').padStart(2, '0')                  // mois en chiffres : 8 -> "08"
+const fmtDateNum = v => { if (!v) return '—'; const s = String(v).slice(0, 10); const p = s.split('-'); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : s }  // 2026-12-01 -> 01/12/2026
 const fmtN = v => v==null?'—':new Intl.NumberFormat('fr-BE').format(v)
 
 // ── Composants utilitaires ──
@@ -41,106 +44,334 @@ function Badge({ label, col, bg }) {
   )
 }
 
-function KpiCard({ label, value, col, sub }) {
+function KpiCard({ label, value, col, sub, onClick }) {
   return (
-    <div style={{ background:'#fff', borderRadius:10, border:'1px solid #e2e8f0',
-      borderTop:`3px solid ${col}`, padding:'14px 18px' }}>
-      <div style={{ fontSize:10, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:6 }}>{label}</div>
+    <div onClick={onClick} style={{ background:'#fff', borderRadius:10, border:'1px solid #e2e8f0',
+      borderTop:`3px solid ${col}`, padding:'14px 18px', cursor:onClick?'pointer':'default', transition:'box-shadow .15s' }}
+      onMouseEnter={e=>{ if(onClick) e.currentTarget.style.boxShadow=`0 4px 14px ${col}25` }}
+      onMouseLeave={e=>{ e.currentTarget.style.boxShadow='none' }}>
+      <div style={{ fontSize:10, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:6, display:'flex', justifyContent:'space-between' }}>
+        <span>{label}</span>{onClick && <i className="ti ti-zoom-in" style={{ color:'#cbd5e1' }}/>}
+      </div>
       <div style={{ fontSize:24, fontWeight:800, color:'#0f172a', lineHeight:1 }}>{value}</div>
       {sub && <div style={{ fontSize:11, color:'#64748b', marginTop:4 }}>{sub}</div>}
     </div>
   )
 }
 
-// ── ONGLET 1 : Vue globale ──
-function OngletGlobal({ data, annee, setAnnee }) {
-  const ANNEES = [2024, 2025, 2026]
-
-  const positifs = ['N.A.', 'Mandat faveur']
-  const negatifs = ['Renon', 'Résiliation Non paiement', 'Mandat défaveur']
-
-  const totalNA      = data.filter(d=>d.type_prod==='N.A.').length
-  const totalMandFav = data.filter(d=>d.type_prod==='Mandat faveur').length
-  const totalMandDef = data.filter(d=>d.type_prod==='Mandat défaveur').length
-  const totalRenon   = data.filter(d=>['Renon','Résiliation Non paiement'].includes(d.type_prod)).length
-  const soldeNet     = totalNA + totalMandFav - totalMandDef - totalRenon
-
-  // Par mois
-  const parMois = Array.from({length:12},(_,i) => {
-    const m = String(i+1).padStart(2,'0')
-    const rows = data.filter(d=>d.mois===m)
-    const na    = rows.filter(d=>d.type_prod==='N.A.').length
-    const plus  = rows.filter(d=>positifs.includes(d.type_prod)).length
-    const moins = rows.filter(d=>negatifs.includes(d.type_prod)).length
-    return { m, label:MOIS_LABELS[i+1], na, plus, moins, net: plus-moins }
-  })
-
-  const maxVal = Math.max(...parMois.map(m=>Math.max(m.plus,m.moins)), 1)
-
+// ── Fenêtre de détail d'UN contrat (clic sur le n° de contrat) ──
+function Field2({ l, v }) {
+  return <div><div style={{ fontSize:10, fontWeight:700, color:'#94a3b8', textTransform:'uppercase' }}>{l}</div><div style={{ color:NAVY, marginTop:1 }}>{v || '—'}</div></div>
+}
+function ContratModal({ police, onClose }) {
+  const [rows, setRows] = useState(null)
+  useEffect(() => {
+    let alive = true
+    supabase.from('contrats')
+      .select('police,compagnie,nom_client,prenom_client,dossier,situation,date_creation,domaine,type_production,garantie_valeur,version,sa_code,nom_sa,code_postal,localite')
+      .eq('police', police)
+      .then(({ data }) => { if (alive) setRows(data || []) })
+    return () => { alive = false }
+  }, [police])
+  const SITC = { 'En cours':{bg:'#dcfce7',c:'#16a34a'}, 'Résilié':{bg:'#fee2e2',c:'#dc2626'}, 'Terminé':{bg:'#fee2e2',c:'#dc2626'}, 'Suspendu':{bg:'#fef3c7',c:'#92400e'} }
+  const main = rows && rows[0]
   return (
-    <div>
-      {/* Sélecteur année */}
-      <div style={{ display:'flex', gap:8, marginBottom:20 }}>
-        {ANNEES.map(a => (
-          <button key={a} onClick={()=>setAnnee(a)} style={{
-            padding:'6px 16px', borderRadius:20, border:`2px solid ${annee===a?BLUE:'#e2e8f0'}`,
-            background: annee===a?BLUE:'#fff', color:annee===a?'#fff':'#64748b',
-            fontWeight:700, fontSize:13, cursor:'pointer'
-          }}>{a}</button>
-        ))}
-      </div>
-
-      {/* KPIs */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:12, marginBottom:24 }}>
-        <KpiCard label="Nouvelles Affaires" value={fmtN(totalNA)}      col="#16a34a" />
-        <KpiCard label="Mandats faveur"     value={fmtN(totalMandFav)} col="#0080BD" />
-        <KpiCard label="Mandats défaveur"   value={fmtN(totalMandDef)} col="#f59e0b" />
-        <KpiCard label="Résiliations"       value={fmtN(totalRenon)}   col="#dc2626" />
-        <KpiCard label="Solde net"
-          value={`${soldeNet>0?'+':''}${fmtN(soldeNet)}`}
-          col={soldeNet>=0?'#16a34a':'#dc2626'}
-          sub="entrées − sorties" />
-      </div>
-
-      {/* Graphe mensuel */}
-      <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', padding:20 }}>
-        <div style={{ fontSize:12, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:16 }}>
-          Évolution mensuelle {annee}
+    <div onClick={e => { e.stopPropagation(); onClose() }} style={{ position:'fixed', inset:0, background:'rgba(15,23,42,.6)', zIndex:1100, display:'flex', alignItems:'flex-start', justifyContent:'center', padding:'8vh 16px' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background:'#fff', borderRadius:14, width:'100%', maxWidth:560, maxHeight:'80vh', overflow:'auto', boxShadow:'0 20px 60px rgba(0,0,0,.3)' }}>
+        <div style={{ background:`linear-gradient(135deg,${NAVY},${BLUE})`, color:'#fff', padding:'16px 20px', display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+          <div>
+            <div style={{ fontSize:12, opacity:.85 }}>Contrat</div>
+            <div style={{ fontSize:20, fontWeight:800, fontFamily:'monospace' }}>{police}</div>
+            {main && <div style={{ fontSize:13, opacity:.9, marginTop:2 }}>{[main.nom_client, main.prenom_client].filter(Boolean).join(' ')}</div>}
+          </div>
+          <button onClick={onClose} style={{ background:'rgba(255,255,255,.2)', border:'none', color:'#fff', width:30, height:30, borderRadius:8, cursor:'pointer', fontSize:16 }}>✕</button>
         </div>
-        <div style={{ display:'flex', alignItems:'flex-end', gap:6, height:120, marginBottom:8 }}>
-          {parMois.map((m,i) => (
-            <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
-              <div style={{ width:'100%', display:'flex', gap:2, alignItems:'flex-end', height:100 }}>
-                <div title={`Entrées: ${m.plus}`} style={{
-                  flex:1, borderRadius:'3px 3px 0 0',
-                  height:`${m.plus/maxVal*100}%`, minHeight:m.plus>0?3:0,
-                  background:'#bbf7d0', transition:'height 0.3s'
-                }} />
-                <div title={`Sorties: ${m.moins}`} style={{
-                  flex:1, borderRadius:'3px 3px 0 0',
-                  height:`${m.moins/maxVal*100}%`, minHeight:m.moins>0?3:0,
-                  background:'#fecaca', transition:'height 0.3s'
-                }} />
-              </div>
-              {/* Solde net */}
-              <div style={{ fontSize:9, fontWeight:700, color:m.net>=0?'#16a34a':'#dc2626' }}>
-                {m.net>0?'+':''}{m.net||''}
-              </div>
-              <div style={{ fontSize:9, color:'#94a3b8' }}>{m.label}</div>
-            </div>
-          ))}
-        </div>
-        <div style={{ display:'flex', gap:16 }}>
-          <span style={{ fontSize:11, color:'#64748b' }}><span style={{ display:'inline-block', width:10, height:10, background:'#bbf7d0', borderRadius:2, marginRight:4 }} />Entrées (NA + mandats fav.)</span>
-          <span style={{ fontSize:11, color:'#64748b' }}><span style={{ display:'inline-block', width:10, height:10, background:'#fecaca', borderRadius:2, marginRight:4 }} />Sorties (renons + mandats déf.)</span>
+        <div style={{ padding:20 }}>
+          {rows === null ? <p style={{ color:'#94a3b8' }}>Chargement…</p>
+            : !rows.length ? <p style={{ color:'#94a3b8' }}>Aucun contrat trouvé pour la police {police} dans la base contrats.</p>
+            : <>
+              {rows.map((c, i) => {
+                const s = SITC[c.situation] || { bg:'#f1f5f9', c:'#64748b' }
+                return (
+                  <div key={i} style={{ border:'1px solid #e2e8f0', borderRadius:10, padding:'12px 14px', marginBottom:10 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+                      <span style={{ fontWeight:700, color:NAVY }}>{c.compagnie || '—'}{c.version ? ` · v${c.version}` : ''}</span>
+                      <span style={{ fontSize:11, fontWeight:700, padding:'2px 9px', borderRadius:5, background:s.bg, color:s.c }}>{c.situation || '—'}</span>
+                    </div>
+                    <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:10, fontSize:13 }}>
+                      <Field2 l="Domaine" v={c.domaine} />
+                      <Field2 l="Type production" v={c.type_production} />
+                      <Field2 l="Créé le" v={fmtDateNum(c.date_creation)} />
+                      <Field2 l="Garantie / valeur" v={c.garantie_valeur} />
+                      <Field2 l="Dossier" v={c.dossier} />
+                      <Field2 l="Sous-agent" v={c.nom_sa || c.sa_code} />
+                    </div>
+                  </div>
+                )
+              })}
+              {main?.dossier && <a href={`/dynassur/clients?dossier=${main.dossier}`} style={{ display:'inline-block', marginTop:4, padding:'8px 14px', background:BLUE, color:'#fff', borderRadius:8, textDecoration:'none', fontSize:13, fontWeight:600 }}>Ouvrir la fiche client →</a>}
+            </>}
         </div>
       </div>
     </div>
   )
 }
 
+// ── Fenêtre de détail : les mouvements (actes) derrière un chiffre ──
+function ActsModal({ titre, rows, onClose }) {
+  const [contratNum, setContratNum] = useState(null)
+  const COLS = [
+    { key:'mois',        label:'Mois',       get:d=>(d.annee||0)*100+parseInt(d.mois||0), render:d=>`${moisNum(d.mois)}/${d.annee}` },
+    { key:'type_prod',   label:'Type',       get:d=>d.type_prod||'', render:d=>{ const cfg=TYPES_PROD[d.type_prod]||{col:'#94a3b8'}; return <Badge label={d.type_prod} col={cfg.col} /> } },
+    { key:'agent_code',  label:'Agent',      get:d=>AGENT_NOMS[d.agent_code]||d.agent_code||'', render:d=>AGENT_NOMS[d.agent_code]||d.agent_code||'—' },
+    { key:'client_nom',  label:'Client',     get:d=>d.client_nom||'', render:d=><span style={{ fontWeight:600, color:NAVY }}>{d.client_nom||'—'}</span> },
+    { key:'branche',     label:'Branche',    get:d=>d.branche||'', render:d=>d.branche||'—' },
+    { key:'compagnie',   label:'Compagnie',  get:d=>d.compagnie||'', render:d=>d.compagnie||'—' },
+    { key:'num_contrat', label:'N° contrat', get:d=>d.num_contrat||'', render:d=>d.num_contrat ? <span onClick={e=>{ e.stopPropagation(); setContratNum(d.num_contrat) }} style={{ color:BLUE, fontWeight:700, cursor:'pointer', textDecoration:'underline', textUnderlineOffset:2 }} title="Voir le contrat">{d.num_contrat}</span> : '—' },
+  ]
+  const [sort, setSort] = useState({ key:'mois', dir:'desc' })
+  const sorted = [...rows].sort((a,b) => {
+    const col = COLS.find(c => c.key === sort.key)
+    const av = col.get(a), bv = col.get(b)
+    const r = typeof av === 'string' ? av.localeCompare(bv) : av - bv
+    return sort.dir === 'asc' ? r : -r
+  })
+  const show = sorted.slice(0,1000)
+  const click = k => setSort(s => s.key === k ? { key:k, dir:s.dir === 'asc' ? 'desc' : 'asc' } : { key:k, dir:'asc' })
+  return (
+    <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(15,23,42,.55)', zIndex:1000, display:'flex', justifyContent:'flex-end' }}>
+      <div onClick={e=>e.stopPropagation()} style={{ width:'min(880px,96vw)', height:'100%', background:'#fff', display:'flex', flexDirection:'column', boxShadow:'-8px 0 30px rgba(0,0,0,.2)' }}>
+        <div style={{ background:NAVY, padding:'14px 20px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <div>
+            <div style={{ color:'#fff', fontSize:15, fontWeight:800 }}>{titre}</div>
+            <div style={{ color:'#cbd5e1', fontSize:12, marginTop:2 }}>{fmtN(rows.length)} mouvement(s)</div>
+          </div>
+          <button onClick={onClose} style={{ background:'transparent', border:'none', color:'#fff', fontSize:22, cursor:'pointer' }}>✕</button>
+        </div>
+        <div style={{ flex:1, overflow:'auto' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12.5 }}>
+            <thead><tr style={{ background:'#f8fafc', position:'sticky', top:0 }}>
+              {COLS.map(c => (
+                <th key={c.key} onClick={()=>click(c.key)} style={{ textAlign:'left', padding:'8px 12px', fontSize:10, fontWeight:700, color: sort.key===c.key?NAVY:'#94a3b8', textTransform:'uppercase', whiteSpace:'nowrap', cursor:'pointer', userSelect:'none' }}>
+                  {c.label}{sort.key===c.key && <span style={{ marginLeft:4 }}>{sort.dir==='asc'?'▲':'▼'}</span>}
+                </th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {show.map((d,i)=>(
+                <tr key={i} style={{ borderBottom:'1px solid #f1f5f9' }}>
+                  {COLS.map(c => (
+                    <td key={c.key} style={{ padding:'7px 12px', color:'#475569', whiteSpace: c.key==='mois'||c.key==='num_contrat'?'nowrap':'normal' }}>{c.render(d)}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {sorted.length>1000 && <p style={{ padding:'12px 16px', color:'#94a3b8', fontSize:12 }}>… et {fmtN(sorted.length-1000)} autres lignes.</p>}
+        </div>
+        {contratNum && <ContratModal police={contratNum} onClose={()=>setContratNum(null)} />}
+      </div>
+    </div>
+  )
+}
+
+// ── ONGLET 1 : Vue globale ──
+// Palette inspirée de l'infographie « mindmap 5 étapes » (cubes dégradés clair→saturé) :
+// cyan (HQ) · violet (SA) · orange (Apporteur) · or (code perso) — magenta réservé
+const CAT_DEF = {
+  HQ:        { label:'HQ',         grad:'linear-gradient(180deg,#38bdf8,#0284c7)', solid:'#0ea5e9' },
+  SA:        { label:'Sous-agent', grad:'linear-gradient(180deg,#c084fc,#7c3aed)', solid:'#9333ea' },
+  Apporteur: { label:'Apporteur',  grad:'linear-gradient(180deg,#fdba74,#ea580c)', solid:'#f97316' },
+}
+const mineDef = code => ({ key:code, label:code, grad:'linear-gradient(180deg,#fcd34d,#f59e0b)', solid:'#f59e0b' })
+const POSITIFS = ['N.A.', 'Mandat faveur']
+const NEGATIFS = ['Renon', 'Résiliation Non paiement', 'Mandat défaveur']
+const MODES = [
+  { key:'entrees', label:'Entrées',          types:POSITIFS },
+  { key:'sorties', label:'Sorties',          types:NEGATIFS },
+  { key:'nette',   label:'Production nette',  types:[...POSITIFS, ...NEGATIFS] },
+]
+const cnt = (rows, types) => rows.filter(d => types.includes(d.type_prod)).length
+const netCnt = rows => cnt(rows, POSITIFS) - cnt(rows, NEGATIFS)
+
+function Legende({ cats }) {
+  return (
+    <div style={{ display:'flex', gap:16, flexWrap:'wrap' }}>
+      {cats.map(c => (
+        <span key={c.key} style={{ fontSize:13, color:'#334155', fontWeight:700, display:'flex', alignItems:'center', gap:6 }}>
+          <i style={{ display:'inline-block', width:14, height:14, borderRadius:4, background:c.grad }} />
+          {c.label}{c.pct != null && <span style={{ color:'#94a3b8', fontWeight:600 }}>· {c.pct}%</span>}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function ChartAnnee({ annee, rows, cats, mode, onDetail, myCode, myBase }) {
+  const isNet = mode.key === 'nette'
+  const val = rc => isNet ? netCnt(rc) : cnt(rc, mode.types)
+  const mois = Array.from({ length:12 }, (_, i) => {
+    const mm = String(i+1).padStart(2,'0')
+    const rM = rows.filter(d => d.mois === mm)
+    const seg = {}
+    cats.forEach(c => { seg[c.key] = val(rM.filter(d => d._dcat === c.key)) })
+    const total = cats.reduce((s,c) => s + seg[c.key], 0)
+    const stack = cats.reduce((s,c) => s + Math.max(0, seg[c.key]), 0)
+    return { i:i+1, mm, label:mm, seg, total, stack, rM }
+  })
+  const maxStack = Math.max(...mois.map(m => m.stack), 1)
+  const totalAn  = mois.reduce((s,m) => s + m.total, 0)
+  const catTot = {}; cats.forEach(c => { catTot[c.key] = mois.reduce((s,m) => s + Math.max(0, m.seg[c.key]), 0) })
+  const grandPos = cats.reduce((s,c) => s + catTot[c.key], 0) || 1
+  const catsP = cats.map(c => ({ ...c, total:catTot[c.key], pct: Math.round(catTot[c.key] / grandPos * 100) }))
+  const H = 210
+
+  let compo = null
+  if (myCode) {
+    compo = {
+      me:  val(rows.filter(d => d._code === myCode)),
+      cat: val(rows.filter(d => d._cat === myBase)),
+      all: val(rows),
+    }
+  }
+
+  return (
+    <div style={{ background:'#fff', borderRadius:14, border:'1px solid #e8edf3', padding:'16px 18px', marginBottom:16, boxShadow:'0 1px 3px rgba(15,23,42,.04)' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8, gap:12, flexWrap:'wrap' }}>
+        <button onClick={() => onDetail(`Production ${annee} — toute la production`, rows)}
+          style={{ fontSize:20, fontWeight:800, color:NAVY, background:'none', border:'none', cursor:'pointer', padding:0, display:'flex', alignItems:'center', gap:6 }}>
+          {annee} <i className="ti ti-zoom-in" style={{ fontSize:15, color:'#cbd5e1' }} />
+        </button>
+        <Legende cats={catsP} />
+      </div>
+      {compo ? (
+        <div style={{ fontSize:13, color:'#475569', marginBottom:14, background:'#f8fafc', borderRadius:8, padding:'9px 14px' }}>
+          Toi (<strong style={{ color:'#b5179e' }}>{myCode}</strong>) : <strong style={{ color:NAVY, fontSize:15 }}>{compo.me}</strong>
+          <span style={{ margin:'0 10px', color:'#cbd5e1' }}>|</span>
+          Ta catégorie ({CAT_DEF[myBase]?.label || myBase}) : <strong style={{ color:NAVY, fontSize:15 }}>{compo.cat}</strong>
+          <span style={{ margin:'0 10px', color:'#cbd5e1' }}>|</span>
+          Tout Dynassur : <strong style={{ color:NAVY, fontSize:15 }}>{compo.all}</strong>
+          {compo.all > 0 && <span style={{ marginLeft:8, color:'#94a3b8' }}>· soit {Math.round(compo.me / compo.all * 100)}% du total</span>}
+        </div>
+      ) : (
+        <div style={{ fontSize:13, color:'#94a3b8', marginBottom:14 }}>{mode.label} {annee} : <strong style={{ color:NAVY, fontSize:15 }}>{totalAn > 0 && isNet ? '+' : ''}{totalAn}</strong> actes</div>
+      )}
+      <div style={{ display:'flex', alignItems:'flex-end', gap:5, height:H+26 }}>
+        {mois.map(m => (
+          <div key={m.i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center' }}>
+            <div style={{ fontSize:13, fontWeight:800, color:m.total>=0?NAVY:'#dc2626', marginBottom:4, height:17 }}>{m.total?`${m.total>0&&isNet?'+':''}${m.total}`:''}</div>
+            <div style={{ width:'100%', height:H, display:'flex', flexDirection:'column', justifyContent:'flex-end', borderRadius:'6px 6px 0 0', overflow:'hidden', background:'#f1f5f9' }}>
+              {catsP.map(c => {
+                const v = Math.max(0, m.seg[c.key])
+                const h = v / maxStack * H
+                if (h <= 0) return null
+                const pct = m.stack ? Math.round(v / m.stack * 100) : 0
+                return (
+                  <div key={c.key} title={`${c.label} — ${m.label} ${annee} : ${m.seg[c.key]} (${pct}%)`}
+                    onClick={() => onDetail(`${c.label} — ${mode.label} ${m.label} ${annee}`,
+                      m.rM.filter(d => d._dcat === c.key && mode.types.includes(d.type_prod)))}
+                    style={{ height:h, background:c.grad, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                    {h >= 18 && <span style={{ fontSize:11, fontWeight:800, color:'#fff' }}>{pct}%</span>}
+                  </div>
+                )
+              })}
+            </div>
+            <div style={{ fontSize:11, color:'#64748b', marginTop:6, fontWeight:600 }}>{m.label}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function OngletGlobal({ onDetail }) {
+  const { perms, isAdmin } = useAuth()
+  const [rows, setRows] = useState(null)
+  const [meta, setMeta] = useState({ commercial:new Set(), base:{} })
+  const [mode, setMode] = useState(MODES[0])
+
+  useEffect(() => {
+    (async () => {
+      const { data: collabs } = await supabase.from('collaborateurs')
+        .select('code,nom_sa_data,noms_repris,est_commercial,est_apporteur,est_sous_agent')
+      const baseOf = c => c.est_apporteur ? 'Apporteur' : c.est_sous_agent ? 'SA' : 'HQ'
+      const nameToCode = {}, commercial = new Set(), base = {}
+      ;(collabs || []).forEach(c => {
+        base[c.code] = baseOf(c)
+        if (c.est_commercial) commercial.add(c.code)
+        if (c.nom_sa_data) nameToCode[c.nom_sa_data.trim()] = c.code
+        ;(c.noms_repris || []).forEach(n => n && (nameToCode[n.trim()] = c.code))
+      })
+      const all = []; let from = 0
+      while (true) {
+        const { data, error } = await supabase.from('mouvements_production')
+          .select('type_prod, annee, mois, agent_code:sa_contrat, num_contrat:police, client_nom:nom_client, branche:type_police, compagnie:cie')
+          .range(from, from + 999)
+        if (error || !data || !data.length) break
+        all.push(...data); if (data.length < 1000) break; from += 1000
+      }
+      const Y = new Date().getFullYear()
+      const mapped = all
+        .filter(d => d.annee >= 2020 && d.annee <= Y)
+        .map(d => {
+          const code = nameToCode[(d.agent_code || '').trim()] || null
+          return { ...d, mois:String(d.mois).padStart(2,'0'), _code:code, _cat: code ? (base[code] || 'SA') : 'SA' }
+        })
+      setMeta({ commercial, base })
+      setRows(mapped)
+    })()
+  }, [])
+
+  const view = useMemo(() => {
+    if (!rows) return null
+    const myCode = perms?.collab_code ? String(perms.collab_code).toUpperCase() : null
+    const patron = isAdmin || !myCode
+    let cats, dcat, myBase = null
+    if (patron) {
+      cats = ['HQ','SA','Apporteur'].map(k => ({ key:k, ...CAT_DEF[k] }))
+      dcat = d => d._cat
+    } else {
+      myBase = meta.base[myCode] || 'HQ'
+      if (meta.commercial.has(myCode)) {
+        cats = [mineDef(myCode), ...['HQ','SA','Apporteur'].map(k => ({ key:k, ...CAT_DEF[k] }))]
+        dcat = d => d._code === myCode ? myCode : d._cat
+      } else {
+        const others = ['HQ','SA','Apporteur'].filter(k => k !== myBase)
+        cats = [mineDef(myCode), ...others.map(k => ({ key:k, ...CAT_DEF[k] }))]
+        dcat = d => d._code === myCode ? myCode : (d._cat === myBase ? null : d._cat)
+      }
+    }
+    return { cats, rows: rows.map(d => ({ ...d, _dcat: dcat(d) })), myCode: patron ? null : myCode, myBase }
+  }, [rows, perms, isAdmin, meta])
+
+  const annees = useMemo(() => view ? [...new Set(view.rows.map(r => r.annee))].sort((a,b) => b - a) : [], [view])
+
+  if (!view) return <div style={{ padding:40, textAlign:'center', color:'#94a3b8' }}>Chargement de la production…</div>
+
+  return (
+    <div>
+      <div style={{ display:'flex', gap:8, marginBottom:18, flexWrap:'wrap', alignItems:'center' }}>
+        {MODES.map(m => (
+          <button key={m.key} onClick={()=>setMode(m)} style={{
+            padding:'7px 18px', borderRadius:22, border:`1.5px solid ${mode.key===m.key?BLUE:'#e2e8f0'}`,
+            background: mode.key===m.key?'linear-gradient(135deg,#0080BD,#0D2F5E)':'#fff',
+            color: mode.key===m.key?'#fff':'#64748b', fontWeight:700, fontSize:13, cursor:'pointer',
+            boxShadow: mode.key===m.key?'0 2px 8px rgba(0,128,189,.3)':'none'
+          }}>{m.label}</button>
+        ))}
+        <span style={{ fontSize:11, color:'#94a3b8', marginLeft:'auto' }}>Volume brut · clique un segment (ou l'année) pour le détail</span>
+      </div>
+      {annees.map(an => (
+        <ChartAnnee key={an} annee={an} rows={view.rows.filter(r => r.annee === an)}
+          cats={view.cats} mode={mode} onDetail={onDetail} myCode={view.myCode} myBase={view.myBase} />
+      ))}
+    </div>
+  )
+}
+
+
 // ── ONGLET 2 : Par collaborateur ──
-function OngletCollaborateurs({ data, annee }) {
+function OngletCollaborateurs({ data, annee, onDetail }) {
   const [selected, setSelected] = useState(null)
   const [moisFilter, setMoisFilter] = useState('all')
 
@@ -181,7 +412,7 @@ function OngletCollaborateurs({ data, annee }) {
             padding:'4px 10px', borderRadius:20, border:`1px solid ${moisFilter===m?BLUE:'#e2e8f0'}`,
             background:moisFilter===m?BLUE:'#fff', color:moisFilter===m?'#fff':'#64748b',
             fontSize:12, cursor:'pointer'
-          }}>{MOIS_LABELS[parseInt(m)]}</button>
+          }}>{moisNum(m)}</button>
         ))}
       </div>
 
@@ -214,13 +445,15 @@ function OngletCollaborateurs({ data, annee }) {
                       <div style={{ fontSize:10, color:'#94a3b8' }}>{ag.code}</div>
                     </td>
                     {TYPES_DISPLAY.map(t=>(
-                      <td key={t.key} style={{ padding:'10px 8px', textAlign:'center', borderBottom:'1px solid #f1f5f9' }}>
+                      <td key={t.key} onClick={e=>{ e.stopPropagation(); if(ag[t.key]>0) onDetail(`${ag.nom} — ${t.label} ${annee}`, filtered.filter(d=>d.agent_code===ag.code && d.type_prod===t.key)) }}
+                        style={{ padding:'10px 8px', textAlign:'center', borderBottom:'1px solid #f1f5f9', cursor:(ag[t.key]||0)>0?'pointer':'default' }}>
                         <span style={{ fontWeight:700, color:(ag[t.key]||0)>0?t.col:'#e2e8f0', fontSize:14 }}>
                           {ag[t.key]||0}
                         </span>
                       </td>
                     ))}
-                    <td style={{ padding:'10px 14px', textAlign:'center', borderBottom:'1px solid #f1f5f9' }}>
+                    <td onClick={e=>{ e.stopPropagation(); onDetail(`${ag.nom} — mouvements impactants ${annee}`, filtered.filter(d=>d.agent_code===ag.code && (TYPES_PROD[d.type_prod]?.sign||0)!==0)) }}
+                      style={{ padding:'10px 14px', textAlign:'center', borderBottom:'1px solid #f1f5f9', cursor:'pointer' }}>
                       <span style={{ fontWeight:800, fontSize:14, color:ag.total>0?'#16a34a':ag.total<0?'#dc2626':'#94a3b8' }}>
                         {ag.total>0?'+':''}{ag.total}
                       </span>
@@ -235,7 +468,8 @@ function OngletCollaborateurs({ data, annee }) {
                   {TYPES_DISPLAY.map(t=>{
                     const tot = parAgent.reduce((s,a)=>s+(a[t.key]||0),0)
                     return (
-                      <td key={t.key} style={{ padding:'10px 8px', textAlign:'center', fontWeight:800, color:tot>0?t.col+'cc':'rgba(255,255,255,0.2)', fontSize:14 }}>
+                      <td key={t.key} onClick={()=>tot>0&&onDetail(`Tous — ${t.label} ${annee}`, filtered.filter(d=>d.type_prod===t.key))}
+                        style={{ padding:'10px 8px', textAlign:'center', fontWeight:800, color:tot>0?t.col+'cc':'rgba(255,255,255,0.2)', fontSize:14, cursor:tot>0?'pointer':'default' }}>
                         {tot||0}
                       </td>
                     )
@@ -269,7 +503,7 @@ function OngletCollaborateurs({ data, annee }) {
                         padding:'9px 16px', borderBottom:i<detailAgent.length-1?'1px solid #f8fafc':'none',
                         background:i%2===0?'#fff':'#fafafe' }}>
                         <div style={{ fontSize:11, color:'#94a3b8', fontWeight:600, minWidth:40 }}>
-                          {MOIS_LABELS[parseInt(d.mois)]}
+                          {moisNum(d.mois)}
                         </div>
                         <div>
                           <div style={{ fontSize:12, fontWeight:500, color:'#1e293b' }}>
@@ -294,6 +528,7 @@ function OngletCollaborateurs({ data, annee }) {
 function OngletDetail({ data }) {
   const [filters, setFilters] = useState({ agent:'all', type:'all', mois:'all' })
   const [page, setPage] = useState(0)
+  const [contratNum, setContratNum] = useState(null)
   const PER_PAGE = 50
 
   const agents  = [...new Set(data.map(d=>d.agent_code).filter(Boolean))].sort()
@@ -327,7 +562,7 @@ function OngletDetail({ data }) {
         <select value={filters.mois} onChange={e=>{setFilters(f=>({...f,mois:e.target.value}));setPage(0)}} style={selStyle}>
           <option value="all">Tous les mois</option>
           {Array.from({length:12},(_,i)=>String(i+1).padStart(2,'0')).map(m=>(
-            <option key={m} value={m}>{MOIS_LABELS[parseInt(m)]}</option>
+            <option key={m} value={m}>{moisNum(m)}</option>
           ))}
         </select>
         <span style={{ fontSize:12, color:'#94a3b8', marginLeft:'auto' }}>
@@ -355,10 +590,10 @@ function OngletDetail({ data }) {
                       <tr key={i} style={{ background:i%2===0?'#fff':'#fafafe' }}
                         onMouseEnter={e=>e.currentTarget.style.background='#f0f9ff'}
                         onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'#fff':'#fafafe'}>
-                        <td style={{ padding:'8px 12px', borderBottom:'1px solid #f1f5f9', color:'#64748b', whiteSpace:'nowrap' }}>{MOIS_LABELS[parseInt(d.mois)]} {d.annee}</td>
+                        <td style={{ padding:'8px 12px', borderBottom:'1px solid #f1f5f9', color:'#64748b', whiteSpace:'nowrap' }}>{moisNum(d.mois)}/{d.annee}</td>
                         <td style={{ padding:'8px 12px', borderBottom:'1px solid #f1f5f9' }}><Badge label={d.type_prod} col={cfg.col} /></td>
                         <td style={{ padding:'8px 12px', borderBottom:'1px solid #f1f5f9', color:'#64748b' }}>{AGENT_NOMS[d.agent_code]||d.agent_code||'—'}</td>
-                        <td style={{ padding:'8px 12px', borderBottom:'1px solid #f1f5f9', fontFamily:'monospace', color:'#374151', fontSize:11 }}>{d.num_contrat||'—'}</td>
+                        <td style={{ padding:'8px 12px', borderBottom:'1px solid #f1f5f9', fontFamily:'monospace', fontSize:11 }}>{d.num_contrat ? <span onClick={()=>setContratNum(d.num_contrat)} style={{ color:BLUE, fontWeight:700, cursor:'pointer', textDecoration:'underline', textUnderlineOffset:2 }} title="Voir le contrat">{d.num_contrat}</span> : <span style={{ color:'#374151' }}>—</span>}</td>
                         <td style={{ padding:'8px 12px', borderBottom:'1px solid #f1f5f9', color:'#1e293b' }}>{d.client_nom||'—'}</td>
                         <td style={{ padding:'8px 12px', borderBottom:'1px solid #f1f5f9', color:'#64748b' }}>{d.branche||'—'}</td>
                         <td style={{ padding:'8px 12px', borderBottom:'1px solid #f1f5f9', color:'#64748b' }}>{d.compagnie||'—'}</td>
@@ -385,6 +620,7 @@ function OngletDetail({ data }) {
           </div>
         )}
       </div>
+      {contratNum && <ContratModal police={contratNum} onClose={()=>setContratNum(null)} />}
     </div>
   )
 }
@@ -397,6 +633,18 @@ export default function DynassurProduction() {
   const [annee, setAnnee]     = useState(new Date().getFullYear())
   const [data, setData]       = useState([])
   const [loading, setLoading] = useState(true)
+  const [detail, setDetail]   = useState(null)   // { titre, rows }
+  const [catCounts, setCatCounts] = useState(null)
+  const onDetail = (titre, rows) => setDetail({ titre, rows })
+
+  useEffect(() => {
+    supabase.from('collaborateurs').select('est_apporteur,est_sous_agent').then(({ data }) => {
+      if (!data) return
+      let hq = 0, sa = 0, app = 0
+      data.forEach(c => c.est_apporteur ? app++ : c.est_sous_agent ? sa++ : hq++)
+      setCatCounts({ hq, sa, app })
+    })
+  }, [])
 
   const ONGLETS = [
     { key:'global',         label:'Vue globale',         icon:'ti-chart-bar' },
@@ -411,7 +659,7 @@ export default function DynassurProduction() {
       let from = 0, all = []
       while (true) {
         const { data: rows, error } = await supabase.from('mouvements_production')
-          .select('type_prod, agent_code, annee, mois, num_contrat, client_nom, branche, compagnie')
+          .select('type_prod, annee, mois, agent_code:sa_contrat, num_contrat:police, client_nom:nom_client, branche:type_police, compagnie:cie')
           .eq('annee', annee)
           .order('mois', { ascending: false })
           .range(from, from + PAGE - 1)
@@ -421,7 +669,8 @@ export default function DynassurProduction() {
         if (r.length < PAGE) break
         from += PAGE
       }
-      setData(all); setLoading(false)
+      // mois est un entier en base -> normaliser en '01'..'12' pour le reste du code (comparaisons + tris)
+      setData(all.map(d => ({ ...d, mois: String(d.mois).padStart(2,'0') }))); setLoading(false)
     })()
   }, [annee])
 
@@ -431,9 +680,13 @@ export default function DynassurProduction() {
 
         <StatBanner
           color={ENTITES.dynassur.color} colorDark={ENTITES.dynassur.colorDark} logoUrl={ENTITES.dynassur.logo}
-          title={`Production ${annee}`}
+          title={onglet === 'global' ? 'Production' : `Production ${annee}`}
           subtitle="Dynassur SRL — suivi par type et collaborateur"
-          stats={!loading ? [{ label: 'Mouvements', value: fmtN(data.length) }] : []}
+          stats={onglet === 'global' && catCounts ? [
+            { label:'HQ', value:`${catCounts.hq} pers.` },
+            { label:'Sous-agents', value:`${catCounts.sa} pers.` },
+            { label:'Apporteurs', value:`${catCounts.app} pers.` },
+          ] : []}
         />
 
         {/* Onglets */}
@@ -452,26 +705,42 @@ export default function DynassurProduction() {
           ))}
         </div>
 
-        {loading ? (
-          <div style={{ padding:60, textAlign:'center', color:'#94a3b8', fontSize:14 }}>
-            <i className="ti ti-loader-2" style={{ fontSize:32, display:'block', marginBottom:12, animation:'spin 1s linear infinite' }} />
-            Chargement de la production…
-            <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
-          </div>
-        ) : data.length === 0 ? (
-          <div style={{ padding:60, textAlign:'center', background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', color:'#94a3b8' }}>
-            <i className="ti ti-database-off" style={{ fontSize:40, display:'block', marginBottom:12 }} />
-            Aucune donnée de production pour {annee}.<br/>
-            <span style={{ fontSize:12 }}>Importez les données depuis Brio via n8n.</span>
-          </div>
+        {onglet === 'global' ? (
+          <OngletGlobal onDetail={onDetail} />
         ) : (
           <>
-            {onglet==='global'         && <OngletGlobal         data={data} annee={annee} setAnnee={setAnnee} />}
-            {onglet==='collaborateurs' && <OngletCollaborateurs data={data} annee={annee} />}
-            {onglet==='detail'         && <OngletDetail         data={data} />}
+            {/* Sélecteur d'année (Collaborateurs / Détail) */}
+            <div style={{ display:'flex', gap:8, marginBottom:20 }}>
+              {[2023,2024,2025,2026].map(a => (
+                <button key={a} onClick={()=>setAnnee(a)} style={{
+                  padding:'6px 16px', borderRadius:20, border:`2px solid ${annee===a?BLUE:'#e2e8f0'}`,
+                  background: annee===a?BLUE:'#fff', color:annee===a?'#fff':'#64748b',
+                  fontWeight:700, fontSize:13, cursor:'pointer'
+                }}>{a}</button>
+              ))}
+            </div>
+            {loading ? (
+              <div style={{ padding:60, textAlign:'center', color:'#94a3b8', fontSize:14 }}>
+                <i className="ti ti-loader-2" style={{ fontSize:32, display:'block', marginBottom:12, animation:'spin 1s linear infinite' }} />
+                Chargement de la production…
+                <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
+              </div>
+            ) : data.length === 0 ? (
+              <div style={{ padding:60, textAlign:'center', background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', color:'#94a3b8' }}>
+                <i className="ti ti-database-off" style={{ fontSize:40, display:'block', marginBottom:12 }} />
+                Aucune donnée de production pour {annee}.<br/>
+                <span style={{ fontSize:12 }}>Importez les données depuis Brio via n8n.</span>
+              </div>
+            ) : (
+              <>
+                {onglet==='collaborateurs' && <OngletCollaborateurs data={data} annee={annee} onDetail={onDetail} />}
+                {onglet==='detail'         && <OngletDetail         data={data} />}
+              </>
+            )}
           </>
         )}
       </div>
+      {detail && <ActsModal titre={detail.titre} rows={detail.rows} onClose={()=>setDetail(null)} />}
     </Layout>
   )
 }

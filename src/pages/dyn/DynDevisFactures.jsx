@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
-import { LODE, TVA_TAUX, CGV, DELAI_PAIEMENT_JOURS } from '../../lib/lodeConfig'
+import { DYN, TVA_TAUX, CGV, DELAI_PAIEMENT_JOURS } from '../../lib/dynConfig'
 import { I18N, CGV_I18N, LANGUES } from '../../lib/lodeI18n'
 import { StatBanner, TabsBar, StatusBadge, ActionButton, DataCard, PrimaryButton, useMobile } from '../../components/ui/AccountableUI'
 
-const ORANGE = LODE.couleur
+const ORANGE = DYN.couleur
 const NAVY = '#1e293b'
 
 // ── Chargement dynamique de libs via CDN (PDF / Excel) ──────────
@@ -90,8 +90,8 @@ const STATUTS_FACT = {
 function Editeur({ type, doc, onClose, onSaved }) {
   const isDevis = type === 'devis'
   const mobE = useMobile()
-  const table = isDevis ? 'lode_devis' : 'lode_factures'
-  const tableLignes = isDevis ? 'lode_devis_lignes' : 'lode_factures_lignes'
+  const table = isDevis ? 'dyn_devis' : 'dyn_factures'
+  const tableLignes = isDevis ? 'dyn_devis_lignes' : 'dyn_factures_lignes'
   const fk = isDevis ? 'devis_id' : 'facture_id'
 
   const [f, setF] = useState({
@@ -105,7 +105,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
   })
   const [lignes, setLignes] = useState([{ description: '', quantite: 1, prix_unitaire: 0, remise_pct: 0, tva_pct: 21 }])
   const [saving, setSaving] = useState(false)
-  const CLIENT_TABLE = 'lode_clients'
+  const CLIENT_TABLE = 'dyn_clients'
   // colonnes texte candidates pour la recherche multi-champs (intersectees avec les colonnes reellement presentes dans la base de CETTE societe)
   const SEARCH_CANDIDATES = ['denomination','nom','prenom','dossier','ville','localite','email','telephone','tel_fixe','gsm','tva','bce','adresse','cp','code_postal','pays']
   const [searchCols, setSearchCols] = useState(['denomination'])
@@ -204,7 +204,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
         await supabase.from(table).update(payload).eq('id', docId)
         await supabase.from(tableLignes).delete().eq(fk, docId)
       } else {
-        const { data: num } = await supabase.rpc('next_lode_numero', { p_type: type })
+        const { data: num } = await supabase.rpc('next_dyn_numero', { p_type: type })
         payload.numero = num
         const { data, error } = await supabase.from(table).insert(payload).select('id').single()
         if (error) throw error
@@ -366,7 +366,7 @@ async function exportPDF(type, doc, lignes) {
   const d = new jsPDF()
   const isDevis = type === 'devis'
   const tot = calcTotaux(lignes, doc.remise_pct)
-  const O = [234, 88, 12]          // orange LODE
+  const O = [234, 88, 12]          // orange DYN
   const O_PALE = [253, 235, 224]   // orange très clair (fond du blob)
   const GREY = [100, 116, 139]
   const DARK = [30, 41, 59]
@@ -381,9 +381,9 @@ async function exportPDF(type, doc, lignes) {
   // On masque la partie qui dépasse en haut/gauche par un rectangle blanc géant en dehors,
   // jsPDF clippe déjà à la page : le cercle crée la courbe organique voulue.
 
-  // ---- Logo LODE (en-tête, à gauche) ----
-  if (LODE.logo_url) {
-    const logo = await loadImageDataURL(LODE.logo_url)
+  // ---- Logo DYN (en-tête, à gauche) ----
+  if (DYN.logo_url) {
+    const logo = await loadImageDataURL(DYN.logo_url)
     if (logo) { try { d.addImage(logo, 'PNG', 16, 14, 26, 26) } catch (e) { /* */ } }
   }
 
@@ -399,13 +399,13 @@ async function exportPDF(type, doc, lignes) {
 
   // ---- Blocs De / À ----
   const yDeA = 56
-  // De (LODE)
+  // De (DYN)
   d.setFontSize(8); d.setTextColor(...GREY); d.setFont(undefined, 'normal')
   d.text('De', 16, yDeA)
   d.setFontSize(13); d.setTextColor(...O); d.setFont(undefined, 'bold')
-  d.text(LODE.raison_sociale, 16, yDeA + 7)
+  d.text(DYN.raison_sociale, 16, yDeA + 7)
   d.setFontSize(9); d.setTextColor(...DARK); d.setFont(undefined, 'normal')
-  d.text([LODE.adresse, `${LODE.cp} ${LODE.ville}`, LODE.pays || 'Belgique', `TVA ${LODE.tva}`], 16, yDeA + 13)
+  d.text([DYN.adresse, `${DYN.cp} ${DYN.ville}`, DYN.pays || 'Belgique', `TVA ${DYN.tva}`], 16, yDeA + 13)
 
   // À (client) - aligné à droite
   d.setFontSize(8); d.setTextColor(...GREY)
@@ -476,7 +476,7 @@ async function exportPDF(type, doc, lignes) {
 
   // ---- Paiement ----
   y += 16; d.setFontSize(9); d.setTextColor(...GREY); d.setFont(undefined, 'normal')
-  d.text(`${L.paiement} : ${LODE.iban}  (${LODE.bic} – ${LODE.banque})`, 16, y)
+  d.text(`${L.paiement} : ${DYN.iban}  (${DYN.bic} – ${DYN.banque})`, 16, y)
   if (!isDevis) { y += 5; d.text(`${L.communication} : ${doc.numero}`, 16, y) }
   y += 9; d.setTextColor(...O); d.setFont(undefined, 'bold'); d.setFontSize(10)
   d.text(L.merci, 16, y)
@@ -510,10 +510,10 @@ async function exportExcel(type, doc, lignes) {
   const isDevis = type === 'devis'
   const L = I18N[doc.langue] || I18N.fr
   const rows = [
-    [LODE.raison_sociale, '', '', isDevis ? L.devis : L.facture],
-    [LODE.adresse, '', '', doc.numero],
-    [`${LODE.cp} ${LODE.ville}`, '', '', isDevis ? `${L.validite} : ${fmtDate(doc.date_validite)}` : `${L.echeance} : ${fmtDate(doc.date_echeance)}`],
-    [`TVA ${LODE.tva}`, '', '', ''],
+    [DYN.raison_sociale, '', '', isDevis ? L.devis : L.facture],
+    [DYN.adresse, '', '', doc.numero],
+    [`${DYN.cp} ${DYN.ville}`, '', '', isDevis ? `${L.validite} : ${fmtDate(doc.date_validite)}` : `${L.echeance} : ${fmtDate(doc.date_echeance)}`],
+    [`TVA ${DYN.tva}`, '', '', ''],
     [], [L.client, doc.client_nom], ['', doc.client_adresse || ''], ['', `${doc.client_cp || ''} ${doc.client_ville || ''}`],
     doc.client_tva ? ['TVA', doc.client_tva] : [],
     [L.objet, doc.objet || ''], [],
@@ -527,7 +527,7 @@ async function exportExcel(type, doc, lignes) {
     ['', '', '', '', L.totalHT, Number(tot.ht.toFixed(2))],
     ['', '', '', '', L.totalTVA, Number(tot.tva.toFixed(2))],
     ['', '', '', '', L.totalTTC, Number(tot.ttc.toFixed(2))],
-    [], [L.paiement, `${LODE.iban} (${LODE.bic})`],
+    [], [L.paiement, `${DYN.iban} (${DYN.bic})`],
   ].filter(r => r.length > 0)
   const ws = XLSX.utils.aoa_to_sheet(rows)
   ws['!cols'] = [{ wch: 40 }, { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 8 }, { wch: 14 }]
@@ -566,23 +566,23 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
   const [statut, setStatut] = useState(doc.statut || 'brouillon')
   const lien = `${window.location.origin}/devis/${doc.accept_token}`
 
-  const charge = () => supabase.from('lode_devis_events').select('*').eq('devis_id', doc.id)
+  const charge = () => supabase.from('dyn_devis_events').select('*').eq('devis_id', doc.id)
     .order('created_at', { ascending: true }).then(({ data }) => setEvents(data || []))
   useEffect(() => {
     charge()
-    supabase.from('lode_devis_lignes').select('*').eq('devis_id', doc.id).order('position', { ascending: true })
+    supabase.from('dyn_devis_lignes').select('*').eq('devis_id', doc.id).order('position', { ascending: true })
       .then(({ data }) => setLignes(data || []))
   }, [doc.id])
 
   async function logEvent(type, detail) {
-    await supabase.from('lode_devis_events').insert({ devis_id: doc.id, type, detail })
+    await supabase.from('dyn_devis_events').insert({ devis_id: doc.id, type, detail })
   }
   async function marquerEnvoye(viaEmail) {
     const now = new Date()
     const valid = new Date(now); valid.setDate(valid.getDate() + 15)   // validité 15 jours calendrier
     const relance = new Date(now); relance.setDate(relance.getDate() + 7)  // rappel à mi-parcours
     const dejaEnvoye = doc.statut && doc.statut !== 'brouillon'
-    await supabase.from('lode_devis').update({
+    await supabase.from('dyn_devis').update({
       statut: 'envoyé', sent_at: now.toISOString(), date_validite: valid.toISOString().slice(0, 10),
     }).eq('id', doc.id)
     await logEvent('envoye', viaEmail ? 'Email envoyé depuis la plateforme' : 'Marqué comme envoyé (envoi manuel)')
@@ -607,7 +607,7 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
     let evt = null, detail = null
     if (s === 'accepté') { patch.accepted_at = new Date().toISOString(); evt = 'accepte'; detail = 'Marqué accepté (manuel)' }
     else if (s === 'refusé') { patch.refused_at = new Date().toISOString(); evt = 'refuse'; detail = 'Marqué refusé (manuel)' }
-    await supabase.from('lode_devis').update(patch).eq('id', doc.id)
+    await supabase.from('dyn_devis').update(patch).eq('id', doc.id)
     if (evt) await logEvent(evt, detail)
     setStatut(s); charge(); onChanged && onChanged()
   }
@@ -625,7 +625,7 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
         body: JSON.stringify({
           client_nom: doc.client_nom, client_email: doc.client_email, numero: doc.numero,
           accept_token: doc.accept_token, date_validite: valid.toISOString().slice(0, 10),
-          base: window.location.origin, entite: LODE.entite,
+          base: window.location.origin, entite: DYN.entite,
         }),
       })
       const j = await r.json().catch(() => ({})); ok = r.ok && j.ok; detail = j.detail || j.error || ''
@@ -648,7 +648,7 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
         <div style={{ flex: 1, background: '#f1f5f9', overflow: 'auto', padding: mob ? 14 : 28, order: mob ? 2 : 1 }}>
           <div style={{ background: '#fff', maxWidth: 620, margin: '0 auto', borderRadius: 10, boxShadow: '0 2px 12px rgba(0,0,0,.08)', padding: mob ? '22px 18px' : '30px 34px', fontSize: 12, color: '#1e293b' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 22 }}>
-              {LODE.logo_url ? <img src={LODE.logo_url} alt="LODE" style={{ height: 46 }} /> : <div style={{ fontWeight: 800, fontSize: 18, color }}>{LODE.raison_sociale}</div>}
+              {DYN.logo_url ? <img src={DYN.logo_url} alt="DYN" style={{ height: 46 }} /> : <div style={{ fontWeight: 800, fontSize: 18, color }}>{DYN.raison_sociale}</div>}
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontWeight: 800, color }}>DEVIS {doc.numero}</div>
                 <div style={{ color: '#64748b' }}>Émis le : {fmtDate(doc.date_devis)}</div>
@@ -658,9 +658,9 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 20, marginBottom: 20 }}>
               <div>
                 <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>De</div>
-                <div style={{ fontWeight: 800 }}>{LODE.raison_sociale}</div>
-                <div style={{ color: '#475569' }}>{LODE.adresse}<br />{LODE.cp} {LODE.ville}<br />{LODE.pays}</div>
-                <div style={{ color: '#475569', marginTop: 4 }}>TVA : {LODE.tva}</div>
+                <div style={{ fontWeight: 800 }}>{DYN.raison_sociale}</div>
+                <div style={{ color: '#475569' }}>{DYN.adresse}<br />{DYN.cp} {DYN.ville}<br />{DYN.pays}</div>
+                <div style={{ color: '#475569', marginTop: 4 }}>TVA : {DYN.tva}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Pour</div>
@@ -694,8 +694,8 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
             </div>
             {doc.notes && <><div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginTop: 18 }}>Notes &amp; commentaires</div><div style={{ color: '#475569' }}>{doc.notes}</div></>}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 22, paddingTop: 12, borderTop: '1px solid #e2e8f0', color: '#64748b', fontSize: 11 }}>
-              <div>{LODE.iban && <>IBAN : {LODE.iban}<br /></>}{LODE.bic && <>BIC : {LODE.bic}</>}</div>
-              <div style={{ textAlign: 'right' }}>{LODE.email}{LODE.telephone && <><br />{LODE.telephone}</>}</div>
+              <div>{DYN.iban && <>IBAN : {DYN.iban}<br /></>}{DYN.bic && <>BIC : {DYN.bic}</>}</div>
+              <div style={{ textAlign: 'right' }}>{DYN.email}{DYN.telephone && <><br />{DYN.telephone}</>}</div>
             </div>
           </div>
         </div>
@@ -763,7 +763,7 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
   )
 }
 
-export default function LodeDevisFactures() {
+export default function DynDevisFactures() {
   const [tab, setTab] = useState('devis')
   const [devis, setDevis] = useState([])
   const [factures, setFactures] = useState([])
@@ -775,15 +775,15 @@ export default function LodeDevisFactures() {
   const load = async () => {
     setLoading(true)
     const [d, fa] = await Promise.all([
-      supabase.from('lode_devis').select('*').order('created_at', { ascending: false }),
-      supabase.from('lode_factures').select('*').order('created_at', { ascending: false }),
+      supabase.from('dyn_devis').select('*').order('created_at', { ascending: false }),
+      supabase.from('dyn_factures').select('*').order('created_at', { ascending: false }),
     ])
     setDevis(d.data || []); setFactures(fa.data || []); setLoading(false)
   }
   useEffect(() => { load() }, [])
 
   const getLignes = async (type, id) => {
-    const t = type === 'devis' ? 'lode_devis_lignes' : 'lode_factures_lignes'
+    const t = type === 'devis' ? 'dyn_devis_lignes' : 'dyn_factures_lignes'
     const fk = type === 'devis' ? 'devis_id' : 'facture_id'
     const { data } = await supabase.from(t).select('*').eq(fk, id).order('position')
     return data || []
@@ -813,22 +813,22 @@ export default function LodeDevisFactures() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json().catch(() => ({}))
       if (data && data.ok) {
-        await supabase.from('lode_factures').update({ statut: 'envoyée' }).eq('id', doc.id)
+        await supabase.from('dyn_factures').update({ statut: 'envoyée' }).eq('id', doc.id)
         alert(`Facture ${doc.numero} envoyée sur Peppol ✓`)
         load()
       } else {
         throw new Error(data?.error || 'Réponse inattendue de Billit')
       }
     } catch (e) {
-      alert(`Échec de l'envoi Peppol : ${e.message}\n\nVérifie que le workflow n8n « LODE - Peppol Send » est actif et que la clé API Billit est renseignée.`)
+      alert(`Échec de l'envoi Peppol : ${e.message}\n\nVérifie que le workflow n8n « DYN - Peppol Send » est actif et que la clé API Billit est renseignée.`)
     } finally { setBusy(null) }
   }
 
   const convertir = async (devisDoc) => {
     if (!confirm(`Convertir le devis ${devisDoc.numero} en facture ?`)) return
     const lignes = await getLignes('devis', devisDoc.id)
-    const { data: num } = await supabase.rpc('next_lode_numero', { p_type: 'facture' })
-    const { data: fact, error } = await supabase.from('lode_factures').insert({
+    const { data: num } = await supabase.rpc('next_dyn_numero', { p_type: 'facture' })
+    const { data: fact, error } = await supabase.from('dyn_factures').insert({
       numero: num, devis_id: devisDoc.id, statut: 'brouillon',
       client_nom: devisDoc.client_nom, client_adresse: devisDoc.client_adresse, client_cp: devisDoc.client_cp,
       client_ville: devisDoc.client_ville, client_email: devisDoc.client_email, client_telephone: devisDoc.client_telephone,
@@ -839,7 +839,7 @@ export default function LodeDevisFactures() {
     }).select('id').single()
     if (error) { alert('Erreur : ' + error.message); return }
     if (lignes.length) {
-      await supabase.from('lode_factures_lignes').insert(lignes.map((l, i) => ({
+      await supabase.from('dyn_factures_lignes').insert(lignes.map((l, i) => ({
         facture_id: fact.id, position: i, description: l.description, quantite: l.quantite,
         prix_unitaire: l.prix_unitaire, remise_pct: l.remise_pct, tva_pct: l.tva_pct, total_ht: l.total_ht,
       })))
@@ -849,13 +849,13 @@ export default function LodeDevisFactures() {
 
   const supprimer = async (type, id) => {
     if (!confirm('Supprimer définitivement ?')) return
-    await supabase.from(type === 'devis' ? 'lode_devis' : 'lode_factures').delete().eq('id', id)
+    await supabase.from(type === 'devis' ? 'dyn_devis' : 'dyn_factures').delete().eq('id', id)
     load()
   }
 
   const liste = tab === 'devis' ? devis : factures
   const STAT = tab === 'devis' ? STATUTS_DEVIS : STATUTS_FACT
-  const C = LODE.couleur
+  const C = DYN.couleur
   const C_DARK = '#7c2d12'
   const mob = useMobile()
 
@@ -878,9 +878,9 @@ export default function LodeDevisFactures() {
     <Layout currentPage="Devis & Factures">
       <div style={{ fontFamily: "'Source Sans Pro', sans-serif", width: '100%' }}>
         <StatBanner
-          color={C} colorDark={C_DARK} logoUrl={LODE.logo_url}
+          color={C} colorDark={C_DARK} logoUrl={DYN.logo_url}
           title={tab === 'devis' ? 'Devis' : 'Factures'}
-          subtitle={`LODE SRL — ${LODE.activite}`}
+          subtitle={`DYN SRL — ${DYN.activite}`}
           stats={stats}
           action={<PrimaryButton color={C} onClick={() => setEditing({ type: tab === 'factures' ? 'facture' : 'devis', doc: null })}>
             <i className="ti ti-plus" /> Nouveau {tab === 'factures' ? 'facture' : 'devis'}
@@ -920,9 +920,6 @@ export default function LodeDevisFactures() {
                       {tab === 'devis' && <ActionButton tone="accent" color={C} onClick={() => setSuivi(doc)}>📊 Suivi</ActionButton>}
                       <ActionButton tone="pdf" disabled={busy === doc.id + 'pdf'} onClick={() => doExport('pdf', t, doc)}>{busy === doc.id + 'pdf' ? '…' : 'PDF'}</ActionButton>
                       <ActionButton tone="excel" disabled={busy === doc.id + 'excel'} onClick={() => doExport('excel', t, doc)}>{busy === doc.id + 'excel' ? '…' : 'Excel'}</ActionButton>
-                      {tab === 'factures' && doc.client_tva && doc.statut !== 'payée' && doc.statut !== 'annulée' && (
-                        <ActionButton tone="peppol" disabled={busy === doc.id + 'peppol'} onClick={() => envoyerPeppol(doc)}>{busy === doc.id + 'peppol' ? '…' : '📨 Peppol'}</ActionButton>
-                      )}
                       {tab === 'devis' && doc.statut === 'accepté' && <ActionButton tone="accent" color={C} onClick={() => convertir(doc)}>→ Facture</ActionButton>}
                       <ActionButton tone="danger" onClick={() => supprimer(t, doc.id)}>Supprimer</ActionButton>
                     </div>
@@ -958,9 +955,6 @@ export default function LodeDevisFactures() {
                             {tab === 'devis' && <ActionButton tone="accent" color={C} onClick={() => setSuivi(doc)}>📊 Suivi</ActionButton>}
                             <ActionButton tone="pdf" disabled={busy === doc.id + 'pdf'} onClick={() => doExport('pdf', tab === 'devis' ? 'devis' : 'facture', doc)}>{busy === doc.id + 'pdf' ? '…' : 'PDF'}</ActionButton>
                             <ActionButton tone="excel" disabled={busy === doc.id + 'excel'} onClick={() => doExport('excel', tab === 'devis' ? 'devis' : 'facture', doc)}>{busy === doc.id + 'excel' ? '…' : 'Excel'}</ActionButton>
-                            {tab === 'factures' && doc.client_tva && doc.statut !== 'payée' && doc.statut !== 'annulée' && (
-                              <ActionButton tone="peppol" disabled={busy === doc.id + 'peppol'} onClick={() => envoyerPeppol(doc)}>{busy === doc.id + 'peppol' ? '…' : '📨 Peppol'}</ActionButton>
-                            )}
                             {tab === 'devis' && doc.statut === 'accepté' && <ActionButton tone="accent" color={C} onClick={() => convertir(doc)}>→ Facture</ActionButton>}
                             <ActionButton tone="danger" onClick={() => supprimer(tab === 'devis' ? 'devis' : 'facture', doc.id)}>×</ActionButton>
                           </div>

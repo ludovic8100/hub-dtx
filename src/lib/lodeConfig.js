@@ -2,6 +2,7 @@
 // ⚠️ Modifier ici met à jour automatiquement tous les documents générés.
 
 export const LODE = {
+  entite: 'lode',
   raison_sociale: 'LODE SRL',
   activite: 'Portes de garage · Stores · Pergolas',
   adresse: 'Chaussée de Tongres 474',

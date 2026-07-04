@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../lib/auth'
 import Layout from '../../components/Layout'
 import { ENTITES } from '../../lib/entites'
 import { StatBanner } from '../../components/ui/AccountableUI'
@@ -27,6 +29,7 @@ const fmtMois = v => { const d=parseDate(v); return d?d.toLocaleDateString('fr-B
 // RDV : le debut Graph peut être sans offset → on force UTC
 const tsRdv = iso => { if(!iso) return 0; const d=new Date(String(iso).length<=19?iso+'Z':iso); return isNaN(d)?0:d.getTime() }
 const fmtRdv = iso => { const t=tsRdv(iso); return t?new Date(t).toLocaleDateString('fr-BE',{day:'2-digit',month:'2-digit',year:'numeric'}):'—' }
+const fmtAppel = iso => { if(!iso) return '—'; const d=new Date(String(iso).replace(' ','T')); return isNaN(d)?'—':d.toLocaleString('fr-BE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) }
 const ilYa = jours => {
   if(jours==null) return ''
   if(jours<31) return `il y a ${jours} j`
@@ -43,9 +46,10 @@ const TRANCHES = [
   { val:'m12', label:'6 à 12 mois',         min:183, max:365 },
   { val:'a2',  label:'1 à 2 ans',           min:365, max:730 },
   { val:'a2p', label:'Plus de 2 ans',       min:730, max:Infinity },
+  { val:'jamais', label:'Jamais contacté',  min:null, max:null },
 ]
-const trancheDe = jours => TRANCHES.find(t=>jours>=t.min&&jours<t.max)?.val || null
-const TRANCHE_COL = { m1:'#16a34a', m3:'#65a30d', m6:'#ca8a04', m12:'#ea580c', a2:'#dc2626', a2p:'#991b1b' }
+const trancheDe = jours => TRANCHES.find(t=>t.min!=null&&jours>=t.min&&jours<t.max)?.val || null
+const TRANCHE_COL = { m1:'#16a34a', m3:'#65a30d', m6:'#ca8a04', m12:'#ea580c', a2:'#dc2626', a2p:'#991b1b', jamais:'#6b7280' }
 // Âge en années (+ mois) à partir d'une date de naissance
 const calcAge = v => {
   const d=parseDate(v); if(!d) return null
@@ -147,7 +151,10 @@ function Sec({ icon, title, count, children, extra, open: defOpen=true, col=BLUE
 
 // ══ Primes + commissions ══
 function Primes({ dossier }) {
+  const { perms }=useAuth()
+  const canComm=!!perms?.voir_commissions
   const [rows,setRows]=useState([]); const [load,setLoad]=useState(true); const [showC,setShowC]=useState(false)
+  const show=showC&&canComm
   useEffect(()=>{
     supabase.from('quittances').select('compagnie,date_comptable,prime_totale,commission,commission_sa,sous_agent').eq('dossier',dossier).order('date_comptable',{ascending:false}).limit(50)
       .then(({data})=>{ setRows(data||[]); setLoad(false) })
@@ -164,7 +171,7 @@ function Primes({ dossier }) {
           <div style={{fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',marginBottom:2}}>Primes TTC</div>
           <div style={{fontSize:18,fontWeight:800,color:NAVY}}>{fmt(tP)}</div>
         </div>
-        {showC&&<>
+        {show&&<>
           <div style={{background:'#f0fdf4',borderRadius:8,padding:'8px 14px',border:'1px solid #bbf7d0'}}>
             <div style={{fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',marginBottom:2}}>Comm. DYN</div>
             <div style={{fontSize:18,fontWeight:800,color:'#16a34a'}}>{fmt(tC)}</div>
@@ -174,14 +181,14 @@ function Primes({ dossier }) {
             <div style={{fontSize:18,fontWeight:800,color:'#7c3aed'}}>{fmt(tS)}</div>
           </div>
         </>}
-        <button onClick={()=>setShowC(s=>!s)} style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:6,fontSize:12,color:showC?'#16a34a':'#64748b',background:showC?'#f0fdf4':'#f8fafc',border:`1px solid ${showC?'#bbf7d0':'#e2e8f0'}`,borderRadius:7,padding:'5px 12px',cursor:'pointer',fontWeight:600}}>
+        {canComm&&<button onClick={()=>setShowC(s=>!s)} style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:6,fontSize:12,color:showC?'#16a34a':'#64748b',background:showC?'#f0fdf4':'#f8fafc',border:`1px solid ${showC?'#bbf7d0':'#e2e8f0'}`,borderRadius:7,padding:'5px 12px',cursor:'pointer',fontWeight:600}}>
           <i className={`ti ${showC?'ti-eye-off':'ti-eye'}`}/>{showC?'Masquer commissions':'Voir commissions'}
-        </button>
+        </button>}
       </div>
       <div style={{overflowX:'auto',maxHeight:200,overflowY:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
           <thead style={{position:'sticky',top:0,background:'#f8fafc',zIndex:1}}>
-            <tr>{['Période','Compagnie','Prime TTC',...(showC?['Comm. DYN','Comm. SA']:[])].map(h=>(
+            <tr>{['Période','Compagnie','Prime TTC',...(show?['Comm. DYN','Comm. SA']:[])].map(h=>(
               <th key={h} style={{padding:'6px 12px',textAlign:'left',fontWeight:700,color:'#94a3b8',fontSize:10,textTransform:'uppercase',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>
             ))}</tr>
           </thead>
@@ -191,7 +198,7 @@ function Primes({ dossier }) {
                 <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b',whiteSpace:'nowrap'}}>{fmtMois(r.date_comptable)}</td>
                 <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',color:'#374151'}}>{r.compagnie||'—'}</td>
                 <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',fontWeight:600,color:NAVY}}>{fmt(r.prime_totale)}</td>
-                {showC&&<><td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',fontWeight:600,color:'#16a34a'}}>{fmt(r.commission)}</td>
+                {show&&<><td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',fontWeight:600,color:'#16a34a'}}>{fmt(r.commission)}</td>
                 <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',fontWeight:600,color:'#7c3aed'}}>{fmt(r.commission_sa)}</td></>}
               </tr>
             ))}
@@ -535,7 +542,7 @@ function ObjetsDetail({ objets, loading }) {
   if(!objets.length) return <div style={{color:'#94a3b8',fontSize:12,fontStyle:'italic'}}>Aucun objet de risque détaillé pour ce dossier.</div>
   // regrouper par police
   const parPolice={}
-  objets.forEach(o=>{ (parPolice[o.police]=parPolice[o.police]||{police:o.police,type:o.type_risque,compagnie:o.compagnie,domaine:o.domaine,gars:[]}).gars.push({g:o.garantie,s:o.situation}) })
+  objets.forEach(o=>{ const gp=(parPolice[o.police]=parPolice[o.police]||{police:o.police,type:o.type_risque,compagnie:o.compagnie,domaine:o.domaine,descrs:new Set(),gars:[]}); gp.gars.push({g:o.garantie,s:o.situation}); if(o.description) gp.descrs.add(o.description) })
   const groupes=Object.values(parPolice).sort((a,b)=>{
     const ac=a.gars.some(x=>x.s==='En cours'), bc=b.gars.some(x=>x.s==='En cours'); return (bc-ac)
   })
@@ -551,6 +558,15 @@ function ObjetsDetail({ objets, loading }) {
               {p.compagnie&&<span style={{fontSize:11,color:'#64748b'}}>· {p.compagnie}</span>}
               {p.domaine&&<span style={{fontSize:10,fontWeight:700,padding:'1px 7px',borderRadius:5,background:'#f5f3ff',color:'#7c3aed'}}>{p.domaine}</span>}
             </div>
+            {p.descrs&&p.descrs.size>0&&(
+              <div style={{display:'flex',flexDirection:'column',gap:3,marginBottom:8}}>
+                {[...p.descrs].map((d,k)=>{
+                  const tl=(p.type||'').toLowerCase()
+                  const ic=tl.includes('hicule')?'ti-car':(tl.includes('timent')||tl.includes('immeuble')?'ti-building':(tl.includes('individu')||tl.includes('personne')?'ti-user':'ti-point'))
+                  return <div key={k} style={{fontSize:12.5,fontWeight:700,color:'#334155',display:'flex',alignItems:'center',gap:6}}><i className={`ti ${ic}`} style={{fontSize:14,color:'#7c3aed'}}/>{d}</div>
+                })}
+              </div>
+            )}
             <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
               {p.gars.map((x,j)=>{
                 const enc=x.s==='En cours'
@@ -564,26 +580,271 @@ function ObjetsDetail({ objets, loading }) {
   )
 }
 
+// ── Normalisation d'adresse (pour comparer "même adresse de résidence") ──
+const normAdr = (...parts) => parts.map(x => x==null?'':String(x)).join(' ')
+  .toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'')
+
+// ── Modal détail contrat (garanties, objets couverts, primes/mensualités, sinistres) ──
+function ContratModal({ contrat, dossier, objets, onClose, preview }) {
+  const [quit,setQuit]=useState([]); const [ld,setLd]=useState(true)
+  useEffect(()=>{
+    setLd(true)
+    supabase.from('quittances').select('prime_totale,periodicite,date_comptable,type_quittance,commission,compagnie,compte_producteur,gestionnaire,etat')
+      .eq('dossier',dossier).eq('police',contrat.police).order('date_comptable',{ascending:false})
+      .then(({data})=>{ setQuit(data||[]); setLd(false) })
+  },[dossier,contrat.police])
+
+  const obj=objets.filter(o=>o.police===contrat.police)
+  const parObjet={}
+  obj.forEach(o=>{ const k=o.description||o.type_risque||'—'; (parObjet[k]=parObjet[k]||{type:o.type_risque,descr:o.description,gars:new Set()}); if(o.garantie) parObjet[k].gars.add(o.garantie) })
+  const objList=Object.values(parObjet)
+  const derniere=quit[0]||null
+  const qval=f=>{ const r=quit.find(x=>x[f]!=null&&x[f]!=='' ); return r?r[f]:null }
+  const SIT={'En cours':{bg:'#dcfce7',col:'#16a34a'},'Résilié':{bg:'#fee2e2',col:'#dc2626'},'Terminé':{bg:'#fee2e2',col:'#dc2626'},'Suspendu':{bg:'#fef3c7',col:'#92400e'}}
+  const st=SIT[contrat.situation]||{bg:'#f1f5f9',col:'#64748b'}
+  const Bloc=({icon,titre,col,children})=>(
+    <div style={{marginBottom:16}}>
+      <div style={{display:'flex',alignItems:'center',gap:7,marginBottom:8}}>
+        <i className={`ti ${icon}`} style={{fontSize:16,color:col}}/>
+        <span style={{fontSize:13,fontWeight:800,color:NAVY}}>{titre}</span>
+      </div>
+      {children}
+    </div>
+  )
+  const Row=({k,v})=> (v==null||v==='')?null:(
+    <div style={{display:'flex',gap:10,fontSize:12.5,padding:'3px 0',borderBottom:'1px solid #f8fafc'}}>
+      <span style={{color:'#94a3b8',minWidth:140,flexShrink:0}}>{k}</span>
+      <span style={{color:'#1e293b',fontWeight:600,wordBreak:'break-word'}}>{v}</span>
+    </div>
+  )
+  return (
+    <div onClick={preview?undefined:onClose} style={{position:'fixed',inset:0,background:preview?'transparent':'rgba(15,23,42,0.55)',zIndex:1000,display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'40px 16px',overflowY:'auto',pointerEvents:preview?'none':'auto'}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:'#fff',borderRadius:14,maxWidth:720,width:'100%',boxShadow:preview?'0 24px 70px rgba(15,23,42,0.28)':'0 20px 60px rgba(0,0,0,0.35)',overflow:'hidden',border:preview?`1px solid ${BLUE}55`:'none'}}>
+        <div style={{background:`linear-gradient(135deg, ${BLUE} 0%, ${NAVY} 140%)`,padding:'16px 20px',display:'flex',alignItems:'flex-start',gap:12}}>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:10,color:'rgba(255,255,255,0.75)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.05em'}}>Contrat</div>
+            <div style={{fontSize:21,fontWeight:800,color:'#fff',fontFamily:'monospace',lineHeight:1.1}}>{contrat.police||'—'}</div>
+            <div style={{fontSize:12.5,color:'rgba(255,255,255,0.9)',marginTop:3}}>{[contrat.compagnie,contrat.domaine].filter(Boolean).join(' · ')||'—'}</div>
+          </div>
+          {preview
+            ? <span style={{alignSelf:'center',background:'rgba(255,255,255,0.18)',border:'1px solid rgba(255,255,255,0.3)',borderRadius:8,padding:'5px 10px',color:'#fff',fontSize:11,fontWeight:700,flexShrink:0,whiteSpace:'nowrap'}}><i className="ti ti-pin"/> Cliquer pour épingler</span>
+            : <button onClick={onClose} style={{background:'rgba(255,255,255,0.15)',border:'1px solid rgba(255,255,255,0.3)',borderRadius:8,padding:'6px 11px',cursor:'pointer',color:'#fff',fontSize:13,fontWeight:600,flexShrink:0}}><i className="ti ti-x"/></button>}
+        </div>
+        <div style={{padding:'18px 20px',maxHeight:'72vh',overflowY:'auto'}}>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:18}}>
+            <span style={{fontSize:11,fontWeight:700,padding:'3px 10px',borderRadius:6,background:st.bg,color:st.col}}>{contrat.situation||'—'}</span>
+            {contrat.date_creation&&<span style={{fontSize:11,fontWeight:600,padding:'3px 10px',borderRadius:6,background:'#f1f5f9',color:'#475569'}}>Depuis {fmtDate(contrat.date_creation)}</span>}
+            {contrat.garantie_valeur?<span style={{fontSize:11,fontWeight:600,padding:'3px 10px',borderRadius:6,background:'#eff6ff',color:'#1d4ed8'}}>Valeur assurée {fmt(contrat.garantie_valeur)}</span>:null}
+          </div>
+
+          <Bloc icon="ti-file-info" titre="Détails du contrat" col={BLUE}>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0 24px'}}>
+              <Row k="Police" v={contrat.police}/>
+              <Row k="Compagnie" v={contrat.compagnie}/>
+              <Row k="Domaine" v={contrat.domaine}/>
+              <Row k="Type de police" v={contrat.type_production}/>
+              <Row k="État" v={contrat.situation}/>
+              <Row k="Version" v={contrat.version}/>
+              <Row k="Producteur" v={contrat.nom_sa?`${contrat.nom_sa}${contrat.sa_code?` (${contrat.sa_code})`:''}`:null}/>
+              <Row k="Date de création" v={contrat.date_creation?fmtDate(contrat.date_creation):null}/>
+              <Row k="Valeur assurée" v={contrat.garantie_valeur?fmt(contrat.garantie_valeur):null}/>
+              <Row k="Compte producteur" v={qval('compte_producteur')}/>
+              <Row k="Gestionnaire" v={qval('gestionnaire')}/>
+              <Row k="Périodicité" v={derniere?.periodicite}/>
+              <Row k="Dernière quittance" v={derniere?`${fmtMois(derniere.date_comptable)} · ${fmt(derniere.prime_totale)}`:null}/>
+              <Row k="État quittance" v={derniere?.etat}/>
+            </div>
+            <p style={{color:'#cbd5e1',fontSize:10.5,margin:'8px 0 0',fontStyle:'italic'}}>Seuls les champs présents dans la base sont affichés. Le reste de la fiche Brio (dates d'effet/échéance, avenants, fractionnement, documents…) n'est pas encore importé.</p>
+          </Bloc>
+
+          <Bloc icon="ti-shield-check" titre="Garanties & objets couverts" col="#7c3aed">
+            {!objList.length?<p style={{color:'#94a3b8',fontSize:12,margin:0}}>Aucun objet de risque détaillé pour cette police.</p>:
+              <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                {objList.map((o,i)=>{
+                  const tl=(o.type||'').toLowerCase()
+                  const ic=tl.includes('hicule')?'ti-car':(tl.includes('timent')||tl.includes('immeuble')?'ti-building':(tl.includes('individu')||tl.includes('personne')?'ti-user':'ti-point'))
+                  return(
+                    <div key={i} style={{border:'1px solid #ede9fe',borderRadius:9,padding:'9px 12px',background:'#fbfaff'}}>
+                      <div style={{fontSize:12.5,fontWeight:700,color:'#334155',display:'flex',alignItems:'center',gap:6,marginBottom:6}}><i className={`ti ${ic}`} style={{fontSize:14,color:'#7c3aed'}}/>{o.descr||o.type||'Objet'}</div>
+                      <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                        {[...o.gars].length?[...o.gars].map((g,j)=><span key={j} style={{fontSize:11,fontWeight:600,padding:'3px 9px',borderRadius:6,background:'#dcfce7',color:'#15803d',border:'1px solid #86efac'}}>{g}</span>):<span style={{fontSize:11,color:'#94a3b8'}}>—</span>}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>}
+          </Bloc>
+
+          <Bloc icon="ti-cash" titre="Primes & mensualités" col="#16a34a">
+            {ld?<p style={{color:'#94a3b8',fontSize:12,margin:0}}>Chargement…</p>:!quit.length?<p style={{color:'#94a3b8',fontSize:12,margin:0}}>Aucune quittance pour cette police.</p>:
+              <div>
+                {derniere&&<div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:10}}>
+                  <div style={{background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:8,padding:'8px 14px'}}>
+                    <div style={{fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase'}}>Dernière prime</div>
+                    <div style={{fontSize:17,fontWeight:800,color:NAVY}}>{fmt(derniere.prime_totale)}</div>
+                  </div>
+                  {derniere.periodicite&&<div style={{background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:8,padding:'8px 14px'}}>
+                    <div style={{fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase'}}>Périodicité</div>
+                    <div style={{fontSize:15,fontWeight:800,color:'#1d4ed8'}}>{derniere.periodicite}</div>
+                  </div>}
+                </div>}
+                <div style={{maxHeight:180,overflowY:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
+                  <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+                    <thead style={{position:'sticky',top:0,background:'#f8fafc'}}><tr>{['Période','Prime','Périodicité','Type'].map(h=><th key={h} style={{padding:'6px 12px',textAlign:'left',fontWeight:700,color:'#94a3b8',fontSize:10,textTransform:'uppercase',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
+                    <tbody>
+                      {quit.map((r,i)=>(
+                        <tr key={i} style={{background:i%2===0?'#fff':'#fafafe'}}>
+                          <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b',whiteSpace:'nowrap'}}>{fmtMois(r.date_comptable)}</td>
+                          <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',fontWeight:600,color:NAVY}}>{fmt(r.prime_totale)}</td>
+                          <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{r.periodicite||'—'}</td>
+                          <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{r.type_quittance||'—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>}
+          </Bloc>
+
+          <Bloc icon="ti-alert-triangle" titre="Sinistres" col="#dc2626">
+            <p style={{color:'#94a3b8',fontSize:12,margin:0,fontStyle:'italic'}}>Les sinistres ne sont pas rattachés au n° de police dans les données actuelles (identifiant interne Brio distinct). À raccorder via un mapping dédié.</p>
+          </Bloc>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Contrats du foyer : contrats des relations vivant à la MÊME adresse ──
+function CouverturesAcquises({ client, onOpenDossier }) {
+  const [rows,setRows]=useState([]); const [ld,setLd]=useState(true)
+  useEffect(()=>{
+    if(!client?.dossier||!client?.nom){ setRows([]); setLd(false); return }
+    setLd(true)
+    ;(async()=>{
+      const { data }=await supabase.rpc('couvertures_acquises',{ p_dossier:client.dossier, p_nom:client.nom||'', p_prenom:client.prenom||'' })
+      setRows(data||[]); setLd(false)
+    })()
+  },[client?.dossier,client?.nom,client?.prenom])
+  if(ld) return <p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>
+  if(!rows.length) return <div style={{color:'#94a3b8',fontSize:12,fontStyle:'italic'}}>Cette personne n'est couverte dans aucun autre contrat dont elle n'est pas le preneur.</div>
+  const SIT={'En cours':{bg:'#dcfce7',col:'#16a34a'},'Résilié':{bg:'#fee2e2',col:'#dc2626'},'Terminé':{bg:'#fee2e2',col:'#dc2626'},'Suspendu':{bg:'#fef3c7',col:'#92400e'}}
+  const byDoss={}
+  rows.forEach(r=>{ const g=(byDoss[r.dossier]=byDoss[r.dossier]||{dossier:r.dossier,preneur:r.preneur,list:[]}); g.list.push(r) })
+  const groupes=Object.values(byDoss)
+  return(
+    <div style={{display:'flex',flexDirection:'column',gap:12}}>
+      <div style={{fontSize:11,color:'#94a3b8',fontStyle:'italic'}}>Contrats d'autres dossiers où {[client.prenom,client.nom].filter(Boolean).join(' ')||'cette personne'} figure comme personne assurée sans en être le preneur. Rapprochement par nom + prénom.</div>
+      {groupes.map((g,i)=>(
+        <div key={i} style={{border:'1px solid #e2e8f0',borderRadius:10,padding:'10px 13px'}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:7}}>
+            <div style={{fontSize:13,fontWeight:800,color:NAVY}}>Preneur : {g.preneur||'—'} <span style={{fontSize:11,fontWeight:600,color:'#94a3b8'}}>#{g.dossier} · {g.list.length} contrat(s)</span></div>
+            {onOpenDossier&&<button onClick={()=>onOpenDossier(g.dossier)} style={{marginLeft:'auto',fontSize:11,fontWeight:600,color:BLUE,background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:6,padding:'3px 9px',cursor:'pointer'}}>Ouvrir</button>}
+          </div>
+          <div style={{display:'flex',flexDirection:'column',gap:5}}>
+            {g.list.map((c,j)=>{
+              const st=SIT[c.situation]||{bg:'#f1f5f9',col:'#64748b'}
+              return(
+                <div key={j} style={{display:'flex',alignItems:'center',gap:8,fontSize:12}}>
+                  <span style={{fontFamily:'monospace',fontWeight:600,color:NAVY,minWidth:82}}>{c.police||'—'}</span>
+                  <span style={{color:'#1e293b',flex:1,minWidth:0}}>{[c.compagnie,c.domaine].filter(Boolean).join(' · ')||'—'}</span>
+                  <span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:4,background:st.bg,color:st.col,whiteSpace:'nowrap'}}>{c.situation||'—'}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function ContratsFoyer({ client }) {
+  const [groupes,setGroupes]=useState([]); const [ld,setLd]=useState(true)
+  useEffect(()=>{
+    if(!client?.dossier){ setGroupes([]); setLd(false); return }
+    setLd(true)
+    ;(async()=>{
+      const NOM=(client.nom||'').toUpperCase().trim(); const PRENOM=(client.prenom||'').trim()
+      const SEL='dossier,nom_principal,prenom_principal,nom_lie,prenom_lie'
+      const [{data:dir},{data:inv}]=await Promise.all([
+        supabase.from('famille').select(SEL).eq('dossier',client.dossier),
+        supabase.from('famille').select(SEL).ilike('nom_lie',NOM).ilike('prenom_lie',PRENOM),
+      ])
+      const relNoms=new Set(); const relDossiers=new Set()
+      ;(dir||[]).forEach(r=>{ if(r.nom_lie) relNoms.add(`${(r.nom_lie||'').toUpperCase()}|${(r.prenom_lie||'').toUpperCase()}`) })
+      ;(inv||[]).forEach(r=>{ if(r.dossier) relDossiers.add(r.dossier); if(r.nom_principal) relNoms.add(`${(r.nom_principal||'').toUpperCase()}|${(r.prenom_principal||'').toUpperCase()}`) })
+      const nomsList=[...new Set([...relNoms].map(k=>k.split('|')[0]).filter(Boolean))]
+      let candidats=[]
+      if(nomsList.length){
+        const {data:cl}=await supabase.from('clients').select('dossier,nom,prenom,rue,num_maison,cp,localite').in('nom',nomsList).not('dossier','is',null)
+        candidats=(cl||[]).filter(c=>relNoms.has(`${(c.nom||'').toUpperCase()}|${(c.prenom||'').toUpperCase()}`))
+      }
+      if(relDossiers.size){
+        const {data:cl2}=await supabase.from('clients').select('dossier,nom,prenom,rue,num_maison,cp,localite').in('dossier',[...relDossiers])
+        candidats=[...candidats,...(cl2||[])]
+      }
+      const byDoss={}
+      candidats.forEach(c=>{ if(c.dossier&&c.dossier!==client.dossier) byDoss[c.dossier]=c })
+      const cle=normAdr(client.rue,client.num_maison,client.cp)
+      const memeAdr=Object.values(byDoss).filter(c=> cle && normAdr(c.rue,c.num_maison,c.cp)===cle )
+      if(!memeAdr.length){ setGroupes([]); setLd(false); return }
+      const {data:ctr}=await supabase.from('contrats').select('dossier,police,compagnie,domaine,situation').in('dossier',memeAdr.map(c=>c.dossier))
+      const parDoss={}
+      ;(ctr||[]).forEach(c=>{ const k=c.police||JSON.stringify(c); const g=(parDoss[c.dossier]=parDoss[c.dossier]||{seen:new Set(),list:[]}); if(!g.seen.has(k)){ g.seen.add(k); g.list.push(c) } })
+      const out=memeAdr.map(c=>({...c,contrats:(parDoss[c.dossier]&&parDoss[c.dossier].list)||[]})).filter(x=>x.contrats.length)
+      setGroupes(out); setLd(false)
+    })()
+  },[client?.dossier])
+
+  if(ld) return <p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>
+  if(!groupes.length) return <div style={{color:'#94a3b8',fontSize:12,fontStyle:'italic'}}>Aucune relation à la même adresse de résidence (avec contrats).</div>
+  const SIT={'En cours':{bg:'#dcfce7',col:'#16a34a'},'Résilié':{bg:'#fee2e2',col:'#dc2626'},'Terminé':{bg:'#fee2e2',col:'#dc2626'},'Suspendu':{bg:'#fef3c7',col:'#92400e'}}
+  return(
+    <div style={{display:'flex',flexDirection:'column',gap:12}}>
+      <div style={{fontSize:11,color:'#94a3b8',fontStyle:'italic'}}>Personnes liées vivant à la même adresse ({[client.rue,client.num_maison].filter(Boolean).join(' ')||'—'}).</div>
+      {groupes.map((g,i)=>(
+        <div key={i} style={{border:'1px solid #e2e8f0',borderRadius:10,padding:'10px 13px'}}>
+          <div style={{fontSize:13,fontWeight:800,color:NAVY,marginBottom:7}}>{[g.prenom,g.nom].filter(Boolean).join(' ')||'—'} <span style={{fontSize:11,fontWeight:600,color:'#94a3b8'}}>#{g.dossier} · {g.contrats.length} contrat(s)</span></div>
+          <div style={{display:'flex',flexDirection:'column',gap:5}}>
+            {g.contrats.map((c,j)=>{
+              const st=SIT[c.situation]||{bg:'#f1f5f9',col:'#64748b'}
+              return(
+                <div key={j} style={{display:'flex',alignItems:'center',gap:8,fontSize:12}}>
+                  <span style={{fontFamily:'monospace',fontWeight:600,color:NAVY,minWidth:82}}>{c.police||'—'}</span>
+                  <span style={{color:'#1e293b',flex:1,minWidth:0}}>{[c.compagnie,c.domaine].filter(Boolean).join(' · ')||'—'}</span>
+                  <span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:4,background:st.bg,color:st.col,whiteSpace:'nowrap'}}>{c.situation||'—'}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function Fiche({ client, onClose, onOpenDossier }) {
-  const [contrats,setContrats]=useState([]); const [taches,setTaches]=useState([]); const [rdvs,setRdvs]=useState([]); const [groupe,setGroupe]=useState([]); const [objets,setObjets]=useState([]); const [loadF,setLoadF]=useState(true)
+  const [contrats,setContrats]=useState([]); const [taches,setTaches]=useState([]); const [rdvs,setRdvs]=useState([]); const [groupe,setGroupe]=useState([]); const [objets,setObjets]=useState([]); const [appels,setAppels]=useState([]); const [loadF,setLoadF]=useState(true)
   const ref=useRef(null)
 
   useEffect(()=>{
     ref.current?.scrollIntoView({behavior:'smooth',block:'start'})
     setLoadF(true)
     Promise.all([
-      supabase.from('contrats').select('police,compagnie,nom_client,situation,date_creation,domaine,type_production,garantie_valeur,version').eq('dossier',client.dossier).order('date_creation',{ascending:false}),
+      supabase.from('contrats').select('police,compagnie,nom_client,situation,date_creation,domaine,type_production,garantie_valeur,version,nom_sa,sa_code').eq('dossier',client.dossier).order('date_creation',{ascending:false}),
       supabase.from('taches').select('*').eq('dossier_client',client.dossier).order('echeance',{ascending:true}).limit(20),
       client.id
         ? supabase.from('rdv').select('id,objet,debut,categorie,user_email,web_link,journee_entiere,lieu').eq('client_id',client.id).order('debut',{ascending:false})
         : Promise.resolve({data:[]}),
       supabase.from('parentes').select('groupe_nom,groupe_type,membre_nom,nb_polices,prime_totale').eq('dossier_principal',client.dossier),
-      supabase.from('objets_risque').select('police,type_risque,garantie,situation,compagnie,domaine').eq('dossier',client.dossier),
-    ]).then(([{data:c},{data:t},{data:rv},{data:gr},{data:ob}])=>{
+      supabase.from('objets_risque').select('police,type_risque,garantie,situation,compagnie,domaine,description,date_effet').eq('dossier',client.dossier),
+      (()=>{ const nums=[client.gsm_e164,client.telfixe_e164].filter(Boolean); return nums.length ? supabase.from('appels').select('id,direction,numero_externe,numero_e164,agent,duree,debut,nom_3cx').in('numero_e164',nums).order('debut',{ascending:false}).limit(50) : Promise.resolve({data:[]}) })(),
+    ]).then(([{data:c},{data:t},{data:rv},{data:gr},{data:ob},{data:ap}])=>{
       // Dédoublonnage par police (les imports créent des lignes identiques) — on garde la plus récente
       const seen=new Set(); const uniq=[]
       ;(c||[]).forEach(r=>{ const k=r.police||JSON.stringify(r); if(!seen.has(k)){ seen.add(k); uniq.push(r) } })
-      setContrats(uniq); setTaches(t||[]); setRdvs(rv||[]); setGroupe(gr||[]); setObjets(ob||[]); setLoadF(false)
+      setContrats(uniq); setTaches(t||[]); setRdvs(rv||[]); setGroupe(gr||[]); setObjets(ob||[]); setAppels(ap||[]); setLoadF(false)
     })
   },[client.dossier,client.id])
 
@@ -603,6 +864,14 @@ function Fiche({ client, onClose, onOpenDossier }) {
   const dernier=rdvPasses[0]||null
   const joursDernier=dernier?Math.floor((nowTs-tsRdv(dernier.debut))/86400000):null
   const prochain=rdvFuturs[0]||null
+  // Contacts unifiés = RDV + appels (une seule notion de « contact »)
+  const appelTs=a=>{ const t=new Date(a.debut).getTime(); return isNaN(t)?0:t }
+  const contactsUnifies=[
+    ...rdvs.map(r=>({kind:'rdv',ts:tsRdv(r.debut),data:r})),
+    ...appels.map(a=>({kind:'appel',ts:appelTs(a),data:a})),
+  ].sort((a,b)=>b.ts-a.ts)
+  const dernierContact=contactsUnifies.find(c=>c.ts<=nowTs)||null
+  const joursDernierC=dernierContact?Math.floor((nowTs-dernierContact.ts)/86400000):null
 
   // Risques (dérivés des domaines de contrats actifs)
   const risques={}
@@ -613,208 +882,237 @@ function Fiche({ client, onClose, onOpenDossier }) {
   })
   const SIT={  'En cours':{bg:'#dcfce7',col:'#16a34a'},'Résilié':{bg:'#fee2e2',col:'#dc2626'},'Terminé':{bg:'#fee2e2',col:'#dc2626'},'Suspendu':{bg:'#fef3c7',col:'#92400e'} }
 
-  return(
-    <div ref={ref} style={{marginTop:20,background:'#fff',borderRadius:14,border:`2px solid ${BLUE}25`,overflow:'hidden',boxShadow:'0 4px 24px rgba(0,128,189,0.1)'}}>
+  const [openSec,setOpenSec]=useState('contrats')
+  const [pinnedContrat,setPinnedContrat]=useState(null)
+  const [hoverContrat,setHoverContrat]=useState(null)
+  const hoverTimer=useRef(null); const closeTimer=useRef(null)
+  const detail=pinnedContrat||hoverContrat
+  const openContrat=c=>{ clearTimeout(hoverTimer.current); clearTimeout(closeTimer.current); setPinnedContrat(c); setHoverContrat(null) }
+  const previewContrat=c=>{ clearTimeout(closeTimer.current); if(pinnedContrat) return; clearTimeout(hoverTimer.current); hoverTimer.current=setTimeout(()=>setHoverContrat(c),180) }
+  const leaveContrat=()=>{ clearTimeout(hoverTimer.current); if(pinnedContrat) return; closeTimer.current=setTimeout(()=>setHoverContrat(null),160) }
+  const closeContrat=()=>{ clearTimeout(hoverTimer.current); clearTimeout(closeTimer.current); setPinnedContrat(null); setHoverContrat(null) }
+  const garantiesParPolice={}
+  const objetsParPolice={}
+  objets.forEach(o=>{ if(o.police){ const gset=(garantiesParPolice[o.police]=garantiesParPolice[o.police]||new Set()); if(o.garantie) gset.add(o.garantie); const oset=(objetsParPolice[o.police]=objetsParPolice[o.police]||new Set()); if(o.description) oset.add(o.description) } })
 
-      {/* ── Header compact : nom mis en avant ── */}
-      <div style={{background:`linear-gradient(135deg, ${NAVY} 0%, ${BLUE} 100%)`,padding:'12px 20px',display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
-        <div style={{width:42,height:42,borderRadius:11,background:'rgba(255,255,255,0.2)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:16,fontWeight:800,color:'#fff'}}>{initiales}</div>
-        <div style={{flex:1,minWidth:160}}>
-          <h2 style={{fontSize:24,fontWeight:800,color:'#fff',margin:0,lineHeight:1.1}}>{client.prenom} {client.nom}</h2>
-          <div style={{fontSize:11,color:'rgba(255,255,255,0.65)',display:'flex',gap:12,flexWrap:'wrap',marginTop:2}}>
-            <span>#{client.dossier}</span>
-            {client.etat_civil&&<span>{client.etat_civil}</span>}
-            {client.bureau&&<span>{client.bureau}</span>}
+  const SECTIONS=[
+    { key:'contacts', icon:'ti-address-book', title:'Contacts', col:'#0d9488', count:contactsUnifies.length, body:(
+      loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:!contactsUnifies.length?
+        <p style={{color:'#94a3b8',fontSize:12}}>Aucun contact enregistré (ni RDV, ni appel).</p>:(
+        <div>
+          <div style={{display:'flex',gap:12,flexWrap:'wrap',marginBottom:12}}>
+            {dernierContact&&(
+              <div style={{flex:'1 1 220px',background:'#f0fdfa',border:'1px solid #99f6e4',borderRadius:10,padding:'12px 16px'}}>
+                <div style={{fontSize:10,fontWeight:800,color:'#0d9488',textTransform:'uppercase',letterSpacing:'.05em'}}>Dernier contact</div>
+                <div style={{fontSize:20,fontWeight:800,color:NAVY,lineHeight:1.1,marginTop:3}}>{dernierContact.kind==='rdv'?fmtRdv(dernierContact.data.debut):fmtAppel(dernierContact.data.debut)}</div>
+                <div style={{fontSize:12,color:'#0d9488',fontWeight:600}}>{ilYa(joursDernierC)}</div>
+                <div style={{fontSize:12,color:'#64748b',marginTop:4}}>{dernierContact.kind==='rdv'?(dernierContact.data.objet||'RDV'):`${String(dernierContact.data.direction||'').toLowerCase().startsWith('in')?'Appel entrant':'Appel sortant'}${dernierContact.data.nom_3cx?` · ${dernierContact.data.nom_3cx}`:''}`}</div>
+              </div>
+            )}
+            {prochain&&(
+              <div style={{flex:'1 1 220px',background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:10,padding:'12px 16px'}}>
+                <div style={{fontSize:10,fontWeight:800,color:'#2563eb',textTransform:'uppercase',letterSpacing:'.05em'}}>Prochain RDV</div>
+                <div style={{fontSize:20,fontWeight:800,color:NAVY,lineHeight:1.1,marginTop:3}}>{fmtRdv(prochain.debut)}</div>
+                <div style={{fontSize:12,color:'#64748b',marginTop:4}}>{prochain.objet}</div>
+              </div>
+            )}
+          </div>
+          <div style={{maxHeight:280,overflowY:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
+            {contactsUnifies.map((c,i)=>{
+              const last=i===contactsUnifies.length-1
+              if(c.kind==='rdv'){
+                const r=c.data; const futur=c.ts>nowTs
+                return(
+                  <div key={'r'+r.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',borderBottom:last?'none':'1px solid #f8fafc',background:futur?'#f8fbff':'#fff'}}>
+                    <span style={{fontSize:10,fontWeight:800,padding:'2px 7px',borderRadius:5,background:'#f0fdfa',color:'#0d9488',whiteSpace:'nowrap'}}><i className="ti ti-calendar" style={{marginRight:4}}/>RDV</span>
+                    <span style={{fontSize:12,fontWeight:700,color:NAVY,whiteSpace:'nowrap',minWidth:74}}>{fmtRdv(r.debut)}</span>
+                    <span style={{flex:1,fontSize:12,color:'#1e293b',minWidth:0}}>
+                      {r.web_link?<a href={r.web_link} target="_blank" rel="noreferrer" style={{color:'#1e293b',textDecoration:'none'}}>{r.objet||'—'}</a>:(r.objet||'—')}
+                      {r.lieu&&<span style={{fontSize:11,color:'#94a3b8'}}> · {r.lieu}</span>}
+                    </span>
+                    <span style={{fontSize:10,fontWeight:700,color:'#64748b'}}>{(r.user_email||'').replace('@dynassur.be','')}</span>
+                    {futur&&<span style={{fontSize:9,fontWeight:800,padding:'2px 6px',borderRadius:4,background:'#dbeafe',color:'#2563eb'}}>À VENIR</span>}
+                  </div>
+                )
+              }
+              const a=c.data; const entrant=String(a.direction||'').toLowerCase().startsWith('in')
+              return(
+                <div key={'a'+a.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',borderBottom:last?'none':'1px solid #f8fafc'}}>
+                  <span style={{fontSize:10,fontWeight:800,padding:'2px 7px',borderRadius:5,background:entrant?'#dcfce7':'#dbeafe',color:entrant?'#16a34a':'#1d4ed8',whiteSpace:'nowrap'}}><i className={`ti ${entrant?'ti-phone-incoming':'ti-phone-outgoing'}`} style={{marginRight:4}}/>{entrant?'Entrant':'Sortant'}</span>
+                  <span style={{fontSize:12,fontWeight:700,color:NAVY,whiteSpace:'nowrap',minWidth:74}}>{fmtAppel(a.debut)}</span>
+                  <span style={{flex:1,fontSize:12,color:'#1e293b',minWidth:0}}>
+                    {a.numero_e164||a.numero_externe||'—'}
+                    {a.nom_3cx&&<span style={{fontSize:11,color:'#94a3b8'}}> · {a.nom_3cx}</span>}
+                  </span>
+                  {a.agent&&<span style={{fontSize:10,fontWeight:700,color:'#64748b'}}>poste {a.agent}</span>}
+                  <span style={{fontSize:11,color:'#64748b',whiteSpace:'nowrap'}}>{a.duree||''}</span>
+                </div>
+              )
+            })}
           </div>
         </div>
-        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-          {[{v:actifs,l:'Actifs'},{v:contrats.length,l:'Contrats'}].map(k=>(
-            <div key={k.l} style={{textAlign:'center',background:'rgba(255,255,255,0.15)',borderRadius:8,padding:'5px 12px'}}>
-              <div style={{fontSize:18,fontWeight:800,color:'#fff',lineHeight:1}}>{k.v}</div>
-              <div style={{fontSize:9,color:'rgba(255,255,255,0.65)',fontWeight:600,marginTop:2}}>{k.l}</div>
+      )
+    )},
+    { key:'relations', icon:'ti-users-group', title:'Relations', col:'#ec4899', count:null, body:(<Relations client={client} onOpenDossier={onOpenDossier}/>) },
+    { key:'foyer', icon:'ti-home', title:'Contrats du foyer', col:'#0891b2', count:null, body:(<ContratsFoyer client={client}/>) },
+    ...(groupe.length>0?[{ key:'groupe', icon:'ti-home-2', title:'Groupe / Ménage', col:'#0d9488', count:groupe.length, body:(
+      <div>
+        <div style={{fontSize:12,color:'#64748b',marginBottom:8,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+          <strong style={{color:NAVY}}>{groupe[0].groupe_nom||'Groupe'}</strong>
+          {groupe[0].groupe_type&&<span style={{fontSize:10,fontWeight:800,padding:'2px 7px',borderRadius:5,background:'#f0fdfa',color:'#0d9488',border:'1px solid #99f6e4'}}>{groupe[0].groupe_type}</span>}
+          {(groupe[0].nb_polices||groupe[0].prime_totale)?<span style={{color:'#94a3b8'}}>· {Math.round(groupe[0].nb_polices||0)} police(s) · {Math.round(groupe[0].prime_totale||0).toLocaleString('fr-BE')} € de prime</span>:null}
+        </div>
+        <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+          {groupe.map((m,i)=>(<span key={i} style={{fontSize:12,padding:'5px 10px',borderRadius:7,background:'#f8fafc',border:'1px solid #e2e8f0',color:'#1e293b'}}>{m.membre_nom}</span>))}
+        </div>
+      </div>
+    )}]:[]),
+    { key:'objets', icon:'ti-shield', title:'Objets de risque', col:'#7c3aed', count:objets.length, body:(<div><Analyse360 client={client} contrats={contrats}/><ObjetsDetail objets={objets} loading={loadF}/></div>) },
+    { key:'contrats', icon:'ti-file-text', title:'Contrats', col:BLUE, count:contrats.length, body:(
+      loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:!contrats.length?<p style={{color:'#94a3b8',fontSize:12}}>Aucun contrat</p>:
+        <div style={{overflowX:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+            <thead style={{position:'sticky',top:0,background:'#f8fafc',zIndex:1}}>
+              <tr>{['Police','Compagnie','Objet de risque','Domaine','Garanties','Situation','Date'].map(h=>(<th key={h} style={{padding:'7px 12px',textAlign:'left',fontWeight:700,color:'#94a3b8',fontSize:10,textTransform:'uppercase',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>))}</tr>
+            </thead>
+            <tbody>
+              {contrats.map((c,i)=>{
+                const st=SIT[c.situation]||{bg:'#f1f5f9',col:'#64748b'}
+                return(
+                  <tr key={i} style={{background:i%2===0?'#fff':'#fafafe'}}>
+                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',fontFamily:'monospace',fontSize:11}}><span onMouseEnter={()=>previewContrat(c)} onMouseLeave={leaveContrat} onClick={()=>openContrat(c)} title="Survoler pour aperçu · cliquer pour épingler" style={{cursor:'pointer',color:BLUE,fontWeight:700,textDecoration:'underline'}}>{c.police||'—'}</span></td>
+                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#1e293b'}}>{c.compagnie||'—'}</td>
+                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#475569',fontSize:11}}>{(()=>{ const os=objetsParPolice[c.police]?[...objetsParPolice[c.police]]:[]; if(!os.length) return <span style={{color:'#cbd5e1'}}>—</span>; return <span style={{display:'flex',flexDirection:'column',gap:2}}>{os.map((o,k)=><span key={k}>{o}</span>)}</span> })()}</td>
+                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{c.domaine||'—'}</td>
+                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9'}}>{(()=>{ const gs=garantiesParPolice[c.police]?[...garantiesParPolice[c.police]]:[]; if(!gs.length) return <span style={{color:'#cbd5e1'}}>—</span>; return <span style={{display:'flex',flexWrap:'wrap',gap:3}}>{gs.map((g,k)=><span key={k} style={{fontSize:10,fontWeight:600,padding:'1px 6px',borderRadius:4,background:'#f5f3ff',color:'#7c3aed',whiteSpace:'nowrap'}}>{g}</span>)}</span> })()}</td>
+                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9'}}><span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:4,background:st.bg,color:st.col}}>{c.situation||'—'}</span></td>
+                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b',whiteSpace:'nowrap'}}>{fmtDate(c.date_creation)}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+    )},
+    { key:'couvertures', icon:'ti-shield-half', title:'Couvertures acquises', col:'#0891b2', count:null, body:(<CouverturesAcquises client={client} onOpenDossier={onOpenDossier}/>) },
+    { key:'primes', icon:'ti-cash', title:'Primes & commissions', col:'#16a34a', count:null, body:(<Primes dossier={client.dossier}/>) },
+    { key:'taches', icon:'ti-checkbox', title:'Tâches', col:'#f59e0b', count:taches.length, body:(
+      loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:!taches.length?
+        <p style={{color:'#16a34a',fontSize:12}}>✓ Aucune tâche en cours</p>:
+        taches.map((t,i)=>{
+          const ret=t.echeance&&new Date(t.echeance)<new Date()
+          return(
+            <div key={t.id} style={{display:'flex',alignItems:'center',gap:10,padding:'7px 0',borderBottom:i<taches.length-1?'1px solid #f8fafc':'none'}}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:13,color:'#1e293b'}}>{t.titre||'—'}</div>
+                <div style={{fontSize:11,color:'#94a3b8'}}>{t.gestionnaire}{t.code_type?` · ${t.code_type}`:''}</div>
+              </div>
+              <span style={{fontSize:11,color:ret?'#dc2626':'#64748b',fontWeight:ret?700:400}}>{fmtDate(t.echeance)}</span>
+              <span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:4,background:ret?'#fee2e2':'#dbeafe',color:ret?'#dc2626':'#1d4ed8'}}>{t.statut}</span>
+            </div>
+          )
+        })
+    )},
+  ]
+  const active = SECTIONS.find(s=>s.key===openSec) || SECTIONS.find(s=>s.key==='contrats') || SECTIONS[0]
+  const coordItems=[
+    {icon:'ti-device-mobile',l:'GSM',v:gsm||'—',tel:client.gsm_e164||gsm},
+    {icon:'ti-phone',l:'Fixe',v:fixe||'—',tel:client.telfixe_e164||fixe},
+    {icon:'ti-mail',l:'Email',v:client.email||'—'},
+    {icon:'ti-calendar',l:'Naissance',v:client.date_naissance?`${fmtDateLong(client.date_naissance)}${age?` · ${age.ans} ans`:''}`:'—'},
+    {icon:'ti-user',l:'Gestionnaire',v:client.gestionnaire_nom||'—'},
+    {icon:'ti-user-star',l:'Sous-agent',v:client.sa_nom||'—'},
+  ]
+
+  return(
+    <div ref={ref} style={{background:'#fff',borderRadius:14,border:`2px solid ${BLUE}25`,overflow:'hidden',boxShadow:'0 4px 24px rgba(0,128,189,0.1)'}}>
+
+      <div style={{background:`linear-gradient(135deg, ${ENTITES.dynassur.color} 0%, ${ENTITES.dynassur.colorDark} 140%)`,padding:'14px 20px'}}>
+        <div style={{display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
+          <div style={{width:44,height:44,borderRadius:11,background:'rgba(255,255,255,0.2)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:16,fontWeight:800,color:'#fff'}}>{initiales}</div>
+          <div style={{flex:1,minWidth:160}}>
+            <h2 style={{fontSize:23,fontWeight:800,color:'#fff',margin:0,lineHeight:1.1}}>{client.prenom} {client.nom}</h2>
+            <div style={{fontSize:11,color:'rgba(255,255,255,0.7)',display:'flex',gap:12,flexWrap:'wrap',marginTop:2}}>
+              <span>#{client.dossier}</span>
+              {client.etat_civil&&<span>{client.etat_civil}</span>}
+              {client.sexe&&<span>{client.sexe}</span>}
+              {client.bureau&&<span>{client.bureau}</span>}
+            </div>
+          </div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            {[{v:actifs,l:'Actifs'},{v:contrats.length,l:'Contrats'}].map(k=>(
+              <div key={k.l} style={{textAlign:'center',background:'rgba(255,255,255,0.15)',borderRadius:8,padding:'5px 12px'}}>
+                <div style={{fontSize:18,fontWeight:800,color:'#fff',lineHeight:1}}>{k.v}</div>
+                <div style={{fontSize:9,color:'rgba(255,255,255,0.65)',fontWeight:600,marginTop:2}}>{k.l}</div>
+              </div>
+            ))}
+          </div>
+          <button onClick={onClose} style={{background:'rgba(255,255,255,0.15)',border:'1px solid rgba(255,255,255,0.3)',borderRadius:8,padding:'6px 12px',cursor:'pointer',color:'#fff',fontSize:13,fontWeight:600,display:'flex',alignItems:'center',gap:5}}>
+            <i className="ti ti-x"/>Fermer
+          </button>
+        </div>
+
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:'8px 18px',marginTop:12,paddingTop:12,borderTop:'1px solid rgba(255,255,255,0.18)'}}>
+          <div style={{display:'flex',alignItems:'flex-start',gap:8,gridColumn:'1 / -1'}}>
+            <i className="ti ti-map-pin" style={{fontSize:14,color:'rgba(255,255,255,0.6)',marginTop:2,flexShrink:0}}/>
+            <div style={{minWidth:0}}>
+              <div style={{fontSize:9,color:'rgba(255,255,255,0.55)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.05em'}}>Adresse</div>
+              {adresseComplete?(
+                <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+                  <span style={{fontSize:13,color:'#fff'}}>{adresseComplete}</span>
+                  <a href={mapsUrl} target="_blank" rel="noreferrer" style={{fontSize:11,color:'#fff',background:'rgba(255,255,255,0.18)',padding:'2px 8px',borderRadius:6,fontWeight:600,textDecoration:'none',display:'inline-flex',alignItems:'center',gap:3}}><i className="ti ti-brand-google-maps" style={{fontSize:12}}/>Maps</a>
+                  <a href={wazeUrl} target="_blank" rel="noreferrer" style={{fontSize:11,color:'#fff',background:'rgba(255,255,255,0.18)',padding:'2px 8px',borderRadius:6,fontWeight:600,textDecoration:'none',display:'inline-flex',alignItems:'center',gap:3}}><i className="ti ti-navigation" style={{fontSize:12}}/>Waze</a>
+                </div>
+              ):<div style={{fontSize:13,color:'#fff'}}>—</div>}
+            </div>
+          </div>
+          {coordItems.map(r=>(
+            <div key={r.l} style={{display:'flex',alignItems:'flex-start',gap:8}}>
+              <i className={`ti ${r.icon}`} style={{fontSize:14,color:'rgba(255,255,255,0.6)',marginTop:2,flexShrink:0}}/>
+              <div style={{minWidth:0}}>
+                <div style={{fontSize:9,color:'rgba(255,255,255,0.55)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.05em'}}>{r.l}</div>
+                {r.tel&&r.v!=='—'
+                  ?<a href={`tel:${r.tel}`} title="Appeler" style={{fontSize:13,color:'#fff',wordBreak:'break-word',textDecoration:'none',borderBottom:'1px dotted rgba(255,255,255,0.6)'}}>{r.v}</a>
+                  :<div style={{fontSize:13,color:'#fff',wordBreak:'break-word'}}>{r.v}</div>}
+              </div>
             </div>
           ))}
         </div>
-        <button onClick={onClose} style={{background:'rgba(255,255,255,0.15)',border:'1px solid rgba(255,255,255,0.3)',borderRadius:8,padding:'6px 12px',cursor:'pointer',color:'#fff',fontSize:13,fontWeight:600,display:'flex',alignItems:'center',gap:5}}>
-          <i className="ti ti-x"/>Fermer
-        </button>
       </div>
 
-      <div style={{padding:'18px 22px'}}>
+      <div style={{padding:'16px 20px'}}>
         {client.alerte&&(
           <div style={{background:'#fff7ed',border:'1px solid #fed7aa',borderRadius:8,padding:'8px 14px',marginBottom:12,display:'flex',gap:8,fontSize:13,color:'#c2410c',alignItems:'center'}}>
             <i className="ti ti-alert-triangle" style={{fontSize:16}}/><strong>Alerte :</strong>{client.alerte}
           </div>
         )}
 
-        {/* Coordonnées inline compact */}
-        <Sec icon="ti-user" title="Coordonnées" col="#64748b" open={true} count={0}>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(210px,1fr))',gap:10}}>
-            {/* Adresse cliquable */}
-            <div style={{display:'flex',alignItems:'flex-start',gap:8}}>
-              <i className="ti ti-map-pin" style={{fontSize:13,color:'#94a3b8',marginTop:2,flexShrink:0}}/>
-              <div style={{minWidth:0}}>
-                <div style={{fontSize:10,color:'#94a3b8',fontWeight:700,textTransform:'uppercase',letterSpacing:'.04em'}}>Adresse</div>
-                {adresseComplete?(
-                  <div>
-                    <div style={{fontSize:13,color:'#1e293b'}}>{adresseComplete}</div>
-                    <div style={{display:'flex',gap:10,marginTop:3}}>
-                      <a href={mapsUrl} target="_blank" rel="noreferrer" style={{fontSize:11,color:BLUE,fontWeight:600,textDecoration:'none',display:'inline-flex',alignItems:'center',gap:3}}><i className="ti ti-brand-google-maps" style={{fontSize:12}}/>Maps</a>
-                      <a href={wazeUrl} target="_blank" rel="noreferrer" style={{fontSize:11,color:'#0d9488',fontWeight:600,textDecoration:'none',display:'inline-flex',alignItems:'center',gap:3}}><i className="ti ti-navigation" style={{fontSize:12}}/>Waze</a>
-                    </div>
-                  </div>
-                ):<div style={{fontSize:13,color:'#1e293b'}}>—</div>}
-              </div>
-            </div>
-            {[
-              {icon:'ti-device-mobile',l:'GSM',       v:gsm||'—'},
-              {icon:'ti-phone',    l:'Fixe',          v:fixe||'—'},
-              {icon:'ti-mail',     l:'Email',         v:client.email||'—'},
-              {icon:'ti-calendar', l:'Naissance',     v:client.date_naissance?`${fmtDateLong(client.date_naissance)}${age?` · ${age.ans} ans`:''}`:'—'},
-              {icon:'ti-heart',    l:'État civil',    v:client.etat_civil||'—'},
-              {icon:'ti-gender-bigender',l:'Sexe',    v:client.sexe||'—'},
-              {icon:'ti-user',     l:'Gestionnaire',  v:client.gestionnaire_nom||'—'},
-              {icon:'ti-user-star',l:'Sous-agent',    v:client.sa_nom||'—'},
-            ].map(r=>(
-              <div key={r.l} style={{display:'flex',alignItems:'flex-start',gap:8}}>
-                <i className={`ti ${r.icon}`} style={{fontSize:13,color:'#94a3b8',marginTop:2,flexShrink:0}}/>
-                <div style={{minWidth:0}}>
-                  <div style={{fontSize:10,color:'#94a3b8',fontWeight:700,textTransform:'uppercase',letterSpacing:'.04em'}}>{r.l}</div>
-                  <div style={{fontSize:13,color:'#1e293b'}}>{r.v}</div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(132px,1fr))',gap:10,marginBottom:16}}>
+          {SECTIONS.map(s=>{
+            const on=active.key===s.key
+            return(
+              <button key={s.key} onClick={()=>setOpenSec(s.key)} style={{textAlign:'left',cursor:'pointer',borderRadius:11,padding:'11px 12px',border:on?`2px solid ${s.col}`:'1.5px solid #e2e8f0',background:on?`${s.col}0d`:'#fff',boxShadow:on?`0 3px 12px ${s.col}22`:'0 1px 3px rgba(0,0,0,0.03)',transition:'all .15s',fontFamily:'inherit'}}
+                onMouseEnter={e=>{ if(!on){e.currentTarget.style.borderColor=s.col+'70'} }}
+                onMouseLeave={e=>{ if(!on){e.currentTarget.style.borderColor='#e2e8f0'} }}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
+                  <div style={{width:30,height:30,borderRadius:8,background:`${s.col}18`,display:'flex',alignItems:'center',justifyContent:'center'}}><i className={`ti ${s.icon}`} style={{fontSize:16,color:s.col}}/></div>
+                  {s.count!=null&&s.count>0&&<span style={{fontSize:12,fontWeight:800,color:s.col}}>{s.count}</span>}
                 </div>
-              </div>
-            ))}
+                <div style={{fontSize:12.5,fontWeight:700,color:on?s.col:NAVY,lineHeight:1.15}}>{s.title}</div>
+              </button>
+            )
+          })}
+        </div>
+
+        <div style={{borderTop:'1px solid #f1f5f9',paddingTop:14}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+            <i className={`ti ${active.icon}`} style={{fontSize:17,color:active.col}}/>
+            <span style={{fontSize:15,fontWeight:800,color:NAVY}}>{active.title}</span>
+            {active.count!=null&&active.count>0&&<span style={{fontSize:11,fontWeight:800,padding:'1px 8px',borderRadius:20,background:`${active.col}18`,color:active.col}}>{active.count}</span>}
           </div>
-        </Sec>
-
-        {/* Dernier contact / RDV */}
-        <Sec icon="ti-calendar-heart" title="Dernier contact" count={rdvs.length} col="#0d9488" open={true}>
-          {loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:!rdvs.length?
-            <p style={{color:'#94a3b8',fontSize:12}}>Aucun RDV lié à ce client. <span style={{color:'#cbd5e1'}}>(Lie un RDV depuis la page RDV / Agenda.)</span></p>:(
-            <div>
-              <div style={{display:'flex',gap:12,flexWrap:'wrap',marginBottom:rdvPasses.length>1||prochain?12:0}}>
-                {dernier&&(
-                  <div style={{flex:'1 1 220px',background:'#f0fdfa',border:'1px solid #99f6e4',borderRadius:10,padding:'12px 16px'}}>
-                    <div style={{fontSize:10,fontWeight:800,color:'#0d9488',textTransform:'uppercase',letterSpacing:'.05em'}}>Dernier contact</div>
-                    <div style={{fontSize:20,fontWeight:800,color:NAVY,lineHeight:1.1,marginTop:3}}>{fmtRdv(dernier.debut)}</div>
-                    <div style={{fontSize:12,color:'#0d9488',fontWeight:600}}>{ilYa(joursDernier)}</div>
-                    <div style={{fontSize:12,color:'#64748b',marginTop:4}}>{dernier.objet}</div>
-                  </div>
-                )}
-                {prochain&&(
-                  <div style={{flex:'1 1 220px',background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:10,padding:'12px 16px'}}>
-                    <div style={{fontSize:10,fontWeight:800,color:'#2563eb',textTransform:'uppercase',letterSpacing:'.05em'}}>Prochain RDV</div>
-                    <div style={{fontSize:20,fontWeight:800,color:NAVY,lineHeight:1.1,marginTop:3}}>{fmtRdv(prochain.debut)}</div>
-                    <div style={{fontSize:12,color:'#64748b',marginTop:4}}>{prochain.objet}</div>
-                  </div>
-                )}
-              </div>
-              <div style={{maxHeight:200,overflowY:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
-                {rdvs.map((r,i)=>{
-                  const futur=tsRdv(r.debut)>nowTs
-                  return(
-                    <div key={r.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',borderBottom:i<rdvs.length-1?'1px solid #f8fafc':'none',background:futur?'#f8fbff':'#fff'}}>
-                      <span style={{fontSize:12,fontWeight:700,color:NAVY,whiteSpace:'nowrap',minWidth:78}}>{fmtRdv(r.debut)}</span>
-                      <span style={{flex:1,fontSize:12,color:'#1e293b'}}>
-                        {r.web_link?<a href={r.web_link} target="_blank" rel="noreferrer" style={{color:'#1e293b',textDecoration:'none'}}>{r.objet||'—'}</a>:(r.objet||'—')}
-                        {r.lieu&&<span style={{fontSize:11,color:'#94a3b8'}}> · {r.lieu}</span>}
-                      </span>
-                      <span style={{fontSize:10,fontWeight:700,color:'#64748b'}}>{(r.user_email||'').replace('@dynassur.be','')}</span>
-                      {futur&&<span style={{fontSize:9,fontWeight:800,padding:'2px 6px',borderRadius:4,background:'#dbeafe',color:'#2563eb'}}>À VENIR</span>}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-        </Sec>
-
-        {/* Relations familiales ET sociétés */}
-        <Sec icon="ti-users-group" title="Relations & sociétés" col="#ec4899" open={true} count={0}>
-          <Relations client={client} onOpenDossier={onOpenDossier}/>
-        </Sec>
-
-        {/* Groupe / Ménage (vue Qlik GroupePreneur) */}
-        {groupe.length>0 && (
-          <Sec icon="ti-home-2" title="Groupe / Ménage" col="#0d9488" open={true} count={groupe.length}>
-            <div style={{fontSize:12,color:'#64748b',marginBottom:8,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-              <strong style={{color:NAVY}}>{groupe[0].groupe_nom||'Groupe'}</strong>
-              {groupe[0].groupe_type&&<span style={{fontSize:10,fontWeight:800,padding:'2px 7px',borderRadius:5,background:'#f0fdfa',color:'#0d9488',border:'1px solid #99f6e4'}}>{groupe[0].groupe_type}</span>}
-              {(groupe[0].nb_polices||groupe[0].prime_totale)?<span style={{color:'#94a3b8'}}>· {Math.round(groupe[0].nb_polices||0)} police(s) · {Math.round(groupe[0].prime_totale||0).toLocaleString('fr-BE')} € de prime</span>:null}
-            </div>
-            <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
-              {groupe.map((m,i)=>(
-                <span key={i} style={{fontSize:12,padding:'5px 10px',borderRadius:7,background:'#f8fafc',border:'1px solid #e2e8f0',color:'#1e293b'}}>{m.membre_nom}</span>
-              ))}
-            </div>
-          </Sec>
-        )}
-
-        {/* Objets de risque (détail Qlik par garantie, lié par police) */}
-        <Sec icon="ti-shield" title="Objets de risque" count={objets.length} col="#7c3aed" open={true}>
-          <Analyse360 client={client} contrats={contrats}/>
-          <ObjetsDetail objets={objets} loading={loadF}/>
-        </Sec>
-
-        {/* Contrats */}
-        <Sec icon="ti-file-text" title="Contrats" count={contrats.length} col={BLUE} open={true}
-          extra={<EnDev label="Contrats des relations à venir" mini />}>
-          {loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:!contrats.length?<p style={{color:'#94a3b8',fontSize:12}}>Aucun contrat</p>:
-            <div style={{overflowX:'auto',maxHeight:240,overflowY:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
-              <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
-                <thead style={{position:'sticky',top:0,background:'#f8fafc',zIndex:1}}>
-                  <tr>{['Police','Compagnie','Domaine','Situation','Type','Date','Garantie'].map(h=>(
-                    <th key={h} style={{padding:'7px 12px',textAlign:'left',fontWeight:700,color:'#94a3b8',fontSize:10,textTransform:'uppercase',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>
-                  ))}</tr>
-                </thead>
-                <tbody>
-                  {contrats.map((c,i)=>{
-                    const s=SIT[c.situation]||{bg:'#f1f5f9',col:'#64748b'}
-                    return(
-                      <tr key={i} title="Fiche contrat détaillée — en cours de développement" style={{background:i%2===0?'#fff':'#fafafe'}}>
-                        <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',fontFamily:'monospace',fontSize:11,fontWeight:600,color:NAVY}}>{c.police||'—'}</td>
-                        <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#1e293b'}}>{c.compagnie||'—'}</td>
-                        <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{c.domaine||'—'}</td>
-                        <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9'}}><span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:4,background:s.bg,color:s.col}}>{c.situation||'—'}</span></td>
-                        <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{c.type_production||'—'}</td>
-                        <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b',whiteSpace:'nowrap'}}>{fmtDate(c.date_creation)}</td>
-                        <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}} title="Détail des garanties — en cours de développement">
-                          {c.garantie_valeur?fmt(c.garantie_valeur):'—'}
-                          <i className="ti ti-tools" style={{fontSize:11,color:'#fb923c',marginLeft:5,verticalAlign:'middle'}}/>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          }
-        </Sec>
-
-        {/* Primes & commissions */}
-        <Sec icon="ti-cash" title="Primes & commissions" count={0} col="#16a34a" open={true}>
-          <Primes dossier={client.dossier}/>
-        </Sec>
-
-        {/* Tâches */}
-        <Sec icon="ti-checkbox" title="Tâches" count={taches.length} col="#f59e0b" open={false}>
-          {loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:!taches.length?
-            <p style={{color:'#16a34a',fontSize:12}}>✓ Aucune tâche en cours</p>:
-            taches.map((t,i)=>{
-              const ret=t.echeance&&new Date(t.echeance)<new Date()
-              return(
-                <div key={t.id} style={{display:'flex',alignItems:'center',gap:10,padding:'7px 0',borderBottom:i<taches.length-1?'1px solid #f8fafc':'none',background:ret?'#fff5f510':''}} >
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:13,color:'#1e293b'}}>{t.titre||'—'}</div>
-                    <div style={{fontSize:11,color:'#94a3b8'}}>{t.gestionnaire}{t.code_type?` · ${t.code_type}`:''}</div>
-                  </div>
-                  <span style={{fontSize:11,color:ret?'#dc2626':'#64748b',fontWeight:ret?700:400}}>{fmtDate(t.echeance)}</span>
-                  <span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:4,background:ret?'#fee2e2':'#dbeafe',color:ret?'#dc2626':'#1d4ed8'}}>{t.statut}</span>
-                </div>
-              )
-            })
-          }
-        </Sec>
+          {active.body}
+          {detail&&<ContratModal contrat={detail} dossier={client.dossier} objets={objets} preview={!pinnedContrat} onClose={closeContrat}/>}
+        </div>
       </div>
     </div>
   )
@@ -837,7 +1135,34 @@ export default function DynassurClients() {
   const [selected,setSelected] = useState(null)
   const [contactFilter,setContactFilter] = useState('tous')   // tous | m1 | m3 | m6 | m12 | a2 | a2p
   const [relance,setRelance]   = useState(null)               // null = pas encore chargé
+  const [kpiModal,setKpiModal] = useState(null)               // { titre, rows } | 'loading' | null
+  // Calcule la liste des clients derrière un KPI (réutilise « relance » = tous les clients)
+  const openKpi = useCallback(async(kind)=>{
+    const all = relance || []
+    if(!all.length){ return }
+    if(kind==='alerte'){
+      const rows = all.filter(c=>c.alerte && String(c.alerte).trim())
+      setKpiModal({ titre:`Clients avec alerte (${rows.length})`, rows, showAlerte:true }); return
+    }
+    setKpiModal('loading')
+    if(kind==='sans_contrat'){
+      // dossiers présents dans contrats
+      const set=new Set(); let from=0
+      while(true){ const {data}=await supabase.from('contrats').select('dossier').range(from,from+999); if(!data||!data.length) break; data.forEach(r=>r.dossier&&set.add(String(r.dossier))); if(data.length<1000) break; from+=1000 }
+      const rows = all.filter(c=>!set.has(String(c.dossier)))
+      setKpiModal({ titre:`Clients sans contrat (${rows.length})`, rows }); return
+    }
+    if(kind==='sans_comm'){
+      // dossiers ayant au moins une commission > 0 en 2026
+      const set=new Set(); let from=0
+      while(true){ const {data}=await supabase.from('quittances').select('dossier,commission,date_comptable').gte('date_comptable','2026-01-01').lte('date_comptable','2026-12-31').range(from,from+999); if(!data||!data.length) break; data.forEach(r=>{ if(r.dossier&&(Number(r.commission)||0)>0) set.add(String(r.dossier)) }); if(data.length<1000) break; from+=1000 }
+      const rows = all.filter(c=>!set.has(String(c.dossier)))
+      setKpiModal({ titre:`Clients sans commission 2026 (${rows.length})`, rows }); return
+    }
+  },[relance])
   const searchRef = useRef(null)
+  const deepLink = useRef(new URLSearchParams(window.location.search).get('dossier'))  // fiche à ouvrir via ?dossier= (lien 3CX / dashboard)
+  const prevQS = useRef({q:'',scope:'all'})
 
   // Init user + counts
   useEffect(()=>{
@@ -864,7 +1189,7 @@ export default function DynassurClients() {
 
   const load = useCallback(async(search,sc,p)=>{
     setLoading(true)
-    let qb=supabase.from('clients').select('id,dossier,nom,prenom,cp,localite,gsm,tel_fixe,email,rue,num_maison,boite,date_naissance,etat_civil,sexe,sa_code,sa_nom,gestionnaire_code,gestionnaire_nom,bureau,classe,alerte',{count:'exact'})
+    let qb=supabase.from('clients').select('id,dossier,nom,prenom,cp,localite,gsm,tel_fixe,gsm_e164,telfixe_e164,email,rue,num_maison,boite,date_naissance,etat_civil,sexe,sa_code,sa_nom,gestionnaire_code,gestionnaire_nom,bureau,classe,alerte',{count:'exact'})
     if(search.length>=2) qb=qb.or(`nom.ilike.%${search}%,prenom.ilike.%${search}%,dossier.ilike.%${search}%,email.ilike.%${search}%,gsm.ilike.%${search}%`)
     if(sc==='mine'&&myCode) qb=qb.eq('gestionnaire_code',myCode)
     else if(sc==='bureau'&&myBureau) qb=qb.eq('bureau',myBureau)
@@ -875,42 +1200,47 @@ export default function DynassurClients() {
 
   // Données de relance : dernier contact (RDV passé lié) par client
   const loadRelance = useCallback(async()=>{
-    const {data:rv}=await supabase.from('rdv').select('client_id,debut').not('client_id','is',null).range(0,4999)
+    // dernier contact = dernier RDV passé
+    const {data:rv}=await supabase.from('rdv').select('client_id,debut').not('client_id','is',null).range(0,9999)
     const now=Date.now(); const last={}
     ;(rv||[]).forEach(r=>{ const t=tsRdv(r.debut); if(t&&t<=now){ if(!last[r.client_id]||t>last[r.client_id]) last[r.client_id]=t } })
-    const ids=Object.keys(last).map(Number)
-    if(!ids.length){ setRelance([]); return }
-    const rows=[]
-    for(let i=0;i<ids.length;i+=200){
+    // TOUS les clients : ceux sans RDV passé tombent dans « jamais contacté »
+    const rows=[]; let from=0
+    while(true){
       const {data}=await supabase.from('clients')
-        .select('id,dossier,nom,prenom,cp,localite,gestionnaire_code,gestionnaire_nom,sa_code,sa_nom,bureau,gsm,tel_fixe,email')
-        .in('id',ids.slice(i,i+200))
-      ;(data||[]).forEach(c=>{ const t=last[c.id]; const jours=Math.floor((now-t)/86400000); rows.push({...c,last:t,jours,tranche:trancheDe(jours)}) })
+        .select('id,dossier,nom,prenom,cp,localite,gestionnaire_code,gestionnaire_nom,sa_code,sa_nom,bureau,gsm,tel_fixe,email,alerte')
+        .range(from,from+999)
+      if(!data||!data.length) break
+      data.forEach(c=>{
+        const t=last[c.id]
+        if(t){ const jours=Math.floor((now-t)/86400000); rows.push({...c,last:t,jours,tranche:trancheDe(jours)}) }
+        else { rows.push({...c,last:null,jours:Infinity,tranche:'jamais'}) }
+      })
+      if(data.length<1000) break
+      from+=1000
     }
     rows.sort((a,b)=>b.jours-a.jours)   // les plus anciens d'abord = priorité de relance
     setRelance(rows)
   },[])
   useEffect(()=>{ loadRelance() },[loadRelance])
 
-  useEffect(()=>{
-    const t=setTimeout(()=>{ setPage(0); setSelected(null); load(q,scope,0) },300)
-    return ()=>clearTimeout(t)
-  },[q,scope,myCode,myBureau])
+  // recherche liste classique retirée — remplacée par la recherche universelle (colonne gauche)
 
-  useEffect(()=>{ load(q,scope,page) },[page])
+  // pagination liste retirée
 
   // Ouvrir une fiche à partir d'un n° de dossier (clic sur une relation)
   const openDossier = useCallback(async(dossier)=>{
     if(!dossier) return
-    const{data}=await supabase.from('clients').select('id,dossier,nom,prenom,cp,localite,gsm,tel_fixe,email,rue,num_maison,boite,date_naissance,etat_civil,sexe,sa_code,sa_nom,gestionnaire_code,gestionnaire_nom,bureau,classe,alerte').eq('dossier',dossier).limit(1)
+    const{data}=await supabase.from('clients').select('id,dossier,nom,prenom,cp,localite,gsm,tel_fixe,gsm_e164,telfixe_e164,email,rue,num_maison,boite,date_naissance,etat_civil,sexe,sa_code,sa_nom,gestionnaire_code,gestionnaire_nom,bureau,classe,alerte').eq('dossier',dossier).limit(1)
     if(data&&data[0]){ setSelected(data[0]); pushRecentClient(data[0]); window.scrollTo({top:0,behavior:'smooth'}) }
   },[])
 
-  // Ouverture directe via ?dossier= (depuis le tableau de bord « derniers clients »)
+  // Ouverture directe / recherche depuis le menu : réagit à ?dossier= au montage ET aux navigations
+  const location = useLocation()
   useEffect(()=>{
-    const p=new URLSearchParams(window.location.search).get('dossier')
+    const p=new URLSearchParams(location.search).get('dossier')
     if(p) openDossier(p)
-  },[openDossier])
+  },[location.search, openDossier])
 
   const nb=Math.ceil(total/PER)
   const tot=counts.total||1
@@ -933,186 +1263,124 @@ export default function DynassurClients() {
   let relanceView = relanceBase
   if(relanceActif) relanceView = relanceView.filter(c=>c.tranche===contactFilter)
   if(q.length>=2){ const s=q.toLowerCase(); relanceView = relanceView.filter(c=>`${c.nom} ${c.prenom} ${c.dossier}`.toLowerCase().includes(s)) }
+  const relanceShow = relanceView.slice(0,500)
 
   return(
     <Layout currentPage="Clients">
       <div style={{fontFamily:"'Source Sans Pro',sans-serif",width:'100%'}}>
 
-        <StatBanner
-          color={ENTITES.dynassur.color} colorDark={ENTITES.dynassur.colorDark} logoUrl={ENTITES.dynassur.logo}
-          title="Clients" subtitle={`Dynassur SRL — base clients ${new Date().getFullYear()}`}
-          stats={[
-            { label: 'Avec alerte', value: kpis?.avec_alerte != null ? kpis.avec_alerte.toLocaleString('fr-BE') : '…' },
-            { label: 'Sans contrat', value: kpis?.sans_contrat != null ? kpis.sans_contrat.toLocaleString('fr-BE') : '…' },
-            { label: 'Sans comm. 2026', value: kpis?.sans_commissions != null ? kpis.sans_commissions.toLocaleString('fr-BE') : '…' },
-          ]}
-        />
-
-        {/* ── Barre de recherche en HAUT ── */}
-        {!selected&&(
-          <div style={{position:'relative',marginBottom:18}}>
-            <i className="ti ti-search" style={{position:'absolute',left:14,top:'50%',transform:'translateY(-50%)',color:'#94a3b8',fontSize:18}}/>
-            <input ref={searchRef} value={q} onChange={e=>setQ(e.target.value)}
-              placeholder="Rechercher par nom, prénom, n° dossier, email, téléphone…"
-              style={{width:'100%',padding:'12px 14px 12px 42px',borderRadius:10,border:`1.5px solid ${q?BLUE:'#e2e8f0'}`,fontSize:14,fontFamily:"'Source Sans Pro',sans-serif",outline:'none',boxSizing:'border-box',transition:'border-color 0.15s',background:'#fff',boxShadow:'0 2px 8px rgba(0,0,0,0.04)'}}
+        {selected ? (
+          <Fiche client={selected} onClose={()=>setSelected(null)} onOpenDossier={openDossier}/>
+        ) : (
+          <>
+            <StatBanner
+              color={ENTITES.dynassur.color} colorDark={ENTITES.dynassur.colorDark} logoUrl={ENTITES.dynassur.logo}
+              title="Clients" subtitle={`Dynassur SRL — base clients ${new Date().getFullYear()}`}
+              stats={[
+                { label: 'Avec alerte', value: kpis?.avec_alerte != null ? kpis.avec_alerte.toLocaleString('fr-BE') : '…', onClick: ()=>openKpi('alerte') },
+                { label: 'Sans contrat', value: kpis?.sans_contrat != null ? kpis.sans_contrat.toLocaleString('fr-BE') : '…', onClick: ()=>openKpi('sans_contrat') },
+                { label: 'Sans comm. 2026', value: kpis?.sans_commissions != null ? kpis.sans_commissions.toLocaleString('fr-BE') : '…', onClick: ()=>openKpi('sans_comm') },
+              ]}
             />
-            {q&&<button onClick={()=>setQ('')} style={{position:'absolute',right:12,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',color:'#94a3b8',fontSize:18}}>✕</button>}
-          </div>
-        )}
 
-        {/* ── Filtre relance : dernier contact ── */}
-        {!selected&&(
-          <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:18}}>
-            <span style={{fontSize:13,color:'#64748b',fontWeight:600}}><i className="ti ti-calendar-heart" style={{marginRight:5,color:'#0d9488'}}/>Dernier contact :</span>
-            <select value={contactFilter} onChange={e=>setContactFilter(e.target.value)}
-              style={{padding:'7px 12px',borderRadius:8,border:`1.5px solid ${relanceActif?'#0d9488':'#e2e8f0'}`,fontSize:13,color:NAVY,background:'#fff',fontFamily:"'Source Sans Pro',sans-serif",fontWeight:relanceActif?700:400}}>
-              <option value="tous">Tous les clients (base complète)</option>
-              {TRANCHES.map(t=><option key={t.val} value={t.val}>{t.label} ({relanceCounts[t.val]||0})</option>)}
-            </select>
-            {relance===null
-              ? <span style={{fontSize:12,color:'#94a3b8'}}>chargement des contacts…</span>
-              : relanceActif && <span style={{fontSize:12,color:'#0d9488',fontWeight:600}}>{relanceView.length} client(s) — du plus ancien au plus récent</span>}
-          </div>
-        )}
-
-        {/* ── 3 cartes de scope ── */}
-        {!selected&&(
-          <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:14,marginBottom:20}}>
-            {SCOPES.map(s=>{
-              const isSel=scope===s.val
-              const barW=s.pct==='100'?100:parseFloat(s.pct)||0
-              return(
-                <div key={s.val} onClick={()=>setScope(s.val)} style={{
-                  background:'#fff',borderRadius:12,padding:'16px 18px',cursor:'pointer',
-                  border:isSel?`2px solid ${s.col}`:'2px solid #e2e8f0',
-                  boxShadow:isSel?`0 4px 16px ${s.col}25`:'0 1px 4px rgba(0,0,0,0.04)',
-                  transition:'all 0.15s',
-                }}
-                  onMouseEnter={e=>{ if(!isSel){e.currentTarget.style.borderColor=s.col+'80';e.currentTarget.style.boxShadow=`0 3px 12px ${s.col}15`} }}
-                  onMouseLeave={e=>{ if(!isSel){e.currentTarget.style.borderColor='#e2e8f0';e.currentTarget.style.boxShadow='0 1px 4px rgba(0,0,0,0.04)'} }}
-                >
-                  <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
-                    <i className={`ti ${s.icon}`} style={{fontSize:18,color:s.col}}/>
-                    <span style={{fontSize:13,fontWeight:700,color:isSel?s.col:NAVY}}>{s.label}</span>
-                    {s.note&&<span style={{fontSize:10,color:'#94a3b8',marginLeft:'auto'}}>{s.note}</span>}
-                  </div>
-                  <div style={{fontSize:30,fontWeight:900,color:isSel?s.col:'#0f172a',lineHeight:1,marginBottom:4}}>{s.nb.toLocaleString('fr-BE')}</div>
-                  <div style={{fontSize:12,color:'#64748b',marginBottom:10}}>{s.pct}% du total Dynassur</div>
-                  <div style={{background:'#f1f5f9',borderRadius:4,height:5,overflow:'hidden'}}>
-                    <div style={{width:`${barW}%`,height:'100%',background:s.col,borderRadius:4,transition:'width 0.4s'}}/>
+            <div style={{background:'#fff',borderRadius:12,border:'1px solid #e2e8f0',overflow:'hidden'}}>
+              <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',padding:'12px 16px',borderBottom:'1px solid #f1f5f9'}}>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <i className="ti ti-calendar-heart" style={{fontSize:18,color:'#0d9488'}}/>
+                  <span style={{fontSize:15,fontWeight:800,color:NAVY}}>Relance clients</span>
+                  <span style={{fontSize:12,color:'#94a3b8'}}>· trie les clients par ancienneté du dernier contact</span>
+                </div>
+                <div style={{display:'flex',gap:8,marginLeft:'auto',flexWrap:'wrap'}}>
+                  <select value={scope} onChange={e=>setScope(e.target.value)} style={{padding:'7px 10px',borderRadius:8,border:'1px solid #e2e8f0',fontSize:13,fontFamily:'inherit',color:NAVY,background:'#fff'}}>
+                    <option value="all">Tous Dynassur ({counts.total.toLocaleString('fr-BE')})</option>
+                    <option value="mine">Mes clients ({counts.mine.toLocaleString('fr-BE')})</option>
+                    <option value="bureau">Mon bureau ({counts.bureau.toLocaleString('fr-BE')})</option>
+                  </select>
+                  <select value={contactFilter} onChange={e=>setContactFilter(e.target.value)} style={{padding:'7px 10px',borderRadius:8,border:`1px solid ${relanceActif?'#0d9488':'#e2e8f0'}`,fontSize:13,fontFamily:'inherit',color:NAVY,background:'#fff',fontWeight:relanceActif?700:400}}>
+                    <option value="tous">Toutes les tranches</option>
+                    {TRANCHES.map(t=><option key={t.val} value={t.val}>{t.label} ({relanceCounts[t.val]||0})</option>)}
+                  </select>
+                  <div style={{position:'relative'}}>
+                    <i className="ti ti-filter" style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'#94a3b8',fontSize:14}}/>
+                    <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Filtrer…" style={{padding:'7px 10px 7px 30px',borderRadius:8,border:`1px solid ${q?'#0d9488':'#e2e8f0'}`,fontSize:13,fontFamily:'inherit',outline:'none',width:150,boxSizing:'border-box'}}/>
                   </div>
                 </div>
-              )
-            })}
-          </div>
-        )}
-
-        {/* ── Si client sélectionné : mini barre compacte ── */}
-        {selected&&(
-          <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16,background:'#f0f9ff',borderRadius:10,padding:'10px 16px',border:`1px solid ${BLUE}30`}}>
-            <button onClick={()=>{ setSelected(null); setTimeout(()=>searchRef.current?.focus(),100) }}
-              style={{display:'flex',alignItems:'center',gap:5,background:'transparent',border:'none',cursor:'pointer',color:BLUE,fontSize:13,fontWeight:600,padding:0}}>
-              <i className="ti ti-search" style={{fontSize:15}}/>Nouvelle recherche
-            </button>
-            <span style={{color:'#94a3b8'}}>·</span>
-            <span style={{fontSize:13,color:'#64748b'}}>Fiche : <strong style={{color:NAVY}}>{selected.prenom} {selected.nom}</strong></span>
-            <button onClick={()=>setSelected(null)} style={{marginLeft:'auto',background:'transparent',border:'none',cursor:'pointer',color:'#94a3b8',fontSize:18}}>✕</button>
-          </div>
-        )}
-
-        {/* ── Tableau ── */}
-        {!selected&&!relanceActif&&(
-          <div style={{background:'#fff',borderRadius:12,border:'1px solid #e2e8f0',overflow:'hidden',marginBottom:4}}>
-            <div style={{overflowX:'auto'}}>
-              <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-                <thead>
-                  <tr style={{background:'#f8fafc'}}>
-                    {['N° Dossier','Nom & Prénom','Localité','GSM / Tél','Gestionnaire','SA',''].map(h=>(
-                      <th key={h} style={{padding:'9px 14px',textAlign:'left',fontWeight:700,color:'#94a3b8',fontSize:10,textTransform:'uppercase',letterSpacing:'.05em',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading&&!clients.length?(<tr><td colSpan={7} style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Chargement…</td></tr>)
-                  :!clients.length?(<tr><td colSpan={7} style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Aucun client trouvé</td></tr>)
-                  :clients.map((c,i)=>(
-                    <tr key={c.dossier||i} onClick={()=>{ setSelected(c); pushRecentClient(c) }} style={{cursor:'pointer',background:i%2===0?'#fff':'#fafafe',transition:'background 0.1s'}}
-                      onMouseEnter={e=>e.currentTarget.style.background='#f0f9ff'}
-                      onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'#fff':'#fafafe'}>
-                      <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9',fontFamily:'monospace',fontSize:11,color:NAVY,fontWeight:600}}>{c.dossier}</td>
-                      <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9'}}>
-                        <div style={{fontWeight:600,color:'#1e293b'}}>{c.nom} {c.prenom}</div>
-                        {c.email&&<div style={{fontSize:11,color:'#94a3b8'}}>{c.email}</div>}
-                      </td>
-                      <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{c.cp} {c.localite||'—'}</td>
-                      <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9',color:'#374151',fontSize:12}}>
-                        {c.gsm||c.tel_fixe||'—'}
-                      </td>
-                      <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9',color:'#64748b',fontSize:12}}>{c.gestionnaire_nom||'—'}</td>
-                      <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9',color:'#64748b',fontSize:12}}>{c.sa_nom||'—'}</td>
-                      <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9',textAlign:'right'}}>
-                        <div style={{display:'flex',gap:4,alignItems:'center',justifyContent:'flex-end'}}>
-                          {c.alerte&&<i className="ti ti-alert-triangle" style={{fontSize:13,color:'#f59e0b'}} title={c.alerte}/>}
-                          <span style={{fontSize:11,color:BLUE,fontWeight:600}}>Fiche ▼</span>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {nb>1&&(
-              <div style={{padding:'10px 18px',borderTop:'1px solid #f1f5f9',display:'flex',alignItems:'center',justifyContent:'space-between',background:'#fafafe'}}>
-                <button onClick={()=>setPage(p=>Math.max(0,p-1))} disabled={page===0} style={{padding:'5px 14px',borderRadius:6,border:'1px solid #e2e8f0',background:page===0?'#f8fafc':'#fff',cursor:page===0?'not-allowed':'pointer',fontSize:12,color:page===0?'#94a3b8':'#374151'}}>← Précédent</button>
-                <span style={{fontSize:12,color:'#64748b'}}>Page {page+1} / {nb} — ≈ {total.toLocaleString('fr-BE')} clients</span>
-                <button onClick={()=>setPage(p=>Math.min(nb-1,p+1))} disabled={page===nb-1} style={{padding:'5px 14px',borderRadius:6,border:'1px solid #e2e8f0',background:page===nb-1?'#f8fafc':'#fff',cursor:page===nb-1?'not-allowed':'pointer',fontSize:12,color:page===nb-1?'#94a3b8':'#374151'}}>Suivant →</button>
               </div>
-            )}
-          </div>
+
+              {relance===null?(
+                <p style={{padding:30,textAlign:'center',color:'#94a3b8'}}>Chargement de la relance…</p>
+              ):!relanceView.length?(
+                <p style={{padding:30,textAlign:'center',color:'#94a3b8'}}>Aucun client pour ce filtre.</p>
+              ):(
+                <div style={{overflowX:'auto'}}>
+                  <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+                    <thead><tr style={{background:'#f8fafc'}}>
+                      {['Client','N° Dossier','Localité','Dernier contact','Gestionnaire'].map(h=>(
+                        <th key={h} style={{textAlign:'left',padding:'9px 16px',fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',whiteSpace:'nowrap',borderBottom:'1px solid #e2e8f0'}}>{h}</th>
+                      ))}
+                    </tr></thead>
+                    <tbody>
+                      {relanceShow.map((c,i)=>{
+                        const col=TRANCHE_COL[c.tranche]||'#64748b'
+                        return(
+                          <tr key={c.id} onClick={()=>openDossier(c.dossier)} style={{cursor:'pointer',borderBottom:'1px solid #f1f5f9',background:i%2===0?'#fff':'#fafafe'}}
+                            onMouseEnter={e=>e.currentTarget.style.background='#f0fdfa'}
+                            onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'#fff':'#fafafe'}>
+                            <td style={{padding:'9px 16px',fontWeight:600,color:'#1e293b'}}>{c.nom} {c.prenom}</td>
+                            <td style={{padding:'9px 16px',fontFamily:'monospace',fontSize:12,color:NAVY}}>{c.dossier}</td>
+                            <td style={{padding:'9px 16px',color:'#64748b'}}>{c.localite||'—'}</td>
+                            <td style={{padding:'9px 16px'}}><span style={{fontSize:11,fontWeight:700,padding:'2px 8px',borderRadius:5,background:col+'18',color:col,whiteSpace:'nowrap'}}>{c.tranche==='jamais'?'Jamais contacté':ilYa(c.jours)}</span></td>
+                            <td style={{padding:'9px 16px',color:'#64748b'}}>{c.gestionnaire_nom||c.gestionnaire_code||'—'}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                  {relanceView.length>relanceShow.length&&(<p style={{padding:'10px 16px',color:'#94a3b8',fontSize:12}}>{relanceShow.length} affichés sur {relanceView.length.toLocaleString('fr-BE')} — affine le filtre.</p>)}
+                </div>
+              )}
+            </div>
+          </>
         )}
 
-        {/* ── Tableau relance (dernier contact) ── */}
-        {!selected&&relanceActif&&(
-          <div style={{background:'#fff',borderRadius:12,border:'1px solid #e2e8f0',overflow:'hidden',marginBottom:4}}>
-            <div style={{overflowX:'auto'}}>
-              <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-                <thead>
-                  <tr style={{background:'#f8fafc'}}>
-                    {['N° Dossier','Nom & Prénom','Localité','Dernier contact','Ancienneté','Gestionnaire / SA',''].map(h=>(
-                      <th key={h} style={{padding:'9px 14px',textAlign:'left',fontWeight:700,color:'#94a3b8',fontSize:10,textTransform:'uppercase',letterSpacing:'.05em',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {relance===null?(<tr><td colSpan={7} style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Chargement…</td></tr>)
-                  :!relanceView.length?(<tr><td colSpan={7} style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Aucun client dans cette tranche.</td></tr>)
-                  :relanceView.map((c,i)=>{
-                    const col=TRANCHE_COL[c.tranche]||'#64748b'
-                    return(
-                      <tr key={c.id} onClick={()=>openDossier(c.dossier)} style={{cursor:'pointer',background:i%2===0?'#fff':'#fafafe'}}
-                        onMouseEnter={e=>e.currentTarget.style.background='#f0fdfa'}
-                        onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'#fff':'#fafafe'}>
-                        <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9',fontFamily:'monospace',fontSize:11,color:NAVY,fontWeight:600}}>{c.dossier}</td>
-                        <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9'}}>
-                          <div style={{fontWeight:600,color:'#1e293b'}}>{c.nom} {c.prenom}</div>
-                          {(c.gsm||c.tel_fixe)&&<div style={{fontSize:11,color:'#94a3b8'}}>{c.gsm||c.tel_fixe}</div>}
-                        </td>
-                        <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{c.cp} {c.localite||'—'}</td>
-                        <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9',color:NAVY,fontWeight:600,whiteSpace:'nowrap'}}>{new Date(c.last).toLocaleDateString('fr-BE',{day:'2-digit',month:'2-digit',year:'numeric'})}</td>
-                        <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9'}}><span style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:4,background:col+'18',color:col,whiteSpace:'nowrap'}}>{ilYa(c.jours)}</span></td>
-                        <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9',color:'#64748b',fontSize:12}}>{c.gestionnaire_nom||c.gestionnaire_code||'—'}{c.sa_nom?` · ${c.sa_nom}`:''}</td>
-                        <td style={{padding:'9px 14px',borderBottom:'1px solid #f1f5f9',textAlign:'right'}}><span style={{fontSize:11,color:'#0d9488',fontWeight:600}}>Fiche ▼</span></td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+        {kpiModal&&(
+          <div onClick={()=>setKpiModal(null)} style={{position:'fixed',inset:0,background:'rgba(15,23,42,.55)',zIndex:1000,display:'flex',justifyContent:'flex-end'}}>
+            <div onClick={e=>e.stopPropagation()} style={{width:'min(820px,96vw)',height:'100%',background:'#fff',display:'flex',flexDirection:'column',boxShadow:'-8px 0 30px rgba(0,0,0,.2)'}}>
+              <div style={{background:NAVY,padding:'14px 20px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                <div style={{color:'#fff',fontSize:15,fontWeight:800}}>{kpiModal==='loading'?'Calcul en cours…':kpiModal.titre}</div>
+                <button onClick={()=>setKpiModal(null)} style={{background:'transparent',border:'none',color:'#fff',fontSize:22,cursor:'pointer'}}>✕</button>
+              </div>
+              <div style={{flex:1,overflow:'auto'}}>
+                {kpiModal==='loading'?(
+                  <div style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Recherche des clients concernés…</div>
+                ):(
+                  <table style={{width:'100%',borderCollapse:'collapse',fontSize:12.5}}>
+                    <thead><tr style={{background:'#f8fafc',position:'sticky',top:0}}>
+                      {['N° Dossier','Nom & Prénom','Localité','Gestionnaire / SA',kpiModal.showAlerte?'Alerte':'Contact'].map(h=>(
+                        <th key={h} style={{textAlign:'left',padding:'8px 12px',fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',whiteSpace:'nowrap'}}>{h}</th>
+                      ))}
+                    </tr></thead>
+                    <tbody>
+                      {!kpiModal.rows.length?(<tr><td colSpan={5} style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Aucun client.</td></tr>)
+                      :kpiModal.rows.slice(0,500).map((c,i)=>(
+                        <tr key={c.id} onClick={()=>{openDossier(c.dossier);setKpiModal(null)}} style={{cursor:'pointer',borderBottom:'1px solid #f1f5f9',background:i%2===0?'#fff':'#fafafe'}}
+                          onMouseEnter={e=>e.currentTarget.style.background='#f0f9ff'}
+                          onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'#fff':'#fafafe'}>
+                          <td style={{padding:'7px 12px',fontFamily:'monospace',fontSize:11,color:NAVY,fontWeight:600}}>{c.dossier}</td>
+                          <td style={{padding:'7px 12px',fontWeight:600,color:'#1e293b'}}>{c.nom} {c.prenom}</td>
+                          <td style={{padding:'7px 12px',color:'#64748b'}}>{c.cp} {c.localite||'—'}</td>
+                          <td style={{padding:'7px 12px',color:'#64748b'}}>{c.gestionnaire_nom||c.gestionnaire_code||'—'}{c.sa_nom?` · ${c.sa_nom}`:''}</td>
+                          <td style={{padding:'7px 12px',color:kpiModal.showAlerte?'#dc2626':'#64748b'}}>{kpiModal.showAlerte?(c.alerte||'—'):(c.gsm||c.tel_fixe||c.email||'—')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+                {kpiModal!=='loading'&&kpiModal.rows.length>500&&(<p style={{padding:'12px 16px',color:'#94a3b8',fontSize:12}}>500 premiers affichés sur {kpiModal.rows.length.toLocaleString('fr-BE')}.</p>)}
+              </div>
             </div>
           </div>
         )}
-
-        {/* ── Fiche ── */}
-        {selected&&<Fiche client={selected} onClose={()=>setSelected(null)} onOpenDossier={openDossier}/>}
 
       </div>
     </Layout>
