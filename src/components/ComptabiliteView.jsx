@@ -284,6 +284,11 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const totalEntrees = txFiltrees.filter(t=>parseFloat(t.montant)>0).reduce((s,t)=>s+parseFloat(t.montant),0)
   const totalSorties = txFiltrees.filter(t=>parseFloat(t.montant)<0).reduce((s,t)=>s+parseFloat(t.montant),0)
 
+  // Compteurs de rapprochement facture (sur les sorties d'argent du périmètre compte sélectionné)
+  const txPerimetre = transactions.filter(t => filtre.compte === 'tous' || t.compte_id === filtre.compte)
+  const nbAvecFacture = txPerimetre.filter(t => t.facture_url).length
+  const nbSansFacture = txPerimetre.filter(t => !t.facture_url).length
+
   // Pagination
   const totalPages = Math.max(1, Math.ceil(txFiltrees.length / PAR_PAGE))
   const pageActuelle = Math.min(page, totalPages)
@@ -298,32 +303,34 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       {/* KPIs */}
       <div style={{ display:'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap:'14px', marginBottom:'24px' }}>
         {[
-          { label:'Trésorerie totale', value: fmt(soldeTotal), color },
-          { label:'Comptes actifs', value: `${comptes.length} (${comptes.filter(c=>c.ponto_account_id).length} Ponto)`, color },
+          { label:'Trésorerie totale', value: fmt(soldeTotal), color, sub:`${comptes.length} comptes` },
           { label:'Entrées', value: fmt(totalEntrees), color:'#16a34a' },
           { label:'Sorties', value: fmt(totalSorties), color:'#dc2626' },
+          { label:'Factures non rapprochées', value: nbSansFacture, color:'#dc2626', clic:'sans', sub:`${nbAvecFacture} rapprochées`, badge:true },
         ].map(k => (
-          <div key={k.label} style={{ background:'#fff', borderRadius:'10px', border:'1px solid #e2e8f0', borderTop:`3px solid ${k.color}`, padding:'16px 20px' }}>
+          <div key={k.label} onClick={k.clic ? ()=>setFiltre(f=>({...f, facture: f.facture===k.clic ? 'toutes' : k.clic})) : undefined}
+            style={{ background: (k.clic && filtre.facture===k.clic) ? '#fef2f2' : '#fff', borderRadius:'10px', border:`1px solid ${(k.clic && filtre.facture===k.clic) ? '#fecaca' : '#e2e8f0'}`, borderTop:`3px solid ${k.color}`, padding:'16px 20px', cursor: k.clic ? 'pointer' : 'default', transition:'all .15s' }}>
             <div style={{ fontSize:'11px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'6px' }}>{k.label}</div>
-            <div style={{ fontSize:'20px', fontWeight:'800', color:'#0f172a', lineHeight:1 }}>{k.value}</div>
+            <div style={{ fontSize:'20px', fontWeight:'800', color: k.badge ? k.color : '#0f172a', lineHeight:1 }}>{k.value}</div>
+            {k.sub && <div style={{ fontSize:'11px', color:'#94a3b8', marginTop:'5px', fontWeight:'600' }}>{k.sub}{k.clic ? ' • cliquer pour filtrer' : ''}</div>}
           </div>
         ))}
       </div>
 
       {/* Barre de filtres */}
-      <div style={{ background:'#fff', borderRadius:'12px', border:'1px solid #e2e8f0', padding:'14px 16px', marginBottom:'14px', display:'flex', gap:'10px', flexWrap:'wrap', alignItems:'center' }}>
+      <div style={{ background:'#fff', borderRadius:'12px', border:'1px solid #e2e8f0', padding:'14px 16px', marginBottom:'14px', display:'flex', gap:'10px', flexWrap:'nowrap', alignItems:'flex-end', overflowX:'auto' }}>
 
         {/* Filtre compte */}
         <div style={{ display:'flex', flexDirection:'column', gap:'3px' }}>
           <label style={{ fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em' }}>Compte</label>
-          <select value={filtre.compte} onChange={e=>setFiltre(f=>({...f,compte:e.target.value}))} style={{ padding:'7px 10px', border:'1px solid #e2e8f0', borderRadius:'6px', fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif", minWidth:'200px', cursor:'pointer' }}>
-            <option value="tous">Tous les comptes</option>
+          <select value={filtre.compte} onChange={e=>setFiltre(f=>({...f,compte:e.target.value}))} style={{ padding:'7px 10px', border:'1px solid #e2e8f0', borderRadius:'6px', fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif", minWidth:'140px', cursor:'pointer' }}>
+            <option value="tous">Tous</option>
             {comptes.map(c => <option key={c.id} value={c.id}>{c.banque} — {c.iban?.slice(-4)}</option>)}
           </select>
         </div>
 
         {/* Filtre type */}
-        <div style={{ display:'flex', flexDirection:'column', gap:'3px' }}>
+        <div style={{ display:'flex', flexDirection:'column', gap:'3px', flexShrink:0 }}>
           <label style={{ fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em' }}>Type</label>
           <div style={{ display:'flex', gap:'4px' }}>
             {[['tous','Tout'],['entrees','▲ Entrées'],['sorties','▼ Sorties']].map(([val,lab]) => (
@@ -338,8 +345,8 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
         </div>
 
         {/* Filtre libellé */}
-        <div style={{ display:'flex', flexDirection:'column', gap:'3px', flex:1, minWidth:'200px' }}>
-          <label style={{ fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em' }}>Libellé / Contrepartie</label>
+        <div style={{ display:'flex', flexDirection:'column', gap:'3px', flex:1, minWidth:'130px' }}>
+          <label style={{ fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em' }}>Libellé</label>
           <input type="text" placeholder="Rechercher…" value={filtre.libelle}
             onChange={e=>setFiltre(f=>({...f,libelle:e.target.value}))}
             style={{ padding:'7px 10px', border:'1px solid #e2e8f0', borderRadius:'6px', fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif" }}
