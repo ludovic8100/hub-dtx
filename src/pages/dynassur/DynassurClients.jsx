@@ -722,7 +722,7 @@ function Foyer({ client, onOpenDossier }) {
   const [membres,setMembres]=useState([]); const [ld,setLd]=useState(true)
   useEffect(()=>{
     if(!client?.dossier){ setMembres([]); setLd(false); return }
-    const cle=normAdr(client.rue,client.num_maison,client.cp,client.localite)
+    const cle=normAdr(client.rue,client.num_maison,client.boite,client.cp,client.localite)
     if(!cle || (!client.cp && !client.num_maison)){ setMembres([]); setLd(false); return }
     setLd(true)
     ;(async()=>{
@@ -730,7 +730,7 @@ function Foyer({ client, onOpenDossier }) {
       if(client.cp) q=q.eq('cp',client.cp)
       if(client.num_maison) q=q.eq('num_maison',client.num_maison)
       const {data:cl}=await q
-      let memb=(cl||[]).filter(c=>c.dossier&&c.dossier!==client.dossier && normAdr(c.rue,c.num_maison,c.cp,c.localite)===cle)
+      let memb=(cl||[]).filter(c=>c.dossier&&c.dossier!==client.dossier && (c.prenom&&c.prenom.trim()) && normAdr(c.rue,c.num_maison,c.boite,c.cp,c.localite)===cle)
       let liens={}
       try{
         const {data:fam}=await supabase.from('famille').select('nom_lie,prenom_lie,type_relation_libelle').eq('dossier',client.dossier)
@@ -751,12 +751,12 @@ function Foyer({ client, onOpenDossier }) {
   const adr=[client.rue,client.num_maison,client.boite&&('bte '+client.boite)].filter(Boolean).join(' ')
   return(
     <div style={{display:'flex',flexDirection:'column',gap:12}}>
-      <div style={{fontSize:11,color:'#94a3b8',fontStyle:'italic'}}>Personnes enregistrées à la même adresse ({adr||'—'}). Leurs garanties « famille / vie privée » peuvent couvrir tout le foyer — à vérifier au contrat, ce n'est pas une certitude.</div>
+      <div style={{fontSize:11,color:'#94a3b8',fontStyle:'italic'}}>Personnes physiques à la même adresse — boîte comprise — sociétés domiciliées exclues ({adr||'—'}). Leurs garanties « famille / vie privée » peuvent couvrir tout le foyer, mais l'adresse ne prouve pas le foyer : à confirmer.</div>
       {membres.map((g,i)=>(
         <div key={i} style={{border:'1px solid #e2e8f0',borderRadius:10,padding:'10px 13px'}}>
           <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:g.contrats.length?7:0}}>
             <div style={{fontSize:13,fontWeight:800,color:NAVY}}>{[g.prenom,g.nom].filter(Boolean).join(' ')||'—'}
-              {g.lien&&<span style={{fontSize:11,fontWeight:700,color:'#0891b2',marginLeft:6}}>· {g.lien}</span>}
+              {g.lien ? <span style={{fontSize:11,fontWeight:700,color:'#0891b2',marginLeft:6}}>· {g.lien}</span> : <span style={{fontSize:10,fontWeight:700,color:'#94a3b8',background:'#f1f5f9',borderRadius:4,padding:'1px 6px',marginLeft:6}}>même adresse</span>}
               <span style={{fontSize:11,fontWeight:600,color:'#94a3b8',marginLeft:6}}>#{g.dossier} · {g.contrats.length} contrat(s)</span>
             </div>
             {onOpenDossier&&<button onClick={()=>onOpenDossier(g.dossier)} style={{marginLeft:'auto',fontSize:11,fontWeight:600,color:BLUE,background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:6,padding:'3px 9px',cursor:'pointer'}}>Ouvrir</button>}
