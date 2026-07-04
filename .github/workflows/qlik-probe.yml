@@ -1,0 +1,21 @@
+name: Qlik Probe (recherche objet par description)
+on:
+  workflow_dispatch:
+    inputs:
+      probe_terms:
+        description: "Termes recherchés dans Description (ex. une plaque)"
+        required: false
+        default: "2ahs210"
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -r scripts/requirements.txt
+      - name: Run probe
+        env:
+          QLIK_API_KEY: ${{ secrets.QLIK_API_KEY }}
+          PROBE_TERMS: ${{ github.event.inputs.probe_terms }}
+        run: python scripts/qlik_probe.py
