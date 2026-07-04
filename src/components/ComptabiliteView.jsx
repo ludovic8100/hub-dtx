@@ -87,6 +87,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const [page, setPage] = useState(1)
   const [categories, setCategories] = useState([])
   const [txSelection, setTxSelection] = useState(null)
+  const [apercu, setApercu] = useState(null) // { tx, x, y } — aperçu au survol du montant
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 768)
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 768)
@@ -460,7 +461,11 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                     <span style={{ fontSize:'11px', color:'#cbd5e1' }}>—</span>
                   )}
                 </div>
-                <div style={{ textAlign:'right', fontSize:'14px', fontWeight:'700', color: parseFloat(t.montant)>=0?'#16a34a':'#dc2626' }}>
+                <div
+                  onMouseEnter={e=>setApercu({ tx:t, x:e.clientX, y:e.clientY })}
+                  onMouseMove={e=>setApercu(a=>a&&a.tx.id===t.id?{ ...a, x:e.clientX, y:e.clientY }:a)}
+                  onMouseLeave={()=>setApercu(null)}
+                  style={{ textAlign:'right', fontSize:'14px', fontWeight:'700', color: parseFloat(t.montant)>=0?'#16a34a':'#dc2626', cursor:'help' }}>
                   {parseFloat(t.montant)>=0?'+':''}{fmt(t.montant)}
                 </div>
               </div>
@@ -485,6 +490,43 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
           </>
         )}
       </div>
+
+      {/* Aperçu flottant au survol du montant (desktop) */}
+      {apercu && !isMobile && (() => {
+        const t = apercu.tx
+        const positif = parseFloat(t.montant) >= 0
+        const cat = categories.find(c => c.id === t.categorie_id)
+        // Positionnement : à gauche du curseur pour ne pas sortir de l'écran
+        const left = Math.min(apercu.x + 16, (typeof window!=='undefined'?window.innerWidth:1200) - 340)
+        const top = Math.min(apercu.y + 16, (typeof window!=='undefined'?window.innerHeight:800) - 260)
+        const L = ({ k, v }) => v ? (
+          <div style={{ display:'flex', gap:'8px', padding:'3px 0' }}>
+            <span style={{ fontSize:'11px', color:'#94a3b8', fontWeight:'700', minWidth:'92px', textTransform:'uppercase', letterSpacing:'0.03em' }}>{k}</span>
+            <span style={{ fontSize:'12px', color:'#1e293b', wordBreak:'break-word' }}>{v}</span>
+          </div>
+        ) : null
+        return (
+          <div style={{
+            position:'fixed', left, top, zIndex:1500, width:'320px',
+            background:'#fff', border:'1px solid #e2e8f0', borderRadius:'12px',
+            boxShadow:'0 12px 40px rgba(15,23,42,0.22)', padding:'14px 16px', pointerEvents:'none'
+          }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'8px', paddingBottom:'8px', borderBottom:'1px solid #f1f5f9' }}>
+              <span style={{ fontSize:'12px', color:'#64748b', fontWeight:'600' }}>{fmtDate(t._date)}</span>
+              <span style={{ fontSize:'18px', fontWeight:'800', color: positif?'#16a34a':'#dc2626' }}>{positif?'+':''}{fmt(t.montant)}</span>
+            </div>
+            <L k="Contrepartie" v={t.contrepartie_nom} />
+            <L k="Communication" v={t.information_paiement} />
+            <L k="Description" v={t.description} />
+            <L k="Compte" v={t.comptes_bancaires?.banque} />
+            <L k="Catégorie" v={cat?.nom} />
+            <L k="Type" v={t.type_transaction} />
+            <div style={{ marginTop:'8px', paddingTop:'8px', borderTop:'1px solid #f1f5f9', fontSize:'11px', color:'#cbd5e1', textAlign:'center' }}>
+              Cliquez pour figer le détail
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Modal détail transaction */}
       {txSelection && (() => {
