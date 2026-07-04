@@ -715,98 +715,53 @@ function ContratModal({ contrat, dossier, objets, onClose, preview }) {
   )
 }
 
-// ── Contrats du foyer : contrats des relations vivant à la MÊME adresse ──
-function CouverturesAcquises({ client, onOpenDossier }) {
-  const [rows,setRows]=useState([]); const [ld,setLd]=useState(true)
+// ── Foyer : personnes enregistrées à la MÊME adresse + leurs contrats ──
+// (couvertures POSSIBLES du foyer — la donnée « personne couverte » n'existe pas dans la source,
+//  donc jamais présenté comme une certitude)
+function Foyer({ client, onOpenDossier }) {
+  const [membres,setMembres]=useState([]); const [ld,setLd]=useState(true)
   useEffect(()=>{
-    if(!client?.dossier||!client?.nom){ setRows([]); setLd(false); return }
+    if(!client?.dossier){ setMembres([]); setLd(false); return }
+    const cle=normAdr(client.rue,client.num_maison,client.cp,client.localite)
+    if(!cle || (!client.cp && !client.num_maison)){ setMembres([]); setLd(false); return }
     setLd(true)
     ;(async()=>{
-      const { data }=await supabase.rpc('couvertures_acquises',{ p_dossier:client.dossier, p_nom:client.nom||'', p_prenom:client.prenom||'' })
-      setRows(data||[]); setLd(false)
-    })()
-  },[client?.dossier,client?.nom,client?.prenom])
-  if(ld) return <p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>
-  if(!rows.length) return <div style={{color:'#94a3b8',fontSize:12,fontStyle:'italic'}}>Cette personne n'est couverte dans aucun autre contrat dont elle n'est pas le preneur.</div>
-  const SIT={'En cours':{bg:'#dcfce7',col:'#16a34a'},'Résilié':{bg:'#fee2e2',col:'#dc2626'},'Terminé':{bg:'#fee2e2',col:'#dc2626'},'Suspendu':{bg:'#fef3c7',col:'#92400e'}}
-  const byDoss={}
-  rows.forEach(r=>{ const g=(byDoss[r.dossier]=byDoss[r.dossier]||{dossier:r.dossier,preneur:r.preneur,list:[]}); g.list.push(r) })
-  const groupes=Object.values(byDoss)
-  return(
-    <div style={{display:'flex',flexDirection:'column',gap:12}}>
-      <div style={{fontSize:11,color:'#94a3b8',fontStyle:'italic'}}>Contrats d'autres dossiers où {[client.prenom,client.nom].filter(Boolean).join(' ')||'cette personne'} figure comme personne assurée sans en être le preneur. Rapprochement par nom + prénom.</div>
-      {groupes.map((g,i)=>(
-        <div key={i} style={{border:'1px solid #e2e8f0',borderRadius:10,padding:'10px 13px'}}>
-          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:7}}>
-            <div style={{fontSize:13,fontWeight:800,color:NAVY}}>Preneur : {g.preneur||'—'} <span style={{fontSize:11,fontWeight:600,color:'#94a3b8'}}>#{g.dossier} · {g.list.length} contrat(s)</span></div>
-            {onOpenDossier&&<button onClick={()=>onOpenDossier(g.dossier)} style={{marginLeft:'auto',fontSize:11,fontWeight:600,color:BLUE,background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:6,padding:'3px 9px',cursor:'pointer'}}>Ouvrir</button>}
-          </div>
-          <div style={{display:'flex',flexDirection:'column',gap:5}}>
-            {g.list.map((c,j)=>{
-              const st=SIT[c.situation]||{bg:'#f1f5f9',col:'#64748b'}
-              return(
-                <div key={j} style={{display:'flex',alignItems:'center',gap:8,fontSize:12}}>
-                  <span style={{fontFamily:'monospace',fontWeight:600,color:NAVY,minWidth:82}}>{c.police||'—'}</span>
-                  <span style={{color:'#1e293b',flex:1,minWidth:0}}>{[c.compagnie,c.domaine].filter(Boolean).join(' · ')||'—'}</span>
-                  <span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:4,background:st.bg,color:st.col,whiteSpace:'nowrap'}}>{c.situation||'—'}</span>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function ContratsFoyer({ client }) {
-  const [groupes,setGroupes]=useState([]); const [ld,setLd]=useState(true)
-  useEffect(()=>{
-    if(!client?.dossier){ setGroupes([]); setLd(false); return }
-    setLd(true)
-    ;(async()=>{
-      const NOM=(client.nom||'').toUpperCase().trim(); const PRENOM=(client.prenom||'').trim()
-      const SEL='dossier,nom_principal,prenom_principal,nom_lie,prenom_lie'
-      const [{data:dir},{data:inv}]=await Promise.all([
-        supabase.from('famille').select(SEL).eq('dossier',client.dossier),
-        supabase.from('famille').select(SEL).ilike('nom_lie',NOM).ilike('prenom_lie',PRENOM),
-      ])
-      const relNoms=new Set(); const relDossiers=new Set()
-      ;(dir||[]).forEach(r=>{ if(r.nom_lie) relNoms.add(`${(r.nom_lie||'').toUpperCase()}|${(r.prenom_lie||'').toUpperCase()}`) })
-      ;(inv||[]).forEach(r=>{ if(r.dossier) relDossiers.add(r.dossier); if(r.nom_principal) relNoms.add(`${(r.nom_principal||'').toUpperCase()}|${(r.prenom_principal||'').toUpperCase()}`) })
-      const nomsList=[...new Set([...relNoms].map(k=>k.split('|')[0]).filter(Boolean))]
-      let candidats=[]
-      if(nomsList.length){
-        const {data:cl}=await supabase.from('clients').select('dossier,nom,prenom,rue,num_maison,cp,localite').in('nom',nomsList).not('dossier','is',null)
-        candidats=(cl||[]).filter(c=>relNoms.has(`${(c.nom||'').toUpperCase()}|${(c.prenom||'').toUpperCase()}`))
-      }
-      if(relDossiers.size){
-        const {data:cl2}=await supabase.from('clients').select('dossier,nom,prenom,rue,num_maison,cp,localite').in('dossier',[...relDossiers])
-        candidats=[...candidats,...(cl2||[])]
-      }
-      const byDoss={}
-      candidats.forEach(c=>{ if(c.dossier&&c.dossier!==client.dossier) byDoss[c.dossier]=c })
-      const cle=normAdr(client.rue,client.num_maison,client.cp)
-      const memeAdr=Object.values(byDoss).filter(c=> cle && normAdr(c.rue,c.num_maison,c.cp)===cle )
-      if(!memeAdr.length){ setGroupes([]); setLd(false); return }
-      const {data:ctr}=await supabase.from('contrats').select('dossier,police,compagnie,domaine,situation').in('dossier',memeAdr.map(c=>c.dossier))
+      let q=supabase.from('clients').select('dossier,nom,prenom,rue,num_maison,boite,cp,localite').not('dossier','is',null)
+      if(client.cp) q=q.eq('cp',client.cp)
+      if(client.num_maison) q=q.eq('num_maison',client.num_maison)
+      const {data:cl}=await q
+      let memb=(cl||[]).filter(c=>c.dossier&&c.dossier!==client.dossier && normAdr(c.rue,c.num_maison,c.cp,c.localite)===cle)
+      let liens={}
+      try{
+        const {data:fam}=await supabase.from('famille').select('nom_lie,prenom_lie,type_relation_libelle').eq('dossier',client.dossier)
+        ;(fam||[]).forEach(r=>{ const k=`${(r.nom_lie||'').toUpperCase()}|${(r.prenom_lie||'').toUpperCase()}`; if(r.type_relation_libelle) liens[k]=r.type_relation_libelle })
+      }catch(e){}
+      memb=memb.map(c=>({...c,lien:liens[`${(c.nom||'').toUpperCase()}|${(c.prenom||'').toUpperCase()}`]||null}))
+      if(!memb.length){ setMembres([]); setLd(false); return }
+      const {data:ctr}=await supabase.from('contrats').select('dossier,police,compagnie,domaine,situation').in('dossier',memb.map(c=>c.dossier))
       const parDoss={}
       ;(ctr||[]).forEach(c=>{ const k=c.police||JSON.stringify(c); const g=(parDoss[c.dossier]=parDoss[c.dossier]||{seen:new Set(),list:[]}); if(!g.seen.has(k)){ g.seen.add(k); g.list.push(c) } })
-      const out=memeAdr.map(c=>({...c,contrats:(parDoss[c.dossier]&&parDoss[c.dossier].list)||[]})).filter(x=>x.contrats.length)
-      setGroupes(out); setLd(false)
+      setMembres(memb.map(c=>({...c,contrats:(parDoss[c.dossier]&&parDoss[c.dossier].list)||[]}))); setLd(false)
     })()
   },[client?.dossier])
 
   if(ld) return <p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>
-  if(!groupes.length) return <div style={{color:'#94a3b8',fontSize:12,fontStyle:'italic'}}>Aucune relation à la même adresse de résidence (avec contrats).</div>
+  if(!membres.length) return <div style={{color:'#94a3b8',fontSize:12,fontStyle:'italic'}}>Aucune autre personne enregistrée à cette adresse.</div>
   const SIT={'En cours':{bg:'#dcfce7',col:'#16a34a'},'Résilié':{bg:'#fee2e2',col:'#dc2626'},'Terminé':{bg:'#fee2e2',col:'#dc2626'},'Suspendu':{bg:'#fef3c7',col:'#92400e'}}
+  const adr=[client.rue,client.num_maison,client.boite&&('bte '+client.boite)].filter(Boolean).join(' ')
   return(
     <div style={{display:'flex',flexDirection:'column',gap:12}}>
-      <div style={{fontSize:11,color:'#94a3b8',fontStyle:'italic'}}>Personnes liées vivant à la même adresse ({[client.rue,client.num_maison].filter(Boolean).join(' ')||'—'}).</div>
-      {groupes.map((g,i)=>(
+      <div style={{fontSize:11,color:'#94a3b8',fontStyle:'italic'}}>Personnes enregistrées à la même adresse ({adr||'—'}). Leurs garanties « famille / vie privée » peuvent couvrir tout le foyer — à vérifier au contrat, ce n'est pas une certitude.</div>
+      {membres.map((g,i)=>(
         <div key={i} style={{border:'1px solid #e2e8f0',borderRadius:10,padding:'10px 13px'}}>
-          <div style={{fontSize:13,fontWeight:800,color:NAVY,marginBottom:7}}>{[g.prenom,g.nom].filter(Boolean).join(' ')||'—'} <span style={{fontSize:11,fontWeight:600,color:'#94a3b8'}}>#{g.dossier} · {g.contrats.length} contrat(s)</span></div>
-          <div style={{display:'flex',flexDirection:'column',gap:5}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:g.contrats.length?7:0}}>
+            <div style={{fontSize:13,fontWeight:800,color:NAVY}}>{[g.prenom,g.nom].filter(Boolean).join(' ')||'—'}
+              {g.lien&&<span style={{fontSize:11,fontWeight:700,color:'#0891b2',marginLeft:6}}>· {g.lien}</span>}
+              <span style={{fontSize:11,fontWeight:600,color:'#94a3b8',marginLeft:6}}>#{g.dossier} · {g.contrats.length} contrat(s)</span>
+            </div>
+            {onOpenDossier&&<button onClick={()=>onOpenDossier(g.dossier)} style={{marginLeft:'auto',fontSize:11,fontWeight:600,color:BLUE,background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:6,padding:'3px 9px',cursor:'pointer'}}>Ouvrir</button>}
+          </div>
+          {g.contrats.length>0&&<div style={{display:'flex',flexDirection:'column',gap:5}}>
             {g.contrats.map((c,j)=>{
               const st=SIT[c.situation]||{bg:'#f1f5f9',col:'#64748b'}
               return(
@@ -817,7 +772,7 @@ function ContratsFoyer({ client }) {
                 </div>
               )
             })}
-          </div>
+          </div>}
         </div>
       ))}
     </div>
@@ -954,7 +909,7 @@ function Fiche({ client, onClose, onOpenDossier }) {
       )
     )},
     { key:'relations', icon:'ti-users-group', title:'Relations', col:'#ec4899', count:null, body:(<Relations client={client} onOpenDossier={onOpenDossier}/>) },
-    { key:'foyer', icon:'ti-home', title:'Contrats du foyer', col:'#0891b2', count:null, body:(<ContratsFoyer client={client}/>) },
+    { key:'foyer', icon:'ti-home', title:'Foyer', col:'#0891b2', count:null, body:(<Foyer client={client} onOpenDossier={onOpenDossier}/>) },
     ...(groupe.length>0?[{ key:'groupe', icon:'ti-home-2', title:'Groupe / Ménage', col:'#0d9488', count:groupe.length, body:(
       <div>
         <div style={{fontSize:12,color:'#64748b',marginBottom:8,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
@@ -994,7 +949,6 @@ function Fiche({ client, onClose, onOpenDossier }) {
           </table>
         </div>
     )},
-    { key:'couvertures', icon:'ti-shield-half', title:'Couvertures acquises', col:'#0891b2', count:null, body:(<CouverturesAcquises client={client} onOpenDossier={onOpenDossier}/>) },
     { key:'primes', icon:'ti-cash', title:'Primes & commissions', col:'#16a34a', count:null, body:(<Primes dossier={client.dossier}/>) },
     { key:'taches', icon:'ti-checkbox', title:'Tâches', col:'#f59e0b', count:taches.length, body:(
       loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:!taches.length?
