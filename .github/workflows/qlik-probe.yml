@@ -6,6 +6,10 @@ on:
         description: "Termes recherchés dans Description (ex. une plaque)"
         required: false
         default: "2ahs210"
+      probe_dossier:
+        description: "Dossier à dumper entièrement (ex 2441/00). Prioritaire sur probe_terms."
+        required: false
+        default: ""
 jobs:
   probe:
     runs-on: ubuntu-latest
@@ -18,4 +22,5 @@ jobs:
         env:
           QLIK_API_KEY: ${{ secrets.QLIK_API_KEY }}
           PROBE_TERMS: ${{ github.event.inputs.probe_terms }}
+          PROBE_DOSSIER: ${{ github.event.inputs.probe_dossier }}
         run: python scripts/qlik_probe.py
