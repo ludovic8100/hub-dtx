@@ -5,6 +5,7 @@ import { useAuth } from '../../lib/auth'
 import Layout from '../../components/Layout'
 import { ENTITES } from '../../lib/entites'
 import { StatBanner } from '../../components/ui/AccountableUI'
+import { getCompagnies, resolveCie } from '../../lib/cie'
 
 const BLUE  = '#0080BD'
 const NAVY  = '#0D2F5E'
@@ -537,7 +538,102 @@ function Relations({ client, onOpenDossier }) {
 // ══════════════════════
 // FICHE CLIENT complète
 // ══════════════════════
-function ObjetsDetail({ objets, loading }) {
+
+// ── Badge compagnie : logo si disponible, sinon monogramme coloré (nom complet au survol) ──
+function Cie({ nom, cies, size=18 }) {
+  const [err,setErr]=useState(false)
+  if(!nom) return <span style={{color:'#cbd5e1'}}>—</span>
+  const r=resolveCie(nom,cies); const pad=Math.round(size*0.3)
+  if(r.logoUrl && !err)
+    return <img src={r.logoUrl} alt={nom} title={nom} onError={()=>setErr(true)}
+      style={{height:size,maxWidth:size*3.4,objectFit:'contain',verticalAlign:'middle',background:'#fff',borderRadius:4,padding:'1px 2px'}}/>
+  return <span title={nom} style={{display:'inline-block',fontSize:Math.max(10,Math.round(size*0.6)),fontWeight:800,padding:`1px ${pad}px`,borderRadius:6,background:r.couleur+'22',color:r.couleur,lineHeight:`${size}px`,whiteSpace:'nowrap'}}>{r.court}</span>
+}
+
+// ── Clé d'un objet de risque : véhicule = plaque, bâtiment = adresse (dans Description) ──
+const _firstSeg = d => (d||'').split(' - ')[0].trim()
+const _isVeh = t => /hicul|ehicul|voertuig/i.test(t||'')
+const _isBat = t => /timent|contenu|immeuble|gebouw|inhoud/i.test(t||'')
+const objetCle = (o) => {
+  if(_isVeh(o.type_risque)){ const p=_firstSeg(o.description).replace(/[^a-z0-9]/gi,'').toUpperCase(); return p?('V:'+p):null }
+  if(_isBat(o.type_risque)){ const a=_firstSeg(o.description).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,''); return a?('B:'+a):null }
+  return null
+}
+
+// ── Couvertures par objet (cross-dossier) : pour chaque objet du client, TOUS les contrats qui le couvrent ──
+function CouverturesParObjet({ client, objets, cies, onOpenDossier }) {
+  const [rows,setRows]=useState(null); const [loading,setLoading]=useState(true)
+  useEffect(()=>{
+    let alive=true; setLoading(true); setRows(null)
+    const veh=new Set(), bat=new Set()
+    ;(objets||[]).forEach(o=>{
+      if(_isVeh(o.type_risque)){ const p=_firstSeg(o.description).replace(/[^a-z0-9]/gi,'').toUpperCase(); if(p) veh.add(p) }
+      else if(_isBat(o.type_risque)){ const a=_firstSeg(o.description); if(a&&a!=='-') bat.add(a) }
+    })
+    const cols='dossier,police,compagnie,domaine,type_risque,garantie,description,situation,etat_contrat'
+    const queries=[]
+    if(veh.size) queries.push(supabase.from('objets_risque').select(cols).or([...veh].map(p=>`description.ilike.*${p}*`).join(',')))
+    ;[...bat].forEach(a=>queries.push(supabase.from('objets_risque').select(cols).ilike('description',`%${a}%`)))
+    if(!queries.length){ setRows([]); setLoading(false); return }
+    Promise.all(queries).then(res=>{ if(!alive) return; const all=[]; res.forEach(({data})=>{(data||[]).forEach(r=>all.push(r))}); setRows(all); setLoading(false) })
+    return ()=>{ alive=false }
+  },[objets,client.dossier])
+
+  const groups={}
+  const add=o=>{ const k=objetCle(o); if(!k) return
+    const g=(groups[k]=groups[k]||{key:k,type:o.type_risque,label:o.description||'',contrats:{}})
+    if((o.description||'').length>(g.label||'').length) g.label=o.description
+    const c=(g.contrats[o.police]=g.contrats[o.police]||{police:o.police,compagnie:o.compagnie,dossier:o.dossier,domaine:o.domaine,situation:o.situation,gars:new Set()})
+    if(o.garantie) c.gars.add(o.garantie); if(o.situation==='En cours') c.situation='En cours'
+  }
+  ;(objets||[]).forEach(add); ;(rows||[]).forEach(add)
+
+  const list=Object.values(groups).map(g=>({ ...g,
+    contrats:Object.values(g.contrats).map(c=>({...c,gars:[...c.gars],externe:c.dossier!==client.dossier}))
+      .sort((a,b)=>(a.situation==='En cours'?0:1)-(b.situation==='En cours'?0:1)) }))
+    .sort((a,b)=>b.contrats.length-a.contrats.length)
+
+  if(loading&&rows===null) return <p style={{color:'#94a3b8',fontSize:12,marginTop:8}}>Recherche des couvertures liées…</p>
+  if(!list.length) return <div style={{color:'#94a3b8',fontSize:12,fontStyle:'italic',marginTop:8}}>Aucun véhicule ni bâtiment exploitable pour ce dossier.</div>
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:10,marginTop:10}}>
+      <p style={{fontSize:11.5,color:'#94a3b8',margin:0}}>Chaque objet (véhicule = plaque, bâtiment = adresse) avec <b>tous</b> les contrats qui le couvrent, y compris via un autre dossier. Le rapprochement des bâtiments par adresse reste approximatif (formats variables).</p>
+      {list.map((g,i)=>{
+        const ic=_isVeh(g.type)?'ti-car':(_isBat(g.type)?'ti-building':'ti-point')
+        const aExterne=g.contrats.some(c=>c.externe)
+        return (
+          <div key={i} style={{border:'1px solid #e9d5ff',borderRadius:10,padding:'11px 13px',background:'#fdfcff'}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,flexWrap:'wrap'}}>
+              <i className={`ti ${ic}`} style={{fontSize:16,color:'#7c3aed'}}/>
+              <span style={{fontSize:13.5,fontWeight:800,color:'#1e293b'}}>{g.label||'—'}</span>
+              <span style={{fontSize:10,fontWeight:700,padding:'1px 7px',borderRadius:5,background:'#f5f3ff',color:'#7c3aed'}}>{g.contrats.length} contrat{g.contrats.length>1?'s':''}</span>
+              {aExterne&&<span style={{fontSize:10,fontWeight:700,padding:'1px 7px',borderRadius:5,background:'#fef3c7',color:'#b45309'}}>couverture via un autre dossier</span>}
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:6}}>
+              {g.contrats.map((c,j)=>{
+                const enc=c.situation==='En cours'
+                return (
+                  <div key={j} style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',padding:'6px 8px',borderRadius:7,background:enc?'#fff':'#fafafa',border:'1px solid #f1f5f9',opacity:enc?1:.65}}>
+                    <Cie nom={c.compagnie} cies={cies} size={18}/>
+                    <span onClick={()=>c.externe&&onOpenDossier&&onOpenDossier(c.dossier)} title={c.externe?`Ouvrir le dossier ${c.dossier}`:undefined} style={{fontFamily:'monospace',fontSize:11,color:'#64748b',cursor:c.externe?'pointer':'default',textDecoration:c.externe?'underline':'none'}}>n° {c.police}</span>
+                    {c.externe&&<span style={{fontSize:10,fontWeight:700,padding:'1px 6px',borderRadius:5,background:'#fef3c7',color:'#b45309'}}>dossier {c.dossier}</span>}
+                    <span style={{display:'flex',flexWrap:'wrap',gap:3,flex:1,minWidth:0}}>
+                      {c.gars.map((gr,k)=><span key={k} style={{fontSize:10,fontWeight:600,padding:'1px 6px',borderRadius:4,background:'#f5f3ff',color:'#7c3aed',whiteSpace:'nowrap'}}>{gr}</span>)}
+                    </span>
+                    <span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:4,background:enc?'#dcfce7':'#f1f5f9',color:enc?'#15803d':'#94a3b8'}}>{c.situation||'—'}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function ObjetsDetail({ objets, loading, cies }) {
   if(loading) return <p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>
   if(!objets.length) return <div style={{color:'#94a3b8',fontSize:12,fontStyle:'italic'}}>Aucun objet de risque détaillé pour ce dossier.</div>
   // regrouper par police
@@ -555,7 +651,7 @@ function ObjetsDetail({ objets, loading }) {
             <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:6}}>
               <span style={{fontSize:13,fontWeight:800,color:'#6d28d9'}}>{p.type||'Objet de risque'}</span>
               <span style={{fontSize:11,color:'#94a3b8'}}>n° {p.police}</span>
-              {p.compagnie&&<span style={{fontSize:11,color:'#64748b'}}>· {p.compagnie}</span>}
+              {p.compagnie&&<Cie nom={p.compagnie} cies={cies} size={16}/>}
               {p.domaine&&<span style={{fontSize:10,fontWeight:700,padding:'1px 7px',borderRadius:5,background:'#f5f3ff',color:'#7c3aed'}}>{p.domaine}</span>}
             </div>
             {p.descrs&&p.descrs.size>0&&(
@@ -585,7 +681,7 @@ const normAdr = (...parts) => parts.map(x => x==null?'':String(x)).join(' ')
   .toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'')
 
 // ── Modal détail contrat (garanties, objets couverts, primes/mensualités, sinistres) ──
-function ContratModal({ contrat, dossier, objets, onClose, preview }) {
+function ContratModal({ contrat, dossier, objets, onClose, preview, cies }) {
   const [quit,setQuit]=useState([]); const [ld,setLd]=useState(true)
   useEffect(()=>{
     setLd(true)
@@ -624,7 +720,7 @@ function ContratModal({ contrat, dossier, objets, onClose, preview }) {
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:10,color:'rgba(255,255,255,0.75)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.05em'}}>Contrat</div>
             <div style={{fontSize:21,fontWeight:800,color:'#fff',fontFamily:'monospace',lineHeight:1.1}}>{contrat.police||'—'}</div>
-            <div style={{fontSize:12.5,color:'rgba(255,255,255,0.9)',marginTop:3}}>{[contrat.compagnie,contrat.domaine].filter(Boolean).join(' · ')||'—'}</div>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginTop:5,flexWrap:'wrap'}}><Cie nom={contrat.compagnie} cies={cies} size={20}/>{contrat.domaine&&<span style={{fontSize:12.5,color:'rgba(255,255,255,0.9)'}}>· {contrat.domaine}</span>}</div>
           </div>
           {preview
             ? <span style={{alignSelf:'center',background:'rgba(255,255,255,0.18)',border:'1px solid rgba(255,255,255,0.3)',borderRadius:8,padding:'5px 10px',color:'#fff',fontSize:11,fontWeight:700,flexShrink:0,whiteSpace:'nowrap'}}><i className="ti ti-pin"/> Cliquer pour épingler</span>
@@ -640,7 +736,7 @@ function ContratModal({ contrat, dossier, objets, onClose, preview }) {
           <Bloc icon="ti-file-info" titre="Détails du contrat" col={BLUE}>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0 24px'}}>
               <Row k="Police" v={contrat.police}/>
-              <Row k="Compagnie" v={contrat.compagnie}/>
+              <Row k="CIE" v={contrat.compagnie?<Cie nom={contrat.compagnie} cies={cies} size={18}/>:null}/>
               <Row k="Domaine" v={contrat.domaine}/>
               <Row k="Type de police" v={contrat.type_production}/>
               <Row k="État" v={contrat.situation}/>
@@ -781,7 +877,9 @@ function Foyer({ client, onOpenDossier }) {
 
 function Fiche({ client, onClose, onOpenDossier }) {
   const [contrats,setContrats]=useState([]); const [taches,setTaches]=useState([]); const [rdvs,setRdvs]=useState([]); const [groupe,setGroupe]=useState([]); const [objets,setObjets]=useState([]); const [appels,setAppels]=useState([]); const [loadF,setLoadF]=useState(true)
+  const [cies,setCies]=useState([])
   const ref=useRef(null)
+  useEffect(()=>{ getCompagnies().then(setCies) },[])
 
   useEffect(()=>{
     ref.current?.scrollIntoView({behavior:'smooth',block:'start'})
@@ -922,13 +1020,14 @@ function Fiche({ client, onClose, onOpenDossier }) {
         </div>
       </div>
     )}]:[]),
-    { key:'objets', icon:'ti-shield', title:'Objets de risque', col:'#7c3aed', count:objets.length, body:(<div><Analyse360 client={client} contrats={contrats}/><ObjetsDetail objets={objets} loading={loadF}/></div>) },
+    { key:'objets', icon:'ti-shield', title:'Objets de risque', col:'#7c3aed', count:objets.length, body:(<div><Analyse360 client={client} contrats={contrats}/><ObjetsDetail objets={objets} loading={loadF} cies={cies}/></div>) },
+    { key:'couvertures', icon:'ti-shield-check', title:'Couvertures par objet', col:'#7c3aed', body:(<CouverturesParObjet client={client} objets={objets} cies={cies} onOpenDossier={onOpenDossier}/>) },
     { key:'contrats', icon:'ti-file-text', title:'Contrats', col:BLUE, count:contrats.length, body:(
       loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:!contrats.length?<p style={{color:'#94a3b8',fontSize:12}}>Aucun contrat</p>:
         <div style={{overflowX:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
           <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
             <thead style={{position:'sticky',top:0,background:'#f8fafc',zIndex:1}}>
-              <tr>{['Police','Compagnie','Objet de risque','Domaine','Garanties','Situation','Date'].map(h=>(<th key={h} style={{padding:'7px 12px',textAlign:'left',fontWeight:700,color:'#94a3b8',fontSize:10,textTransform:'uppercase',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>))}</tr>
+              <tr>{['Police','CIE','Objet de risque','Domaine','Garanties','Situation','Date'].map(h=>(<th key={h} style={{padding:'7px 12px',textAlign:'left',fontWeight:700,color:'#94a3b8',fontSize:10,textTransform:'uppercase',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>))}</tr>
             </thead>
             <tbody>
               {contrats.map((c,i)=>{
@@ -936,7 +1035,7 @@ function Fiche({ client, onClose, onOpenDossier }) {
                 return(
                   <tr key={i} style={{background:i%2===0?'#fff':'#fafafe'}}>
                     <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',fontFamily:'monospace',fontSize:11}}><span onMouseEnter={()=>previewContrat(c)} onMouseLeave={leaveContrat} onClick={()=>openContrat(c)} title="Survoler pour aperçu · cliquer pour épingler" style={{cursor:'pointer',color:BLUE,fontWeight:700,textDecoration:'underline'}}>{c.police||'—'}</span></td>
-                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#1e293b'}}>{c.compagnie||'—'}</td>
+                    <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9'}}><Cie nom={c.compagnie} cies={cies} size={16}/></td>
                     <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#475569',fontSize:11}}>{(()=>{ const os=objetsParPolice[c.police]?[...objetsParPolice[c.police]]:[]; if(!os.length) return <span style={{color:'#cbd5e1'}}>—</span>; return <span style={{display:'flex',flexDirection:'column',gap:2}}>{os.map((o,k)=><span key={k}>{o}</span>)}</span> })()}</td>
                     <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{c.domaine||'—'}</td>
                     <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9'}}>{(()=>{ const gs=garantiesParPolice[c.police]?[...garantiesParPolice[c.police]]:[]; if(!gs.length) return <span style={{color:'#cbd5e1'}}>—</span>; return <span style={{display:'flex',flexWrap:'wrap',gap:3}}>{gs.map((g,k)=><span key={k} style={{fontSize:10,fontWeight:600,padding:'1px 6px',borderRadius:4,background:'#f5f3ff',color:'#7c3aed',whiteSpace:'nowrap'}}>{g}</span>)}</span> })()}</td>
@@ -1065,7 +1164,7 @@ function Fiche({ client, onClose, onOpenDossier }) {
             {active.count!=null&&active.count>0&&<span style={{fontSize:11,fontWeight:800,padding:'1px 8px',borderRadius:20,background:`${active.col}18`,color:active.col}}>{active.count}</span>}
           </div>
           {active.body}
-          {detail&&<ContratModal contrat={detail} dossier={client.dossier} objets={objets} preview={!pinnedContrat} onClose={closeContrat}/>}
+          {detail&&<ContratModal contrat={detail} dossier={client.dossier} objets={objets} cies={cies} preview={!pinnedContrat} onClose={closeContrat}/>}
         </div>
       </div>
     </div>
