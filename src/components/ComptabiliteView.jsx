@@ -198,9 +198,16 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
     alert(`✅ ${nb} transaction(s) de "${contrepartie}" catégorisées. Les futures le seront automatiquement.`)
   }
 
-  // Cliquer le "V" vert : ouvrir la facture liée dans SharePoint
+  // Forcer l'ouverture dans la visionneuse SharePoint (pas de téléchargement / Adobe)
+  function urlVisionneuse(url) {
+    if (!url) return url
+    if (/[?&]web=1/.test(url)) return url
+    return url + (url.includes('?') ? '&' : '?') + 'web=1'
+  }
+
+  // Cliquer le "V" vert : ouvrir la facture liée dans la visionneuse SharePoint
   function ouvrirFactureLiee(tx) {
-    if (tx.facture_url) window.open(tx.facture_url, '_blank', 'noopener,noreferrer')
+    if (tx.facture_url) window.open(urlVisionneuse(tx.facture_url), '_blank', 'noopener,noreferrer')
   }
 
   // Cliquer la croix rouge : ouvrir le dossier SharePoint pour trouver/copier la facture
