@@ -198,6 +198,16 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
     alert(`✅ ${nb} transaction(s) de "${contrepartie}" catégorisées. Les futures le seront automatiquement.`)
   }
 
+  // Extraire le nom + chemin lisible d'une facture depuis son URL (pour tooltip)
+  function cheminFacture(url) {
+    if (!url) return ''
+    try {
+      let u = url.split('?')[0]
+      u = decodeURIComponent(u)
+      return u.includes('/FACTURES/') ? u.split('/FACTURES/')[1] : u.split('/').pop()
+    } catch { return url }
+  }
+
   // Forcer l'ouverture dans la visionneuse SharePoint (pas de téléchargement / Adobe)
   function urlVisionneuse(url) {
     if (!url) return url
@@ -442,7 +452,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                       )}
                       <div style={{ display:'flex', alignItems:'center', gap:'8px' }} onClick={e=>e.stopPropagation()}>
                         {t.facture_url ? (
-                          <button onClick={()=>ouvrirFactureLiee(t)} title="Facture liée — ouvrir" style={{
+                          <button onClick={()=>ouvrirFactureLiee(t)} title={`Facture liée :\n${cheminFacture(t.facture_url)}\n\nCliquer pour ouvrir`} style={{
                             display:'flex', alignItems:'center', justifyContent:'center', width:'30px', height:'30px',
                             borderRadius:'7px', border:'none', background:'#16a34a', color:'#fff', cursor:'pointer', fontSize:'16px', fontWeight:'700'
                           }}>✓</button>
@@ -466,7 +476,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
               }}>
                 <div style={{ display:'flex', alignItems:'center', justifyContent:'center' }} onClick={e=>e.stopPropagation()}>
                   {t.facture_url ? (
-                    <button onClick={()=>ouvrirFactureLiee(t)} title="Facture liée — cliquer pour l'ouvrir dans SharePoint" style={{
+                    <button onClick={()=>ouvrirFactureLiee(t)} title={`Facture liée :\n${cheminFacture(t.facture_url)}\n\nCliquer pour ouvrir dans SharePoint`} style={{
                       display:'flex', alignItems:'center', justifyContent:'center', width:'26px', height:'26px',
                       borderRadius:'6px', border:'none', background:'#16a34a', color:'#fff', cursor:'pointer', fontSize:'15px', fontWeight:'700'
                     }}>✓</button>
