@@ -1182,8 +1182,8 @@ function Fiche({ client, onClose, onOpenDossier }) {
         </div>
       </div>
     )}]:[]),
-    { key:'objets', icon:'ti-shield', title:'Objets de risque', col:'#7c3aed', count:objets.length, body:(<div><Analyse360 client={client} contrats={contrats}/><ObjetsDetail objets={objets} loading={loadF} cies={cies}/></div>) },
-    { key:'contrats', icon:'ti-file-text', title:'Contrats', col:BLUE, count:contrats.length, body:(<VueContrats client={client} objets={objets} contratsClient={contrats} garantiesParPolice={garantiesParPolice} cies={cies} onOpenDossier={onOpenDossier} loadF={loadF} previewContrat={previewContrat} openContrat={openContrat} leaveContrat={leaveContrat}/>) },
+    { key:'objets', icon:'ti-shield', title:'Objets de risque', col:'#7c3aed', count:objets.length, body:(<ObjetsDetail objets={objets} loading={loadF} cies={cies}/>) },
+    { key:'contrats', icon:'ti-file-text', title:'Contrats', col:BLUE, count:contrats.length, body:(<div><Analyse360 client={client} contrats={contrats}/><div style={{marginTop:14}}><VueContrats client={client} objets={objets} contratsClient={contrats} garantiesParPolice={garantiesParPolice} cies={cies} onOpenDossier={onOpenDossier} loadF={loadF} previewContrat={previewContrat} openContrat={openContrat} leaveContrat={leaveContrat}/></div></div>) },
     { key:'primes', icon:'ti-cash', title:'Primes & commissions', col:'#16a34a', count:null, body:(<Primes dossier={client.dossier}/>) },
     { key:'taches', icon:'ti-checkbox', title:'Tâches', col:'#f59e0b', count:taches.length, body:(
       loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:!taches.length?
