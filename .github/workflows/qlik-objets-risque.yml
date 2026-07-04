@@ -1,0 +1,22 @@
+name: Qlik - Reimport objets_risque (grain objet)
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "1 = simulation (aucune ecriture), 0 = recharge reelle"
+        required: false
+        default: "1"
+jobs:
+  reimport:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -r scripts/requirements.txt
+      - name: Reimport objets_risque
+        env:
+          QLIK_API_KEY: ${{ secrets.QLIK_API_KEY }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: python scripts/qlik_objets_risque.py
