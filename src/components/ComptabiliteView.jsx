@@ -7,6 +7,15 @@ const fmt = (v) => v === null || v === undefined ? '—'
 const fmtDate = d => d ? new Date(d).toLocaleDateString('fr-BE') : '—'
 const fmtSync = d => d ? new Date(d).toLocaleString('fr-BE', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : 'Non synchronisé'
 
+// Dossiers SharePoint des factures par société
+const SHAREPOINT_FACTURES = {
+  DYNASSUR: 'https://dynassur.sharepoint.com/sites/ADMINISTRATION/Documents%20partages/COMPTA/FACTURES/_DYNASSUR',
+  DTX:      'https://dynassur.sharepoint.com/sites/ADMINISTRATION/Documents%20partages/COMPTA/FACTURES/_DTX',
+  LODE:     'https://dynassur.sharepoint.com/sites/ADMINISTRATION/Documents%20partages/COMPTA/FACTURES/_LODE',
+  HEXAGROUP:'https://dynassur.sharepoint.com/sites/ADMINISTRATION/Documents%20partages/COMPTA/FACTURES/_HEXAGROUP',
+  PRIVE:    'https://dynassur.sharepoint.com/sites/ADMINISTRATION/Documents%20partages/COMPTA/FACTURES/_PRIVE',
+}
+
 // ── VUE CONSOLIDÉE GROUPE ──
 function VueConsolidee({ comptes }) {
   const COLORS = { DYNASSUR:'#0080BD', DTX:'#94a3b8', LODE:'#ea580c', HEXAGROUP:'#dc2626', PRIVE:'#0d9488' }
@@ -84,7 +93,6 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [])
-  const [catExpanded, setCatExpanded] = useState(null)
   const PAR_PAGE = 100
 
   const isConsolide = societeCodes.length > 1
@@ -189,6 +197,21 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
     alert(`✅ ${nb} transaction(s) de "${contrepartie}" catégorisées. Les futures le seront automatiquement.`)
   }
 
+  // Marquer/démarquer une transaction comme rapprochée (facture trouvée)
+  async function toggleRapproche(txId, valeurActuelle) {
+    const nouvelle = !valeurActuelle
+    await supabase.from('transactions').update({ rapproche: nouvelle }).eq('id', txId)
+    setTransactions(prev => prev.map(t => t.id === txId ? { ...t, rapproche: nouvelle } : t))
+    setTxSelection(prev => prev && prev.id === txId ? { ...prev, rapproche: nouvelle } : prev)
+  }
+
+  // Ouvrir le dossier SharePoint des factures de la société (dans le navigateur)
+  function ouvrirFacture(tx) {
+    const code = tx.comptes_bancaires?.societes?.code || societeCodes[0]
+    const url = SHAREPOINT_FACTURES[code] || SHAREPOINT_FACTURES.DYNASSUR
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
   if (loading) return <div style={{ padding:'60px', textAlign:'center', color:'#94a3b8', fontFamily:"'Source Sans Pro', sans-serif" }}>Chargement…</div>
   if (isConsolide) return <VueConsolidee comptes={comptes} />
 
@@ -223,63 +246,6 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   })
   const totalEntrees = txFiltrees.filter(t=>parseFloat(t.montant)>0).reduce((s,t)=>s+parseFloat(t.montant),0)
   const totalSorties = txFiltrees.filter(t=>parseFloat(t.montant)<0).reduce((s,t)=>s+parseFloat(t.montant),0)
-
-  // Synthèse par catégorie (sur transactions filtrées)
-  const parCategorie = {}
-  txFiltrees.forEach(t => {
-    const key = t.categorie_id || '_none'
-    if (!parCategorie[key]) parCategorie[key] = { recettes: 0, depenses: 0, nb: 0 }
-    const m = parseFloat(t.montant) || 0
-    if (m >= 0) parCategorie[key].recettes += m
-    else parCategorie[key].depenses += m
-    parCategorie[key].nb++
-  })
-  const syntheseRecettes = Object.entries(parCategorie)
-    .map(([id, v]) => ({ cat: categories.find(c=>c.id===id), ...v }))
-    .filter(x => x.recettes > 0)
-    .sort((a,b) => b.recettes - a.recettes)
-  const syntheseDepenses = Object.entries(parCategorie)
-    .map(([id, v]) => ({ cat: categories.find(c=>c.id===id), ...v }))
-    .filter(x => x.depenses < 0)
-    .sort((a,b) => a.depenses - b.depenses)
-  const nonCategorise = txFiltrees.filter(t => !t.categorie_id).length
-
-  // Synthèse mensuelle (recettes / dépenses par mois)
-  const MOIS_NOMS = ['', 'Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc']
-  const parMois = {}
-  txFiltrees.forEach(t => {
-    const d = t._date || ''
-    if (d.length < 7) return
-    const key = d.substring(0, 7) // YYYY-MM
-    if (!parMois[key]) parMois[key] = { recettes: 0, depenses: 0, nb: 0 }
-    const m = parseFloat(t.montant) || 0
-    if (m >= 0) parMois[key].recettes += m
-    else parMois[key].depenses += m
-    parMois[key].nb++
-  })
-  const syntheseMensuelle = Object.entries(parMois)
-    .map(([ym, v]) => ({ ym, annee: ym.substring(0,4), mois: parseInt(ym.substring(5,7)), ...v, solde: v.recettes + v.depenses }))
-    .sort((a, b) => a.ym.localeCompare(b.ym))
-  const maxFluxMois = Math.max(1, ...syntheseMensuelle.map(m => Math.max(m.recettes, Math.abs(m.depenses))))
-
-  // Détail par fournisseur/contrepartie pour une catégorie donnée
-  function detailFournisseurs(catId, sens) {
-    const map = {}
-    txFiltrees.forEach(t => {
-      const key = t.categorie_id || '_none'
-      if (key !== catId) return
-      const m = parseFloat(t.montant) || 0
-      if (sens === 'recette' && m < 0) return
-      if (sens === 'depense' && m >= 0) return
-      const nom = t.contrepartie_nom || '(sans contrepartie)'
-      if (!map[nom]) map[nom] = { total: 0, nb: 0 }
-      map[nom].total += m
-      map[nom].nb++
-    })
-    return Object.entries(map)
-      .map(([nom, v]) => ({ nom, ...v }))
-      .sort((a,b) => sens === 'recette' ? b.total - a.total : a.total - b.total)
-  }
 
   // Pagination
   const totalPages = Math.max(1, Math.ceil(txFiltrees.length / PAR_PAGE))
@@ -373,159 +339,11 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
         )}
       </div>
 
-      {/* Synthèse par catégorie */}
-      {txFiltrees.length > 0 && (
-        <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap:'14px', marginBottom:'14px' }}>
-          {/* Recettes par catégorie */}
-          <div style={{ background:'#fff', borderRadius:'12px', border:'1px solid #e2e8f0', overflow:'hidden' }}>
-            <div style={{ padding:'12px 16px', background:'#f0fdf4', borderBottom:'1px solid #dcfce7', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <span style={{ fontSize:'12px', fontWeight:'700', color:'#16a34a', textTransform:'uppercase', letterSpacing:'0.05em' }}>▲ Recettes par catégorie</span>
-              <span style={{ fontSize:'15px', fontWeight:'800', color:'#16a34a' }}>+{fmt(totalEntrees)}</span>
-            </div>
-            <div>
-              {syntheseRecettes.length === 0 ? (
-                <div style={{ padding:'20px 16px', fontSize:'13px', color:'#94a3b8', textAlign:'center' }}>Aucune recette</div>
-              ) : syntheseRecettes.map((x, i) => {
-                const pct = totalEntrees > 0 ? (x.recettes / totalEntrees * 100) : 0
-                const cat = x.cat
-                const catId = cat?.id || '_none'
-                const expKey = 'r_' + catId
-                const ouvert = catExpanded === expKey
-                const detail = ouvert ? detailFournisseurs(catId, 'recette') : []
-                return (
-                  <div key={i} style={{ borderBottom: i<syntheseRecettes.length-1?'1px solid #f8fafc':'none' }}>
-                    <div onClick={()=>setCatExpanded(ouvert?null:expKey)} style={{ padding:'10px 16px', cursor:'pointer' }}>
-                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'5px' }}>
-                        <span style={{ display:'flex', alignItems:'center', gap:'7px' }}>
-                          <span style={{ fontSize:'10px', color:'#cbd5e1' }}>{ouvert?'▼':'▶'}</span>
-                          <span style={{ width:'9px', height:'9px', borderRadius:'50%', background: cat?.couleur || '#94a3b8' }}></span>
-                          <span style={{ fontSize:'13px', fontWeight:'600', color:'#1e293b' }}>{cat?.nom || 'Non catégorisé'}</span>
-                          <span style={{ fontSize:'11px', color:'#cbd5e1' }}>({x.nb})</span>
-                        </span>
-                        <span style={{ fontSize:'13px', fontWeight:'700', color:'#16a34a' }}>+{fmt(x.recettes)}</span>
-                      </div>
-                      <div style={{ height:'5px', background:'#f1f5f9', borderRadius:'3px', overflow:'hidden' }}>
-                        <div style={{ height:'100%', width:`${pct}%`, background: cat?.couleur || '#94a3b8', borderRadius:'3px' }}></div>
-                      </div>
-                    </div>
-                    {ouvert && (
-                      <div style={{ background:'#fafafa', padding:'4px 16px 10px 32px' }}>
-                        {detail.map((d, j) => (
-                          <div key={j} style={{ display:'flex', justifyContent:'space-between', padding:'5px 0', borderBottom: j<detail.length-1?'1px solid #f1f5f9':'none' }}>
-                            <span style={{ fontSize:'12px', color:'#475569', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', paddingRight:'10px' }}>{d.nom} <span style={{ color:'#cbd5e1' }}>({d.nb})</span></span>
-                            <span style={{ fontSize:'12px', fontWeight:'600', color:'#16a34a', flexShrink:0 }}>+{fmt(d.total)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Dépenses par catégorie */}
-          <div style={{ background:'#fff', borderRadius:'12px', border:'1px solid #e2e8f0', overflow:'hidden' }}>
-            <div style={{ padding:'12px 16px', background:'#fef2f2', borderBottom:'1px solid #fee2e2', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <span style={{ fontSize:'12px', fontWeight:'700', color:'#dc2626', textTransform:'uppercase', letterSpacing:'0.05em' }}>▼ Dépenses par catégorie</span>
-              <span style={{ fontSize:'15px', fontWeight:'800', color:'#dc2626' }}>{fmt(totalSorties)}</span>
-            </div>
-            <div>
-              {syntheseDepenses.length === 0 ? (
-                <div style={{ padding:'20px 16px', fontSize:'13px', color:'#94a3b8', textAlign:'center' }}>Aucune dépense</div>
-              ) : syntheseDepenses.map((x, i) => {
-                const pct = totalSorties < 0 ? (x.depenses / totalSorties * 100) : 0
-                const cat = x.cat
-                const catId = cat?.id || '_none'
-                const expKey = 'd_' + catId
-                const ouvert = catExpanded === expKey
-                const detail = ouvert ? detailFournisseurs(catId, 'depense') : []
-                return (
-                  <div key={i} style={{ borderBottom: i<syntheseDepenses.length-1?'1px solid #f8fafc':'none' }}>
-                    <div onClick={()=>setCatExpanded(ouvert?null:expKey)} style={{ padding:'10px 16px', cursor:'pointer' }}>
-                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'5px' }}>
-                        <span style={{ display:'flex', alignItems:'center', gap:'7px' }}>
-                          <span style={{ fontSize:'10px', color:'#cbd5e1' }}>{ouvert?'▼':'▶'}</span>
-                          <span style={{ width:'9px', height:'9px', borderRadius:'50%', background: cat?.couleur || '#94a3b8' }}></span>
-                          <span style={{ fontSize:'13px', fontWeight:'600', color:'#1e293b' }}>{cat?.nom || 'Non catégorisé'}</span>
-                          <span style={{ fontSize:'11px', color:'#cbd5e1' }}>({x.nb})</span>
-                        </span>
-                        <span style={{ fontSize:'13px', fontWeight:'700', color:'#dc2626' }}>{fmt(x.depenses)}</span>
-                      </div>
-                      <div style={{ height:'5px', background:'#f1f5f9', borderRadius:'3px', overflow:'hidden' }}>
-                        <div style={{ height:'100%', width:`${pct}%`, background: cat?.couleur || '#94a3b8', borderRadius:'3px' }}></div>
-                      </div>
-                    </div>
-                    {ouvert && (
-                      <div style={{ background:'#fafafa', padding:'4px 16px 10px 32px' }}>
-                        {detail.map((d, j) => (
-                          <div key={j} style={{ display:'flex', justifyContent:'space-between', padding:'5px 0', borderBottom: j<detail.length-1?'1px solid #f1f5f9':'none' }}>
-                            <span style={{ fontSize:'12px', color:'#475569', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', paddingRight:'10px' }}>{d.nom} <span style={{ color:'#cbd5e1' }}>({d.nb})</span></span>
-                            <span style={{ fontSize:'12px', fontWeight:'600', color:'#dc2626', flexShrink:0 }}>{fmt(d.total)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-      {nonCategorise > 0 && (
-        <div style={{ marginBottom:'14px', padding:'10px 16px', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'8px', fontSize:'13px', color:'#92400e' }}>
-          ⚠️ {nonCategorise} transaction{nonCategorise>1?'s':''} non catégorisée{nonCategorise>1?'s':''} — cliquez dessus pour leur attribuer une catégorie.
-        </div>
-      )}
-
-      {/* Synthèse mensuelle */}
-      {syntheseMensuelle.length > 0 && (
-        <div style={{ background:'#fff', borderRadius:'12px', border:'1px solid #e2e8f0', overflow:'hidden', marginBottom:'14px' }}>
-          <div style={{ padding:'12px 16px', background:'#f8fafc', borderBottom:'1px solid #e2e8f0', fontSize:'12px', fontWeight:'700', color:'#475569', textTransform:'uppercase', letterSpacing:'0.05em' }}>
-            📅 Évolution mensuelle
-          </div>
-          <div>
-            {syntheseMensuelle.map((m, i) => {
-              const pctR = (m.recettes / maxFluxMois) * 100
-              const pctD = (Math.abs(m.depenses) / maxFluxMois) * 100
-              return (
-                <div key={m.ym} style={{ padding:'10px 16px', borderBottom: i<syntheseMensuelle.length-1?'1px solid #f8fafc':'none', display:'grid', gridTemplateColumns: isMobile?'70px 1fr':'90px 1fr 120px', gap:'12px', alignItems:'center' }}>
-                  <div style={{ fontSize:'13px', fontWeight:'700', color:'#1e293b' }}>{MOIS_NOMS[m.mois]} {m.annee}</div>
-                  <div style={{ display:'flex', flexDirection:'column', gap:'3px' }}>
-                    {/* Barre recettes */}
-                    <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
-                      <div style={{ flex:1, height:'8px', background:'#f1f5f9', borderRadius:'4px', overflow:'hidden' }}>
-                        <div style={{ height:'100%', width:`${pctR}%`, background:'#16a34a', borderRadius:'4px' }}></div>
-                      </div>
-                      <span style={{ fontSize:'11px', fontWeight:'600', color:'#16a34a', minWidth:'70px', textAlign:'right' }}>+{fmt(m.recettes)}</span>
-                    </div>
-                    {/* Barre dépenses */}
-                    <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
-                      <div style={{ flex:1, height:'8px', background:'#f1f5f9', borderRadius:'4px', overflow:'hidden' }}>
-                        <div style={{ height:'100%', width:`${pctD}%`, background:'#dc2626', borderRadius:'4px' }}></div>
-                      </div>
-                      <span style={{ fontSize:'11px', fontWeight:'600', color:'#dc2626', minWidth:'70px', textAlign:'right' }}>{fmt(m.depenses)}</span>
-                    </div>
-                  </div>
-                  {!isMobile && (
-                    <div style={{ textAlign:'right' }}>
-                      <div style={{ fontSize:'10px', color:'#94a3b8', textTransform:'uppercase', fontWeight:'700' }}>Solde</div>
-                      <div style={{ fontSize:'15px', fontWeight:'800', color: m.solde>=0?'#16a34a':'#dc2626' }}>{m.solde>=0?'+':''}{fmt(m.solde)}</div>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
       {/* Tableau transactions pleine largeur */}
       <div style={{ background:'#fff', borderRadius:'12px', border:'1px solid #e2e8f0', overflow:'hidden' }}>
         {/* En-tête (desktop) */}
         {!isMobile && (
-        <div style={{ display:'grid', gridTemplateColumns:'100px 110px 1fr 170px 140px 110px', padding:'9px 16px', background:'#f8fafc', borderBottom:'1px solid #e2e8f0', fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.06em' }}>
+        <div style={{ display:'grid', gridTemplateColumns:'70px 100px 110px 1fr 170px 140px 110px', padding:'9px 16px', background:'#f8fafc', borderBottom:'1px solid #e2e8f0', fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.06em' }}>
           {(() => {
             const trier = (col) => setTri(t => ({ col, sens: t.col === col && t.sens === 'desc' ? 'asc' : 'desc' }))
             const fleche = (col) => tri.col === col ? (tri.sens === 'desc' ? ' ↓' : ' ↑') : ''
@@ -533,6 +351,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
               <div onClick={()=>trier(col)} style={{ cursor:'pointer', textAlign:align||'left', color: tri.col===col?color:'#94a3b8', userSelect:'none' }}>{children}{fleche(col)}</div>
             )
             return <>
+              <div style={{ textAlign:'center' }}>Facture</div>
               <Th col="date">Date</Th>
               <div>Compte</div>
               <div>Libellé</div>
@@ -574,7 +393,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                   <div key={t.id} onClick={() => setTxSelection(t)} style={{
                     padding:'12px 14px', cursor:'pointer',
                     borderBottom: i < txPage.length-1 ? '1px solid #f1f5f9' : 'none',
-                    background:'#fff'
+                    background: t.rapproche ? '#f0fdf4' : '#fff'
                   }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:'10px' }}>
                       <div style={{ minWidth:0, flex:1 }}>
@@ -589,23 +408,41 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                         {positif?'+':''}{fmt(t.montant)}
                       </div>
                     </div>
-                    <div style={{ marginTop:'6px' }}>
+                    <div style={{ marginTop:'6px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                       {cat ? (
                         <span style={{ fontSize:'11px', fontWeight:'600', padding:'2px 8px', borderRadius:'10px', background:`${cat.couleur}18`, color:cat.couleur }}>{cat.nom}</span>
                       ) : (
                         <span style={{ fontSize:'11px', color:'#cbd5e1' }}>Sans catégorie</span>
                       )}
+                      <div style={{ display:'flex', alignItems:'center', gap:'8px' }} onClick={e=>e.stopPropagation()}>
+                        <input type="checkbox" checked={!!t.rapproche} onChange={()=>toggleRapproche(t.id, t.rapproche)}
+                          title="Facture rapprochée" style={{ width:'18px', height:'18px', cursor:'pointer', accentColor:'#16a34a' }} />
+                        <button onClick={()=>ouvrirFacture(t)} title="Ouvrir factures SharePoint" style={{
+                          display:'flex', alignItems:'center', justifyContent:'center', width:'26px', height:'26px',
+                          borderRadius:'6px', border:'none', background: t.rapproche?'#16a34a':'#e2e8f0',
+                          color: t.rapproche?'#fff':'#64748b', cursor:'pointer', fontSize:'14px', fontWeight:'700'
+                        }}>✓</button>
+                      </div>
                     </div>
                   </div>
                 )
               }
               return (
               <div key={t.id} onClick={() => setTxSelection(t)} style={{
-                display:'grid', gridTemplateColumns:'100px 110px 1fr 170px 140px 110px',
+                display:'grid', gridTemplateColumns:'70px 100px 110px 1fr 170px 140px 110px',
                 padding:'9px 16px', alignItems:'center', cursor:'pointer',
                 borderBottom: i < txPage.length-1 ? '1px solid #f8fafc' : 'none',
-                background: i%2===0 ? '#fff' : '#fafafa'
+                background: t.rapproche ? '#f0fdf4' : (i%2===0 ? '#fff' : '#fafafa')
               }}>
+                <div style={{ display:'flex', alignItems:'center', gap:'8px', justifyContent:'center' }} onClick={e=>e.stopPropagation()}>
+                  <input type="checkbox" checked={!!t.rapproche} onChange={()=>toggleRapproche(t.id, t.rapproche)}
+                    title="Facture rapprochée" style={{ width:'16px', height:'16px', cursor:'pointer', accentColor:'#16a34a' }} />
+                  <button onClick={()=>ouvrirFacture(t)} title="Ouvrir les factures dans SharePoint" style={{
+                    display:'flex', alignItems:'center', justifyContent:'center', width:'22px', height:'22px',
+                    borderRadius:'5px', border:'none', background: t.rapproche?'#16a34a':'#e2e8f0',
+                    color: t.rapproche?'#fff':'#64748b', cursor:'pointer', fontSize:'13px', fontWeight:'700'
+                  }}>✓</button>
+                </div>
                 <div style={{ fontSize:'12px', color:'#64748b' }}>{fmtDate(t._date)}</div>
                 <div style={{ fontSize:'11px', color:'#94a3b8', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                   {t.comptes_bancaires?.banque || '—'}
@@ -670,6 +507,19 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                 <button onClick={()=>setTxSelection(null)} style={{ background:'rgba(255,255,255,0.2)', border:'none', borderRadius:'8px', width:'32px', height:'32px', color:'#fff', fontSize:'18px', cursor:'pointer' }}>×</button>
               </div>
               <div style={{ padding:'20px 24px' }}>
+                {/* Rapprochement facture */}
+                <div style={{ marginBottom:'18px', padding:'14px', border:`1px solid ${t.rapproche?'#bbf7d0':'#e2e8f0'}`, borderRadius:'10px', background: t.rapproche?'#f0fdf4':'#f8fafc' }}>
+                  <div style={{ fontSize:'12px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'10px' }}>Facture</div>
+                  <div style={{ display:'flex', gap:'10px', alignItems:'center' }}>
+                    <label style={{ display:'flex', alignItems:'center', gap:'8px', cursor:'pointer', fontSize:'14px', color:'#1e293b', fontWeight:'600' }}>
+                      <input type="checkbox" checked={!!t.rapproche} onChange={()=>toggleRapproche(t.id, t.rapproche)} style={{ width:'18px', height:'18px', cursor:'pointer', accentColor:'#16a34a' }} />
+                      {t.rapproche ? 'Facture rapprochée' : 'Marquer comme rapprochée'}
+                    </label>
+                    <button onClick={()=>ouvrirFacture(t)} style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', borderRadius:'8px', border:'none', background:color, color:'#fff', cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                      📄 Ouvrir dans SharePoint
+                    </button>
+                  </div>
+                </div>
                 {/* Sélecteur catégorie */}
                 <div style={{ marginBottom:'18px' }}>
                   <div style={{ fontSize:'12px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'8px' }}>Catégorie</div>
