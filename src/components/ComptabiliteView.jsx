@@ -82,7 +82,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadingTx, setLoadingTx] = useState(false)
-  const [filtre, setFiltre] = useState({ compte: 'tous', type: 'tous', libelle: '', annee: '', categorie: 'toutes' })
+  const [filtre, setFiltre] = useState({ compte: 'tous', type: 'tous', libelle: '', annee: '', categorie: 'toutes', facture: 'toutes' })
   const [tri, setTri] = useState({ col: 'date', sens: 'desc' })
   const [page, setPage] = useState(1)
   const [categories, setCategories] = useState([])
@@ -106,7 +106,6 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
         .from('comptes_bancaires')
         .select('*, societes(code,nom)')
         .in('societe_id', socs.map(s=>s.id))
-        .eq('actif', true)
         .order('banque')
       setComptes(data || [])
       setLoading(false)
@@ -147,7 +146,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   }, [comptes.map(c=>c.id).join(',')])
 
   // Reset pagination quand les filtres changent
-  useEffect(() => { setPage(1) }, [filtre.compte, filtre.type, filtre.libelle, filtre.annee, filtre.categorie])
+  useEffect(() => { setPage(1) }, [filtre.compte, filtre.type, filtre.libelle, filtre.annee, filtre.categorie, filtre.facture])
 
   // Charger les catégories
   async function chargerCategories() {
@@ -264,6 +263,8 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
     if (filtre.annee && !(t._date || '').startsWith(filtre.annee)) return false
     if (filtre.categorie === 'sans' && t.categorie_id) return false
     if (filtre.categorie !== 'toutes' && filtre.categorie !== 'sans' && t.categorie_id !== filtre.categorie) return false
+    if (filtre.facture === 'avec' && !t.facture_url) return false
+    if (filtre.facture === 'sans' && t.facture_url) return false
     return true
   })
   // Tri
@@ -364,11 +365,26 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
           </select>
         </div>
 
+        {/* Filtre facture */}
+        <div style={{ display:'flex', flexDirection:'column', gap:'3px' }}>
+          <label style={{ fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em' }}>Facture</label>
+          <div style={{ display:'flex', gap:'4px' }}>
+            {[['toutes','Toutes','#64748b','#f1f5f9'],['avec','✓ Avec','#16a34a','#dcfce7'],['sans','✕ Sans','#dc2626','#fee2e2']].map(([val,lab,c,bg]) => (
+              <button key={val} onClick={()=>setFiltre(f=>({...f,facture:val}))} style={{
+                padding:'7px 11px', borderRadius:'6px', border:'none', cursor:'pointer', fontSize:'13px', fontWeight:'600',
+                fontFamily:"'Source Sans Pro', sans-serif",
+                background: filtre.facture===val ? bg : '#f1f5f9',
+                color: filtre.facture===val ? c : '#94a3b8'
+              }}>{lab}</button>
+            ))}
+          </div>
+        </div>
+
         {/* Reset */}
-        {(filtre.compte!=='tous'||filtre.type!=='tous'||filtre.libelle||filtre.annee||filtre.categorie!=='toutes') && (
+        {(filtre.compte!=='tous'||filtre.type!=='tous'||filtre.libelle||filtre.annee||filtre.categorie!=='toutes'||filtre.facture!=='toutes') && (
           <div style={{ display:'flex', flexDirection:'column', gap:'3px' }}>
             <label style={{ fontSize:'10px', color:'transparent' }}>.</label>
-            <button onClick={()=>setFiltre({compte:'tous',type:'tous',libelle:'',annee:'',categorie:'toutes'})} style={{ padding:'7px 12px', borderRadius:'6px', fontSize:'12px', fontWeight:'600', cursor:'pointer', border:'1px solid #e2e8f0', background:'#fff', color:'#64748b' }}>
+            <button onClick={()=>setFiltre({compte:'tous',type:'tous',libelle:'',annee:'',categorie:'toutes',facture:'toutes'})} style={{ padding:'7px 12px', borderRadius:'6px', fontSize:'12px', fontWeight:'600', cursor:'pointer', border:'1px solid #e2e8f0', background:'#fff', color:'#64748b' }}>
               ✕ Reset
             </button>
           </div>
