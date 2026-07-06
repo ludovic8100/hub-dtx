@@ -832,7 +832,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       {/* Panneau de saisie : lier / justifier avec une facture (remplace window.prompt) */}
       {panneauJustif && (
         <div onClick={()=>setPanneauJustif(null)} style={{
-          position:'fixed', inset:0, background:'rgba(15,23,42,0.5)', zIndex:300,
+          position:'fixed', inset:0, background:'rgba(15,23,42,0.5)', zIndex:2000,
           display:'flex', alignItems:'center', justifyContent:'center', padding:'20px'
         }}>
           <div onClick={e=>e.stopPropagation()} style={{
