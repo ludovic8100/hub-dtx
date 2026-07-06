@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
-import VueFacturesFournisseurs from './VueFacturesFournisseurs'
+import VueFactures from './VueFactures'
 
 const fmt = (v) => v === null || v === undefined ? '—'
   : new Intl.NumberFormat('fr-BE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 }).format(v)
@@ -462,7 +462,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       </div>
 
       {onglet === 'factures' ? (
-        <VueFacturesFournisseurs societeCodes={societeCodes} color={color} />
+        <VueFactures societeCodes={societeCodes} color={color} />
       ) : (<>
 
       {/* En-tête collant : boutons sync + KPIs + filtres restent visibles, seuls les mouvements scrollent */}
