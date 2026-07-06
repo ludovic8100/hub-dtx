@@ -93,13 +93,6 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
     window.addEventListener('resize', fermer)
     return () => { window.removeEventListener('scroll', fermer, true); window.removeEventListener('resize', fermer) }
   }, [periodeOuverte])
-  useEffect(() => {
-    if (!menuCroix) return
-    const fermer = () => setMenuCroix(null)
-    window.addEventListener('scroll', fermer, true)
-    window.addEventListener('resize', fermer)
-    return () => { window.removeEventListener('scroll', fermer, true); window.removeEventListener('resize', fermer) }
-  }, [menuCroix])
   const [anneesDepliees, setAnneesDepliees] = useState({})
   const [tri, setTri] = useState({ col: 'date', sens: 'desc' })
   const [page, setPage] = useState(1)
@@ -111,6 +104,13 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const [apercu, setApercu] = useState(null) // { tx, x, y } — aperçu au survol du montant
   const [apercuFacture, setApercuFacture] = useState(null) // { url } — aperçu PDF au survol de la date
   const [menuCroix, setMenuCroix] = useState(null) // { tx, top, left } — menu au clic sur la croix rouge
+  useEffect(() => {
+    if (!menuCroix) return
+    const fermer = () => setMenuCroix(null)
+    window.addEventListener('scroll', fermer, true)
+    window.addEventListener('resize', fermer)
+    return () => { window.removeEventListener('scroll', fermer, true); window.removeEventListener('resize', fermer) }
+  }, [menuCroix])
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 768)
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 768)
