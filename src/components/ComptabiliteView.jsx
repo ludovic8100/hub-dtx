@@ -550,7 +550,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                   )}
                 </div>
                 <div
-                  onMouseEnter={() => t.facture_url && setApercuFacture({ url: urlVisionneuse(t.facture_url), nom: cheminFacture(t.facture_url) })}
+                  onMouseEnter={() => t.facture_url && setApercuFacture({ thumb: t.facture_thumb_url, lien: urlVisionneuse(t.facture_url), nom: cheminFacture(t.facture_url) })}
                   onMouseLeave={() => setApercuFacture(null)}
                   style={{ fontSize:'12px', color: t.facture_url ? '#16a34a' : '#64748b', fontWeight: t.facture_url ? '700' : '400', cursor: t.facture_url ? 'zoom-in' : 'default' }}>
                   {fmtDate(t._date)}{t.facture_url ? ' 🔍' : ''}
@@ -700,7 +700,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       {apercuFacture && !isMobile && (
         <div style={{
           position:'fixed', top:'50%', right:'32px', transform:'translateY(-50%)', zIndex:250,
-          width:'620px', maxWidth:'46vw', height:'80vh', background:'#fff', borderRadius:'14px',
+          width:'440px', maxWidth:'40vw', maxHeight:'86vh', background:'#fff', borderRadius:'14px',
           boxShadow:'0 20px 60px rgba(0,0,0,0.35)', border:'1px solid #e2e8f0', overflow:'hidden',
           display:'flex', flexDirection:'column', pointerEvents:'none'
         }}>
@@ -708,7 +708,13 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
             fontFamily:"'Source Sans Pro', sans-serif", whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
             📄 {apercuFacture.nom}
           </div>
-          <iframe src={apercuFacture.url} title="Aperçu facture" style={{ flex:1, border:'none', width:'100%' }} />
+          {apercuFacture.thumb ? (
+            <img src={apercuFacture.thumb} alt="Aperçu facture" style={{ width:'100%', height:'auto', display:'block', objectFit:'contain' }} />
+          ) : (
+            <div style={{ padding:'30px 20px', textAlign:'center', color:'#94a3b8', fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif" }}>
+              Aperçu en cours de génération…<br/><span style={{ fontSize:'11px' }}>Cliquez sur le ✓ pour ouvrir la facture</span>
+            </div>
+          )}
         </div>
       )}
 
