@@ -89,6 +89,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const [txSelection, setTxSelection] = useState(null)
   const [selection, setSelection] = useState(new Set()) // IDs des mouvements cochés pour justif multiple
   const [panneauJustif, setPanneauJustif] = useState(null) // { ids:[...], url:'', code:'LODE' } ou null
+  const [aideOuverte, setAideOuverte] = useState(false)
   const [apercu, setApercu] = useState(null) // { tx, x, y } — aperçu au survol du montant
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 768)
   useEffect(() => {
@@ -275,6 +276,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
     setTransactions(prev => prev.map(t => ids.includes(t.id) ? { ...t, facture_url: clean || null, rapproche: !!clean } : t))
     setTxSelection(prev => prev && ids.includes(prev.id) ? { ...prev, facture_url: clean || null, rapproche: !!clean } : prev)
     setPanneauJustif(null)
+    setAideOuverte(false)
     viderSelection()
   }
 
@@ -601,18 +603,43 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
             background:'#fff', borderRadius:'14px', padding:'24px', width:'100%', maxWidth:'520px',
             boxShadow:'0 20px 60px rgba(0,0,0,0.3)', fontFamily:"'Source Sans Pro', sans-serif"
           }}>
-            <div style={{ fontSize:'17px', fontWeight:'800', color:'#0f172a', marginBottom:'6px' }}>
-              {panneauJustif.ids.length > 1 ? `Justifier ${panneauJustif.ids.length} mouvements` : 'Lier une facture'}
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'6px' }}>
+              <div style={{ fontSize:'17px', fontWeight:'800', color:'#0f172a' }}>
+                {panneauJustif.ids.length > 1 ? `Justifier ${panneauJustif.ids.length} mouvements` : 'Lier une facture'}
+              </div>
+              <button onClick={()=>setAideOuverte(a=>!a)} style={{
+                display:'flex', alignItems:'center', gap:'5px', padding:'5px 10px', borderRadius:'20px', border:'1px solid #cbd5e1',
+                background: aideOuverte ? `${color}12` : '#fff', color: aideOuverte ? color : '#64748b', cursor:'pointer', fontSize:'12px', fontWeight:'700',
+                fontFamily:"'Source Sans Pro', sans-serif"
+              }}>❔ Comment faire ?</button>
             </div>
-            <div style={{ fontSize:'13px', color:'#64748b', marginBottom:'16px', lineHeight:1.5 }}>
-              1. Ouvrez SharePoint, trouvez la facture, faites un clic droit puis « Copier le lien ».<br/>
-              2. Collez le lien ci-dessous et validez.
-            </div>
+
+            {/* Encart d'aide dépliable (pour Nadine) */}
+            {aideOuverte && (
+              <div style={{ background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:'10px', padding:'14px 16px', marginBottom:'16px', fontSize:'13px', color:'#334155', lineHeight:1.7 }}>
+                <div style={{ fontWeight:'700', marginBottom:'8px', color:'#0f172a' }}>📋 Étapes à suivre :</div>
+                <div style={{ marginBottom:'6px' }}><b>1.</b> Cliquez sur <b>« Ouvrir SharePoint »</b> ci-dessous — un nouvel onglet s'ouvre.</div>
+                <div style={{ marginBottom:'6px' }}><b>2.</b> Dans SharePoint, retrouvez la <b>facture</b> concernée (le bon fichier PDF).</div>
+                <div style={{ marginBottom:'6px' }}><b>3.</b> <b>Clic droit</b> sur le fichier → <b>« Copier le lien »</b> (ou sélectionnez-le puis « Copier le lien » en haut).</div>
+                <div style={{ marginBottom:'6px' }}><b>4.</b> Si SharePoint affiche une fenêtre de partage, cliquez simplement sur <b>« Copier »</b>.</div>
+                <div style={{ marginBottom:'6px' }}><b>5.</b> Revenez sur cet onglet, cliquez dans le champ ci-dessous et <b>collez</b> (Ctrl+V).</div>
+                <div><b>6.</b> Cliquez sur <b>« Valider »</b>. La facture est reliée au(x) mouvement(s) ✓</div>
+              </div>
+            )}
+
+            {!aideOuverte && (
+              <div style={{ fontSize:'13px', color:'#64748b', marginBottom:'16px', lineHeight:1.5 }}>
+                Ouvrez SharePoint, copiez le lien de la facture (clic droit → « Copier le lien »), puis collez-le ci-dessous.
+              </div>
+            )}
+
             <button onClick={ouvrirDossierDepuisPanneau} style={{
-              display:'flex', alignItems:'center', gap:'8px', padding:'9px 14px', borderRadius:'8px', border:'1px solid #cbd5e1',
-              background:'#f8fafc', color:'#334155', cursor:'pointer', fontSize:'13px', fontWeight:'600', marginBottom:'14px',
+              display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', padding:'12px 14px', borderRadius:'8px', border:'none',
+              background:'#0078d4', color:'#fff', cursor:'pointer', fontSize:'14px', fontWeight:'700', marginBottom:'14px', width:'100%',
               fontFamily:"'Source Sans Pro', sans-serif"
-            }}>📂 Ouvrir le dossier SharePoint ({panneauJustif.code})</button>
+            }}>📂 Ouvrir SharePoint pour chercher la facture ({panneauJustif.code})</button>
+
+            <label style={{ fontSize:'11px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em', display:'block', marginBottom:'5px' }}>Lien de la facture</label>
             <input type="text" autoFocus placeholder="Collez ici le lien SharePoint de la facture…"
               value={panneauJustif.url}
               onChange={e=>setPanneauJustif(p=>({...p, url:e.target.value}))}
