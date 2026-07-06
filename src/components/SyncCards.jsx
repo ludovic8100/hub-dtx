@@ -84,7 +84,7 @@ export function fmtDerniereExec(at) {
 }
 
 // Bouton compact unique avec dernière exécution
-function SyncMiniButton({ sync }) {
+function SyncMiniButton({ sync, onDark }) {
   const [state, setState] = useState('idle')
   const [lastExec, setLastExec] = useState(null)
 
@@ -107,21 +107,26 @@ function SyncMiniButton({ sync }) {
     setTimeout(() => { loadLastExec(); setState('idle') }, 8000)
   }
   const running = state === 'running'
-  const statusCol = lastExec?.status === 'error' ? '#dc2626' : lastExec?.status === 'success' ? '#16a34a' : '#94a3b8'
+  const statusCol = lastExec?.status === 'error' ? '#f87171' : lastExec?.status === 'success' ? (onDark ? '#86efac' : '#16a34a') : (onDark ? 'rgba(255,255,255,0.6)' : '#94a3b8')
+  const bg = onDark
+    ? (running ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.92)')
+    : (running ? '#f1f5f9' : (state==='ok' ? '#f0fdf4' : state==='error' ? '#fef2f2' : '#fff'))
+  const txtCol = onDark ? '#1e293b' : '#334155'
+  const iconCol = running ? '#94a3b8' : (state==='ok' ? '#16a34a' : state==='error' ? '#dc2626' : sync.color)
+  const border = onDark ? '1px solid rgba(255,255,255,0.3)' : '1px solid #e2e8f0'
 
   return (
     <button onClick={run} disabled={running} title={`Dernière exécution : ${fmtDerniereExec(lastExec?.at)}${lastExec?.status ? ' ('+lastExec.status+')' : ''}`}
       style={{
         display:'flex', alignItems:'center', gap:'7px', padding:'7px 12px', borderRadius:'8px',
-        border:'1px solid #e2e8f0', background: running ? '#f1f5f9' : (state==='ok' ? '#f0fdf4' : state==='error' ? '#fef2f2' : '#fff'),
+        border, background: bg,
         cursor: running ? 'wait' : 'pointer', fontSize:'12px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif",
-        color:'#334155', whiteSpace:'nowrap', flexShrink:0
+        color: txtCol, whiteSpace:'nowrap', flexShrink:0
       }}>
       <i className={`ti ${running ? 'ti-loader-2' : (state==='ok' ? 'ti-check' : state==='error' ? 'ti-x' : sync.icon)}`}
-        style={{ color: running ? '#94a3b8' : (state==='ok' ? '#16a34a' : state==='error' ? '#dc2626' : sync.color), fontSize:'15px',
-          animation: running ? 'spin 1s linear infinite' : 'none' }} />
+        style={{ color: iconCol, fontSize:'15px', animation: running ? 'spin 1s linear infinite' : 'none' }} />
       <span>{sync.label}</span>
-      <span style={{ display:'inline-flex', alignItems:'center', gap:'4px', paddingLeft:'6px', borderLeft:'1px solid #e2e8f0', color:statusCol, fontSize:'11px', fontWeight:'500' }}>
+      <span style={{ display:'inline-flex', alignItems:'center', gap:'4px', paddingLeft:'6px', borderLeft: onDark?'1px solid #e2e8f0':'1px solid #e2e8f0', color:statusCol, fontSize:'11px', fontWeight:'500' }}>
         <span style={{ width:'6px', height:'6px', borderRadius:'50%', background:statusCol, display:'inline-block' }} />
         {fmtDerniereExec(lastExec?.at)}
       </span>
@@ -130,14 +135,14 @@ function SyncMiniButton({ sync }) {
 }
 
 // Ligne de boutons de synchronisation manuelle (avec dernière exécution)
-export function SyncButtonsRow({ only, style }) {
+export function SyncButtonsRow({ only, style, onDark }) {
   const list = only ? SYNC_BUTTONS.filter(s => only.includes(s.key)) : SYNC_BUTTONS
   return (
     <div style={{ display:'flex', gap:'8px', flexWrap:'wrap', alignItems:'center', ...style }}>
-      <span style={{ fontSize:'11px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em', marginRight:'2px' }}>
+      <span style={{ fontSize:'11px', fontWeight:'700', color: onDark ? 'rgba(255,255,255,0.85)' : '#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em', marginRight:'2px' }}>
         <i className="ti ti-refresh" style={{ fontSize:'13px', marginRight:'4px' }} />Mettre à jour
       </span>
-      {list.map(s => <SyncMiniButton key={s.key} sync={s} />)}
+      {list.map(s => <SyncMiniButton key={s.key} sync={s} onDark={onDark} />)}
     </div>
   )
 }

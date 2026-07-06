@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { SyncButtonsRow } from './SyncCards'
 
 const fmt = (v) => v === null || v === undefined ? '—'
   : new Intl.NumberFormat('fr-BE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 }).format(v)
@@ -340,14 +339,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
     <div style={{ fontFamily:"'Source Sans Pro', sans-serif" }}>
 
       {/* En-tête collant : boutons sync + KPIs + filtres restent visibles, seuls les mouvements scrollent */}
-      <div style={{ position:'sticky', top: isMobile ? '-8px' : '-28px', zIndex:60, background:'#f1f5f9', paddingTop: isMobile ? '4px' : '8px', marginBottom:'14px' }}>
-
-      {/* Boutons de mise à jour manuelle des workflows */}
-      {!isMobile && (
-        <div style={{ marginBottom:'14px' }}>
-          <SyncButtonsRow only={['rapprochement','iban','bordereaux']} />
-        </div>
-      )}
+      <div style={{ position:'sticky', top: isMobile ? '-16px' : '-28px', zIndex:60, background:'#f1f5f9', paddingTop: isMobile ? '16px' : '28px', paddingBottom:'2px', marginBottom:'14px' }}>
 
       {/* KPIs */}
       <div style={{ display:'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap:'14px', marginBottom:'14px' }}>

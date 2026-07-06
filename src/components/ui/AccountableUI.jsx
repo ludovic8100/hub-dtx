@@ -30,7 +30,7 @@ function hexToRgba(hex, a = 1) {
  * Bandeau de statistiques — l'en-tête coloré façon Accountable.
  * props: color, colorLight, title, subtitle, stats[{label,value}], action (JSX), logoUrl
  * ------------------------------------------------------------------------- */
-export function StatBanner({ color, colorDark, title, subtitle, stats = [], action, logoUrl }) {
+export function StatBanner({ color, colorDark, title, subtitle, stats = [], action, logoUrl, footer }) {
   const mob = useMobile()
   return (
     <div style={{
@@ -57,6 +57,10 @@ export function StatBanner({ color, colorDark, title, subtitle, stats = [], acti
         </div>
         {action && <div style={{ position: 'relative' }}>{action}</div>}
       </div>
+
+      {footer && (
+        <div style={{ position: 'relative', marginTop: mob ? 12 : 16 }}>{footer}</div>
+      )}
 
       {stats.length > 0 && (
         <div style={{ position: 'relative', display: 'flex', gap: mob ? 20 : 36, marginTop: mob ? 14 : 18, flexWrap: 'wrap' }}>
