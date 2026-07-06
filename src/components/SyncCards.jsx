@@ -62,7 +62,7 @@ export const SYNC_BUTTONS = [
   ...SYNCS,
   {
     key: 'rapprochement',
-    label: 'Rapprochement factures',
+    label: 'Rapprochement & prévisualisation',
     desc: 'Associe automatiquement les factures SharePoint aux transactions bancaires.',
     icon: 'ti-link',
     color: '#0080BD',
