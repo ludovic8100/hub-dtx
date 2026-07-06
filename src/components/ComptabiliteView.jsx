@@ -88,6 +88,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const [categories, setCategories] = useState([])
   const [txSelection, setTxSelection] = useState(null)
   const [selection, setSelection] = useState(new Set()) // IDs des mouvements cochés pour justif multiple
+  const [panneauJustif, setPanneauJustif] = useState(null) // { ids:[...], url:'', code:'LODE' } ou null
   const [apercu, setApercu] = useState(null) // { tx, x, y } — aperçu au survol du montant
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 768)
   useEffect(() => {
@@ -228,17 +229,9 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   }
 
   // Lier manuellement une facture : coller son URL SharePoint
-  async function lierFactureManuelle(tx) {
+  function lierFactureManuelle(tx) {
     const code = tx.comptes_bancaires?.societes?.code || societeCodes[0]
-    const dossier = SHAREPOINT_FACTURES[code] || SHAREPOINT_FACTURES.DYNASSUR
-    // ouvrir le dossier pour que l'utilisateur copie le lien
-    window.open(dossier, '_blank', 'noopener,noreferrer')
-    const url = window.prompt("Collez ici le lien SharePoint de la facture (clic droit sur le fichier > Copier le lien) :", tx.facture_url || '')
-    if (url === null) return // annulé
-    const clean = url.trim()
-    await supabase.from('transactions').update({ facture_url: clean || null, rapproche: !!clean }).eq('id', tx.id)
-    setTransactions(prev => prev.map(t => t.id === tx.id ? { ...t, facture_url: clean || null, rapproche: !!clean } : t))
-    setTxSelection(prev => prev && prev.id === tx.id ? { ...prev, facture_url: clean || null, rapproche: !!clean } : prev)
+    setPanneauJustif({ ids: [tx.id], url: tx.facture_url || '', code })
   }
 
   // Retirer le lien facture (repasse en croix rouge)
@@ -259,20 +252,29 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   function viderSelection() { setSelection(new Set()) }
 
   // Relier tous les mouvements sélectionnés à une même facture
-  async function justifierSelection() {
+  function justifierSelection() {
     const ids = [...selection]
     if (ids.length === 0) return
-    // société du 1er mouvement sélectionné pour ouvrir le bon dossier
     const premier = transactions.find(t => t.id === ids[0])
     const code = premier?.comptes_bancaires?.societes?.code || societeCodes[0]
-    const dossier = SHAREPOINT_FACTURES[code] || SHAREPOINT_FACTURES.DYNASSUR
+    setPanneauJustif({ ids, url: '', code })
+  }
+
+  // Ouvrir le dossier SharePoint depuis le panneau
+  function ouvrirDossierDepuisPanneau() {
+    const dossier = SHAREPOINT_FACTURES[panneauJustif?.code] || SHAREPOINT_FACTURES.DYNASSUR
     window.open(dossier, '_blank', 'noopener,noreferrer')
-    const url = window.prompt(`Justifier ${ids.length} mouvement(s) avec une même facture.\nCollez le lien SharePoint de la facture :`, '')
-    if (url === null) return
-    const clean = url.trim()
-    if (!clean) return
-    await supabase.from('transactions').update({ facture_url: clean, rapproche: true }).in('id', ids)
-    setTransactions(prev => prev.map(t => ids.includes(t.id) ? { ...t, facture_url: clean, rapproche: true } : t))
+  }
+
+  // Valider le panneau : appliquer le lien facture aux mouvements
+  async function validerPanneauJustif() {
+    if (!panneauJustif) return
+    const { ids } = panneauJustif
+    const clean = (panneauJustif.url || '').trim()
+    await supabase.from('transactions').update({ facture_url: clean || null, rapproche: !!clean }).in('id', ids)
+    setTransactions(prev => prev.map(t => ids.includes(t.id) ? { ...t, facture_url: clean || null, rapproche: !!clean } : t))
+    setTxSelection(prev => prev && ids.includes(prev.id) ? { ...prev, facture_url: clean || null, rapproche: !!clean } : prev)
+    setPanneauJustif(null)
     viderSelection()
   }
 
@@ -588,6 +590,49 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
           </>
         )}
       </div>
+
+      {/* Panneau de saisie : lier / justifier avec une facture (remplace window.prompt) */}
+      {panneauJustif && (
+        <div onClick={()=>setPanneauJustif(null)} style={{
+          position:'fixed', inset:0, background:'rgba(15,23,42,0.5)', zIndex:300,
+          display:'flex', alignItems:'center', justifyContent:'center', padding:'20px'
+        }}>
+          <div onClick={e=>e.stopPropagation()} style={{
+            background:'#fff', borderRadius:'14px', padding:'24px', width:'100%', maxWidth:'520px',
+            boxShadow:'0 20px 60px rgba(0,0,0,0.3)', fontFamily:"'Source Sans Pro', sans-serif"
+          }}>
+            <div style={{ fontSize:'17px', fontWeight:'800', color:'#0f172a', marginBottom:'6px' }}>
+              {panneauJustif.ids.length > 1 ? `Justifier ${panneauJustif.ids.length} mouvements` : 'Lier une facture'}
+            </div>
+            <div style={{ fontSize:'13px', color:'#64748b', marginBottom:'16px', lineHeight:1.5 }}>
+              1. Ouvrez SharePoint, trouvez la facture, faites un clic droit puis « Copier le lien ».<br/>
+              2. Collez le lien ci-dessous et validez.
+            </div>
+            <button onClick={ouvrirDossierDepuisPanneau} style={{
+              display:'flex', alignItems:'center', gap:'8px', padding:'9px 14px', borderRadius:'8px', border:'1px solid #cbd5e1',
+              background:'#f8fafc', color:'#334155', cursor:'pointer', fontSize:'13px', fontWeight:'600', marginBottom:'14px',
+              fontFamily:"'Source Sans Pro', sans-serif"
+            }}>📂 Ouvrir le dossier SharePoint ({panneauJustif.code})</button>
+            <input type="text" autoFocus placeholder="Collez ici le lien SharePoint de la facture…"
+              value={panneauJustif.url}
+              onChange={e=>setPanneauJustif(p=>({...p, url:e.target.value}))}
+              onKeyDown={e=>{ if(e.key==='Enter') validerPanneauJustif() }}
+              style={{ width:'100%', padding:'10px 12px', border:'1px solid #e2e8f0', borderRadius:'8px', fontSize:'13px',
+                fontFamily:"'Source Sans Pro', sans-serif", boxSizing:'border-box', marginBottom:'18px' }}
+            />
+            <div style={{ display:'flex', gap:'10px', justifyContent:'flex-end' }}>
+              <button onClick={()=>setPanneauJustif(null)} style={{
+                padding:'9px 16px', borderRadius:'8px', border:'1px solid #e2e8f0', background:'#fff', color:'#64748b',
+                cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif"
+              }}>Annuler</button>
+              <button onClick={validerPanneauJustif} style={{
+                padding:'9px 18px', borderRadius:'8px', border:'none', background:color, color:'#fff',
+                cursor:'pointer', fontSize:'13px', fontWeight:'700', fontFamily:"'Source Sans Pro', sans-serif"
+              }}>Valider</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Barre d'action : justifier plusieurs mouvements avec une facture */}
       {selection.size > 0 && (
