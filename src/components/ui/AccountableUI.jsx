@@ -36,7 +36,7 @@ export function StatBanner({ color, colorDark, title, subtitle, stats = [], acti
     <div style={{
       position: 'relative', overflow: 'hidden',
       background: `linear-gradient(135deg, ${color} 0%, ${colorDark || color} 140%)`,
-      borderRadius: 16, padding: mob ? '14px 16px' : '18px 24px', marginBottom: mob ? 10 : 12, color: '#fff',
+      borderRadius: 16, padding: mob ? '12px 16px' : '16px 24px', marginBottom: mob ? 8 : 10, color: '#fff',
       fontFamily: FONT, boxShadow: `0 6px 20px ${hexToRgba(color, 0.25)}`,
     }}>
       {/* Cercle décoratif en fond */}

@@ -451,7 +451,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
     <div style={{ fontFamily:"'Source Sans Pro', sans-serif" }}>
 
       {/* Onglets Mouvements / Factures */}
-      <div style={{ display:'flex', gap:'4px', marginBottom:'16px', borderBottom:'2px solid #e2e8f0' }}>
+      <div style={{ display:'flex', gap:'4px', marginBottom:'10px', borderBottom:'2px solid #e2e8f0' }}>
         {[['mouvements','Mouvements bancaires'],['factures','Factures']].map(([k,lab]) => (
           <button key={k} onClick={()=>setOnglet(k)} style={{
             padding:'10px 20px', border:'none', background:'none', cursor:'pointer', fontSize:'14px', fontWeight:'700',
@@ -466,7 +466,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       ) : (<>
 
       {/* En-tête collant : boutons sync + KPIs + filtres restent visibles, seuls les mouvements scrollent */}
-      <div style={{ position:'sticky', top: isMobile ? '-16px' : '-20px', zIndex:60, background:'#f1f5f9', paddingTop: isMobile ? '10px' : '12px', paddingBottom:'2px', marginBottom:'10px' }}>
+      <div style={{ position:'sticky', top: isMobile ? '-16px' : '-20px', zIndex:60, background:'#f1f5f9', paddingTop: isMobile ? '6px' : '8px', paddingBottom:'2px', marginBottom:'8px' }}>
 
       {/* KPIs */}
       <div style={{ display:'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap:'12px', marginBottom:'10px' }}>
