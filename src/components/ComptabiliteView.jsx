@@ -378,8 +378,15 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
     if (filtre.type === 'entrees' && parseFloat(t.montant) <= 0) return false
     if (filtre.type === 'sorties' && parseFloat(t.montant) >= 0) return false
     if (filtre.libelle) {
-      const q = filtre.libelle.toLowerCase()
-      if (!t.information_paiement?.toLowerCase().includes(q) && !t.description?.toLowerCase().includes(q) && !t.contrepartie_nom?.toLowerCase().includes(q)) return false
+      const mots = filtre.libelle.toLowerCase().trim().split(/\s+/).filter(Boolean)
+      const cat = categories.find(c => c.id === t.categorie_id)
+      const hay = [
+        t.contrepartie_nom, t.contrepartie_iban, t.information_paiement, t.description,
+        t.type_transaction, t.statut, t.devise, t.ponto_transaction_id,
+        t.comptes_bancaires?.banque, t.comptes_bancaires?.libelle, t.comptes_bancaires?.iban,
+        cat?.nom, fmt(t.montant), String(t.montant), t.date_valeur, t.date_execution
+      ].filter(Boolean).join(' ').toLowerCase()
+      if (!mots.every(m => hay.includes(m))) return false
     }
     if (filtre.periodes.length > 0) {
       const ym = (t._date || '').substring(0,7) // 'YYYY-MM'
@@ -550,10 +557,10 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
           </div>
         </div>
 
-        {/* Filtre libellé */}
+        {/* Filtre recherche (sur toutes les données du mouvement) */}
         <div style={{ display:'flex', flexDirection:'column', gap:'3px', flex:1, minWidth:'130px' }}>
-          <label style={{ fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em' }}>Libellé</label>
-          <input type="text" placeholder="Rechercher…" value={filtre.libelle}
+          <label style={{ fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em' }}>Recherche</label>
+          <input type="text" placeholder="Contrepartie, IBAN, communication, montant, date…" value={filtre.libelle}
             onChange={e=>setFiltre(f=>({...f,libelle:e.target.value}))}
             style={{ padding:'7px 10px', border:'1px solid #e2e8f0', borderRadius:'6px', fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif" }}
           />
