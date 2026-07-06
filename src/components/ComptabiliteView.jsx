@@ -426,13 +426,17 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
           { label:'Trésorerie totale', value: fmt(soldeTotal), color, sub:`${comptes.length} comptes` },
           { label:'Entrées', value: fmt(totalEntrees), color:'#16a34a' },
           { label:'Sorties', value: fmt(totalSorties), color:'#dc2626' },
-          { label:'Factures non liées', value: nbSansFacture, color:'#dc2626', clic:'sans', sub:`${nbAvecFacture} liées`, badge:true },
+          (filtre.facture === 'avec'
+            ? { label:'Factures liées', value: nbAvecFacture, color:'#16a34a', clic:'toggle', sub:`${nbSansFacture} non liées • ${nbAvecFacture+nbSansFacture} au total`, badge:true }
+            : filtre.facture === 'sans'
+            ? { label:'Factures non liées', value: nbSansFacture, color:'#dc2626', clic:'toggle', sub:`${nbAvecFacture} liées • ${nbAvecFacture+nbSansFacture} au total`, badge:true }
+            : { label:'Factures (toutes)', value: nbAvecFacture+nbSansFacture, color, clic:'toggle', sub:`${nbAvecFacture} liées • ${nbSansFacture} non liées`, badge:true }),
         ].map(k => (
-          <div key={k.label} onClick={k.clic ? ()=>setFiltre(f=>({...f, facture: f.facture===k.clic ? 'toutes' : k.clic})) : undefined}
-            style={{ background: (k.clic && filtre.facture===k.clic) ? '#fef2f2' : '#fff', borderRadius:'10px', border:`1px solid ${(k.clic && filtre.facture===k.clic) ? '#fecaca' : '#e2e8f0'}`, borderTop:`3px solid ${k.color}`, padding:'16px 20px', cursor: k.clic ? 'pointer' : 'default', transition:'all .15s' }}>
+          <div key={k.label} onClick={k.clic ? ()=>setFiltre(f=>({...f, facture: f.facture==='toutes' ? 'sans' : f.facture==='sans' ? 'avec' : 'toutes'})) : undefined}
+            style={{ background: (k.clic && filtre.facture!=='toutes') ? '#f8fafc' : '#fff', borderRadius:'10px', border:`1px solid ${(k.clic && filtre.facture!=='toutes') ? '#cbd5e1' : '#e2e8f0'}`, borderTop:`3px solid ${k.color}`, padding:'16px 20px', cursor: k.clic ? 'pointer' : 'default', transition:'all .15s' }}>
             <div style={{ fontSize:'11px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'6px' }}>{k.label}</div>
             <div style={{ fontSize:'20px', fontWeight:'800', color: k.badge ? k.color : '#0f172a', lineHeight:1 }}>{k.value}</div>
-            {k.sub && <div style={{ fontSize:'11px', color:'#94a3b8', marginTop:'5px', fontWeight:'600' }}>{k.sub}{k.clic ? ' • cliquer pour filtrer' : ''}</div>}
+            {k.sub && <div style={{ fontSize:'11px', color:'#94a3b8', marginTop:'5px', fontWeight:'600' }}>{k.sub}</div>}
           </div>
         ))}
       </div>
