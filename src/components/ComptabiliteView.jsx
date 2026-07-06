@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
 const fmt = (v) => v === null || v === undefined ? '—'
@@ -84,6 +84,15 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const [loadingTx, setLoadingTx] = useState(false)
   const [filtre, setFiltre] = useState({ compte: 'tous', type: 'tous', libelle: '', periodes: [], categorie: 'toutes', facture: 'toutes' })
   const [periodeOuverte, setPeriodeOuverte] = useState(false)
+  const [periodePos, setPeriodePos] = useState({ top:0, left:0 })
+  const periodeBtnRef = useRef(null)
+  useEffect(() => {
+    if (!periodeOuverte) return
+    const fermer = () => setPeriodeOuverte(false)
+    window.addEventListener('scroll', fermer, true)
+    window.addEventListener('resize', fermer)
+    return () => { window.removeEventListener('scroll', fermer, true); window.removeEventListener('resize', fermer) }
+  }, [periodeOuverte])
   const [anneesDepliees, setAnneesDepliees] = useState({})
   const [tri, setTri] = useState({ col: 'date', sens: 'desc' })
   const [page, setPage] = useState(1)
@@ -450,7 +459,13 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
         {/* Filtre période (Année > Trimestre > Mois, sélection multiple) */}
         <div style={{ display:'flex', flexDirection:'column', gap:'3px', flexShrink:0, position:'relative' }}>
           <label style={{ fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em' }}>Période</label>
-          <button onClick={()=>setPeriodeOuverte(o=>!o)} style={{
+          <button ref={periodeBtnRef} onClick={()=>{
+            if (!periodeOuverte && periodeBtnRef.current) {
+              const r = periodeBtnRef.current.getBoundingClientRect()
+              setPeriodePos({ top: r.bottom + 4, left: r.left })
+            }
+            setPeriodeOuverte(o=>!o)
+          }} style={{
             padding:'7px 10px', border:'1px solid #e2e8f0', borderRadius:'6px', fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif",
             cursor:'pointer', background:'#fff', color: filtre.periodes.length ? '#0f172a' : '#94a3b8', minWidth:'180px', maxWidth:'240px',
             display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px', whiteSpace:'nowrap', overflow:'hidden'
@@ -460,9 +475,9 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
           </button>
           {periodeOuverte && (
             <>
-              <div onClick={()=>setPeriodeOuverte(false)} style={{ position:'fixed', inset:0, zIndex:90 }} />
+              <div onClick={()=>setPeriodeOuverte(false)} style={{ position:'fixed', inset:0, zIndex:1000 }} />
               <div style={{
-                position:'absolute', top:'100%', left:0, marginTop:'4px', zIndex:100, background:'#fff',
+                position:'fixed', top: periodePos.top, left: periodePos.left, zIndex:1001, background:'#fff',
                 border:'1px solid #e2e8f0', borderRadius:'10px', boxShadow:'0 12px 32px rgba(0,0,0,0.15)',
                 padding:'8px', width:'280px', maxHeight:'380px', overflowY:'auto'
               }}>
