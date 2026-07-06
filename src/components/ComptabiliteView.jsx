@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import VueFacturesFournisseurs from './VueFacturesFournisseurs'
 
 const fmt = (v) => v === null || v === undefined ? '—'
   : new Intl.NumberFormat('fr-BE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 }).format(v)
@@ -83,6 +84,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const [loading, setLoading] = useState(true)
   const [loadingTx, setLoadingTx] = useState(false)
   const [filtre, setFiltre] = useState({ compte: 'tous', type: 'tous', libelle: '', periodes: [], categorie: 'toutes', facture: 'toutes' })
+  const [onglet, setOnglet] = useState('mouvements') // 'mouvements' | 'factures'
   const [periodeOuverte, setPeriodeOuverte] = useState(false)
   const [periodePos, setPeriodePos] = useState({ top:0, left:0 })
   const periodeBtnRef = useRef(null)
@@ -446,6 +448,21 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
 
   return (
     <div style={{ fontFamily:"'Source Sans Pro', sans-serif" }}>
+
+      {/* Onglets Mouvements / Factures */}
+      <div style={{ display:'flex', gap:'4px', marginBottom:'16px', borderBottom:'2px solid #e2e8f0' }}>
+        {[['mouvements','Mouvements bancaires'],['factures','Factures']].map(([k,lab]) => (
+          <button key={k} onClick={()=>setOnglet(k)} style={{
+            padding:'10px 20px', border:'none', background:'none', cursor:'pointer', fontSize:'14px', fontWeight:'700',
+            fontFamily:"'Source Sans Pro', sans-serif", color: onglet===k ? color : '#94a3b8',
+            borderBottom: onglet===k ? `3px solid ${color}` : '3px solid transparent', marginBottom:'-2px'
+          }}>{lab}</button>
+        ))}
+      </div>
+
+      {onglet === 'factures' ? (
+        <VueFacturesFournisseurs societeCodes={societeCodes} color={color} />
+      ) : (<>
 
       {/* En-tête collant : boutons sync + KPIs + filtres restent visibles, seuls les mouvements scrollent */}
       <div style={{ position:'sticky', top: isMobile ? '-16px' : '-28px', zIndex:60, background:'#f1f5f9', paddingTop: isMobile ? '16px' : '28px', paddingBottom:'2px', marginBottom:'14px' }}>
@@ -1125,6 +1142,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
           </div>
         )
       })()}
+      </>)}
     </div>
   )
 }
