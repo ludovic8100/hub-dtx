@@ -82,7 +82,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadingTx, setLoadingTx] = useState(false)
-  const [filtre, setFiltre] = useState({ compte: 'tous', type: 'tous', libelle: '', annee: '', categorie: 'toutes', facture: 'toutes' })
+  const [filtre, setFiltre] = useState({ compte: 'tous', type: 'tous', libelle: '', annee: '', trimestre: '', mois: '', categorie: 'toutes', facture: 'toutes' })
   const [tri, setTri] = useState({ col: 'date', sens: 'desc' })
   const [page, setPage] = useState(1)
   const [categories, setCategories] = useState([])
@@ -150,7 +150,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   }, [comptes.map(c=>c.id).join(',')])
 
   // Reset pagination quand les filtres changent
-  useEffect(() => { setPage(1) }, [filtre.compte, filtre.type, filtre.libelle, filtre.annee, filtre.categorie, filtre.facture])
+  useEffect(() => { setPage(1) }, [filtre.compte, filtre.type, filtre.libelle, filtre.annee, filtre.trimestre, filtre.mois, filtre.categorie, filtre.facture])
 
   // Charger les catégories
   async function chargerCategories() {
@@ -299,6 +299,12 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       if (!t.information_paiement?.toLowerCase().includes(q) && !t.description?.toLowerCase().includes(q) && !t.contrepartie_nom?.toLowerCase().includes(q)) return false
     }
     if (filtre.annee && !(t._date || '').startsWith(filtre.annee)) return false
+    if (filtre.mois) { const m = (t._date || '').substring(5,7); if (m !== filtre.mois) return false }
+    if (filtre.trimestre) {
+      const m = parseInt((t._date || '').substring(5,7), 10)
+      const q = m>=1&&m<=3 ? '1' : m>=4&&m<=6 ? '2' : m>=7&&m<=9 ? '3' : m>=10&&m<=12 ? '4' : ''
+      if (q !== filtre.trimestre) return false
+    }
     if (filtre.categorie === 'sans' && t.categorie_id) return false
     if (filtre.categorie !== 'toutes' && filtre.categorie !== 'sans' && t.categorie_id !== filtre.categorie) return false
     if (filtre.facture === 'avec' && !t.facture_url) return false
@@ -395,11 +401,32 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
         </div>
 
         {/* Filtre année */}
-        <div style={{ display:'flex', flexDirection:'column', gap:'3px' }}>
+        <div style={{ display:'flex', flexDirection:'column', gap:'3px', flexShrink:0 }}>
           <label style={{ fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em' }}>Année</label>
           <select value={filtre.annee} onChange={e=>setFiltre(f=>({...f,annee:e.target.value}))} style={{ padding:'7px 10px', border:'1px solid #e2e8f0', borderRadius:'6px', fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif", cursor:'pointer' }}>
             <option value="">Toutes</option>
             {anneesDispo.map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </div>
+
+        {/* Filtre trimestre */}
+        <div style={{ display:'flex', flexDirection:'column', gap:'3px', flexShrink:0 }}>
+          <label style={{ fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em' }}>Trimestre</label>
+          <select value={filtre.trimestre} onChange={e=>setFiltre(f=>({...f,trimestre:e.target.value, mois:''}))} style={{ padding:'7px 10px', border:'1px solid #e2e8f0', borderRadius:'6px', fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif", cursor:'pointer' }}>
+            <option value="">Tous</option>
+            <option value="1">T1 (jan–mar)</option>
+            <option value="2">T2 (avr–juin)</option>
+            <option value="3">T3 (juil–sep)</option>
+            <option value="4">T4 (oct–déc)</option>
+          </select>
+        </div>
+
+        {/* Filtre mois */}
+        <div style={{ display:'flex', flexDirection:'column', gap:'3px', flexShrink:0 }}>
+          <label style={{ fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em' }}>Mois</label>
+          <select value={filtre.mois} onChange={e=>setFiltre(f=>({...f,mois:e.target.value, trimestre:''}))} style={{ padding:'7px 10px', border:'1px solid #e2e8f0', borderRadius:'6px', fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif", cursor:'pointer' }}>
+            <option value="">Tous</option>
+            {[['01','Janvier'],['02','Février'],['03','Mars'],['04','Avril'],['05','Mai'],['06','Juin'],['07','Juillet'],['08','Août'],['09','Septembre'],['10','Octobre'],['11','Novembre'],['12','Décembre']].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
           </select>
         </div>
 
@@ -429,10 +456,10 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
         </div>
 
         {/* Reset */}
-        {(filtre.compte!=='tous'||filtre.type!=='tous'||filtre.libelle||filtre.annee||filtre.categorie!=='toutes'||filtre.facture!=='toutes') && (
+        {(filtre.compte!=='tous'||filtre.type!=='tous'||filtre.libelle||filtre.annee||filtre.trimestre||filtre.mois||filtre.categorie!=='toutes'||filtre.facture!=='toutes') && (
           <div style={{ display:'flex', flexDirection:'column', gap:'3px' }}>
             <label style={{ fontSize:'10px', color:'transparent' }}>.</label>
-            <button onClick={()=>setFiltre({compte:'tous',type:'tous',libelle:'',annee:'',categorie:'toutes',facture:'toutes'})} style={{ padding:'7px 12px', borderRadius:'6px', fontSize:'12px', fontWeight:'600', cursor:'pointer', border:'1px solid #e2e8f0', background:'#fff', color:'#64748b' }}>
+            <button onClick={()=>setFiltre({compte:'tous',type:'tous',libelle:'',annee:'',trimestre:'',mois:'',categorie:'toutes',facture:'toutes'})} style={{ padding:'7px 12px', borderRadius:'6px', fontSize:'12px', fontWeight:'600', cursor:'pointer', border:'1px solid #e2e8f0', background:'#fff', color:'#64748b' }}>
               ✕ Reset
             </button>
           </div>

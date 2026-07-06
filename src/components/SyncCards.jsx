@@ -10,6 +10,7 @@ export const SYNCS = [
   {
     key: 'import',
     label: 'Import Brio',
+    labelCourt: 'Import',
     desc: 'Clients, contrats, production, quittances, famille et objets de risque depuis les CSV Brio (SharePoint).',
     icon: 'ti-database-import',
     color: '#0080BD',
@@ -20,6 +21,7 @@ export const SYNCS = [
   {
     key: 'iban',
     label: 'Comptes bancaires',
+    labelCourt: 'Banque',
     desc: 'Soldes et transactions Ponto pour toutes les entités.',
     icon: 'ti-building-bank',
     color: '#16a34a',
@@ -30,6 +32,7 @@ export const SYNCS = [
   {
     key: 'bordereaux',
     label: 'Bordereaux BQT / RCP',
+    labelCourt: 'Bordereaux',
     desc: 'Bordereaux de primes et commissions depuis SharePoint.',
     icon: 'ti-file-invoice',
     color: '#7c3aed',
@@ -63,6 +66,7 @@ export const SYNC_BUTTONS = [
   {
     key: 'rapprochement',
     label: 'Rapprochement & prévisualisation',
+    labelCourt: 'Rapprochement',
     desc: 'Associe automatiquement les factures SharePoint aux transactions bancaires.',
     icon: 'ti-link',
     color: '#0080BD',
@@ -84,7 +88,7 @@ export function fmtDerniereExec(at) {
 }
 
 // Bouton compact unique avec dernière exécution
-function SyncMiniButton({ sync, onDark }) {
+function SyncMiniButton({ sync, onDark, compact }) {
   const [state, setState] = useState('idle')
   const [lastExec, setLastExec] = useState(null)
 
@@ -115,18 +119,19 @@ function SyncMiniButton({ sync, onDark }) {
   const iconCol = running ? '#94a3b8' : (state==='ok' ? '#16a34a' : state==='error' ? '#dc2626' : sync.color)
   const border = onDark ? '1px solid rgba(255,255,255,0.3)' : '1px solid #e2e8f0'
 
+  const label = compact ? (sync.labelCourt || sync.label) : sync.label
   return (
-    <button onClick={run} disabled={running} title={`Dernière exécution : ${fmtDerniereExec(lastExec?.at)}${lastExec?.status ? ' ('+lastExec.status+')' : ''}`}
+    <button onClick={run} disabled={running} title={`${sync.label} — dernière exécution : ${fmtDerniereExec(lastExec?.at)}${lastExec?.status ? ' ('+lastExec.status+')' : ''}`}
       style={{
-        display:'flex', alignItems:'center', gap:'7px', padding:'7px 12px', borderRadius:'8px',
+        display:'flex', alignItems:'center', gap: compact ? '5px' : '7px', padding: compact ? '4px 9px' : '7px 12px', borderRadius: compact ? '7px' : '8px',
         border, background: bg,
-        cursor: running ? 'wait' : 'pointer', fontSize:'12px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif",
+        cursor: running ? 'wait' : 'pointer', fontSize: compact ? '11.5px' : '12px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif",
         color: txtCol, whiteSpace:'nowrap', flexShrink:0
       }}>
       <i className={`ti ${running ? 'ti-loader-2' : (state==='ok' ? 'ti-check' : state==='error' ? 'ti-x' : sync.icon)}`}
-        style={{ color: iconCol, fontSize:'15px', animation: running ? 'spin 1s linear infinite' : 'none' }} />
-      <span>{sync.label}</span>
-      <span style={{ display:'inline-flex', alignItems:'center', gap:'4px', paddingLeft:'6px', borderLeft: onDark?'1px solid #e2e8f0':'1px solid #e2e8f0', color:statusCol, fontSize:'11px', fontWeight:'500' }}>
+        style={{ color: iconCol, fontSize: compact ? '14px' : '15px', animation: running ? 'spin 1s linear infinite' : 'none' }} />
+      <span>{label}</span>
+      <span style={{ display:'inline-flex', alignItems:'center', gap:'4px', paddingLeft:'6px', borderLeft:'1px solid #e2e8f0', color:statusCol, fontSize: compact ? '10px' : '11px', fontWeight:'500' }}>
         <span style={{ width:'6px', height:'6px', borderRadius:'50%', background:statusCol, display:'inline-block' }} />
         {fmtDerniereExec(lastExec?.at)}
       </span>
@@ -135,14 +140,14 @@ function SyncMiniButton({ sync, onDark }) {
 }
 
 // Ligne de boutons de synchronisation manuelle (avec dernière exécution)
-export function SyncButtonsRow({ only, style, onDark }) {
+export function SyncButtonsRow({ only, style, onDark, compact }) {
   const list = only ? SYNC_BUTTONS.filter(s => only.includes(s.key)) : SYNC_BUTTONS
   return (
-    <div style={{ display:'flex', gap:'8px', flexWrap:'wrap', alignItems:'center', ...style }}>
-      <span style={{ fontSize:'11px', fontWeight:'700', color: onDark ? 'rgba(255,255,255,0.85)' : '#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em', marginRight:'2px' }}>
-        <i className="ti ti-refresh" style={{ fontSize:'13px', marginRight:'4px' }} />Mettre à jour
+    <div style={{ display:'flex', gap: compact ? '6px' : '8px', flexWrap:'wrap', alignItems:'center', ...style }}>
+      <span title="Mettre à jour" style={{ fontSize:'11px', fontWeight:'700', color: onDark ? 'rgba(255,255,255,0.85)' : '#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em', marginRight:'2px', display:'inline-flex', alignItems:'center' }}>
+        <i className="ti ti-refresh" style={{ fontSize:'14px' }} />{!compact && <span style={{ marginLeft:'4px' }}>Mettre à jour</span>}
       </span>
-      {list.map(s => <SyncMiniButton key={s.key} sync={s} onDark={onDark} />)}
+      {list.map(s => <SyncMiniButton key={s.key} sync={s} onDark={onDark} compact={compact} />)}
     </div>
   )
 }

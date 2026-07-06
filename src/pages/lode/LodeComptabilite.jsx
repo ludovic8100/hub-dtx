@@ -11,7 +11,7 @@ export default function LodeComptabilite() {
         <StatBanner
           color={LODE.couleur} colorDark="#7c2d12" logoUrl={LODE.logo_url}
           title="Comptabilité" subtitle="LODE SRL — comptes synchronisés via Ponto"
-          footer={<SyncButtonsRow only={['rapprochement','iban','bordereaux']} onDark />}
+          footer={<SyncButtonsRow only={['rapprochement','iban','bordereaux']} onDark compact />}
         />
         <ComptabiliteView societeCodes={['LODE']} color="#ea580c" colorDark="#7c2d12" titre="LODE SRL" />
       </div>
