@@ -62,7 +62,25 @@ function VueAchats({ societeCodes, color }) {
   const [loading, setLoading] = useState(true)
   const [filtre, setFiltre] = useState({ statut: 'toutes', recherche: '', annee: '' })
   const [page, setPage] = useState(1)
+  const [lierPaiement, setLierPaiement] = useState(null) // facture en cours de liaison à un mouvement
   const PAR_PAGE = 100
+
+  // Lier une facture à un mouvement bancaire (écrit les DEUX côtés du lien)
+  async function lierTransaction(facture, tx) {
+    await supabase.from('transactions').update({ facture_url: facture.url, rapproche: true, facture_thumb_url: null }).eq('id', tx.id)
+    await supabase.from('factures_achat').update({ transaction_id: tx.id }).eq('fichier_id', facture.fichier_id)
+    setFactures(prev => prev.map(f => f.fichier_id === facture.fichier_id ? { ...f, transaction_id: tx.id } : f))
+    setLierPaiement(null)
+    fetch('https://n8n.srv1082740.hstgr.cloud/webhook/backfill-thumbs2', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(() => {})
+  }
+  // Délier un paiement (remet la facture en « à vérifier » et libère le mouvement)
+  async function delierPaiement(facture) {
+    if (facture.transaction_id) {
+      await supabase.from('transactions').update({ facture_url: null, rapproche: false, facture_thumb_url: null }).eq('id', facture.transaction_id)
+    }
+    await supabase.from('factures_achat').update({ transaction_id: null }).eq('fichier_id', facture.fichier_id)
+    setFactures(prev => prev.map(f => f.fichier_id === facture.fichier_id ? { ...f, transaction_id: null } : f))
+  }
 
   useEffect(() => {
     setLoading(true)
@@ -106,22 +124,26 @@ function VueAchats({ societeCodes, color }) {
       <KpiRow kpis={kpis} actif={filtre.statut} onClic={(v) => setFiltre(f => ({ ...f, statut: f.statut === v ? 'toutes' : v }))} />
       <FiltreBar filtre={filtre} setFiltre={setFiltre} anneesDispo={anneesDispo} placeholder="Nom de facture…" reset={() => setFiltre({ statut: 'toutes', recherche: '', annee: '' })} />
       <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-        <Ligne header cols={multiSociete ? ['90px', '110px', '1fr', '120px', '130px'] : ['90px', '110px', '1fr', '130px']}
+        <Ligne header cols={multiSociete ? ['110px', '110px', '1fr', '120px', '130px'] : ['110px', '110px', '1fr', '130px']}
           items={multiSociete ? ['Statut', 'Date', 'Facture', 'Société', 'Montant'] : ['Statut', 'Date', 'Facture', 'Montant']} />
         {facturesPage.length === 0 && <div style={{ padding: '50px', textAlign: 'center', color: '#94a3b8' }}>Aucune facture</div>}
         {facturesPage.map((f, i) => {
           const payee = !!f.transaction_id
           const cells = [
-            <Badge payee={payee} labelPayee="✓ Payée" labelNon="✕ À vérifier" />,
+            <span onClick={(e) => { e.stopPropagation(); payee ? delierPaiement(f) : setLierPaiement(f) }} style={{ cursor: 'pointer' }}
+              title={payee ? 'Payée — cliquer pour délier le paiement' : 'Cliquer pour retrouver et lier le paiement'}>
+              <Badge payee={payee} labelPayee="✓ Payée" labelNon="✕ Lier paiement" />
+            </span>,
             <span style={{ fontSize: '12.5px', color: '#64748b', fontWeight: '600' }}>{fmtDate(f.date_facture)}</span>,
             <span style={{ fontSize: '13px', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '10px' }}>{(f.nom || '').replace(/\.pdf$/i, '')}</span>,
             ...(multiSociete ? [<span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: '600' }}>{f.societe}</span>] : []),
             <span style={{ textAlign: 'right', display: 'block', fontSize: '13.5px', fontWeight: '700', color: f.montant == null ? '#cbd5e1' : '#0f172a' }}>{f.montant == null ? '—' : fmt(f.montant)}</span>,
           ]
-          return <Ligne key={f.fichier_id} cols={multiSociete ? ['90px', '110px', '1fr', '120px', '130px'] : ['90px', '110px', '1fr', '130px']} items={cells} onClick={() => ouvrir(f)} clickable={!!f.url} alt={i % 2 === 1} title={f.nom} />
+          return <Ligne key={f.fichier_id} cols={multiSociete ? ['110px', '110px', '1fr', '120px', '130px'] : ['110px', '110px', '1fr', '130px']} items={cells} onClick={() => ouvrir(f)} clickable={!!f.url} alt={i % 2 === 1} title={f.nom} />
         })}
       </div>
       <Pagination page={page} totalPages={totalPages} setPage={setPage} total={filtrees.length} />
+      {lierPaiement && <PanneauLierPaiement facture={lierPaiement} color={color} onClose={() => setLierPaiement(null)} onLier={(tx) => lierTransaction(lierPaiement, tx)} />}
     </>
   )
 }
@@ -278,6 +300,81 @@ function Pagination({ page, totalPages, setPage, total }) {
       <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} style={{ padding: '7px 14px', borderRadius: '7px', border: '1px solid #e2e8f0', background: page <= 1 ? '#f1f5f9' : '#fff', color: page <= 1 ? '#cbd5e1' : '#334155', cursor: page <= 1 ? 'default' : 'pointer', fontSize: '13px', fontWeight: '600', fontFamily: FONT }}>← Précédent</button>
       <span style={{ fontSize: '13px', color: '#64748b', fontWeight: '600' }}>Page {page} / {totalPages} · {total} factures</span>
       <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} style={{ padding: '7px 14px', borderRadius: '7px', border: '1px solid #e2e8f0', background: page >= totalPages ? '#f1f5f9' : '#fff', color: page >= totalPages ? '#cbd5e1' : '#334155', cursor: page >= totalPages ? 'default' : 'pointer', fontSize: '13px', fontWeight: '600', fontFamily: FONT }}>Suivant →</button>
+    </div>
+  )
+}
+
+/* ─────────────── Panneau : lier un paiement à une facture d'achat ─────────────── */
+function PanneauLierPaiement({ facture, color, onClose, onLier }) {
+  const [mouvements, setMouvements] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [recherche, setRecherche] = useState('')
+  const montantCible = Math.abs(parseFloat(facture.montant) || 0)
+
+  useEffect(() => {
+    setLoading(true)
+    const soc = facture.societe
+    // Mouvements sortants non liés de la société ; on privilégie le montant proche
+    const base = `/transactions?select=id,montant,date_valeur,date_execution,contrepartie_nom,information_paiement,comptes_bancaires!inner(banque,societes!inner(code))&comptes_bancaires.societes.code=eq.${soc}&facture_url=is.null&montant=lt.0`
+    let q
+    if (recherche.trim()) {
+      const r = encodeURIComponent(`%${recherche.trim()}%`)
+      q = supabase.from('transactions').select('id,montant,date_valeur,date_execution,contrepartie_nom,information_paiement,comptes_bancaires!inner(banque,societes!inner(code))')
+        .eq('comptes_bancaires.societes.code', soc).is('facture_url', null).lt('montant', 0)
+        .or(`contrepartie_nom.ilike.${r},information_paiement.ilike.${r},description.ilike.${r}`).limit(60)
+    } else if (montantCible > 0) {
+      // fenêtre autour du montant cible
+      q = supabase.from('transactions').select('id,montant,date_valeur,date_execution,contrepartie_nom,information_paiement,comptes_bancaires!inner(banque,societes!inner(code))')
+        .eq('comptes_bancaires.societes.code', soc).is('facture_url', null)
+        .gte('montant', -(montantCible + 1)).lte('montant', -(montantCible - 1)).limit(60)
+    } else {
+      q = supabase.from('transactions').select('id,montant,date_valeur,date_execution,contrepartie_nom,information_paiement,comptes_bancaires!inner(banque,societes!inner(code))')
+        .eq('comptes_bancaires.societes.code', soc).is('facture_url', null).lt('montant', 0).limit(60)
+    }
+    q.then(({ data }) => {
+      let rows = data || []
+      // tri par proximité de montant puis de date
+      rows.sort((a, b) => Math.abs(Math.abs(a.montant) - montantCible) - Math.abs(Math.abs(b.montant) - montantCible))
+      setMouvements(rows); setLoading(false)
+    })
+  }, [facture.fichier_id, recherche])
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT }} onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: '14px', width: 'min(620px, 94vw)', maxHeight: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
+          <div style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a' }}>Lier un paiement</div>
+          <div style={{ fontSize: '12.5px', color: '#64748b', marginTop: '3px' }}>{(facture.nom || '').replace(/\.pdf$/i, '')} — <strong>{fmt(facture.montant)}</strong></div>
+        </div>
+        <div style={{ padding: '12px 20px', borderBottom: '1px solid #f1f5f9' }}>
+          <input value={recherche} onChange={e => setRecherche(e.target.value)} placeholder="Rechercher un mouvement (contrepartie, libellé)…"
+            style={{ width: '100%', padding: '9px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', fontFamily: FONT, boxSizing: 'border-box' }} />
+          {!recherche && montantCible > 0 && <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px' }}>Mouvements sortants proches de {fmt(-montantCible)} · non encore liés</div>}
+        </div>
+        <div style={{ overflowY: 'auto', flex: 1 }}>
+          {loading && <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>Recherche…</div>}
+          {!loading && mouvements.length === 0 && <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>Aucun mouvement correspondant.<br />Essaie une recherche par libellé.</div>}
+          {!loading && mouvements.map(m => {
+            const exact = Math.abs(Math.abs(m.montant) - montantCible) < 0.01
+            return (
+              <div key={m.id} onClick={() => onLier(m)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '11px 20px', borderBottom: '1px solid #f8fafc', cursor: 'pointer' }}
+                onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.contrepartie_nom || m.information_paiement || 'Mouvement'}</div>
+                  <div style={{ fontSize: '11.5px', color: '#94a3b8' }}>{fmtDate(m.date_valeur || m.date_execution)} · {m.comptes_bancaires?.banque || ''}</div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                  {exact && <span style={{ fontSize: '10px', fontWeight: '700', color: '#16a34a', background: '#dcfce7', padding: '2px 7px', borderRadius: '12px' }}>montant exact</span>}
+                  <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#dc2626' }}>{fmt(m.montant)}</span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9', textAlign: 'right' }}>
+          <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', cursor: 'pointer', fontSize: '13px', fontWeight: '600', fontFamily: FONT }}>Annuler</button>
+        </div>
+      </div>
     </div>
   )
 }

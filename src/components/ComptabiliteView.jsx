@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import VueFactures from './VueFactures'
+import SelecteurFactureAchat from './SelecteurFactureAchat'
 
 const fmt = (v) => v === null || v === undefined ? '—'
   : new Intl.NumberFormat('fr-BE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 }).format(v)
@@ -103,6 +104,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const [txSelection, setTxSelection] = useState(null)
   const [selection, setSelection] = useState(new Set()) // IDs des mouvements cochés pour justif multiple
   const [panneauJustif, setPanneauJustif] = useState(null) // { ids:[...], url:'', code:'LODE' } ou null
+  const [selecteurFacture, setSelecteurFacture] = useState(null) // { tx } : lier une facture d'achat à un mouvement
   const [aideOuverte, setAideOuverte] = useState(false)
   const [apercu, setApercu] = useState(null) // { tx, x, y } — aperçu au survol du montant
   const [apercuFacture, setApercuFacture] = useState(null) // { url } — aperçu PDF au survol de la date
@@ -272,12 +274,36 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   }
 
   function lierFactureManuelle(tx) {
-    const code = tx.comptes_bancaires?.societes?.code || societeCodes[0]
-    setPanneauJustif({ ids: [tx.id], url: tx.facture_url || '', code })
+    setSelecteurFacture({ tx })
+  }
+
+  // Lier une facture d'achat choisie dans le sélecteur -> écrit les DEUX côtés du lien
+  async function lierFactureChoisie(facture) {
+    const tx = selecteurFacture?.tx
+    if (!tx) return
+    await supabase.from('transactions').update({ facture_url: facture.url, rapproche: true, facture_thumb_url: null }).eq('id', tx.id)
+    await supabase.from('factures_achat').update({ transaction_id: tx.id }).eq('fichier_id', facture.fichier_id)
+    setTransactions(prev => prev.map(t => t.id === tx.id ? { ...t, facture_url: facture.url, rapproche: true, facture_thumb_url: null } : t))
+    setTxSelection(prev => prev && prev.id === tx.id ? { ...prev, facture_url: facture.url, rapproche: true, facture_thumb_url: null } : prev)
+    setSelecteurFacture(null)
+    fetch('https://n8n.srv1082740.hstgr.cloud/webhook/backfill-thumbs2', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' }).catch(()=>{})
+  }
+
+  // Lier via URL collée manuellement (secours) depuis le sélecteur
+  async function lierFactureUrl(url) {
+    const tx = selecteurFacture?.tx
+    if (!tx) return
+    await supabase.from('transactions').update({ facture_url: url, rapproche: true, facture_thumb_url: null }).eq('id', tx.id)
+    await supabase.from('factures_achat').update({ transaction_id: tx.id }).eq('url', url)
+    setTransactions(prev => prev.map(t => t.id === tx.id ? { ...t, facture_url: url, rapproche: true, facture_thumb_url: null } : t))
+    setTxSelection(prev => prev && prev.id === tx.id ? { ...prev, facture_url: url, rapproche: true, facture_thumb_url: null } : prev)
+    setSelecteurFacture(null)
+    fetch('https://n8n.srv1082740.hstgr.cloud/webhook/backfill-thumbs2', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' }).catch(()=>{})
   }
 
   // Retirer le lien facture (repasse en croix rouge)
   async function retirerLienFacture(tx) {
+    if (tx.facture_url) { await supabase.from('factures_achat').update({ transaction_id: null }).eq('url', tx.facture_url) }
     await supabase.from('transactions').update({ facture_url: null, rapproche: false, facture_thumb_url: null }).eq('id', tx.id)
     setTransactions(prev => prev.map(t => t.id === tx.id ? { ...t, facture_url: null, rapproche: false, facture_thumb_url: null } : t))
     setTxSelection(prev => prev && prev.id === tx.id ? { ...prev, facture_url: null, rapproche: false, facture_thumb_url: null } : prev)
@@ -856,6 +882,16 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       )}
 
       {/* Panneau de saisie : lier / justifier avec une facture (remplace window.prompt) */}
+      {selecteurFacture && (
+        <SelecteurFactureAchat
+          societeCode={selecteurFacture.tx.comptes_bancaires?.societes?.code || societeCodes[0]}
+          montantCible={selecteurFacture.tx.montant}
+          onChoisir={lierFactureChoisie}
+          onCollerUrl={lierFactureUrl}
+          onClose={()=>setSelecteurFacture(null)}
+        />
+      )}
+
       {panneauJustif && (
         <div onClick={()=>setPanneauJustif(null)} style={{
           position:'fixed', inset:0, background:'rgba(15,23,42,0.5)', zIndex:2000,
