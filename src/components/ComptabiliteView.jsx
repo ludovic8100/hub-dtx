@@ -163,6 +163,19 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   // Reset pagination quand les filtres changent
   useEffect(() => { setPage(1) }, [filtre.compte, filtre.type, filtre.libelle, filtre.periodes, filtre.categorie, filtre.facture])
 
+  // Au 1er chargement des transactions : cocher l'année en cours (2026) par défaut, si aucune période choisie
+  const [periodeInitialisee, setPeriodeInitialisee] = useState(false)
+  useEffect(() => {
+    if (periodeInitialisee || transactions.length === 0) return
+    const annees = [...new Set(transactions.map(t => (t._date || '').substring(0,4)).filter(Boolean))]
+    const cible = annees.includes('2026') ? '2026' : annees.sort((a,b)=>b-a)[0]
+    if (cible) {
+      const mois = Array.from({length:12}, (_,i) => `${cible}-${String(i+1).padStart(2,'0')}`)
+      setFiltre(f => f.periodes.length === 0 ? { ...f, periodes: mois } : f)
+    }
+    setPeriodeInitialisee(true)
+  }, [transactions, periodeInitialisee])
+
   // Charger les catégories
   async function chargerCategories() {
     const { data } = await supabase.from('categories').select('*').order('nom')
@@ -490,13 +503,13 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                 {anneesDispo.length === 0 && <div style={{ padding:'10px', fontSize:'12px', color:'#94a3b8' }}>Aucune donnée</div>}
                 {anneesDispo.map(an => {
                   const etatA = anneeEtat(an)
-                  const deplie = anneesDepliees[an]
+                  const deplie = anneesDepliees[an] !== false // déplié par défaut
                   return (
                     <div key={an} style={{ marginBottom:'2px' }}>
                       <div style={{ display:'flex', alignItems:'center', gap:'6px', padding:'5px 6px', borderRadius:'6px', background: etatA!=='none' ? `${color}0c` : 'transparent' }}>
                         <input type="checkbox" checked={etatA==='all'} ref={el=>{ if(el) el.indeterminate = etatA==='some' }}
                           onChange={()=>toggleAnnee(an)} style={{ width:'15px', height:'15px', cursor:'pointer', accentColor:color }} />
-                        <span onClick={()=>setAnneesDepliees(d=>({...d,[an]:!d[an]}))} style={{ flex:1, cursor:'pointer', fontSize:'14px', fontWeight:'700', color:'#0f172a', display:'flex', alignItems:'center', gap:'5px' }}>
+                        <span onClick={()=>setAnneesDepliees(d=>({...d,[an]: d[an]===false ? true : false}))} style={{ flex:1, cursor:'pointer', fontSize:'14px', fontWeight:'700', color:'#0f172a', display:'flex', alignItems:'center', gap:'5px' }}>
                           <i className={`ti ti-chevron-${deplie?'down':'right'}`} style={{ fontSize:'13px', color:'#94a3b8' }} />{an}
                         </span>
                       </div>
