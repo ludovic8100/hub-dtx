@@ -306,38 +306,42 @@ function Pagination({ page, totalPages, setPage, total }) {
 
 /* ─────────────── Panneau : lier un paiement à une facture d'achat ─────────────── */
 function PanneauLierPaiement({ facture, color, onClose, onLier }) {
-  const [mouvements, setMouvements] = useState([])
+  const [tous, setTous] = useState([])
   const [loading, setLoading] = useState(true)
   const [recherche, setRecherche] = useState('')
   const montantCible = Math.abs(parseFloat(facture.montant) || 0)
 
+  // Charger une seule fois tous les mouvements sortants non liés de la société
   useEffect(() => {
+    let annule = false
     setLoading(true)
     const soc = facture.societe
-    // Mouvements sortants non liés de la société ; on privilégie le montant proche
-    const base = `/transactions?select=id,montant,date_valeur,date_execution,contrepartie_nom,information_paiement,comptes_bancaires!inner(banque,societes!inner(code))&comptes_bancaires.societes.code=eq.${soc}&facture_url=is.null&montant=lt.0`
-    let q
-    if (recherche.trim()) {
-      const r = encodeURIComponent(`%${recherche.trim()}%`)
-      q = supabase.from('transactions').select('id,montant,date_valeur,date_execution,contrepartie_nom,information_paiement,comptes_bancaires!inner(banque,societes!inner(code))')
-        .eq('comptes_bancaires.societes.code', soc).is('facture_url', null).lt('montant', 0)
-        .or(`contrepartie_nom.ilike.${r},information_paiement.ilike.${r},description.ilike.${r}`).limit(60)
-    } else if (montantCible > 0) {
-      // fenêtre autour du montant cible
-      q = supabase.from('transactions').select('id,montant,date_valeur,date_execution,contrepartie_nom,information_paiement,comptes_bancaires!inner(banque,societes!inner(code))')
-        .eq('comptes_bancaires.societes.code', soc).is('facture_url', null)
-        .gte('montant', -(montantCible + 1)).lte('montant', -(montantCible - 1)).limit(60)
-    } else {
-      q = supabase.from('transactions').select('id,montant,date_valeur,date_execution,contrepartie_nom,information_paiement,comptes_bancaires!inner(banque,societes!inner(code))')
-        .eq('comptes_bancaires.societes.code', soc).is('facture_url', null).lt('montant', 0).limit(60)
-    }
-    q.then(({ data }) => {
-      let rows = data || []
-      // tri par proximité de montant puis de date
-      rows.sort((a, b) => Math.abs(Math.abs(a.montant) - montantCible) - Math.abs(Math.abs(b.montant) - montantCible))
-      setMouvements(rows); setLoading(false)
-    })
-  }, [facture.fichier_id, recherche])
+    const cols = 'id,montant,date_valeur,date_execution,contrepartie_nom,contrepartie_iban,information_paiement,description,type_transaction,statut,devise,ponto_transaction_id,comptes_bancaires!inner(banque,societes!inner(code))'
+    ;(async () => {
+      let out = []; let from = 0
+      for (;;) {
+        const { data, error } = await supabase.from('transactions').select(cols)
+          .eq('comptes_bancaires.societes.code', soc).is('facture_url', null).lt('montant', 0)
+          .order('date_valeur', { ascending: false }).range(from, from + 999)
+        if (error || !data) break
+        out = out.concat(data)
+        if (data.length < 1000) break
+        from += 1000
+      }
+      if (!annule) { setTous(out); setLoading(false) }
+    })()
+    return () => { annule = true }
+  }, [facture.fichier_id])
+
+  // Recherche sur TOUTES les données (multi-mots) ; sinon tri par proximité de montant
+  const mots = recherche.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  const hayFor = (m) => [
+    m.contrepartie_nom, m.contrepartie_iban, m.information_paiement, m.description,
+    m.type_transaction, m.statut, m.devise, m.ponto_transaction_id, m.comptes_bancaires?.banque,
+    fmt(m.montant), String(m.montant), fmtDate(m.date_valeur || m.date_execution), m.date_valeur, m.date_execution
+  ].filter(Boolean).join(' ').toLowerCase()
+  let mouvements = mots.length ? tous.filter(m => { const h = hayFor(m); return mots.every(w => h.includes(w)) }) : tous
+  mouvements = [...mouvements].sort((a, b) => Math.abs(Math.abs(a.montant) - montantCible) - Math.abs(Math.abs(b.montant) - montantCible)).slice(0, 80)
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT }} onClick={onClose}>
@@ -347,13 +351,14 @@ function PanneauLierPaiement({ facture, color, onClose, onLier }) {
           <div style={{ fontSize: '12.5px', color: '#64748b', marginTop: '3px' }}>{(facture.nom || '').replace(/\.pdf$/i, '')} — <strong>{fmt(facture.montant)}</strong></div>
         </div>
         <div style={{ padding: '12px 20px', borderBottom: '1px solid #f1f5f9' }}>
-          <input value={recherche} onChange={e => setRecherche(e.target.value)} placeholder="Rechercher un mouvement (contrepartie, libellé)…"
+          <input value={recherche} onChange={e => setRecherche(e.target.value)} placeholder="Rechercher sur tout : contrepartie, IBAN, communication, montant, date…" autoFocus
             style={{ width: '100%', padding: '9px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', fontFamily: FONT, boxSizing: 'border-box' }} />
-          {!recherche && montantCible > 0 && <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px' }}>Mouvements sortants proches de {fmt(-montantCible)} · non encore liés</div>}
+          {!recherche && montantCible > 0 && <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px' }}>{tous.length} mouvements non liés · triés par montant proche de {fmt(-montantCible)}</div>}
+          {recherche && <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px' }}>{mouvements.length} résultat{mouvements.length > 1 ? 's' : ''}</div>}
         </div>
         <div style={{ overflowY: 'auto', flex: 1 }}>
           {loading && <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>Recherche…</div>}
-          {!loading && mouvements.length === 0 && <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>Aucun mouvement correspondant.<br />Essaie une recherche par libellé.</div>}
+          {!loading && mouvements.length === 0 && <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>Aucun mouvement correspondant.</div>}
           {!loading && mouvements.map(m => {
             const exact = Math.abs(Math.abs(m.montant) - montantCible) < 0.01
             return (
