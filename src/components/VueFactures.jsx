@@ -304,6 +304,37 @@ function Pagination({ page, totalPages, setPage, total }) {
   )
 }
 
+// Nombre de jours entre deux dates (ISO), ou null si l'une manque/est invalide
+function ecartJours(a, b) {
+  if (!a || !b) return null
+  const ta = new Date(a).getTime(), tb = new Date(b).getTime()
+  if (Number.isNaN(ta) || Number.isNaN(tb)) return null
+  return Math.abs(ta - tb) / 86400000
+}
+
+// Le nom du fichier facture apparaît-il dans le nom du tiers du mouvement ?
+function nomCorrespond(nomFichier, contrepartie) {
+  if (!nomFichier || !contrepartie) return false
+  const normalise = s => s.toString().normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+  const mots = normalise(nomFichier).split(/[^a-z0-9]+/).filter(w => w.length >= 4)
+  const hay = normalise(contrepartie)
+  return mots.some(w => hay.includes(w))
+}
+
+// Score de correspondance d'un mouvement avec la facture à rapprocher (plus haut = meilleur)
+function scoreCorrespondance(m, montantCible, facture) {
+  let score = 0
+  const montant = Math.abs(parseFloat(m.montant) || 0)
+  if (montantCible > 0) {
+    const diff = Math.abs(montant - montantCible)
+    score += diff < 0.01 ? 100 : Math.max(0, 40 - diff)
+  }
+  const jours = ecartJours(m.date_valeur || m.date_execution, facture.date_facture)
+  if (jours != null) score += Math.max(0, 30 - jours)
+  if (nomCorrespond(facture.nom, m.contrepartie_nom)) score += 40
+  return score
+}
+
 /* ─────────────── Panneau : lier un paiement à une facture d'achat ─────────────── */
 function PanneauLierPaiement({ facture, color, onClose, onLier }) {
   const [tous, setTous] = useState([])
@@ -341,7 +372,12 @@ function PanneauLierPaiement({ facture, color, onClose, onLier }) {
     fmt(m.montant), String(m.montant), fmtDate(m.date_valeur || m.date_execution), m.date_valeur, m.date_execution
   ].filter(Boolean).join(' ').toLowerCase()
   let mouvements = mots.length ? tous.filter(m => { const h = hayFor(m); return mots.every(w => h.includes(w)) }) : tous
-  mouvements = [...mouvements].sort((a, b) => Math.abs(Math.abs(a.montant) - montantCible) - Math.abs(Math.abs(b.montant) - montantCible)).slice(0, 80)
+  mouvements = [...mouvements].sort((a, b) => scoreCorrespondance(b, montantCible, facture) - scoreCorrespondance(a, montantCible, facture)).slice(0, 80)
+
+  // Suggestion automatique : le mouvement en tête si sa correspondance est forte (montant exact et un seul candidat à ce montant)
+  const suggestion = (!recherche && mouvements.length > 0) ? mouvements[0] : null
+  const montantExactCount = tous.filter(m => Math.abs(Math.abs(m.montant) - montantCible) < 0.01).length
+  const suggestionForte = suggestion && montantCible > 0 && Math.abs(Math.abs(suggestion.montant) - montantCible) < 0.01 && montantExactCount === 1
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT }} onClick={onClose}>
@@ -350,6 +386,16 @@ function PanneauLierPaiement({ facture, color, onClose, onLier }) {
           <div style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a' }}>Lier un paiement</div>
           <div style={{ fontSize: '12.5px', color: '#64748b', marginTop: '3px' }}>{(facture.nom || '').replace(/\.pdf$/i, '')} — <strong>{fmt(facture.montant)}</strong></div>
         </div>
+        {suggestionForte && (
+          <div style={{ margin: '12px 20px 0', padding: '10px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <i className="ti ti-sparkles" style={{ fontSize: '16px', color: '#16a34a' }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: '11px', fontWeight: '700', color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Correspondance trouvée</div>
+              <div style={{ fontSize: '13px', color: '#0f172a', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{suggestion.contrepartie_nom || suggestion.information_paiement || 'Mouvement'} · {fmtDate(suggestion.date_valeur || suggestion.date_execution)}</div>
+            </div>
+            <button onClick={() => onLier(suggestion)} style={{ padding: '7px 14px', borderRadius: '8px', border: 'none', background: '#16a34a', color: '#fff', cursor: 'pointer', fontSize: '12.5px', fontWeight: '700', fontFamily: FONT, whiteSpace: 'nowrap' }}>Lier ce paiement</button>
+          </div>
+        )}
         <div style={{ padding: '12px 20px', borderBottom: '1px solid #f1f5f9' }}>
           <input value={recherche} onChange={e => setRecherche(e.target.value)} placeholder="Rechercher sur tout : contrepartie, IBAN, communication, montant, date…" autoFocus
             style={{ width: '100%', padding: '9px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', fontFamily: FONT, boxSizing: 'border-box' }} />

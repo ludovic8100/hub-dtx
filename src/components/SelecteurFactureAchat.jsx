@@ -10,10 +10,42 @@ const fmtDate = (d) => {
   return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : d
 }
 
+// Nombre de jours entre deux dates (ISO), ou null si l'une manque/est invalide
+function ecartJours(a, b) {
+  if (!a || !b) return null
+  const ta = new Date(a).getTime(), tb = new Date(b).getTime()
+  if (Number.isNaN(ta) || Number.isNaN(tb)) return null
+  return Math.abs(ta - tb) / 86400000
+}
+
+// Le nom du tiers (contrepartie du mouvement) apparaît-il dans le nom du fichier facture ?
+function nomCorrespond(contrepartie, nomFichier) {
+  if (!contrepartie || !nomFichier) return false
+  const normalise = s => s.toString().normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+  const mots = normalise(contrepartie).split(/[^a-z0-9]+/).filter(w => w.length >= 4)
+  const hay = normalise(nomFichier)
+  return mots.some(w => hay.includes(w))
+}
+
+// Score de correspondance d'une facture avec le mouvement à rapprocher (plus haut = meilleur)
+function scoreCorrespondance(f, cible, dateCible, contrepartieCible) {
+  let score = 0
+  const montant = parseFloat(f.montant)
+  if (cible > 0 && !Number.isNaN(montant)) {
+    const diff = Math.abs(montant - cible)
+    score += diff < 0.01 ? 100 : Math.max(0, 40 - diff)
+  }
+  const jours = ecartJours(f.date_facture, dateCible)
+  if (jours != null) score += Math.max(0, 30 - jours)
+  if (nomCorrespond(contrepartieCible, f.nom)) score += 40
+  return score
+}
+
 /* Sélecteur de factures d'achat non liées, pour rapprocher un mouvement bancaire.
    Props: societeCode, montantCible (montant du mouvement, souvent négatif),
+          dateCible (date du mouvement), contrepartieCible (nom du tiers),
           onChoisir(facture), onCollerUrl(url), onClose */
-export default function SelecteurFactureAchat({ societeCode, montantCible, onChoisir, onCollerUrl, onClose }) {
+export default function SelecteurFactureAchat({ societeCode, montantCible, dateCible, contrepartieCible, onChoisir, onCollerUrl, onClose }) {
   const [tous, setTous] = useState([])
   const [loading, setLoading] = useState(true)
   const [recherche, setRecherche] = useState('')
@@ -47,7 +79,12 @@ export default function SelecteurFactureAchat({ societeCode, montantCible, onCho
     fmtDate(f.date_facture), f.date_facture
   ].filter(Boolean).join(' ').toLowerCase()
   let factures = mots.length ? tous.filter(f => { const h = hayFor(f); return mots.every(w => h.includes(w)) }) : tous
-  factures = [...factures].sort((a, b) => Math.abs((parseFloat(a.montant) || 0) - cible) - Math.abs((parseFloat(b.montant) || 0) - cible)).slice(0, 80)
+  factures = [...factures].sort((a, b) => scoreCorrespondance(b, cible, dateCible, contrepartieCible) - scoreCorrespondance(a, cible, dateCible, contrepartieCible)).slice(0, 80)
+
+  // Suggestion automatique : la facture arrivant en tête si sa correspondance est forte (montant exact et une seule candidate à ce montant)
+  const suggestion = (!recherche && factures.length > 0) ? factures[0] : null
+  const montantExactCount = tous.filter(f => Math.abs((parseFloat(f.montant) || 0) - cible) < 0.01).length
+  const suggestionForte = suggestion && cible > 0 && Math.abs((parseFloat(suggestion.montant) || 0) - cible) < 0.01 && montantExactCount === 1
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT }} onClick={onClose}>
@@ -56,6 +93,16 @@ export default function SelecteurFactureAchat({ societeCode, montantCible, onCho
           <div style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a' }}>Lier une facture</div>
           <div style={{ fontSize: '12.5px', color: '#64748b', marginTop: '3px' }}>Mouvement de <strong>{fmt(montantCible)}</strong>{societeCode ? ` · ${societeCode}` : ''}</div>
         </div>
+        {suggestionForte && (
+          <div style={{ margin: '12px 20px 0', padding: '10px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <i className="ti ti-sparkles" style={{ fontSize: '16px', color: '#16a34a' }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: '11px', fontWeight: '700', color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Correspondance trouvée</div>
+              <div style={{ fontSize: '13px', color: '#0f172a', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(suggestion.nom || '').replace(/\.pdf$/i, '')} · {fmtDate(suggestion.date_facture)}</div>
+            </div>
+            <button onClick={() => onChoisir(suggestion)} style={{ padding: '7px 14px', borderRadius: '8px', border: 'none', background: '#16a34a', color: '#fff', cursor: 'pointer', fontSize: '12.5px', fontWeight: '700', fontFamily: FONT, whiteSpace: 'nowrap' }}>Lier cette facture</button>
+          </div>
+        )}
         <div style={{ padding: '12px 20px', borderBottom: '1px solid #f1f5f9' }}>
           <input value={recherche} onChange={e => setRecherche(e.target.value)} placeholder="Rechercher sur tout : nom, fournisseur, numéro, montant, date…" autoFocus
             style={{ width: '100%', padding: '9px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', fontFamily: FONT, boxSizing: 'border-box' }} />
