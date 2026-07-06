@@ -1009,7 +1009,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
               </div>
               <div style={{ padding:'20px 24px' }}>
                 {/* Rapprochement facture */}
-                <div style={{ marginBottom:'18px', padding:'14px', border:`1px solid ${t.facture_url?'#bbf7d0':'#fecaca'}`, borderRadius:'10px', background: t.facture_url?'#f0fdf4':'#fef2f2' }}>
+                <div style={{ marginBottom:'18px', padding:'14px', border:`1px solid ${t.facture_url?'#bbf7d0':t.sans_facture?'#99f6e4':'#fecaca'}`, borderRadius:'10px', background: t.facture_url?'#f0fdf4':t.sans_facture?'#f0fdfa':'#fef2f2' }}>
                   <div style={{ fontSize:'12px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'10px' }}>Facture</div>
                   {t.facture_url ? (
                     <div>
@@ -1029,15 +1029,35 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                         </button>
                       </div>
                     </div>
+                  ) : t.sans_facture ? (
+                    <div>
+                      <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'10px' }}>
+                        <span style={{ display:'flex', alignItems:'center', justifyContent:'center', width:'22px', height:'22px', borderRadius:'6px', background:'#f0fdfa', border:'1px solid #99f6e4', color:'#0d9488', fontSize:'12px', fontWeight:'700' }}><i className="ti ti-file-off" /></span>
+                        <span style={{ fontSize:'14px', color:'#0d9488', fontWeight:'700' }}>Sans facture nécessaire</span>
+                      </div>
+                      <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
+                        <button onClick={()=>lierFactureManuelle(t)} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', borderRadius:'8px', border:'none', background:color, color:'#fff', cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                          🔗 Lier une facture finalement
+                        </button>
+                        <button onClick={()=>marquerSansFacture(t, false)} style={{ padding:'8px 14px', borderRadius:'8px', border:'1px solid #cbd5e1', background:'#fff', color:'#475569', cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                          Annuler « sans facture »
+                        </button>
+                      </div>
+                    </div>
                   ) : (
                     <div>
                       <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'10px' }}>
                         <span style={{ display:'flex', alignItems:'center', justifyContent:'center', width:'22px', height:'22px', borderRadius:'6px', background:'#fee2e2', color:'#dc2626', fontSize:'13px', fontWeight:'700' }}>✕</span>
                         <span style={{ fontSize:'14px', color:'#dc2626', fontWeight:'700' }}>Aucune facture liée</span>
                       </div>
-                      <button onClick={()=>lierFactureManuelle(t)} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', borderRadius:'8px', border:'none', background:color, color:'#fff', cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
-                        🔗 Ajouter le lien de la facture
-                      </button>
+                      <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
+                        <button onClick={()=>lierFactureManuelle(t)} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', borderRadius:'8px', border:'none', background:color, color:'#fff', cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                          🔗 Ajouter le lien de la facture
+                        </button>
+                        <button onClick={()=>marquerSansFacture(t, true)} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', borderRadius:'8px', border:'none', background:'#0d9488', color:'#fff', cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                          <i className="ti ti-file-off" /> Sans facture nécessaire
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
