@@ -14,29 +14,40 @@ const fmtDate = (d) => {
    Props: societeCode, montantCible (montant du mouvement, souvent négatif),
           onChoisir(facture), onCollerUrl(url), onClose */
 export default function SelecteurFactureAchat({ societeCode, montantCible, onChoisir, onCollerUrl, onClose }) {
-  const [factures, setFactures] = useState([])
+  const [tous, setTous] = useState([])
   const [loading, setLoading] = useState(true)
   const [recherche, setRecherche] = useState('')
   const [urlManuelle, setUrlManuelle] = useState('')
   const cible = Math.abs(parseFloat(montantCible) || 0)
 
+  // Charger une seule fois toutes les factures non liées de la société
   useEffect(() => {
+    let annule = false
     setLoading(true)
-    let q = supabase.from('factures_achat').select('fichier_id,nom,montant,date_facture,url').is('transaction_id', null)
-    if (societeCode) q = q.eq('societe', societeCode)
-    if (recherche.trim()) {
-      q = q.ilike('nom', `%${recherche.trim()}%`).limit(60)
-    } else if (cible > 0) {
-      q = q.gte('montant', cible - 1).lte('montant', cible + 1).limit(60)
-    } else {
-      q = q.order('date_facture', { ascending: false }).limit(60)
-    }
-    q.then(({ data }) => {
-      let rows = data || []
-      rows.sort((a, b) => Math.abs((parseFloat(a.montant) || 0) - cible) - Math.abs((parseFloat(b.montant) || 0) - cible))
-      setFactures(rows); setLoading(false)
-    })
-  }, [societeCode, recherche])
+    ;(async () => {
+      let out = []; let from = 0
+      for (;;) {
+        let q = supabase.from('factures_achat').select('fichier_id,nom,montant,date_facture,url,societe').is('transaction_id', null)
+        if (societeCode) q = q.eq('societe', societeCode)
+        const { data, error } = await q.order('date_facture', { ascending: false }).range(from, from + 999)
+        if (error || !data) break
+        out = out.concat(data)
+        if (data.length < 1000) break
+        from += 1000
+      }
+      if (!annule) { setTous(out); setLoading(false) }
+    })()
+    return () => { annule = true }
+  }, [societeCode])
+
+  // Recherche sur TOUTES les données (multi-mots) ; sinon tri par proximité de montant
+  const mots = recherche.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  const hayFor = (f) => [
+    f.nom, f.societe, fmt(f.montant), String(f.montant),
+    fmtDate(f.date_facture), f.date_facture
+  ].filter(Boolean).join(' ').toLowerCase()
+  let factures = mots.length ? tous.filter(f => { const h = hayFor(f); return mots.every(w => h.includes(w)) }) : tous
+  factures = [...factures].sort((a, b) => Math.abs((parseFloat(a.montant) || 0) - cible) - Math.abs((parseFloat(b.montant) || 0) - cible)).slice(0, 80)
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT }} onClick={onClose}>
@@ -46,13 +57,14 @@ export default function SelecteurFactureAchat({ societeCode, montantCible, onCho
           <div style={{ fontSize: '12.5px', color: '#64748b', marginTop: '3px' }}>Mouvement de <strong>{fmt(montantCible)}</strong>{societeCode ? ` · ${societeCode}` : ''}</div>
         </div>
         <div style={{ padding: '12px 20px', borderBottom: '1px solid #f1f5f9' }}>
-          <input value={recherche} onChange={e => setRecherche(e.target.value)} placeholder="Rechercher une facture (nom, fournisseur, numéro)…"
+          <input value={recherche} onChange={e => setRecherche(e.target.value)} placeholder="Rechercher sur tout : nom, fournisseur, numéro, montant, date…" autoFocus
             style={{ width: '100%', padding: '9px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', fontFamily: FONT, boxSizing: 'border-box' }} />
-          {!recherche && cible > 0 && <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px' }}>Factures non liées proches de {fmt(cible)}</div>}
+          {!recherche && <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px' }}>{tous.length} factures non liées{cible > 0 ? ` · triées par montant proche de ${fmt(cible)}` : ''}</div>}
+          {recherche && <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px' }}>{factures.length} résultat{factures.length > 1 ? 's' : ''}</div>}
         </div>
         <div style={{ overflowY: 'auto', flex: 1 }}>
           {loading && <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>Recherche…</div>}
-          {!loading && factures.length === 0 && <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>Aucune facture correspondante.<br />Essaie une recherche par nom, ou colle l'URL ci-dessous.</div>}
+          {!loading && factures.length === 0 && <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>Aucune facture correspondante.<br />Tu peux aussi coller l'URL ci-dessous.</div>}
           {!loading && factures.map(f => {
             const exact = Math.abs((parseFloat(f.montant) || 0) - cible) < 0.01
             return (
