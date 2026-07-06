@@ -314,7 +314,8 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
 
   // KPIs
   const soldeTotal = comptes.reduce((s,c) => s + parseFloat(c.solde_actuel||0), 0)
-  const txFiltrees = transactions.filter(t => {
+  // Filtrage SANS le critère facture (sert aux compteurs liées/non liées)
+  const txHorsFacture = transactions.filter(t => {
     if (filtre.compte !== 'tous' && t.compte_id !== filtre.compte) return false
     if (filtre.type === 'entrees' && parseFloat(t.montant) <= 0) return false
     if (filtre.type === 'sorties' && parseFloat(t.montant) >= 0) return false
@@ -328,6 +329,10 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
     }
     if (filtre.categorie === 'sans' && t.categorie_id) return false
     if (filtre.categorie !== 'toutes' && filtre.categorie !== 'sans' && t.categorie_id !== filtre.categorie) return false
+    return true
+  })
+  // Filtrage complet = + critère facture
+  const txFiltrees = txHorsFacture.filter(t => {
     if (filtre.facture === 'avec' && !t.facture_url) return false
     if (filtre.facture === 'sans' && t.facture_url) return false
     return true
@@ -349,10 +354,9 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const totalEntrees = txFiltrees.filter(t=>parseFloat(t.montant)>0).reduce((s,t)=>s+parseFloat(t.montant),0)
   const totalSorties = txFiltrees.filter(t=>parseFloat(t.montant)<0).reduce((s,t)=>s+parseFloat(t.montant),0)
 
-  // Compteurs de rapprochement facture (sur les sorties d'argent du périmètre compte sélectionné)
-  const txPerimetre = transactions.filter(t => filtre.compte === 'tous' || t.compte_id === filtre.compte)
-  const nbAvecFacture = txPerimetre.filter(t => t.facture_url).length
-  const nbSansFacture = txPerimetre.filter(t => !t.facture_url).length
+  // Compteurs facture : respectent tous les filtres actifs (période, compte, etc.) sauf le critère facture
+  const nbAvecFacture = txHorsFacture.filter(t => t.facture_url).length
+  const nbSansFacture = txHorsFacture.filter(t => !t.facture_url).length
 
   // Pagination
   const totalPages = Math.max(1, Math.ceil(txFiltrees.length / PAR_PAGE))
