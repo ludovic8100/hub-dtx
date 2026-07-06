@@ -664,14 +664,20 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       )}
 
       {/* Barre d'action : justifier plusieurs mouvements avec une facture */}
-      {selection.size > 0 && (
+      {selection.size > 0 && (() => {
+        const totalSel = transactions.filter(t => selection.has(t.id)).reduce((s,t)=>s+Math.abs(parseFloat(t.montant)||0),0)
+        return (
         <div style={{
           position:'fixed', bottom:'24px', left:'50%', transform:'translateX(-50%)', zIndex:200,
           background:'#0f172a', color:'#fff', borderRadius:'12px', padding:'12px 18px',
           display:'flex', alignItems:'center', gap:'16px', boxShadow:'0 8px 30px rgba(0,0,0,0.25)',
           fontFamily:"'Source Sans Pro', sans-serif"
         }}>
-          <span style={{ fontSize:'14px', fontWeight:'600' }}>{selection.size} mouvement{selection.size>1?'s':''} sélectionné{selection.size>1?'s':''}</span>
+          <span style={{ fontSize:'14px', fontWeight:'600' }}>
+            {selection.size} mouvement{selection.size>1?'s':''}
+            <span style={{ color:'#94a3b8', margin:'0 8px' }}>·</span>
+            <span style={{ fontWeight:'800' }}>{fmt(totalSel)}</span>
+          </span>
           <button onClick={justifierSelection} style={{
             padding:'8px 16px', borderRadius:'8px', border:'none', background:color, color:'#fff',
             cursor:'pointer', fontSize:'13px', fontWeight:'700', fontFamily:"'Source Sans Pro', sans-serif"
@@ -681,7 +687,8 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
             cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif"
           }}>Annuler</button>
         </div>
-      )}
+        )
+      })()}
 
       {/* Aperçu flottant au survol du montant (desktop) */}
       {apercu && !isMobile && (() => {
