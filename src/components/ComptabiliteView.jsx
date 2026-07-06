@@ -531,9 +531,11 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                 background: t.facture_url ? '#f0fdf4' : (i%2===0 ? '#fff' : '#fafafa')
               }}>
                 <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'6px' }} onClick={e=>e.stopPropagation()}>
-                  <input type="checkbox" checked={selection.has(t.id)} onChange={()=>toggleSelection(t.id)}
-                    title="Sélectionner pour justifier plusieurs mouvements avec une seule facture"
-                    style={{ width:'15px', height:'15px', cursor:'pointer', accentColor:color, flexShrink:0 }} />
+                  {!t.facture_url && (
+                    <input type="checkbox" checked={selection.has(t.id)} onChange={()=>toggleSelection(t.id)}
+                      title="Sélectionner pour justifier plusieurs mouvements avec une seule facture"
+                      style={{ width:'15px', height:'15px', cursor:'pointer', accentColor:color, flexShrink:0 }} />
+                  )}
                   {t.facture_url ? (
                     <button onClick={()=>ouvrirFactureLiee(t)} title={`Facture liée :\n${cheminFacture(t.facture_url)}\n\nCliquer pour ouvrir dans SharePoint`} style={{
                       display:'flex', alignItems:'center', justifyContent:'center', width:'26px', height:'26px',
