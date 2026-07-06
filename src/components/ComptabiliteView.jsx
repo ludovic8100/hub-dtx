@@ -238,9 +238,9 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
 
   // Retirer le lien facture (repasse en croix rouge)
   async function retirerLienFacture(tx) {
-    await supabase.from('transactions').update({ facture_url: null, rapproche: false }).eq('id', tx.id)
-    setTransactions(prev => prev.map(t => t.id === tx.id ? { ...t, facture_url: null, rapproche: false } : t))
-    setTxSelection(prev => prev && prev.id === tx.id ? { ...prev, facture_url: null, rapproche: false } : prev)
+    await supabase.from('transactions').update({ facture_url: null, rapproche: false, facture_thumb_url: null }).eq('id', tx.id)
+    setTransactions(prev => prev.map(t => t.id === tx.id ? { ...t, facture_url: null, rapproche: false, facture_thumb_url: null } : t))
+    setTxSelection(prev => prev && prev.id === tx.id ? { ...prev, facture_url: null, rapproche: false, facture_thumb_url: null } : prev)
   }
 
   // --- Sélection multiple : justifier plusieurs mouvements avec UNE facture ---
@@ -273,12 +273,16 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
     if (!panneauJustif) return
     const { ids } = panneauJustif
     const clean = (panneauJustif.url || '').trim()
-    await supabase.from('transactions').update({ facture_url: clean || null, rapproche: !!clean }).in('id', ids)
-    setTransactions(prev => prev.map(t => ids.includes(t.id) ? { ...t, facture_url: clean || null, rapproche: !!clean } : t))
-    setTxSelection(prev => prev && ids.includes(prev.id) ? { ...prev, facture_url: clean || null, rapproche: !!clean } : prev)
+    await supabase.from('transactions').update({ facture_url: clean || null, rapproche: !!clean, facture_thumb_url: null }).in('id', ids)
+    setTransactions(prev => prev.map(t => ids.includes(t.id) ? { ...t, facture_url: clean || null, rapproche: !!clean, facture_thumb_url: null } : t))
+    setTxSelection(prev => prev && ids.includes(prev.id) ? { ...prev, facture_url: clean || null, rapproche: !!clean, facture_thumb_url: null } : prev)
     setPanneauJustif(null)
     setAideOuverte(false)
     viderSelection()
+    // Régénérer la vignette de la nouvelle facture (en arrière-plan)
+    if (clean) {
+      fetch('https://n8n.srv1082740.hstgr.cloud/webhook/backfill-thumbs2', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' }).catch(()=>{})
+    }
   }
 
   if (loading) return <div style={{ padding:'60px', textAlign:'center', color:'#94a3b8', fontFamily:"'Source Sans Pro', sans-serif" }}>Chargement…</div>
@@ -334,8 +338,11 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   return (
     <div style={{ fontFamily:"'Source Sans Pro', sans-serif" }}>
 
+      {/* En-tête collant : KPIs + filtres restent visibles, seuls les mouvements scrollent */}
+      <div style={{ position:'sticky', top: isMobile ? '-8px' : '-28px', zIndex:60, background:'#f1f5f9', paddingTop: isMobile ? '4px' : '8px', marginBottom:'14px' }}>
+
       {/* KPIs */}
-      <div style={{ display:'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap:'14px', marginBottom:'24px' }}>
+      <div style={{ display:'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap:'14px', marginBottom:'14px' }}>
         {[
           { label:'Trésorerie totale', value: fmt(soldeTotal), color, sub:`${comptes.length} comptes` },
           { label:'Entrées', value: fmt(totalEntrees), color:'#16a34a' },
@@ -431,6 +438,8 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
           </div>
         )}
       </div>
+
+      </div>{/* fin en-tête collant */}
 
       {/* Tableau transactions pleine largeur */}
       <div style={{ background:'#fff', borderRadius:'12px', border:'1px solid #e2e8f0', overflow:'hidden' }}>
