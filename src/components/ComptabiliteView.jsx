@@ -347,7 +347,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
           { label:'Trésorerie totale', value: fmt(soldeTotal), color, sub:`${comptes.length} comptes` },
           { label:'Entrées', value: fmt(totalEntrees), color:'#16a34a' },
           { label:'Sorties', value: fmt(totalSorties), color:'#dc2626' },
-          { label:'Factures non rapprochées', value: nbSansFacture, color:'#dc2626', clic:'sans', sub:`${nbAvecFacture} rapprochées`, badge:true },
+          { label:'Factures non liées', value: nbSansFacture, color:'#dc2626', clic:'sans', sub:`${nbAvecFacture} liées`, badge:true },
         ].map(k => (
           <div key={k.label} onClick={k.clic ? ()=>setFiltre(f=>({...f, facture: f.facture===k.clic ? 'toutes' : k.clic})) : undefined}
             style={{ background: (k.clic && filtre.facture===k.clic) ? '#fef2f2' : '#fff', borderRadius:'10px', border:`1px solid ${(k.clic && filtre.facture===k.clic) ? '#fecaca' : '#e2e8f0'}`, borderTop:`3px solid ${k.color}`, padding:'16px 20px', cursor: k.clic ? 'pointer' : 'default', transition:'all .15s' }}>
@@ -417,7 +417,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
         <div style={{ display:'flex', flexDirection:'column', gap:'3px' }}>
           <label style={{ fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em' }}>Facture</label>
           <div style={{ display:'flex', gap:'4px' }}>
-            {[['toutes','Toutes','#64748b','#f1f5f9'],['avec','✓ Avec','#16a34a','#dcfce7'],['sans','✕ Sans','#dc2626','#fee2e2']].map(([val,lab,c,bg]) => (
+            {[['toutes','Toutes','#64748b','#f1f5f9'],['avec','✓ Liées','#16a34a','#dcfce7'],['sans','✕ Non liées','#dc2626','#fee2e2']].map(([val,lab,c,bg]) => (
               <button key={val} onClick={()=>setFiltre(f=>({...f,facture:val}))} style={{
                 padding:'7px 11px', borderRadius:'6px', border:'none', cursor:'pointer', fontSize:'13px', fontWeight:'600',
                 fontFamily:"'Source Sans Pro', sans-serif",
