@@ -5,6 +5,7 @@ import Layout from '../../components/Layout'
 import { ENTITES } from '../../lib/entites'
 import { StatBanner, PrimaryButton } from '../../components/ui/AccountableUI'
 import { SYNCS, SyncCard, WebhookStatus } from '../../components/SyncCards'
+import { SyncButtonsRow } from '../../components/SyncCards'
 
 // ── Constantes ──
 const SOCIETES = {
@@ -677,6 +678,10 @@ export default function DashboardGroupe() {
           subtitle="Vue consolidée — Groupe DTX · Dynassur · LODE · Hexagroup · Privé"
 
         />
+
+        <div style={{ marginBottom:20 }}>
+          <SyncButtonsRow />
+        </div>
 
         {/* 1 — Synchronisations tout en haut */}
         <div style={{ marginBottom:24 }}>

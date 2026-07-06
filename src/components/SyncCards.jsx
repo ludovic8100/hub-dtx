@@ -56,6 +56,92 @@ export async function triggerWorkflow(webhook, workflowId) {
   return { ok: false }
 }
 
+
+// Liste étendue pour les boutons compacts (inclut rapprochement factures)
+export const SYNC_BUTTONS = [
+  ...SYNCS,
+  {
+    key: 'rapprochement',
+    label: 'Rapprochement factures',
+    desc: 'Associe automatiquement les factures SharePoint aux transactions bancaires.',
+    icon: 'ti-link',
+    color: '#0080BD',
+    webhook: 'rapprochement-factures',
+    workflowId: 'hmL5WFBknLUfDwGw',
+    tables: [],
+  },
+]
+
+// Formate une date en "il y a X min" ou date courte
+export function fmtDerniereExec(at) {
+  if (!at) return 'jamais'
+  const d = new Date(at)
+  const diff = Math.floor((Date.now() - d.getTime()) / 60000) // minutes
+  if (diff < 1) return "à l'instant"
+  if (diff < 60) return `il y a ${diff} min`
+  if (diff < 1440) return `il y a ${Math.floor(diff/60)} h`
+  return d.toLocaleDateString('fr-BE', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })
+}
+
+// Bouton compact unique avec dernière exécution
+function SyncMiniButton({ sync }) {
+  const [state, setState] = useState('idle')
+  const [lastExec, setLastExec] = useState(null)
+
+  const loadLastExec = async () => {
+    try {
+      const res = await fetch(`${N8N_API}/executions?workflowId=${sync.workflowId}&limit=1`, { headers: { 'X-N8N-API-KEY': N8N_KEY } })
+      if (res.ok) {
+        const data = await res.json()
+        const e = data.data?.[0]
+        if (e) setLastExec({ status: e.status, at: e.startedAt })
+      }
+    } catch {}
+  }
+  useEffect(() => { loadLastExec() }, [])
+
+  const run = async () => {
+    setState('running')
+    const result = await triggerWorkflow(sync.webhook, sync.workflowId)
+    setState(result.ok ? 'ok' : 'error')
+    setTimeout(() => { loadLastExec(); setState('idle') }, 8000)
+  }
+  const running = state === 'running'
+  const statusCol = lastExec?.status === 'error' ? '#dc2626' : lastExec?.status === 'success' ? '#16a34a' : '#94a3b8'
+
+  return (
+    <button onClick={run} disabled={running} title={`Dernière exécution : ${fmtDerniereExec(lastExec?.at)}${lastExec?.status ? ' ('+lastExec.status+')' : ''}`}
+      style={{
+        display:'flex', alignItems:'center', gap:'7px', padding:'7px 12px', borderRadius:'8px',
+        border:'1px solid #e2e8f0', background: running ? '#f1f5f9' : (state==='ok' ? '#f0fdf4' : state==='error' ? '#fef2f2' : '#fff'),
+        cursor: running ? 'wait' : 'pointer', fontSize:'12px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif",
+        color:'#334155', whiteSpace:'nowrap', flexShrink:0
+      }}>
+      <i className={`ti ${running ? 'ti-loader-2' : (state==='ok' ? 'ti-check' : state==='error' ? 'ti-x' : sync.icon)}`}
+        style={{ color: running ? '#94a3b8' : (state==='ok' ? '#16a34a' : state==='error' ? '#dc2626' : sync.color), fontSize:'15px',
+          animation: running ? 'spin 1s linear infinite' : 'none' }} />
+      <span>{sync.label}</span>
+      <span style={{ display:'inline-flex', alignItems:'center', gap:'4px', paddingLeft:'6px', borderLeft:'1px solid #e2e8f0', color:statusCol, fontSize:'11px', fontWeight:'500' }}>
+        <span style={{ width:'6px', height:'6px', borderRadius:'50%', background:statusCol, display:'inline-block' }} />
+        {fmtDerniereExec(lastExec?.at)}
+      </span>
+    </button>
+  )
+}
+
+// Ligne de boutons de synchronisation manuelle (avec dernière exécution)
+export function SyncButtonsRow({ only, style }) {
+  const list = only ? SYNC_BUTTONS.filter(s => only.includes(s.key)) : SYNC_BUTTONS
+  return (
+    <div style={{ display:'flex', gap:'8px', flexWrap:'wrap', alignItems:'center', ...style }}>
+      <span style={{ fontSize:'11px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em', marginRight:'2px' }}>
+        <i className="ti ti-refresh" style={{ fontSize:'13px', marginRight:'4px' }} />Mettre à jour
+      </span>
+      {list.map(s => <SyncMiniButton key={s.key} sync={s} />)}
+    </div>
+  )
+}
+
 export function WebhookStatus() {
   const [status, setStatus] = useState('checking')
   useEffect(() => {

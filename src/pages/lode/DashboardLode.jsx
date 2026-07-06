@@ -5,6 +5,7 @@ import { useAuth } from '../../lib/auth'
 import BlocComptes from '../../components/BlocComptes'
 import { LODE } from '../../lib/lodeConfig'
 import { StatBanner, DataCard, StatusBadge, useMobile } from '../../components/ui/AccountableUI'
+import { SyncButtonsRow } from '../../components/SyncCards'
 
 const fmt = v => v == null ? '—' : new Intl.NumberFormat('fr-BE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v)
 const fmtDate = v => v ? new Date(v).toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit' }) : '—'
@@ -75,6 +76,10 @@ export default function DashboardLode() {
             { label: 'Sorties ce mois', value: loading ? '…' : fmt(txStats.sorties) },
           ]}
         />
+
+        <div style={{ marginBottom:20 }}>
+          <SyncButtonsRow />
+        </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14, marginBottom: 22 }}>
           <KpiCard label="Tâches en cours" value={loading ? '…' : taches.length} icon="ti-checkbox" color="#f59e0b" sub={nbRetard + ' en retard'} />

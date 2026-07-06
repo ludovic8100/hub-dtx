@@ -6,6 +6,7 @@ import { useAuth } from '../../lib/auth'
 import BlocComptes from '../../components/BlocComptes'
 import { ENTITES } from '../../lib/entites'
 import { StatBanner } from '../../components/ui/AccountableUI'
+import { SyncButtonsRow } from '../../components/SyncCards'
 
 const C = { navy:'#0D2F5E', blue:'#0080BD', cyan:'#5DC3E8', ok:'#16a34a', warn:'#f59e0b', danger:'#dc2626', border:'#e2e8f0', bg:'#f8fafc', text:'#1e293b', muted:'#94a3b8' }
 const fmt = v => v==null?'—':new Intl.NumberFormat('fr-BE',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(v)
@@ -126,6 +127,10 @@ export default function DashboardDynassur() {
           title={`Bonjour ${firstName || ''}`.trim()}
           subtitle={`Dynassur SRL — aperçu de l'activité ${annee}`}
         />
+
+        <div style={{ marginBottom:20 }}>
+          <SyncButtonsRow />
+        </div>
 
         {/* KPIs */}
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:14, marginBottom:24 }}>
