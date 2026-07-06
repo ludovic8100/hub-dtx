@@ -91,6 +91,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const [panneauJustif, setPanneauJustif] = useState(null) // { ids:[...], url:'', code:'LODE' } ou null
   const [aideOuverte, setAideOuverte] = useState(false)
   const [apercu, setApercu] = useState(null) // { tx, x, y } — aperçu au survol du montant
+  const [apercuFacture, setApercuFacture] = useState(null) // { url } — aperçu PDF au survol de la date
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 768)
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 768)
@@ -548,7 +549,12 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                     }}>✕</button>
                   )}
                 </div>
-                <div style={{ fontSize:'12px', color:'#64748b' }}>{fmtDate(t._date)}</div>
+                <div
+                  onMouseEnter={() => t.facture_url && setApercuFacture({ url: urlVisionneuse(t.facture_url), nom: cheminFacture(t.facture_url) })}
+                  onMouseLeave={() => setApercuFacture(null)}
+                  style={{ fontSize:'12px', color: t.facture_url ? '#16a34a' : '#64748b', fontWeight: t.facture_url ? '700' : '400', cursor: t.facture_url ? 'zoom-in' : 'default' }}>
+                  {fmtDate(t._date)}{t.facture_url ? ' 🔍' : ''}
+                </div>
                 <div style={{ fontSize:'11px', color:'#94a3b8', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                   {t.comptes_bancaires?.banque || '—'}
                 </div>
@@ -689,6 +695,22 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
         </div>
         )
       })()}
+
+      {/* Aperçu PDF de la facture au survol de la date (desktop) */}
+      {apercuFacture && !isMobile && (
+        <div style={{
+          position:'fixed', top:'50%', right:'32px', transform:'translateY(-50%)', zIndex:250,
+          width:'620px', maxWidth:'46vw', height:'80vh', background:'#fff', borderRadius:'14px',
+          boxShadow:'0 20px 60px rgba(0,0,0,0.35)', border:'1px solid #e2e8f0', overflow:'hidden',
+          display:'flex', flexDirection:'column', pointerEvents:'none'
+        }}>
+          <div style={{ padding:'10px 14px', background:'#0f172a', color:'#fff', fontSize:'12px', fontWeight:'600',
+            fontFamily:"'Source Sans Pro', sans-serif", whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+            📄 {apercuFacture.nom}
+          </div>
+          <iframe src={apercuFacture.url} title="Aperçu facture" style={{ flex:1, border:'none', width:'100%' }} />
+        </div>
+      )}
 
       {/* Aperçu flottant au survol du montant (desktop) */}
       {apercu && !isMobile && (() => {
