@@ -85,6 +85,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const [loadingTx, setLoadingTx] = useState(false)
   const [filtre, setFiltre] = useState({ compte: 'tous', type: 'tous', libelle: '', periodes: [], categorie: 'toutes', facture: 'toutes' })
   const [onglet, setOnglet] = useState('mouvements') // 'mouvements' | 'factures'
+  const [montantsMasques, setMontantsMasques] = useState(true) // masquer soldes/entrées/sorties par défaut
   const [periodeOuverte, setPeriodeOuverte] = useState(false)
   const [periodePos, setPeriodePos] = useState({ top:0, left:0 })
   const periodeBtnRef = useRef(null)
@@ -465,14 +466,14 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       ) : (<>
 
       {/* En-tête collant : boutons sync + KPIs + filtres restent visibles, seuls les mouvements scrollent */}
-      <div style={{ position:'sticky', top: isMobile ? '-16px' : '-28px', zIndex:60, background:'#f1f5f9', paddingTop: isMobile ? '16px' : '28px', paddingBottom:'2px', marginBottom:'14px' }}>
+      <div style={{ position:'sticky', top: isMobile ? '-16px' : '-20px', zIndex:60, background:'#f1f5f9', paddingTop: isMobile ? '10px' : '12px', paddingBottom:'2px', marginBottom:'10px' }}>
 
       {/* KPIs */}
-      <div style={{ display:'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap:'14px', marginBottom:'14px' }}>
+      <div style={{ display:'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap:'12px', marginBottom:'10px' }}>
         {[
-          { label:'Trésorerie totale', value: fmt(soldeTotal), color, sub:`${comptes.length} comptes` },
-          { label:'Entrées', value: fmt(totalEntrees), color:'#16a34a' },
-          { label:'Sorties', value: fmt(totalSorties), color:'#dc2626' },
+          { label:'Trésorerie totale', value: fmt(soldeTotal), color, sub:`${comptes.length} comptes`, sensible:true },
+          { label:'Entrées', value: fmt(totalEntrees), color:'#16a34a', sensible:true },
+          { label:'Sorties', value: fmt(totalSorties), color:'#dc2626', sensible:true },
           (filtre.facture === 'avec'
             ? { label:'Factures liées', value: nbAvecFacture, color:'#16a34a', clic:'toggle', sub:`${nbSansFacture} non liées • ${nbAvecFacture+nbSansFacture} au total`, badge:true }
             : filtre.facture === 'sans'
@@ -480,9 +481,17 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
             : { label:'Factures (toutes)', value: nbAvecFacture+nbSansFacture+nbSansFactureRequise, color, clic:'toggle', sub:`${nbAvecFacture} liées • ${nbSansFacture} non liées${nbSansFactureRequise?` • ${nbSansFactureRequise} sans facture`:''}`, badge:true }),
         ].map(k => (
           <div key={k.label} onClick={k.clic ? ()=>setFiltre(f=>({...f, facture: f.facture==='toutes' ? 'sans' : f.facture==='sans' ? 'avec' : 'toutes'})) : undefined}
-            style={{ background: (k.clic && filtre.facture!=='toutes') ? '#f8fafc' : '#fff', borderRadius:'10px', border:`1px solid ${(k.clic && filtre.facture!=='toutes') ? '#cbd5e1' : '#e2e8f0'}`, borderTop:`3px solid ${k.color}`, padding:'16px 20px', cursor: k.clic ? 'pointer' : 'default', transition:'all .15s' }}>
+            style={{ position:'relative', background: (k.clic && filtre.facture!=='toutes') ? '#f8fafc' : '#fff', borderRadius:'10px', border:`1px solid ${(k.clic && filtre.facture!=='toutes') ? '#cbd5e1' : '#e2e8f0'}`, borderTop:`3px solid ${k.color}`, padding:'14px 18px', cursor: k.clic ? 'pointer' : 'default', transition:'all .15s' }}>
             <div style={{ fontSize:'11px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'6px' }}>{k.label}</div>
-            <div style={{ fontSize:'20px', fontWeight:'800', color: k.badge ? k.color : '#0f172a', lineHeight:1 }}>{k.value}</div>
+            <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
+              <div style={{ fontSize:'20px', fontWeight:'800', color: k.badge ? k.color : '#0f172a', lineHeight:1 }}>{k.sensible && montantsMasques ? '••••••' : k.value}</div>
+              {k.sensible && (
+                <button onClick={(e)=>{ e.stopPropagation(); setMontantsMasques(m=>!m) }} title={montantsMasques?'Afficher les montants':'Masquer les montants'}
+                  style={{ border:'none', background:'none', cursor:'pointer', padding:'2px', color:'#94a3b8', display:'flex', alignItems:'center' }}>
+                  <i className={`ti ti-${montantsMasques?'eye':'eye-off'}`} style={{ fontSize:'16px' }} />
+                </button>
+              )}
+            </div>
             {k.sub && <div style={{ fontSize:'11px', color:'#94a3b8', marginTop:'5px', fontWeight:'600' }}>{k.sub}</div>}
           </div>
         ))}
