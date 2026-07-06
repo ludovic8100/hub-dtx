@@ -82,7 +82,9 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadingTx, setLoadingTx] = useState(false)
-  const [filtre, setFiltre] = useState({ compte: 'tous', type: 'tous', libelle: '', annee: '', trimestre: '', mois: '', categorie: 'toutes', facture: 'toutes' })
+  const [filtre, setFiltre] = useState({ compte: 'tous', type: 'tous', libelle: '', periodes: [], categorie: 'toutes', facture: 'toutes' })
+  const [periodeOuverte, setPeriodeOuverte] = useState(false)
+  const [anneesDepliees, setAnneesDepliees] = useState({})
   const [tri, setTri] = useState({ col: 'date', sens: 'desc' })
   const [page, setPage] = useState(1)
   const [categories, setCategories] = useState([])
@@ -150,7 +152,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   }, [comptes.map(c=>c.id).join(',')])
 
   // Reset pagination quand les filtres changent
-  useEffect(() => { setPage(1) }, [filtre.compte, filtre.type, filtre.libelle, filtre.annee, filtre.trimestre, filtre.mois, filtre.categorie, filtre.facture])
+  useEffect(() => { setPage(1) }, [filtre.compte, filtre.type, filtre.libelle, filtre.periodes, filtre.categorie, filtre.facture])
 
   // Charger les catégories
   async function chargerCategories() {
@@ -298,12 +300,9 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       const q = filtre.libelle.toLowerCase()
       if (!t.information_paiement?.toLowerCase().includes(q) && !t.description?.toLowerCase().includes(q) && !t.contrepartie_nom?.toLowerCase().includes(q)) return false
     }
-    if (filtre.annee && !(t._date || '').startsWith(filtre.annee)) return false
-    if (filtre.mois) { const m = (t._date || '').substring(5,7); if (m !== filtre.mois) return false }
-    if (filtre.trimestre) {
-      const m = parseInt((t._date || '').substring(5,7), 10)
-      const q = m>=1&&m<=3 ? '1' : m>=4&&m<=6 ? '2' : m>=7&&m<=9 ? '3' : m>=10&&m<=12 ? '4' : ''
-      if (q !== filtre.trimestre) return false
+    if (filtre.periodes.length > 0) {
+      const ym = (t._date || '').substring(0,7) // 'YYYY-MM'
+      if (!filtre.periodes.includes(ym)) return false
     }
     if (filtre.categorie === 'sans' && t.categorie_id) return false
     if (filtre.categorie !== 'toutes' && filtre.categorie !== 'sans' && t.categorie_id !== filtre.categorie) return false
@@ -340,6 +339,54 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
 
   // Années disponibles
   const anneesDispo = [...new Set(transactions.map(t => (t._date || '').substring(0,4)).filter(Boolean))].sort((a,b)=>b-a)
+
+  // --- Sélecteur de période hiérarchique (Année > Trimestre > Mois) ---
+  const MOIS_NOMS = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Août','Sep','Oct','Nov','Déc']
+  const TRIMESTRES = [ {q:'1', mois:[1,2,3]}, {q:'2', mois:[4,5,6]}, {q:'3', mois:[7,8,9]}, {q:'4', mois:[10,11,12]} ]
+  const moisDeAnnee = (an) => Array.from({length:12}, (_,i) => `${an}-${String(i+1).padStart(2,'0')}`)
+  const periodesSet = new Set(filtre.periodes)
+
+  const setPeriodes = (arr) => setFiltre(f => ({ ...f, periodes: [...new Set(arr)].sort() }))
+
+  const toggleMois = (ym) => {
+    const s = new Set(periodesSet)
+    if (s.has(ym)) s.delete(ym); else s.add(ym)
+    setPeriodes([...s])
+  }
+  const toggleTrimestre = (an, mois) => {
+    const cles = mois.map(m => `${an}-${String(m).padStart(2,'0')}`)
+    const tousCoches = cles.every(c => periodesSet.has(c))
+    const s = new Set(periodesSet)
+    cles.forEach(c => tousCoches ? s.delete(c) : s.add(c))
+    setPeriodes([...s])
+  }
+  const toggleAnnee = (an) => {
+    const cles = moisDeAnnee(an)
+    const tousCoches = cles.every(c => periodesSet.has(c))
+    const s = new Set(periodesSet)
+    cles.forEach(c => tousCoches ? s.delete(c) : s.add(c))
+    setPeriodes([...s])
+  }
+  const anneeEtat = (an) => { // 'all' | 'some' | 'none'
+    const cles = moisDeAnnee(an); const n = cles.filter(c => periodesSet.has(c)).length
+    return n===0 ? 'none' : n===12 ? 'all' : 'some'
+  }
+  const trimestreEtat = (an, mois) => {
+    const cles = mois.map(m => `${an}-${String(m).padStart(2,'0')}`); const n = cles.filter(c => periodesSet.has(c)).length
+    return n===0 ? 'none' : n===mois.length ? 'all' : 'some'
+  }
+  // Libellé résumé du bouton
+  const periodeLabel = () => {
+    if (filtre.periodes.length === 0) return 'Toutes les périodes'
+    const parAnnee = {}
+    filtre.periodes.forEach(ym => { const [a,m] = ym.split('-'); (parAnnee[a] = parAnnee[a] || []).push(m) })
+    const parts = Object.keys(parAnnee).sort().map(a => {
+      const n = parAnnee[a].length
+      if (n === 12) return a
+      return `${a} (${n} mois)`
+    })
+    return parts.join(', ')
+  }
 
   return (
     <div style={{ fontFamily:"'Source Sans Pro', sans-serif" }}>
@@ -400,34 +447,78 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
           />
         </div>
 
-        {/* Filtre année */}
-        <div style={{ display:'flex', flexDirection:'column', gap:'3px', flexShrink:0 }}>
-          <label style={{ fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em' }}>Année</label>
-          <select value={filtre.annee} onChange={e=>setFiltre(f=>({...f,annee:e.target.value}))} style={{ padding:'7px 10px', border:'1px solid #e2e8f0', borderRadius:'6px', fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif", cursor:'pointer' }}>
-            <option value="">Toutes</option>
-            {anneesDispo.map(a => <option key={a} value={a}>{a}</option>)}
-          </select>
-        </div>
-
-        {/* Filtre trimestre */}
-        <div style={{ display:'flex', flexDirection:'column', gap:'3px', flexShrink:0 }}>
-          <label style={{ fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em' }}>Trimestre</label>
-          <select value={filtre.trimestre} onChange={e=>setFiltre(f=>({...f,trimestre:e.target.value, mois:''}))} style={{ padding:'7px 10px', border:'1px solid #e2e8f0', borderRadius:'6px', fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif", cursor:'pointer' }}>
-            <option value="">Tous</option>
-            <option value="1">T1 (jan–mar)</option>
-            <option value="2">T2 (avr–juin)</option>
-            <option value="3">T3 (juil–sep)</option>
-            <option value="4">T4 (oct–déc)</option>
-          </select>
-        </div>
-
-        {/* Filtre mois */}
-        <div style={{ display:'flex', flexDirection:'column', gap:'3px', flexShrink:0 }}>
-          <label style={{ fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em' }}>Mois</label>
-          <select value={filtre.mois} onChange={e=>setFiltre(f=>({...f,mois:e.target.value, trimestre:''}))} style={{ padding:'7px 10px', border:'1px solid #e2e8f0', borderRadius:'6px', fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif", cursor:'pointer' }}>
-            <option value="">Tous</option>
-            {[['01','Janvier'],['02','Février'],['03','Mars'],['04','Avril'],['05','Mai'],['06','Juin'],['07','Juillet'],['08','Août'],['09','Septembre'],['10','Octobre'],['11','Novembre'],['12','Décembre']].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
-          </select>
+        {/* Filtre période (Année > Trimestre > Mois, sélection multiple) */}
+        <div style={{ display:'flex', flexDirection:'column', gap:'3px', flexShrink:0, position:'relative' }}>
+          <label style={{ fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em' }}>Période</label>
+          <button onClick={()=>setPeriodeOuverte(o=>!o)} style={{
+            padding:'7px 10px', border:'1px solid #e2e8f0', borderRadius:'6px', fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif",
+            cursor:'pointer', background:'#fff', color: filtre.periodes.length ? '#0f172a' : '#94a3b8', minWidth:'180px', maxWidth:'240px',
+            display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px', whiteSpace:'nowrap', overflow:'hidden'
+          }}>
+            <span style={{ overflow:'hidden', textOverflow:'ellipsis' }}>{periodeLabel()}</span>
+            <i className={`ti ti-chevron-${periodeOuverte?'up':'down'}`} style={{ fontSize:'14px', flexShrink:0 }} />
+          </button>
+          {periodeOuverte && (
+            <>
+              <div onClick={()=>setPeriodeOuverte(false)} style={{ position:'fixed', inset:0, zIndex:90 }} />
+              <div style={{
+                position:'absolute', top:'100%', left:0, marginTop:'4px', zIndex:100, background:'#fff',
+                border:'1px solid #e2e8f0', borderRadius:'10px', boxShadow:'0 12px 32px rgba(0,0,0,0.15)',
+                padding:'8px', width:'280px', maxHeight:'380px', overflowY:'auto'
+              }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 6px 8px', borderBottom:'1px solid #f1f5f9', marginBottom:'6px' }}>
+                  <span style={{ fontSize:'12px', fontWeight:'700', color:'#334155' }}>Sélection multiple</span>
+                  {filtre.periodes.length > 0 && (
+                    <button onClick={()=>setPeriodes([])} style={{ fontSize:'11px', color:color, background:'none', border:'none', cursor:'pointer', fontWeight:'600' }}>Tout effacer</button>
+                  )}
+                </div>
+                {anneesDispo.length === 0 && <div style={{ padding:'10px', fontSize:'12px', color:'#94a3b8' }}>Aucune donnée</div>}
+                {anneesDispo.map(an => {
+                  const etatA = anneeEtat(an)
+                  const deplie = anneesDepliees[an]
+                  return (
+                    <div key={an} style={{ marginBottom:'2px' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:'6px', padding:'5px 6px', borderRadius:'6px', background: etatA!=='none' ? `${color}0c` : 'transparent' }}>
+                        <input type="checkbox" checked={etatA==='all'} ref={el=>{ if(el) el.indeterminate = etatA==='some' }}
+                          onChange={()=>toggleAnnee(an)} style={{ width:'15px', height:'15px', cursor:'pointer', accentColor:color }} />
+                        <span onClick={()=>setAnneesDepliees(d=>({...d,[an]:!d[an]}))} style={{ flex:1, cursor:'pointer', fontSize:'14px', fontWeight:'700', color:'#0f172a', display:'flex', alignItems:'center', gap:'5px' }}>
+                          <i className={`ti ti-chevron-${deplie?'down':'right'}`} style={{ fontSize:'13px', color:'#94a3b8' }} />{an}
+                        </span>
+                      </div>
+                      {deplie && (
+                        <div style={{ paddingLeft:'18px' }}>
+                          {TRIMESTRES.map(tr => {
+                            const etatT = trimestreEtat(an, tr.mois)
+                            return (
+                              <div key={tr.q} style={{ marginTop:'2px' }}>
+                                <div style={{ display:'flex', alignItems:'center', gap:'6px', padding:'3px 6px' }}>
+                                  <input type="checkbox" checked={etatT==='all'} ref={el=>{ if(el) el.indeterminate = etatT==='some' }}
+                                    onChange={()=>toggleTrimestre(an, tr.mois)} style={{ width:'14px', height:'14px', cursor:'pointer', accentColor:color }} />
+                                  <span style={{ fontSize:'12.5px', fontWeight:'600', color:'#475569' }}>T{tr.q}</span>
+                                </div>
+                                <div style={{ display:'flex', flexWrap:'wrap', gap:'2px', paddingLeft:'20px' }}>
+                                  {tr.mois.map(m => {
+                                    const ym = `${an}-${String(m).padStart(2,'0')}`
+                                    const on = periodesSet.has(ym)
+                                    return (
+                                      <label key={ym} style={{ display:'flex', alignItems:'center', gap:'4px', padding:'3px 6px', borderRadius:'5px', cursor:'pointer', fontSize:'12px', color: on?color:'#64748b', background: on?`${color}10`:'transparent', minWidth:'62px' }}>
+                                        <input type="checkbox" checked={on} onChange={()=>toggleMois(ym)} style={{ width:'13px', height:'13px', cursor:'pointer', accentColor:color }} />
+                                        {MOIS_NOMS[m-1]}
+                                      </label>
+                                    )
+                                  })}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Filtre catégorie */}
@@ -456,10 +547,10 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
         </div>
 
         {/* Reset */}
-        {(filtre.compte!=='tous'||filtre.type!=='tous'||filtre.libelle||filtre.annee||filtre.trimestre||filtre.mois||filtre.categorie!=='toutes'||filtre.facture!=='toutes') && (
+        {(filtre.compte!=='tous'||filtre.type!=='tous'||filtre.libelle||filtre.periodes.length>0||filtre.categorie!=='toutes'||filtre.facture!=='toutes') && (
           <div style={{ display:'flex', flexDirection:'column', gap:'3px' }}>
             <label style={{ fontSize:'10px', color:'transparent' }}>.</label>
-            <button onClick={()=>setFiltre({compte:'tous',type:'tous',libelle:'',annee:'',trimestre:'',mois:'',categorie:'toutes',facture:'toutes'})} style={{ padding:'7px 12px', borderRadius:'6px', fontSize:'12px', fontWeight:'600', cursor:'pointer', border:'1px solid #e2e8f0', background:'#fff', color:'#64748b' }}>
+            <button onClick={()=>setFiltre({compte:'tous',type:'tous',libelle:'',periodes:[],categorie:'toutes',facture:'toutes'})} style={{ padding:'7px 12px', borderRadius:'6px', fontSize:'12px', fontWeight:'600', cursor:'pointer', border:'1px solid #e2e8f0', background:'#fff', color:'#64748b' }}>
               ✕ Reset
             </button>
           </div>
