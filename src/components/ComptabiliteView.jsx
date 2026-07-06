@@ -87,6 +87,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const [page, setPage] = useState(1)
   const [categories, setCategories] = useState([])
   const [txSelection, setTxSelection] = useState(null)
+  const [selection, setSelection] = useState(new Set()) // IDs des mouvements cochés pour justif multiple
   const [apercu, setApercu] = useState(null) // { tx, x, y } — aperçu au survol du montant
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 768)
   useEffect(() => {
@@ -247,6 +248,34 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
     setTxSelection(prev => prev && prev.id === tx.id ? { ...prev, facture_url: null, rapproche: false } : prev)
   }
 
+  // --- Sélection multiple : justifier plusieurs mouvements avec UNE facture ---
+  function toggleSelection(id) {
+    setSelection(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+  function viderSelection() { setSelection(new Set()) }
+
+  // Relier tous les mouvements sélectionnés à une même facture
+  async function justifierSelection() {
+    const ids = [...selection]
+    if (ids.length === 0) return
+    // société du 1er mouvement sélectionné pour ouvrir le bon dossier
+    const premier = transactions.find(t => t.id === ids[0])
+    const code = premier?.comptes_bancaires?.societes?.code || societeCodes[0]
+    const dossier = SHAREPOINT_FACTURES[code] || SHAREPOINT_FACTURES.DYNASSUR
+    window.open(dossier, '_blank', 'noopener,noreferrer')
+    const url = window.prompt(`Justifier ${ids.length} mouvement(s) avec une même facture.\nCollez le lien SharePoint de la facture :`, '')
+    if (url === null) return
+    const clean = url.trim()
+    if (!clean) return
+    await supabase.from('transactions').update({ facture_url: clean, rapproche: true }).in('id', ids)
+    setTransactions(prev => prev.map(t => ids.includes(t.id) ? { ...t, facture_url: clean, rapproche: true } : t))
+    viderSelection()
+  }
+
   if (loading) return <div style={{ padding:'60px', textAlign:'center', color:'#94a3b8', fontFamily:"'Source Sans Pro', sans-serif" }}>Chargement…</div>
   if (isConsolide) return <VueConsolidee comptes={comptes} />
 
@@ -402,7 +431,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       <div style={{ background:'#fff', borderRadius:'12px', border:'1px solid #e2e8f0', overflow:'hidden' }}>
         {/* En-tête (desktop) */}
         {!isMobile && (
-        <div style={{ display:'grid', gridTemplateColumns:'70px 100px 110px 1fr 170px 140px 110px', padding:'9px 16px', background:'#f8fafc', borderBottom:'1px solid #e2e8f0', fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.06em' }}>
+        <div style={{ display:'grid', gridTemplateColumns:'95px 100px 110px 1fr 170px 140px 110px', padding:'9px 16px', background:'#f8fafc', borderBottom:'1px solid #e2e8f0', fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.06em' }}>
           {(() => {
             const trier = (col) => setTri(t => ({ col, sens: t.col === col && t.sens === 'desc' ? 'asc' : 'desc' }))
             const fleche = (col) => tri.col === col ? (tri.sens === 'desc' ? ' ↓' : ' ↑') : ''
@@ -492,12 +521,15 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
               }
               return (
               <div key={t.id} onClick={() => setTxSelection(t)} style={{
-                display:'grid', gridTemplateColumns:'70px 100px 110px 1fr 170px 140px 110px',
+                display:'grid', gridTemplateColumns:'95px 100px 110px 1fr 170px 140px 110px',
                 padding:'9px 16px', alignItems:'center', cursor:'pointer',
                 borderBottom: i < txPage.length-1 ? '1px solid #f8fafc' : 'none',
                 background: t.facture_url ? '#f0fdf4' : (i%2===0 ? '#fff' : '#fafafa')
               }}>
-                <div style={{ display:'flex', alignItems:'center', justifyContent:'center' }} onClick={e=>e.stopPropagation()}>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'6px' }} onClick={e=>e.stopPropagation()}>
+                  <input type="checkbox" checked={selection.has(t.id)} onChange={()=>toggleSelection(t.id)}
+                    title="Sélectionner pour justifier plusieurs mouvements avec une seule facture"
+                    style={{ width:'15px', height:'15px', cursor:'pointer', accentColor:color, flexShrink:0 }} />
                   {t.facture_url ? (
                     <button onClick={()=>ouvrirFactureLiee(t)} title={`Facture liée :\n${cheminFacture(t.facture_url)}\n\nCliquer pour ouvrir dans SharePoint`} style={{
                       display:'flex', alignItems:'center', justifyContent:'center', width:'26px', height:'26px',
@@ -556,6 +588,26 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
           </>
         )}
       </div>
+
+      {/* Barre d'action : justifier plusieurs mouvements avec une facture */}
+      {selection.size > 0 && (
+        <div style={{
+          position:'fixed', bottom:'24px', left:'50%', transform:'translateX(-50%)', zIndex:200,
+          background:'#0f172a', color:'#fff', borderRadius:'12px', padding:'12px 18px',
+          display:'flex', alignItems:'center', gap:'16px', boxShadow:'0 8px 30px rgba(0,0,0,0.25)',
+          fontFamily:"'Source Sans Pro', sans-serif"
+        }}>
+          <span style={{ fontSize:'14px', fontWeight:'600' }}>{selection.size} mouvement{selection.size>1?'s':''} sélectionné{selection.size>1?'s':''}</span>
+          <button onClick={justifierSelection} style={{
+            padding:'8px 16px', borderRadius:'8px', border:'none', background:color, color:'#fff',
+            cursor:'pointer', fontSize:'13px', fontWeight:'700', fontFamily:"'Source Sans Pro', sans-serif"
+          }}>🔗 Justifier avec une facture</button>
+          <button onClick={viderSelection} style={{
+            padding:'8px 12px', borderRadius:'8px', border:'1px solid #334155', background:'transparent', color:'#cbd5e1',
+            cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif"
+          }}>Annuler</button>
+        </div>
+      )}
 
       {/* Aperçu flottant au survol du montant (desktop) */}
       {apercu && !isMobile && (() => {
