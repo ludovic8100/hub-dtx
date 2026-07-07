@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { sansExtraits } from '../lib/factures'
 
 const FONT = "'Source Sans Pro', sans-serif"
 const fmt = (v) => v === null || v === undefined ? '—'
@@ -86,8 +87,9 @@ function VueAchats({ societeCodes, color }) {
     setLoading(true)
     chargerTout('factures_achat', 'fichier_id,nom,societe,montant,date_facture,url,transaction_id', societeCodes)
       .then(rows => {
-        rows.sort((a, b) => (b.date_facture || '').localeCompare(a.date_facture || ''))
-        setFactures(rows); setLoading(false)
+        const propres = sansExtraits(rows) // exclure les extraits de compte bancaires
+        propres.sort((a, b) => (b.date_facture || '').localeCompare(a.date_facture || ''))
+        setFactures(propres); setLoading(false)
       })
   }, [societeCodes.join(',')])
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { sansExtraits } from '../lib/factures'
 
 const FONT = "'Source Sans Pro', sans-serif"
 const fmt = (v) => v === null || v === undefined ? '—'
@@ -67,7 +68,7 @@ export default function SelecteurFactureAchat({ societeCode, montantCible, dateC
         if (data.length < 1000) break
         from += 1000
       }
-      if (!annule) { setTous(out); setLoading(false) }
+      if (!annule) { setTous(sansExtraits(out)); setLoading(false) }
     })()
     return () => { annule = true }
   }, [societeCode])
