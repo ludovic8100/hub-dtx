@@ -500,7 +500,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       {/* Onglets Mouvements / Factures */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:'8px', marginBottom:'10px', borderBottom:'2px solid #e2e8f0' }}>
         <div style={{ display:'flex', gap:'4px' }}>
-          {[['mouvements','Mouvements bancaires'],['factures','Factures']].map(([k,lab]) => (
+          {[['mouvements','Mouvements bancaires'],['factures','DÉPENSES']].map(([k,lab]) => (
             <button key={k} onClick={()=>setOnglet(k)} style={{
               padding:'10px 20px', border:'none', background:'none', cursor:'pointer', fontSize:'14px', fontWeight:'700',
               fontFamily:"'Source Sans Pro', sans-serif", color: onglet===k ? color : '#94a3b8',

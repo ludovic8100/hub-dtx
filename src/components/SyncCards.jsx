@@ -21,7 +21,8 @@ export const SYNCS = [
   {
     key: 'iban',
     label: 'Comptes bancaires',
-    labelCourt: 'Banque',
+    labelCourt: 'BANQUE',
+    tooltip: 'Récupère les mouvements et soldes des comptes via Ponto',
     desc: 'Soldes et transactions Ponto pour toutes les entités.',
     icon: 'ti-building-bank',
     color: '#16a34a',
@@ -66,7 +67,8 @@ export const SYNC_BUTTONS = [
   {
     key: 'rapprochement',
     label: 'Rapprochement & prévisualisation',
-    labelCourt: 'Rapprochement',
+    labelCourt: 'ACHAT',
+    tooltip: "Relit le dossier SharePoint et met à jour les factures d'achat",
     desc: 'Associe automatiquement les factures SharePoint aux transactions bancaires.',
     icon: 'ti-link',
     color: '#0080BD',
@@ -121,7 +123,7 @@ function SyncMiniButton({ sync, onDark, compact }) {
 
   const label = compact ? (sync.labelCourt || sync.label) : sync.label
   return (
-    <button onClick={run} disabled={running} title={`${sync.label} — dernière exécution : ${fmtDerniereExec(lastExec?.at)}${lastExec?.status ? ' ('+lastExec.status+')' : ''}`}
+    <button onClick={run} disabled={running} title={sync.tooltip || `${sync.label} — dernière exécution : ${fmtDerniereExec(lastExec?.at)}${lastExec?.status ? ' ('+lastExec.status+')' : ''}`}
       style={{
         display:'flex', alignItems:'center', gap: compact ? '5px' : '7px', padding: compact ? '4px 9px' : '7px 12px', borderRadius: compact ? '7px' : '8px',
         border, background: bg,
