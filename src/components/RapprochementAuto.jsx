@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
+import { sansExtraits } from '../lib/factures'
 
 const FONT = "'Source Sans Pro', sans-serif"
 const fmt = (v) => v === null || v === undefined ? '—'
@@ -43,7 +44,7 @@ export default function RapprochementAuto({ societeCode, transactions, onClose, 
         if (data.length < 1000) break
         from += 1000
       }
-      if (!annule) { setFactures(out); setLoading(false) }
+      if (!annule) { setFactures(sansExtraits(out)); setLoading(false) }
     })()
     return () => { annule = true }
   }, [societeCode])
