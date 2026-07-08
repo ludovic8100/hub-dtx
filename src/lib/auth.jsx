@@ -74,26 +74,39 @@ export function AuthProvider({ children }) {
   }
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    let cancelled = false
+
+    // Applique une session : le chargement des permissions (requête Supabase) se fait
+    // ICI, hors du callback onAuthStateChange, pour ne pas tenir le verrou d'auth.
+    async function applySession(session, track) {
+      if (cancelled) return
       if (session?.user) {
         setUser(session.user)
         const p = await loadPerms(session.user.email)
+        if (cancelled) return
         setPerms(p)
         setActiveSociete(getDefaultSociete(p, p?.role === 'admin'))
+        if (track) trackConnexion(session.user.email)
+      } else {
+        setUser(null); setPerms(null); setActiveSociete(null)
       }
-      setLoading(false)
+      if (!cancelled) setLoading(false)
+    }
+
+    // Session initiale (hors émission d'événement auth → pas d'interblocage)
+    supabase.auth.getSession().then(({ data: { session } }) => applySession(session, false))
+
+    // NE JAMAIS appeler Supabase directement dans ce callback : supabase-js détient un
+    // Web Lock pendant l'émission de l'événement ; un await vers supabase.from(...) ici
+    // interbloque le client → getSession() ne se résout jamais → loading reste true →
+    // chargement infini au démarrage (que le refresh « débloque » par hasard de timing).
+    // On diffère donc tout travail Supabase hors du callback avec setTimeout(0).
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'INITIAL_SESSION') return // déjà géré par getSession()
+      setTimeout(() => applySession(session, event === 'SIGNED_IN'), 0)
     })
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        setUser(session.user)
-        const p = await loadPerms(session.user.email)
-        setPerms(p)
-        setActiveSociete(getDefaultSociete(p, p?.role === 'admin'))
-        if (event === 'SIGNED_IN') trackConnexion(session.user.email)
-      } else { setUser(null); setPerms(null); setActiveSociete(null) }
-      setLoading(false)
-    })
-    return () => subscription.unsubscribe()
+
+    return () => { cancelled = true; subscription.unsubscribe() }
   }, [])
 
   async function signInWithMicrosoft() {
