@@ -298,11 +298,11 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
     if (!sel) return
     const ids = sel.ids || (sel.tx ? [sel.tx.id] : [])
     if (ids.length === 0) return
-    await supabase.from('transactions').update({ facture_url: facture.url, rapproche: true, facture_thumb_url: null }).in('id', ids)
+    await supabase.from('transactions').update({ facture_url: facture.url, rapproche: true, facture_thumb_url: null, en_attente_facture: false }).in('id', ids)
     // Modèle facture<->paiement 1:1 : la facture est rattachée au 1er mouvement de la sélection
     await supabase.from('factures_achat').update({ transaction_id: ids[0] }).eq('fichier_id', facture.fichier_id)
-    setTransactions(prev => prev.map(t => ids.includes(t.id) ? { ...t, facture_url: facture.url, rapproche: true, facture_thumb_url: null } : t))
-    setTxSelection(prev => prev && ids.includes(prev.id) ? { ...prev, facture_url: facture.url, rapproche: true, facture_thumb_url: null } : prev)
+    setTransactions(prev => prev.map(t => ids.includes(t.id) ? { ...t, facture_url: facture.url, rapproche: true, facture_thumb_url: null, en_attente_facture: false } : t))
+    setTxSelection(prev => prev && ids.includes(prev.id) ? { ...prev, facture_url: facture.url, rapproche: true, facture_thumb_url: null, en_attente_facture: false } : prev)
     setSelecteurFacture(null)
     if (sel.ids) viderSelection()
     fetch('https://n8n.srv1082740.hstgr.cloud/webhook/backfill-thumbs2', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' }).catch(()=>{})
@@ -318,9 +318,18 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
 
   // Marquer un mouvement comme "sans facture nécessaire" (ou annuler)
   async function marquerSansFacture(tx, valeur = true) {
-    await supabase.from('transactions').update({ sans_facture: valeur }).eq('id', tx.id)
-    setTransactions(prev => prev.map(t => t.id === tx.id ? { ...t, sans_facture: valeur } : t))
-    setTxSelection(prev => prev && prev.id === tx.id ? { ...prev, sans_facture: valeur } : prev)
+    const patch = valeur ? { sans_facture: true, en_attente_facture: false } : { sans_facture: false }
+    await supabase.from('transactions').update(patch).eq('id', tx.id)
+    setTransactions(prev => prev.map(t => t.id === tx.id ? { ...t, ...patch } : t))
+    setTxSelection(prev => prev && prev.id === tx.id ? { ...prev, ...patch } : prev)
+  }
+
+  // Marquer un mouvement comme "en attente de facture" (pay\u00e9, facture \u00e0 venir) \u2014 ou annuler
+  async function marquerEnAttente(tx, valeur = true) {
+    const patch = valeur ? { en_attente_facture: true, sans_facture: false } : { en_attente_facture: false }
+    await supabase.from('transactions').update(patch).eq('id', tx.id)
+    setTransactions(prev => prev.map(t => t.id === tx.id ? { ...t, ...patch } : t))
+    setTxSelection(prev => prev && prev.id === tx.id ? { ...prev, ...patch } : prev)
   }
 
   // Marquer plusieurs mouvements sélectionnés comme "sans facture nécessaire"
@@ -384,7 +393,8 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   // Filtrage complet = + critère facture
   const txFiltrees = txHorsFacture.filter(t => {
     if (filtre.facture === 'avec' && !t.facture_url) return false
-    if (filtre.facture === 'sans' && (t.facture_url || t.sans_facture)) return false
+    if (filtre.facture === 'sans' && (t.facture_url || t.sans_facture || t.en_attente_facture)) return false
+    if (filtre.facture === 'attente' && !t.en_attente_facture) return false
     return true
   })
   // Tri
@@ -407,7 +417,8 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   // Compteurs facture : respectent tous les filtres actifs (période, compte, etc.) sauf le critère facture
   const nbAvecFacture = txHorsFacture.filter(t => t.facture_url).length
   const nbSansFactureRequise = txHorsFacture.filter(t => !t.facture_url && t.sans_facture).length
-  const nbSansFacture = txHorsFacture.filter(t => !t.facture_url && !t.sans_facture).length // vraiment non justifiées
+  const nbEnAttente = txHorsFacture.filter(t => !t.facture_url && !t.sans_facture && t.en_attente_facture).length
+  const nbSansFacture = txHorsFacture.filter(t => !t.facture_url && !t.sans_facture && !t.en_attente_facture).length // vraiment à justifier
 
   // Pagination
   const totalPages = Math.max(1, Math.ceil(txFiltrees.length / PAR_PAGE))
@@ -498,9 +509,11 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
             ? { label:'Factures liées', value: nbAvecFacture, color:'#16a34a', clic:'toggle', sub:`${nbSansFacture} non liées • ${nbAvecFacture+nbSansFacture} au total`, badge:true }
             : filtre.facture === 'sans'
             ? { label:'Factures non liées', value: nbSansFacture, color:'#dc2626', clic:'toggle', sub:`${nbAvecFacture} liées • ${nbAvecFacture+nbSansFacture} au total`, badge:true }
-            : { label:'Factures (toutes)', value: nbAvecFacture+nbSansFacture+nbSansFactureRequise, color, clic:'toggle', sub:`${nbAvecFacture} liées • ${nbSansFacture} non liées${nbSansFactureRequise?` • ${nbSansFactureRequise} sans facture`:''}`, badge:true }),
+            : filtre.facture === 'attente'
+            ? { label:'En attente de facture', value: nbEnAttente, color:'#64748b', clic:'toggle', sub:`${nbSansFacture} à justifier • ${nbAvecFacture} liées`, badge:true }
+            : { label:'Factures (toutes)', value: nbAvecFacture+nbSansFacture+nbSansFactureRequise+nbEnAttente, color, clic:'toggle', sub:`${nbAvecFacture} liées • ${nbSansFacture} à justifier${nbEnAttente?` • ${nbEnAttente} en attente`:''}${nbSansFactureRequise?` • ${nbSansFactureRequise} sans facture`:''}`, badge:true }),
         ].map(k => (
-          <div key={k.label} onClick={k.clic ? ()=>setFiltre(f=>({...f, facture: f.facture==='toutes' ? 'sans' : f.facture==='sans' ? 'avec' : 'toutes'})) : undefined}
+          <div key={k.label} onClick={k.clic ? ()=>setFiltre(f=>({...f, facture: f.facture==='toutes' ? 'sans' : f.facture==='sans' ? 'attente' : f.facture==='attente' ? 'avec' : 'toutes'})) : undefined}
             style={{ position:'relative', background: (k.clic && filtre.facture!=='toutes') ? '#f8fafc' : '#fff', borderRadius:'10px', border:`1px solid ${(k.clic && filtre.facture!=='toutes') ? '#cbd5e1' : '#e2e8f0'}`, borderTop:`3px solid ${k.color}`, padding:'14px 18px', cursor: k.clic ? 'pointer' : 'default', transition:'all .15s' }}>
             <div style={{ fontSize:'11px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'6px' }}>{k.label}</div>
             <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
@@ -647,7 +660,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
         <div style={{ display:'flex', flexDirection:'column', gap:'3px' }}>
           <label style={{ fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em' }}>Facture</label>
           <div style={{ display:'flex', gap:'4px' }}>
-            {[['toutes','Toutes','#64748b','#f1f5f9'],['avec','✓ Liées','#16a34a','#dcfce7'],['sans','✕ Non liées','#dc2626','#fee2e2']].map(([val,lab,c,bg]) => (
+            {[['toutes','Toutes','#64748b','#f1f5f9'],['avec','✓ Liées','#16a34a','#dcfce7'],['sans','✕ Non liées','#dc2626','#fee2e2'],['attente','⏳ En attente','#475569','#e2e8f0']].map(([val,lab,c,bg]) => (
               <button key={val} onClick={()=>setFiltre(f=>({...f,facture:val}))} style={{
                 padding:'7px 11px', borderRadius:'6px', border:'none', cursor:'pointer', fontSize:'13px', fontWeight:'600',
                 fontFamily:"'Source Sans Pro', sans-serif",
@@ -762,6 +775,11 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                             display:'flex', alignItems:'center', justifyContent:'center', width:'30px', height:'30px',
                             borderRadius:'7px', border:'1px solid #99f6e4', background:'#f0fdfa', color:'#0d9488', cursor:'pointer', fontSize:'15px', fontWeight:'700'
                           }}><i className="ti ti-file-off" /></button>
+                        ) : t.en_attente_facture ? (
+                          <button onClick={(e)=>ouvrirMenuCroix(e, t)} title="En attente de facture — cliquer pour lier ou changer" style={{
+                            display:'flex', alignItems:'center', justifyContent:'center', width:'30px', height:'30px',
+                            borderRadius:'7px', border:'1px solid #e2e8f0', background:'#f1f5f9', color:'#64748b', cursor:'pointer', fontSize:'16px', fontWeight:'700'
+                          }}><i className="ti ti-clock" /></button>
                         ) : (
                           <button onClick={(e)=>ouvrirMenuCroix(e, t)} title="Aucune facture — cliquer pour choisir" style={{
                             display:'flex', alignItems:'center', justifyContent:'center', width:'30px', height:'30px',
@@ -781,7 +799,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                 background: t.facture_url ? '#f0fdf4' : (i%2===0 ? '#fff' : '#fafafa')
               }}>
                 <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'6px' }} onClick={e=>e.stopPropagation()}>
-                  {!t.facture_url && !t.sans_facture && (
+                  {!t.facture_url && !t.sans_facture && !t.en_attente_facture && (
                     <input type="checkbox" checked={selection.has(t.id)} onChange={()=>toggleSelection(t.id)}
                       title="Sélectionner pour justifier plusieurs mouvements avec une seule facture"
                       style={{ width:'15px', height:'15px', cursor:'pointer', accentColor:color, flexShrink:0 }} />
@@ -801,6 +819,11 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                       display:'flex', alignItems:'center', justifyContent:'center', width:'26px', height:'26px',
                       borderRadius:'6px', border:'1px solid #99f6e4', background:'#f0fdfa', color:'#0d9488', cursor:'pointer', fontSize:'14px', fontWeight:'700'
                     }}><i className="ti ti-file-off" /></button>
+                  ) : t.en_attente_facture ? (
+                    <button onClick={(e)=>ouvrirMenuCroix(e, t)} title="En attente de facture — cliquer pour lier ou changer" style={{
+                      display:'flex', alignItems:'center', justifyContent:'center', width:'26px', height:'26px',
+                      borderRadius:'6px', border:'1px solid #e2e8f0', background:'#f1f5f9', color:'#64748b', cursor:'pointer', fontSize:'15px', fontWeight:'700'
+                    }}><i className="ti ti-clock" /></button>
                   ) : (
                     <button onClick={(e)=>ouvrirMenuCroix(e, t)} title="Aucune facture — cliquer pour choisir" style={{
                       display:'flex', alignItems:'center', justifyContent:'center', width:'26px', height:'26px',
@@ -875,6 +898,21 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
             }} onMouseEnter={e=>e.currentTarget.style.background='#f1f5f9'} onMouseLeave={e=>e.currentTarget.style.background='none'}>
               <i className="ti ti-paperclip" style={{ fontSize:'17px', color:color }} /> Lier une facture
             </button>
+            {menuCroix.tx.en_attente_facture ? (
+              <button onClick={()=>{ const tx = menuCroix.tx; setMenuCroix(null); marquerEnAttente(tx, false) }} style={{
+                display:'flex', alignItems:'center', gap:'10px', width:'100%', padding:'9px 12px', border:'none', background:'none',
+                cursor:'pointer', fontSize:'13px', fontWeight:'600', color:'#0f172a', borderRadius:'7px', textAlign:'left'
+              }} onMouseEnter={e=>e.currentTarget.style.background='#f1f5f9'} onMouseLeave={e=>e.currentTarget.style.background='none'}>
+                <i className="ti ti-arrow-back-up" style={{ fontSize:'17px', color:'#64748b' }} /> Repasser \u00e0 justifier
+              </button>
+            ) : (
+              <button onClick={()=>{ const tx = menuCroix.tx; setMenuCroix(null); marquerEnAttente(tx, true) }} style={{
+                display:'flex', alignItems:'center', gap:'10px', width:'100%', padding:'9px 12px', border:'none', background:'none',
+                cursor:'pointer', fontSize:'13px', fontWeight:'600', color:'#0f172a', borderRadius:'7px', textAlign:'left'
+              }} onMouseEnter={e=>e.currentTarget.style.background='#f1f5f9'} onMouseLeave={e=>e.currentTarget.style.background='none'}>
+                <i className="ti ti-clock" style={{ fontSize:'17px', color:'#64748b' }} /> En attente de facture
+              </button>
+            )}
             <button onClick={()=>{ const tx = menuCroix.tx; setMenuCroix(null); marquerSansFacture(tx, true) }} style={{
               display:'flex', alignItems:'center', gap:'10px', width:'100%', padding:'9px 12px', border:'none', background:'none',
               cursor:'pointer', fontSize:'13px', fontWeight:'600', color:'#0f172a', borderRadius:'7px', textAlign:'left'
@@ -1014,7 +1052,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
               </div>
               <div style={{ padding:'20px 24px' }}>
                 {/* Rapprochement facture */}
-                <div style={{ marginBottom:'18px', padding:'14px', border:`1px solid ${t.facture_url?'#bbf7d0':t.sans_facture?'#99f6e4':'#fecaca'}`, borderRadius:'10px', background: t.facture_url?'#f0fdf4':t.sans_facture?'#f0fdfa':'#fef2f2' }}>
+                <div style={{ marginBottom:'18px', padding:'14px', border:`1px solid ${t.facture_url?'#bbf7d0':t.sans_facture?'#99f6e4':t.en_attente_facture?'#e2e8f0':'#fecaca'}`, borderRadius:'10px', background: t.facture_url?'#f0fdf4':t.sans_facture?'#f0fdfa':t.en_attente_facture?'#f1f5f9':'#fef2f2' }}>
                   <div style={{ fontSize:'12px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'10px' }}>Facture</div>
                   {t.facture_url ? (
                     <div>
@@ -1049,6 +1087,21 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                         </button>
                       </div>
                     </div>
+                  ) : t.en_attente_facture ? (
+                    <div>
+                      <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'10px' }}>
+                        <span style={{ display:'flex', alignItems:'center', justifyContent:'center', width:'22px', height:'22px', borderRadius:'6px', background:'#f1f5f9', border:'1px solid #e2e8f0', color:'#64748b', fontSize:'12px', fontWeight:'700' }}><i className="ti ti-clock" /></span>
+                        <span style={{ fontSize:'14px', color:'#64748b', fontWeight:'700' }}>En attente de facture</span>
+                      </div>
+                      <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
+                        <button onClick={()=>lierFactureManuelle(t)} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', borderRadius:'8px', border:'none', background:color, color:'#fff', cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                          🔗 La facture est arrivée — la lier
+                        </button>
+                        <button onClick={()=>marquerEnAttente(t, false)} style={{ padding:'8px 14px', borderRadius:'8px', border:'1px solid #cbd5e1', background:'#fff', color:'#475569', cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                          Repasser à justifier
+                        </button>
+                      </div>
+                    </div>
                   ) : (
                     <div>
                       <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'10px' }}>
@@ -1058,6 +1111,9 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                       <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
                         <button onClick={()=>lierFactureManuelle(t)} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', borderRadius:'8px', border:'none', background:color, color:'#fff', cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
                           🔗 Ajouter le lien de la facture
+                        </button>
+                        <button onClick={()=>marquerEnAttente(t, true)} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', borderRadius:'8px', border:'1px solid #e2e8f0', background:'#f1f5f9', color:'#64748b', cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                          <i className="ti ti-clock" /> En attente de facture
                         </button>
                         <button onClick={()=>marquerSansFacture(t, true)} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', borderRadius:'8px', border:'none', background:'#0d9488', color:'#fff', cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
                           <i className="ti ti-file-off" /> Sans facture nécessaire
