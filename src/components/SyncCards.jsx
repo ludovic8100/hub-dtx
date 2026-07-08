@@ -66,10 +66,10 @@ export const SYNC_BUTTONS = [
   ...SYNCS,
   {
     key: 'rapprochement',
-    label: 'Dépenses (SharePoint)',
-    labelCourt: 'DÉPENSES',
+    label: 'Achats / Ventes (SharePoint)',
+    labelCourt: 'ACHATS/VENTES',
     tooltip: 'Relit le dossier SharePoint et met à jour les factures (dépenses)',
-    desc: "Relit le dossier SharePoint et met à jour les factures d'achat (import + miniatures). Aucun rapprochement automatique : chaque paiement se lie manuellement.",
+    desc: "Relit le dossier SharePoint et met à jour les documents d'achat et de vente (import + miniatures). Aucun rapprochement automatique : chaque paiement se lie manuellement.",
     icon: 'ti-receipt',
     color: '#0080BD',
     webhook: 'rapprochement-factures',
