@@ -303,7 +303,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
 
   // Retirer le lien facture (repasse en croix rouge)
   async function retirerLienFacture(tx) {
-    if (tx.facture_url) { await supabase.from('factures_achat').update({ transaction_id: null }).eq('url', tx.facture_url) }
+    await supabase.from('factures_achat').update({ transaction_id: null }).eq('transaction_id', tx.id)
     await supabase.from('transactions').update({ facture_url: null, rapproche: false, facture_thumb_url: null }).eq('id', tx.id)
     setTransactions(prev => prev.map(t => t.id === tx.id ? { ...t, facture_url: null, rapproche: false, facture_thumb_url: null } : t))
     setTxSelection(prev => prev && prev.id === tx.id ? { ...prev, facture_url: null, rapproche: false, facture_thumb_url: null } : prev)

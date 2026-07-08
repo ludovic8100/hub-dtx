@@ -66,11 +66,11 @@ export const SYNC_BUTTONS = [
   ...SYNCS,
   {
     key: 'rapprochement',
-    label: "Factures d'achat (SharePoint)",
-    labelCourt: 'ACHAT',
-    tooltip: "Relit le dossier SharePoint et met à jour les factures d'achat",
+    label: 'Dépenses (SharePoint)',
+    labelCourt: 'DÉPENSES',
+    tooltip: 'Relit le dossier SharePoint et met à jour les factures (dépenses)',
     desc: "Relit le dossier SharePoint et met à jour les factures d'achat (import + miniatures). Aucun rapprochement automatique : chaque paiement se lie manuellement.",
-    icon: 'ti-link',
+    icon: 'ti-receipt',
     color: '#0080BD',
     webhook: 'rapprochement-factures',
     workflowId: 'hmL5WFBknLUfDwGw',
@@ -94,14 +94,20 @@ function SyncMiniButton({ sync, onDark, compact }) {
   const [state, setState] = useState('idle')
   const [lastSync, setLastSync] = useState(null)
 
-  // Date réelle de la dernière synchro des données (écriture Ponto -> Supabase), uniquement pour le bouton BANQUE
+  // Date réelle de la dernière synchro : soldes bancaires (BANQUE) ou factures d'achat (DÉPENSES)
   const loadLastSync = async () => {
-    if (sync.key !== 'iban') return
     try {
-      const { data } = await supabase.from('comptes_bancaires')
-        .select('date_synchro').not('date_synchro', 'is', null)
-        .order('date_synchro', { ascending: false }).limit(1)
-      if (data && data[0]) setLastSync(data[0].date_synchro)
+      if (sync.key === 'iban') {
+        const { data } = await supabase.from('comptes_bancaires')
+          .select('date_synchro').not('date_synchro', 'is', null)
+          .order('date_synchro', { ascending: false }).limit(1)
+        if (data && data[0]) setLastSync(data[0].date_synchro)
+      } else if (sync.key === 'rapprochement') {
+        const { data } = await supabase.from('factures_achat')
+          .select('updated_at').not('updated_at', 'is', null)
+          .order('updated_at', { ascending: false }).limit(1)
+        if (data && data[0]) setLastSync(data[0].updated_at)
+      }
     } catch {}
   }
   useEffect(() => { loadLastSync() }, [])
@@ -137,7 +143,7 @@ function SyncMiniButton({ sync, onDark, compact }) {
       <i className={`ti ${running ? 'ti-loader-2' : (state==='ok' ? 'ti-check' : state==='error' ? 'ti-x' : sync.icon)}`}
         style={{ color: iconCol, fontSize: compact ? '14px' : '15px', animation: running ? 'spin 1s linear infinite' : 'none' }} />
       <span>{label}</span>
-      {sync.key === 'iban' && (
+      {(sync.key === 'iban' || sync.key === 'rapprochement') && (
         <span title="Dernière synchro (heure belge)" style={{ display:'inline-flex', alignItems:'center', gap:'4px', paddingLeft:'6px', borderLeft:'1px solid #e2e8f0', color:'#334155', fontSize: compact ? '10px' : '11px', fontWeight:'600' }}>
           <i className="ti ti-clock" style={{ fontSize: compact ? '11px' : '12px', color:'#64748b' }} />
           {dateSync}
