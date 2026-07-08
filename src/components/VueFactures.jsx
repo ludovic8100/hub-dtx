@@ -50,15 +50,21 @@ function VueAchats({ societeCodes, color, sens = 'achat' }) {
   const PAR_PAGE = 100
 
   // Lier une facture à un mouvement bancaire (écrit les DEUX côtés du lien)
-  async function lierTransaction(facture, tx) {
-    await supabase.from('transactions').update({ facture_url: facture.url, rapproche: true, facture_thumb_url: null }).eq('id', tx.id)
-    await supabase.from('factures_achat').update({ transaction_id: tx.id }).eq('fichier_id', facture.fichier_id)
-    setFactures(prev => prev.map(f => f.fichier_id === facture.fichier_id ? { ...f, transaction_id: tx.id } : f))
+  async function lierTransaction(facture, txs) {
+    const liste = Array.isArray(txs) ? txs : [txs]
+    const ids = liste.map(t => t.id).filter(Boolean)
+    if (ids.length === 0) return
+    await supabase.from('transactions').update({ facture_url: facture.url, rapproche: true, facture_thumb_url: null }).in('id', ids)
+    await supabase.from('factures_achat').update({ transaction_id: ids[0] }).eq('fichier_id', facture.fichier_id)
+    setFactures(prev => prev.map(f => f.fichier_id === facture.fichier_id ? { ...f, transaction_id: ids[0] } : f))
     setLierPaiement(null)
     fetch('https://n8n.srv1082740.hstgr.cloud/webhook/backfill-thumbs2', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(() => {})
   }
   // Délier un paiement (remet la facture en « à vérifier » et libère le mouvement)
   async function delierPaiement(facture) {
+    if (facture.url) {
+      await supabase.from('transactions').update({ facture_url: null, rapproche: false, facture_thumb_url: null }).eq('facture_url', facture.url)
+    }
     if (facture.transaction_id) {
       await supabase.from('transactions').update({ facture_url: null, rapproche: false, facture_thumb_url: null }).eq('id', facture.transaction_id)
     }
@@ -337,12 +343,15 @@ function PanneauLierPaiement({ facture, color, onClose, onLier }) {
   const [tous, setTous] = useState([])
   const [loading, setLoading] = useState(true)
   const [recherche, setRecherche] = useState('')
+  const [sel, setSel] = useState([])
+  const toggle = (id) => setSel(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id])
   const montantCible = Math.abs(parseFloat(facture.montant) || 0)
 
   // Charger une seule fois tous les mouvements sortants non liés de la société
   useEffect(() => {
     let annule = false
     setLoading(true)
+    setSel([])
     const soc = facture.societe
     const cols = 'id,montant,date_valeur,date_execution,contrepartie_nom,contrepartie_iban,information_paiement,description,type_transaction,statut,devise,ponto_transaction_id,comptes_bancaires!inner(banque,societes!inner(code))'
     ;(async () => {
@@ -375,6 +384,9 @@ function PanneauLierPaiement({ facture, color, onClose, onLier }) {
   const suggestion = (!recherche && mouvements.length > 0) ? mouvements[0] : null
   const montantExactCount = tous.filter(m => Math.abs(Math.abs(m.montant) - montantCible) < 0.01).length
   const suggestionForte = suggestion && montantCible > 0 && Math.abs(Math.abs(suggestion.montant) - montantCible) < 0.01 && montantExactCount === 1
+  const selMouvements = tous.filter(m => sel.includes(m.id))
+  const sommeSel = selMouvements.reduce((s, m) => s + Math.abs(parseFloat(m.montant) || 0), 0)
+  const ecartOk = montantCible > 0 && Math.abs(sommeSel - montantCible) < 0.01
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT }} onClick={onClose}>
@@ -390,7 +402,7 @@ function PanneauLierPaiement({ facture, color, onClose, onLier }) {
               <div style={{ fontSize: '11px', fontWeight: '700', color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Correspondance trouvée</div>
               <div style={{ fontSize: '13px', color: '#0f172a', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{suggestion.contrepartie_nom || suggestion.information_paiement || 'Mouvement'} · {fmtDate(suggestion.date_valeur || suggestion.date_execution)}</div>
             </div>
-            <button onClick={() => onLier(suggestion)} style={{ padding: '7px 14px', borderRadius: '8px', border: 'none', background: '#16a34a', color: '#fff', cursor: 'pointer', fontSize: '12.5px', fontWeight: '700', fontFamily: FONT, whiteSpace: 'nowrap' }}>Lier ce paiement</button>
+            <button onClick={() => onLier([suggestion])} style={{ padding: '7px 14px', borderRadius: '8px', border: 'none', background: '#16a34a', color: '#fff', cursor: 'pointer', fontSize: '12.5px', fontWeight: '700', fontFamily: FONT, whiteSpace: 'nowrap' }}>Lier ce paiement</button>
           </div>
         )}
         <div style={{ padding: '12px 20px', borderBottom: '1px solid #f1f5f9' }}>
@@ -405,11 +417,14 @@ function PanneauLierPaiement({ facture, color, onClose, onLier }) {
           {!loading && mouvements.map(m => {
             const exact = Math.abs(Math.abs(m.montant) - montantCible) < 0.01
             return (
-              <div key={m.id} onClick={() => onLier(m)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '11px 20px', borderBottom: '1px solid #f8fafc', cursor: 'pointer' }}
-                onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
-                <div style={{ minWidth: 0 }}>
+              <div key={m.id} onClick={() => toggle(m.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '11px 20px', borderBottom: '1px solid #f8fafc', cursor: 'pointer', background: sel.includes(m.id) ? '#eff6ff' : '#fff' }}
+                onMouseEnter={e => { if (!sel.includes(m.id)) e.currentTarget.style.background = '#f8fafc' }} onMouseLeave={e => { e.currentTarget.style.background = sel.includes(m.id) ? '#eff6ff' : '#fff' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '11px', minWidth: 0 }}>
+                  <span style={{ width: '18px', height: '18px', flexShrink: 0, borderRadius: '5px', border: sel.includes(m.id) ? 'none' : '2px solid #cbd5e1', background: sel.includes(m.id) ? color : '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{sel.includes(m.id) && <i className="ti ti-check" style={{ fontSize: '12px', color: '#fff' }} />}</span>
+                  <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: '13px', fontWeight: '600', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.contrepartie_nom || m.information_paiement || 'Mouvement'}</div>
                   <div style={{ fontSize: '11.5px', color: '#94a3b8' }}>{fmtDate(m.date_valeur || m.date_execution)} · {m.comptes_bancaires?.banque || ''}</div>
+                </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
                   {exact && <span style={{ fontSize: '10px', fontWeight: '700', color: '#16a34a', background: '#dcfce7', padding: '2px 7px', borderRadius: '12px' }}>montant exact</span>}
@@ -419,8 +434,16 @@ function PanneauLierPaiement({ facture, color, onClose, onLier }) {
             )
           })}
         </div>
-        <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9', textAlign: 'right' }}>
-          <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', cursor: 'pointer', fontSize: '13px', fontWeight: '600', fontFamily: FONT }}>Annuler</button>
+        <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+          <div style={{ fontSize: '12.5px', color: '#64748b', minWidth: 0 }}>
+            {sel.length > 0
+              ? <span>{sel.length} sélectionné{sel.length > 1 ? 's' : ''} · &Sigma; <strong style={{ color: ecartOk ? '#16a34a' : '#0f172a' }}>{fmt(sommeSel)}</strong>{montantCible > 0 && !ecartOk && <span style={{ color: '#94a3b8' }}> / {fmt(montantCible)}</span>}{ecartOk && <span style={{ color: '#16a34a', fontWeight: 700 }}> &#10003;</span>}</span>
+              : <span style={{ color: '#94a3b8' }}>Cochez un ou plusieurs mouvements</span>}
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+            <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', cursor: 'pointer', fontSize: '13px', fontWeight: '600', fontFamily: FONT }}>Annuler</button>
+            <button onClick={() => sel.length && onLier(selMouvements)} disabled={sel.length === 0} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: sel.length ? color : '#e2e8f0', color: sel.length ? '#fff' : '#94a3b8', cursor: sel.length ? 'pointer' : 'default', fontSize: '13px', fontWeight: '700', fontFamily: FONT }}>{sel.length > 1 ? `Lier ${sel.length} mouvements` : 'Lier ce paiement'}</button>
+          </div>
         </div>
       </div>
     </div>
