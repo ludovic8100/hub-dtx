@@ -46,10 +46,28 @@ function scoreCorrespondance(f, cible, dateCible, contrepartieCible) {
    Props: societeCode, montantCible (montant du mouvement, souvent négatif),
           dateCible (date du mouvement), contrepartieCible (nom du tiers),
           onChoisir(facture), onClose, sousTitre (libellé optionnel) */
+// Aperçu (miniature) d'une facture, récupérée à la volée via le webhook n8n (Microsoft Graph).
+function ApercuFacture({ fid, nom }) {
+  const [etat, setEtat] = useState('load')
+  useEffect(() => { setEtat('load') }, [fid])
+  const src = `https://n8n.srv1082740.hstgr.cloud/webhook/apercu-facture?fid=${encodeURIComponent(fid)}`
+  return (
+    <div style={{ position: 'fixed', top: '50%', right: '24px', transform: 'translateY(-50%)', zIndex: 2100, width: '380px', maxWidth: '34vw', maxHeight: '86vh', background: '#fff', borderRadius: '14px', boxShadow: '0 20px 60px rgba(0,0,0,0.35)', border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', pointerEvents: 'none' }}>
+      <div style={{ padding: '10px 14px', background: '#0f172a', color: '#fff', fontSize: '12px', fontWeight: '600', fontFamily: FONT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>\U0001F4C4 {nom}</div>
+      <div style={{ overflowY: 'auto', background: '#f8fafc' }}>
+        <img src={src} alt="Apercu facture" onLoad={() => setEtat('ok')} onError={() => setEtat('err')} style={{ width: '100%', height: 'auto', display: etat === 'ok' ? 'block' : 'none' }} />
+        {etat === 'load' && <div style={{ padding: '34px 20px', textAlign: 'center', color: '#94a3b8', fontSize: '13px', fontFamily: FONT }}>Chargement de l'apercu...</div>}
+        {etat === 'err' && <div style={{ padding: '34px 20px', textAlign: 'center', color: '#94a3b8', fontSize: '13px', fontFamily: FONT }}>Apercu indisponible pour ce document.</div>}
+      </div>
+    </div>
+  )
+}
+
 export default function SelecteurFactureAchat({ societeCode, montantCible, dateCible, contrepartieCible, onChoisir, onClose, sousTitre }) {
   const [tous, setTous] = useState([])
   const [loading, setLoading] = useState(true)
   const [recherche, setRecherche] = useState('')
+  const [apercu, setApercu] = useState(null)
   const cible = Math.abs(parseFloat(montantCible) || 0)
 
   // Charger une seule fois toutes les factures non liées de la société
@@ -109,14 +127,14 @@ export default function SelecteurFactureAchat({ societeCode, montantCible, dateC
           {!recherche && <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px' }}>{tous.length} factures non liées{cible > 0 ? ` · triées par montant proche de ${fmt(cible)}` : ''}</div>}
           {recherche && <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px' }}>{factures.length} résultat{factures.length > 1 ? 's' : ''}</div>}
         </div>
-        <div style={{ overflowY: 'auto', flex: 1 }}>
+        <div onMouseLeave={() => setApercu(null)} style={{ overflowY: 'auto', flex: 1 }}>
           {loading && <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>Recherche…</div>}
           {!loading && factures.length === 0 && <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>Aucune facture correspondante.</div>}
           {!loading && factures.map(f => {
             const exact = Math.abs((parseFloat(f.montant) || 0) - cible) < 0.01
             return (
               <div key={f.fichier_id} onClick={() => onChoisir(f)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '11px 20px', borderBottom: '1px solid #f8fafc', cursor: 'pointer' }}
-                onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                onMouseEnter={e => { e.currentTarget.style.background = '#f8fafc'; setApercu({ fid: f.fichier_id, nom: (f.nom || '').replace(/\.pdf$/i, '') }) }} onMouseLeave={e => { e.currentTarget.style.background = '#fff' }}>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: '13px', fontWeight: '600', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(f.nom || '').replace(/\.pdf$/i, '')}</div>
                   <div style={{ fontSize: '11.5px', color: '#94a3b8' }}>{fmtDate(f.date_facture)}</div>
@@ -133,6 +151,7 @@ export default function SelecteurFactureAchat({ societeCode, montantCible, dateC
           <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', cursor: 'pointer', fontSize: '13px', fontWeight: '600', fontFamily: FONT }}>Annuler</button>
         </div>
       </div>
+      {apercu && <ApercuFacture fid={apercu.fid} nom={apercu.nom} />}
     </div>
   )
 }
