@@ -56,6 +56,7 @@ const MODULES_ADMIN = [
   { key: 'admin_config', label: 'Paramètres', icon: 'ti-settings', path: '/config' },
   { key: 'admin_sync', label: 'Synchronisation', icon: 'ti-refresh', path: '/admin/sync' },
   { key: 'admin_rdv_cat', label: 'Catégories RDV', icon: 'ti-tags', path: '/admin/rdv-categories' },
+  { key: 'admin_liens', label: 'Liens cassés', icon: 'ti-unlink', path: '/admin/liens-casses' },
 ]
 
 // ── Recherche client universelle (Dynassur), intégrée au menu ──
