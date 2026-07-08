@@ -15,11 +15,12 @@ const fmtDate = (d) => {
 const TABLE_VENTES = { LODE: 'lode_factures', DTX: 'dtx_factures', DYNASSUR: 'dyn_factures' }
 
 // Récupère toutes les lignes en contournant le plafond 1000 de PostgREST
-async function chargerTout(table, select, filtreSociete) {
+async function chargerTout(table, select, filtreSociete, filtreSens) {
   let out = []; let from = 0
   for (;;) {
     let q = supabase.from(table).select(select).range(from, from + 999)
     if (filtreSociete && filtreSociete.length) q = q.in('societe', filtreSociete)
+    if (filtreSens) q = q.eq('sens', filtreSens)
     const { data, error } = await q
     if (error || !data) break
     out = out.concat(data)
@@ -29,36 +30,18 @@ async function chargerTout(table, select, filtreSociete) {
   return out
 }
 
-export default function VueFactures({ societeCodes, color }) {
-  const [sousOnglet, setSousOnglet] = useState('achats') // 'achats' | 'ventes'
-
-  const tablesVente = societeCodes.map(c => TABLE_VENTES[c]).filter(Boolean)
-
+export default function VueFactures({ societeCodes, color, sens = 'achat' }) {
+  // Achats et Ventes viennent tous deux de factures_achat (documents SharePoint), filtrés par `sens`.
   return (
     <div style={{ fontFamily: FONT }}>
-      {/* Sous-onglets Achats / Ventes */}
-      <div style={{ display: 'flex', gap: '6px', marginBottom: '14px' }}>
-        {[['achats', 'Achats', 'factures reçues à payer'], ['ventes', 'Ventes', 'factures émises à encaisser']].map(([k, lab, sub]) => (
-          <button key={k} onClick={() => setSousOnglet(k)} style={{
-            display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px',
-            padding: '8px 16px', borderRadius: '9px', border: `1px solid ${sousOnglet === k ? color : '#e2e8f0'}`,
-            background: sousOnglet === k ? `${color}0f` : '#fff', cursor: 'pointer', fontFamily: FONT
-          }}>
-            <span style={{ fontSize: '14px', fontWeight: '700', color: sousOnglet === k ? color : '#334155' }}>{lab}</span>
-            <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '600' }}>{sub}</span>
-          </button>
-        ))}
-      </div>
-
-      {sousOnglet === 'achats'
-        ? <VueAchats societeCodes={societeCodes} color={color} />
-        : <VueVentes tables={tablesVente} color={color} />}
+      <VueAchats societeCodes={societeCodes} color={color} sens={sens} />
     </div>
   )
 }
 
 /* ─────────────── ACHATS (factures fournisseurs, dossier SharePoint) ─────────────── */
-function VueAchats({ societeCodes, color }) {
+function VueAchats({ societeCodes, color, sens = 'achat' }) {
+  const vente = sens === 'vente'
   const [factures, setFactures] = useState([])
   const [loading, setLoading] = useState(true)
   const [filtre, setFiltre] = useState({ statut: 'toutes', recherche: '', annee: '' })
@@ -83,15 +66,21 @@ function VueAchats({ societeCodes, color }) {
     setFactures(prev => prev.map(f => f.fichier_id === facture.fichier_id ? { ...f, transaction_id: null } : f))
   }
 
+  async function basculerSens(f) {
+    const cible = sens === 'vente' ? 'achat' : 'vente'
+    await supabase.from('factures_achat').update({ sens: cible }).eq('fichier_id', f.fichier_id)
+    setFactures(prev => prev.filter(x => x.fichier_id !== f.fichier_id))
+  }
+
   useEffect(() => {
     setLoading(true)
-    chargerTout('factures_achat', 'fichier_id,nom,societe,montant,date_facture,url,transaction_id', societeCodes)
+    chargerTout('factures_achat', 'fichier_id,nom,societe,montant,date_facture,url,transaction_id,sens', societeCodes, sens)
       .then(rows => {
         const propres = sansExtraits(rows) // exclure les extraits de compte bancaires
         propres.sort((a, b) => (b.date_facture || '').localeCompare(a.date_facture || ''))
         setFactures(propres); setLoading(false)
       })
-  }, [societeCodes.join(',')])
+  }, [societeCodes.join(','), sens])
 
   useEffect(() => { setPage(1) }, [filtre.statut, filtre.recherche, filtre.annee])
 
@@ -112,9 +101,14 @@ function VueAchats({ societeCodes, color }) {
   const multiSociete = societeCodes.length > 1
   const ouvrir = (f) => { if (f.url) window.open(f.url, '_blank', 'noopener,noreferrer') }
 
-  if (loading) return <div style={{ padding: '50px', textAlign: 'center', color: '#94a3b8' }}>Chargement des achats…</div>
+  if (loading) return <div style={{ padding: '50px', textAlign: 'center', color: '#94a3b8' }}>Chargement…</div>
 
-  const kpis = [
+  const kpis = vente ? [
+    { label: 'Total ventes', value: factures.length, c: color, sub: `${nbPayees} encaissées • ${nbNonPayees} à vérifier` },
+    { label: 'Encaissées', value: nbPayees, c: '#16a34a', sub: 'liées à un mouvement', clic: 'payees' },
+    { label: 'À encaisser', value: nbNonPayees, c: '#dc2626', sub: 'aucun mouvement lié', clic: 'nonpayees' },
+    { label: 'Montant à encaisser', value: fmt(montantNonPaye), c: '#dc2626', sub: 'total non rapproché' },
+  ] : [
     { label: 'Total achats', value: factures.length, c: color, sub: `${nbPayees} payées • ${nbNonPayees} à vérifier` },
     { label: 'Payées', value: nbPayees, c: '#16a34a', sub: 'liées à un paiement', clic: 'payees' },
     { label: 'Paiement à vérifier', value: nbNonPayees, c: '#dc2626', sub: 'aucun paiement lié', clic: 'nonpayees' },
@@ -126,22 +120,23 @@ function VueAchats({ societeCodes, color }) {
       <KpiRow kpis={kpis} actif={filtre.statut} onClic={(v) => setFiltre(f => ({ ...f, statut: f.statut === v ? 'toutes' : v }))} />
       <FiltreBar filtre={filtre} setFiltre={setFiltre} anneesDispo={anneesDispo} placeholder="Nom de facture…" reset={() => setFiltre({ statut: 'toutes', recherche: '', annee: '' })} />
       <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-        <Ligne header cols={multiSociete ? ['110px', '110px', '1fr', '120px', '130px'] : ['110px', '110px', '1fr', '130px']}
-          items={multiSociete ? ['Statut', 'Date', 'Facture', 'Société', 'Montant'] : ['Statut', 'Date', 'Facture', 'Montant']} />
+        <Ligne header cols={multiSociete ? ['110px', '110px', '1fr', '120px', '130px', '46px'] : ['110px', '110px', '1fr', '130px', '46px']}
+          items={multiSociete ? ['Statut', 'Date', 'Facture', 'Société', 'Montant', ''] : ['Statut', 'Date', 'Facture', 'Montant', '']} />
         {facturesPage.length === 0 && <div style={{ padding: '50px', textAlign: 'center', color: '#94a3b8' }}>Aucune facture</div>}
         {facturesPage.map((f, i) => {
           const payee = !!f.transaction_id
           const cells = [
             <span onClick={(e) => { e.stopPropagation(); payee ? delierPaiement(f) : setLierPaiement(f) }} style={{ cursor: 'pointer' }}
-              title={payee ? 'Payée — cliquer pour délier le paiement' : 'Cliquer pour retrouver et lier le paiement'}>
-              <Badge payee={payee} labelPayee="✓ Payée" labelNon="🔍 Rechercher mouvement" />
+              title={payee ? (vente ? 'Encaissée — cliquer pour délier le mouvement' : 'Payée — cliquer pour délier le paiement') : 'Cliquer pour retrouver et lier le mouvement'}>
+              <Badge payee={payee} labelPayee={vente ? "✓ Encaissée" : "✓ Payée"} labelNon="🔍 Rechercher mouvement" />
             </span>,
             <span style={{ fontSize: '12.5px', color: '#64748b', fontWeight: '600' }}>{fmtDate(f.date_facture)}</span>,
             <span style={{ fontSize: '13px', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '10px' }}>{(f.nom || '').replace(/\.pdf$/i, '')}</span>,
             ...(multiSociete ? [<span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: '600' }}>{f.societe}</span>] : []),
             <span style={{ textAlign: 'right', display: 'block', fontSize: '13.5px', fontWeight: '700', color: f.montant == null ? '#cbd5e1' : '#0f172a' }}>{f.montant == null ? '—' : fmt(f.montant)}</span>,
+            <button onClick={(e) => { e.stopPropagation(); basculerSens(f) }} title={vente ? 'Reclasser dans les Achats' : 'Reclasser dans les Ventes'} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '30px', height: '30px', margin: '0 auto', borderRadius: '7px', border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', cursor: 'pointer' }}><i className="ti ti-transfer" style={{ fontSize: '16px' }} /></button>,
           ]
-          return <Ligne key={f.fichier_id} cols={multiSociete ? ['110px', '110px', '1fr', '120px', '130px'] : ['110px', '110px', '1fr', '130px']} items={cells} onClick={() => ouvrir(f)} clickable={!!f.url} alt={i % 2 === 1} title={f.nom} />
+          return <Ligne key={f.fichier_id} cols={multiSociete ? ['110px', '110px', '1fr', '120px', '130px', '46px'] : ['110px', '110px', '1fr', '130px', '46px']} items={cells} onClick={() => ouvrir(f)} clickable={!!f.url} alt={i % 2 === 1} title={f.nom} />
         })}
       </div>
       <Pagination page={page} totalPages={totalPages} setPage={setPage} total={filtrees.length} />

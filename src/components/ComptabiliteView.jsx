@@ -482,7 +482,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       {/* Onglets Mouvements / Factures */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:'8px', marginBottom:'10px', borderBottom:'2px solid #e2e8f0' }}>
         <div style={{ display:'flex', gap:'4px' }}>
-          {[['mouvements','Mouvements bancaires'],['factures','DÉPENSES']].map(([k,lab]) => (
+          {[['mouvements','Mouvements bancaires'],['achats','Achats'],['ventes','Ventes']].map(([k,lab]) => (
             <button key={k} onClick={()=>setOnglet(k)} style={{
               padding:'10px 20px', border:'none', background:'none', cursor:'pointer', fontSize:'14px', fontWeight:'700',
               fontFamily:"'Source Sans Pro', sans-serif", color: onglet===k ? color : '#94a3b8',
@@ -492,8 +492,8 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
         </div>
       </div>
 
-      {onglet === 'factures' ? (
-        <VueFactures societeCodes={societeCodes} color={color} />
+      {onglet !== 'mouvements' ? (
+        <VueFactures societeCodes={societeCodes} color={color} sens={onglet === 'ventes' ? 'vente' : 'achat'} />
       ) : (<>
 
       {/* En-tête collant : boutons sync + KPIs + filtres restent visibles, seuls les mouvements scrollent */}
