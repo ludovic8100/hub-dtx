@@ -45,12 +45,11 @@ function scoreCorrespondance(f, cible, dateCible, contrepartieCible) {
 /* Sélecteur de factures d'achat non liées, pour rapprocher un mouvement bancaire.
    Props: societeCode, montantCible (montant du mouvement, souvent négatif),
           dateCible (date du mouvement), contrepartieCible (nom du tiers),
-          onChoisir(facture), onCollerUrl(url), onClose */
-export default function SelecteurFactureAchat({ societeCode, montantCible, dateCible, contrepartieCible, onChoisir, onCollerUrl, onClose }) {
+          onChoisir(facture), onClose, sousTitre (libellé optionnel) */
+export default function SelecteurFactureAchat({ societeCode, montantCible, dateCible, contrepartieCible, onChoisir, onClose, sousTitre }) {
   const [tous, setTous] = useState([])
   const [loading, setLoading] = useState(true)
   const [recherche, setRecherche] = useState('')
-  const [urlManuelle, setUrlManuelle] = useState('')
   const cible = Math.abs(parseFloat(montantCible) || 0)
 
   // Charger une seule fois toutes les factures non liées de la société
@@ -92,7 +91,7 @@ export default function SelecteurFactureAchat({ societeCode, montantCible, dateC
       <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: '14px', width: 'min(620px, 94vw)', maxHeight: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
           <div style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a' }}>Lier une facture</div>
-          <div style={{ fontSize: '12.5px', color: '#64748b', marginTop: '3px' }}>Mouvement de <strong>{fmt(montantCible)}</strong>{societeCode ? ` · ${societeCode}` : ''}</div>
+          <div style={{ fontSize: '12.5px', color: '#64748b', marginTop: '3px' }}>{sousTitre ? sousTitre : (<>Mouvement de <strong>{fmt(montantCible)}</strong>{societeCode ? ` · ${societeCode}` : ''}</>)}</div>
         </div>
         {suggestionForte && (
           <div style={{ margin: '12px 20px 0', padding: '10px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -112,7 +111,7 @@ export default function SelecteurFactureAchat({ societeCode, montantCible, dateC
         </div>
         <div style={{ overflowY: 'auto', flex: 1 }}>
           {loading && <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>Recherche…</div>}
-          {!loading && factures.length === 0 && <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>Aucune facture correspondante.<br />Tu peux aussi coller l'URL ci-dessous.</div>}
+          {!loading && factures.length === 0 && <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>Aucune facture correspondante.</div>}
           {!loading && factures.map(f => {
             const exact = Math.abs((parseFloat(f.montant) || 0) - cible) < 0.01
             return (
@@ -130,12 +129,8 @@ export default function SelecteurFactureAchat({ societeCode, montantCible, dateC
             )
           })}
         </div>
-        <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9', display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <input value={urlManuelle} onChange={e => setUrlManuelle(e.target.value)} placeholder="…ou coller une URL SharePoint"
-            style={{ flex: 1, padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '12.5px', fontFamily: FONT, boxSizing: 'border-box' }} />
-          <button disabled={!urlManuelle.trim()} onClick={() => onCollerUrl(urlManuelle.trim())}
-            style={{ padding: '8px 14px', borderRadius: '8px', border: 'none', background: urlManuelle.trim() ? '#0f172a' : '#e2e8f0', color: '#fff', cursor: urlManuelle.trim() ? 'pointer' : 'default', fontSize: '13px', fontWeight: '600', fontFamily: FONT, whiteSpace: 'nowrap' }}>Lier l'URL</button>
-          <button onClick={onClose} style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', cursor: 'pointer', fontSize: '13px', fontWeight: '600', fontFamily: FONT }}>Annuler</button>
+        <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9', textAlign: 'right' }}>
+          <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', cursor: 'pointer', fontSize: '13px', fontWeight: '600', fontFamily: FONT }}>Annuler</button>
         </div>
       </div>
     </div>

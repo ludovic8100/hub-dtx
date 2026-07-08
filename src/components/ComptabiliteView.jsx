@@ -103,9 +103,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const [categories, setCategories] = useState([])
   const [txSelection, setTxSelection] = useState(null)
   const [selection, setSelection] = useState(new Set()) // IDs des mouvements cochés pour justif multiple
-  const [panneauJustif, setPanneauJustif] = useState(null) // { ids:[...], url:'', code:'LODE' } ou null
-  const [selecteurFacture, setSelecteurFacture] = useState(null) // { tx } : lier une facture d'achat à un mouvement
-  const [aideOuverte, setAideOuverte] = useState(false)
+  const [selecteurFacture, setSelecteurFacture] = useState(null) // { tx } (un mouvement) ou { ids, code, montant } (sélection multiple)
   const [apercu, setApercu] = useState(null) // { tx, x, y } — aperçu au survol du montant
   const [apercuFacture, setApercuFacture] = useState(null) // { url } — aperçu PDF au survol de la date
   const [menuCroix, setMenuCroix] = useState(null) // { tx, top, left } — menu au clic sur la croix rouge
@@ -277,27 +275,20 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
     setSelecteurFacture({ tx })
   }
 
-  // Lier une facture d'achat choisie dans le sélecteur -> écrit les DEUX côtés du lien
+  // Lier une facture d'achat choisie dans le sélecteur -> écrit les DEUX côtés du lien.
+  // Fonctionne pour un seul mouvement ({tx}) ou une sélection multiple ({ids}).
   async function lierFactureChoisie(facture) {
-    const tx = selecteurFacture?.tx
-    if (!tx) return
-    await supabase.from('transactions').update({ facture_url: facture.url, rapproche: true, facture_thumb_url: null }).eq('id', tx.id)
-    await supabase.from('factures_achat').update({ transaction_id: tx.id }).eq('fichier_id', facture.fichier_id)
-    setTransactions(prev => prev.map(t => t.id === tx.id ? { ...t, facture_url: facture.url, rapproche: true, facture_thumb_url: null } : t))
-    setTxSelection(prev => prev && prev.id === tx.id ? { ...prev, facture_url: facture.url, rapproche: true, facture_thumb_url: null } : prev)
+    const sel = selecteurFacture
+    if (!sel) return
+    const ids = sel.ids || (sel.tx ? [sel.tx.id] : [])
+    if (ids.length === 0) return
+    await supabase.from('transactions').update({ facture_url: facture.url, rapproche: true, facture_thumb_url: null }).in('id', ids)
+    // Modèle facture<->paiement 1:1 : la facture est rattachée au 1er mouvement de la sélection
+    await supabase.from('factures_achat').update({ transaction_id: ids[0] }).eq('fichier_id', facture.fichier_id)
+    setTransactions(prev => prev.map(t => ids.includes(t.id) ? { ...t, facture_url: facture.url, rapproche: true, facture_thumb_url: null } : t))
+    setTxSelection(prev => prev && ids.includes(prev.id) ? { ...prev, facture_url: facture.url, rapproche: true, facture_thumb_url: null } : prev)
     setSelecteurFacture(null)
-    fetch('https://n8n.srv1082740.hstgr.cloud/webhook/backfill-thumbs2', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' }).catch(()=>{})
-  }
-
-  // Lier via URL collée manuellement (secours) depuis le sélecteur
-  async function lierFactureUrl(url) {
-    const tx = selecteurFacture?.tx
-    if (!tx) return
-    await supabase.from('transactions').update({ facture_url: url, rapproche: true, facture_thumb_url: null }).eq('id', tx.id)
-    await supabase.from('factures_achat').update({ transaction_id: tx.id }).eq('url', url)
-    setTransactions(prev => prev.map(t => t.id === tx.id ? { ...t, facture_url: url, rapproche: true, facture_thumb_url: null } : t))
-    setTxSelection(prev => prev && prev.id === tx.id ? { ...prev, facture_url: url, rapproche: true, facture_thumb_url: null } : prev)
-    setSelecteurFacture(null)
+    if (sel.ids) viderSelection()
     fetch('https://n8n.srv1082740.hstgr.cloud/webhook/backfill-thumbs2', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' }).catch(()=>{})
   }
 
@@ -335,36 +326,14 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   }
   function viderSelection() { setSelection(new Set()) }
 
-  // Relier tous les mouvements sélectionnés à une même facture
+  // Relier tous les mouvements sélectionnés à une même facture (via le sélecteur par liste)
   function justifierSelection() {
     const ids = [...selection]
     if (ids.length === 0) return
     const premier = transactions.find(t => t.id === ids[0])
     const code = premier?.comptes_bancaires?.societes?.code || societeCodes[0]
-    setPanneauJustif({ ids, url: '', code })
-  }
-
-  // Ouvrir le dossier SharePoint depuis le panneau
-  function ouvrirDossierDepuisPanneau() {
-    const dossier = SHAREPOINT_FACTURES[panneauJustif?.code] || SHAREPOINT_FACTURES.DYNASSUR
-    window.open(dossier, '_blank', 'noopener,noreferrer')
-  }
-
-  // Valider le panneau : appliquer le lien facture aux mouvements
-  async function validerPanneauJustif() {
-    if (!panneauJustif) return
-    const { ids } = panneauJustif
-    const clean = (panneauJustif.url || '').trim()
-    await supabase.from('transactions').update({ facture_url: clean || null, rapproche: !!clean, facture_thumb_url: null }).in('id', ids)
-    setTransactions(prev => prev.map(t => ids.includes(t.id) ? { ...t, facture_url: clean || null, rapproche: !!clean, facture_thumb_url: null } : t))
-    setTxSelection(prev => prev && ids.includes(prev.id) ? { ...prev, facture_url: clean || null, rapproche: !!clean, facture_thumb_url: null } : prev)
-    setPanneauJustif(null)
-    setAideOuverte(false)
-    viderSelection()
-    // Régénérer la vignette de la nouvelle facture (en arrière-plan)
-    if (clean) {
-      fetch('https://n8n.srv1082740.hstgr.cloud/webhook/backfill-thumbs2', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' }).catch(()=>{})
-    }
+    const montant = transactions.filter(t => ids.includes(t.id)).reduce((sum, t) => sum + Math.abs(parseFloat(t.montant) || 0), 0)
+    setSelecteurFacture({ ids, code, montant })
   }
 
   if (loading) return <div style={{ padding:'60px', textAlign:'center', color:'#94a3b8', fontFamily:"'Source Sans Pro', sans-serif" }}>Chargement…</div>
@@ -890,85 +859,22 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
         </>
       )}
 
-      {/* Panneau de saisie : lier / justifier avec une facture (remplace window.prompt) */}
-      {selecteurFacture && (
-        <SelecteurFactureAchat
-          societeCode={selecteurFacture.tx.comptes_bancaires?.societes?.code || societeCodes[0]}
-          montantCible={selecteurFacture.tx.montant}
-          dateCible={selecteurFacture.tx.date_valeur || selecteurFacture.tx.date_execution}
-          contrepartieCible={selecteurFacture.tx.contrepartie_nom}
-          onChoisir={lierFactureChoisie}
-          onCollerUrl={lierFactureUrl}
-          onClose={()=>setSelecteurFacture(null)}
-        />
-      )}
-
-      {panneauJustif && (
-        <div onClick={()=>setPanneauJustif(null)} style={{
-          position:'fixed', inset:0, background:'rgba(15,23,42,0.5)', zIndex:2000,
-          display:'flex', alignItems:'center', justifyContent:'center', padding:'20px'
-        }}>
-          <div onClick={e=>e.stopPropagation()} style={{
-            background:'#fff', borderRadius:'14px', padding:'24px', width:'100%', maxWidth:'520px',
-            boxShadow:'0 20px 60px rgba(0,0,0,0.3)', fontFamily:"'Source Sans Pro', sans-serif"
-          }}>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'6px' }}>
-              <div style={{ fontSize:'17px', fontWeight:'800', color:'#0f172a' }}>
-                {panneauJustif.ids.length > 1 ? `Justifier ${panneauJustif.ids.length} mouvements` : 'Lier une facture'}
-              </div>
-              <button onClick={()=>setAideOuverte(a=>!a)} style={{
-                display:'flex', alignItems:'center', gap:'5px', padding:'5px 10px', borderRadius:'20px', border:'1px solid #cbd5e1',
-                background: aideOuverte ? `${color}12` : '#fff', color: aideOuverte ? color : '#64748b', cursor:'pointer', fontSize:'12px', fontWeight:'700',
-                fontFamily:"'Source Sans Pro', sans-serif"
-              }}>❔ Comment faire ?</button>
-            </div>
-
-            {/* Encart d'aide dépliable (pour Nadine) */}
-            {aideOuverte && (
-              <div style={{ background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:'10px', padding:'14px 16px', marginBottom:'16px', fontSize:'13px', color:'#334155', lineHeight:1.7 }}>
-                <div style={{ fontWeight:'700', marginBottom:'8px', color:'#0f172a' }}>📋 Étapes à suivre :</div>
-                <div style={{ marginBottom:'6px' }}><b>1.</b> Cliquez sur <b>« Ouvrir SharePoint »</b> ci-dessous — un nouvel onglet s'ouvre.</div>
-                <div style={{ marginBottom:'6px' }}><b>2.</b> Dans SharePoint, retrouvez la <b>facture</b> concernée (le bon fichier PDF).</div>
-                <div style={{ marginBottom:'6px' }}><b>3.</b> <b>Clic droit</b> sur le fichier → <b>« Copier le lien »</b> (ou sélectionnez-le puis « Copier le lien » en haut).</div>
-                <div style={{ marginBottom:'6px' }}><b>4.</b> Si SharePoint affiche une fenêtre de partage, cliquez simplement sur <b>« Copier »</b>.</div>
-                <div style={{ marginBottom:'6px' }}><b>5.</b> Revenez sur cet onglet, cliquez dans le champ ci-dessous et <b>collez</b> (Ctrl+V).</div>
-                <div><b>6.</b> Cliquez sur <b>« Valider »</b>. La facture est reliée au(x) mouvement(s) ✓</div>
-              </div>
-            )}
-
-            {!aideOuverte && (
-              <div style={{ fontSize:'13px', color:'#64748b', marginBottom:'16px', lineHeight:1.5 }}>
-                Ouvrez SharePoint, copiez le lien de la facture (clic droit → « Copier le lien »), puis collez-le ci-dessous.
-              </div>
-            )}
-
-            <button onClick={ouvrirDossierDepuisPanneau} style={{
-              display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', padding:'12px 14px', borderRadius:'8px', border:'none',
-              background:'#0078d4', color:'#fff', cursor:'pointer', fontSize:'14px', fontWeight:'700', marginBottom:'14px', width:'100%',
-              fontFamily:"'Source Sans Pro', sans-serif"
-            }}>📂 Ouvrir SharePoint pour chercher la facture ({panneauJustif.code})</button>
-
-            <label style={{ fontSize:'11px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em', display:'block', marginBottom:'5px' }}>Lien de la facture</label>
-            <input type="text" autoFocus placeholder="Collez ici le lien SharePoint de la facture…"
-              value={panneauJustif.url}
-              onChange={e=>setPanneauJustif(p=>({...p, url:e.target.value}))}
-              onKeyDown={e=>{ if(e.key==='Enter') validerPanneauJustif() }}
-              style={{ width:'100%', padding:'10px 12px', border:'1px solid #e2e8f0', borderRadius:'8px', fontSize:'13px',
-                fontFamily:"'Source Sans Pro', sans-serif", boxSizing:'border-box', marginBottom:'18px' }}
-            />
-            <div style={{ display:'flex', gap:'10px', justifyContent:'flex-end' }}>
-              <button onClick={()=>setPanneauJustif(null)} style={{
-                padding:'9px 16px', borderRadius:'8px', border:'1px solid #e2e8f0', background:'#fff', color:'#64748b',
-                cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif"
-              }}>Annuler</button>
-              <button onClick={validerPanneauJustif} style={{
-                padding:'9px 18px', borderRadius:'8px', border:'none', background:color, color:'#fff',
-                cursor:'pointer', fontSize:'13px', fontWeight:'700', fontFamily:"'Source Sans Pro', sans-serif"
-              }}>Valider</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Sélecteur de facture par liste (un mouvement ou une sélection multiple) */}
+      {selecteurFacture && (() => {
+        const sel = selecteurFacture
+        const multi = !!sel.ids
+        return (
+          <SelecteurFactureAchat
+            societeCode={multi ? sel.code : (sel.tx.comptes_bancaires?.societes?.code || societeCodes[0])}
+            montantCible={multi ? sel.montant : sel.tx.montant}
+            dateCible={multi ? undefined : (sel.tx.date_valeur || sel.tx.date_execution)}
+            contrepartieCible={multi ? undefined : sel.tx.contrepartie_nom}
+            sousTitre={multi ? `${sel.ids.length} mouvement${sel.ids.length > 1 ? 's' : ''} · ${fmt(sel.montant)}` : undefined}
+            onChoisir={lierFactureChoisie}
+            onClose={() => setSelecteurFacture(null)}
+          />
+        )
+      })()}
 
       {/* Barre d'action : justifier plusieurs mouvements avec une facture */}
       {selection.size > 0 && (() => {
