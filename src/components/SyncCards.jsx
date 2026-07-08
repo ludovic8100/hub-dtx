@@ -92,19 +92,8 @@ export function fmtDerniereExec(at) {
 // Bouton compact unique avec dernière exécution
 function SyncMiniButton({ sync, onDark, compact }) {
   const [state, setState] = useState('idle')
-  const [lastExec, setLastExec] = useState(null)
   const [lastSync, setLastSync] = useState(null)
 
-  const loadLastExec = async () => {
-    try {
-      const res = await fetch(`${N8N_API}/executions?workflowId=${sync.workflowId}&limit=1`, { headers: { 'X-N8N-API-KEY': N8N_KEY } })
-      if (res.ok) {
-        const data = await res.json()
-        const e = data.data?.[0]
-        if (e) setLastExec({ status: e.status, at: e.startedAt })
-      }
-    } catch {}
-  }
   // Date réelle de la dernière synchro des données (écriture Ponto -> Supabase), uniquement pour le bouton BANQUE
   const loadLastSync = async () => {
     if (sync.key !== 'iban') return
@@ -115,18 +104,17 @@ function SyncMiniButton({ sync, onDark, compact }) {
       if (data && data[0]) setLastSync(data[0].date_synchro)
     } catch {}
   }
-  useEffect(() => { loadLastExec(); loadLastSync() }, [])
+  useEffect(() => { loadLastSync() }, [])
 
   const run = async () => {
     setState('running')
     const result = await triggerWorkflow(sync.webhook, sync.workflowId)
     setState(result.ok ? 'ok' : 'error')
-    setTimeout(() => { loadLastExec(); loadLastSync(); setState('idle') }, 8000)
+    setTimeout(() => { loadLastSync(); setState('idle') }, 8000)
     // second rafraîchissement après la fin probable du run (~55s)
     setTimeout(() => { loadLastSync() }, 55000)
   }
   const running = state === 'running'
-  const statusCol = lastExec?.status === 'error' ? '#dc2626' : lastExec?.status === 'success' ? '#16a34a' : '#94a3b8'
   const bg = onDark
     ? (running ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.92)')
     : (running ? '#f1f5f9' : (state==='ok' ? '#f0fdf4' : state==='error' ? '#fef2f2' : '#fff'))
@@ -135,12 +123,11 @@ function SyncMiniButton({ sync, onDark, compact }) {
   const border = onDark ? '1px solid rgba(255,255,255,0.3)' : '1px solid #e2e8f0'
 
   const label = compact ? (sync.labelCourt || sync.label) : sync.label
-  const dateSync = sync.key === 'iban'
-    ? (lastSync ? new Date(lastSync).toLocaleString('fr-BE', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }).replace(',', ' ·') : 'jamais')
-    : null
+  const dateSync = lastSync
+    ? new Date(lastSync).toLocaleString('fr-BE', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }).replace(',', ' ·')
+    : '—'
   return (
-    <div style={{ display:'inline-flex', flexDirection:'column', alignItems:'stretch', gap:'2px', flexShrink:0 }}>
-    <button onClick={run} disabled={running} title={sync.tooltip || `${sync.label} — dernière exécution : ${fmtDerniereExec(lastExec?.at)}${lastExec?.status ? ' ('+lastExec.status+')' : ''}`}
+    <button onClick={run} disabled={running} title={sync.tooltip || sync.label}
       style={{
         display:'flex', alignItems:'center', gap: compact ? '5px' : '7px', padding: compact ? '4px 9px' : '7px 12px', borderRadius: compact ? '7px' : '8px',
         border, background: bg,
@@ -150,18 +137,13 @@ function SyncMiniButton({ sync, onDark, compact }) {
       <i className={`ti ${running ? 'ti-loader-2' : (state==='ok' ? 'ti-check' : state==='error' ? 'ti-x' : sync.icon)}`}
         style={{ color: iconCol, fontSize: compact ? '14px' : '15px', animation: running ? 'spin 1s linear infinite' : 'none' }} />
       <span>{label}</span>
-      <span style={{ display:'inline-flex', alignItems:'center', gap:'4px', paddingLeft:'6px', borderLeft:'1px solid #e2e8f0', color:statusCol, fontSize: compact ? '10px' : '11px', fontWeight:'500' }}>
-        <span style={{ width:'6px', height:'6px', borderRadius:'50%', background:statusCol, display:'inline-block' }} />
-        {fmtDerniereExec(lastExec?.at)}
-      </span>
+      {sync.key === 'iban' && (
+        <span title="Dernière synchro (heure belge)" style={{ display:'inline-flex', alignItems:'center', gap:'4px', paddingLeft:'6px', borderLeft:'1px solid #e2e8f0', color:'#334155', fontSize: compact ? '10px' : '11px', fontWeight:'600' }}>
+          <i className="ti ti-clock" style={{ fontSize: compact ? '11px' : '12px', color:'#64748b' }} />
+          {dateSync}
+        </span>
+      )}
     </button>
-    {dateSync && (
-      <span title="Dernière synchro des données (heure belge)"
-        style={{ fontSize:'10px', fontWeight:'600', color:'#1e293b', background:'rgba(255,255,255,0.9)', padding:'1px 6px', borderRadius:'6px', display:'inline-flex', alignItems:'center', justifyContent:'center', gap:'3px', whiteSpace:'nowrap', alignSelf:'center' }}>
-        <i className="ti ti-clock" style={{ fontSize:'11px', color:'#64748b' }} />{dateSync}
-      </span>
-    )}
-    </div>
   )
 }
 
@@ -169,8 +151,8 @@ function SyncMiniButton({ sync, onDark, compact }) {
 export function SyncButtonsRow({ only, style, onDark, compact }) {
   const list = only ? SYNC_BUTTONS.filter(s => only.includes(s.key)) : SYNC_BUTTONS
   return (
-    <div style={{ display:'flex', gap: compact ? '6px' : '8px', flexWrap:'wrap', alignItems:'flex-start', ...style }}>
-      <span title="Mettre à jour" style={{ fontSize:'11px', fontWeight:'700', color: onDark ? 'rgba(255,255,255,0.85)' : '#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em', marginRight:'2px', display:'inline-flex', alignItems:'center', height: compact ? '25px' : '32px' }}>
+    <div style={{ display:'flex', gap: compact ? '6px' : '8px', flexWrap:'wrap', alignItems:'center', ...style }}>
+      <span title="Mettre à jour" style={{ fontSize:'11px', fontWeight:'700', color: onDark ? 'rgba(255,255,255,0.85)' : '#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em', marginRight:'2px', display:'inline-flex', alignItems:'center' }}>
         <i className="ti ti-refresh" style={{ fontSize:'14px' }} />{!compact && <span style={{ marginLeft:'4px' }}>Mettre à jour</span>}
       </span>
       {list.map(s => <SyncMiniButton key={s.key} sync={s} onDark={onDark} compact={compact} />)}

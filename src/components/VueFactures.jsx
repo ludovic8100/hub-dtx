@@ -134,7 +134,7 @@ function VueAchats({ societeCodes, color }) {
           const cells = [
             <span onClick={(e) => { e.stopPropagation(); payee ? delierPaiement(f) : setLierPaiement(f) }} style={{ cursor: 'pointer' }}
               title={payee ? 'Payée — cliquer pour délier le paiement' : 'Cliquer pour retrouver et lier le paiement'}>
-              <Badge payee={payee} labelPayee="✓ Payée" labelNon="✕ Lier paiement" />
+              <Badge payee={payee} labelPayee="✓ Payée" labelNon="🔍 Rechercher facture" />
             </span>,
             <span style={{ fontSize: '12.5px', color: '#64748b', fontWeight: '600' }}>{fmtDate(f.date_facture)}</span>,
             <span style={{ fontSize: '13px', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '10px' }}>{(f.nom || '').replace(/\.pdf$/i, '')}</span>,
@@ -385,7 +385,7 @@ function PanneauLierPaiement({ facture, color, onClose, onLier }) {
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: '14px', width: 'min(620px, 94vw)', maxHeight: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
-          <div style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a' }}>Lier un paiement</div>
+          <div style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a' }}>Rechercher une facture</div>
           <div style={{ fontSize: '12.5px', color: '#64748b', marginTop: '3px' }}>{(facture.nom || '').replace(/\.pdf$/i, '')} — <strong>{fmt(facture.montant)}</strong></div>
         </div>
         {suggestionForte && (

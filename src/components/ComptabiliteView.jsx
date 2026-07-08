@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import VueFactures from './VueFactures'
 import SelecteurFactureAchat from './SelecteurFactureAchat'
-import RapprochementAuto from './RapprochementAuto'
 
 const fmt = (v) => v === null || v === undefined ? '—'
   : new Intl.NumberFormat('fr-BE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 }).format(v)
@@ -106,7 +105,6 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const [selection, setSelection] = useState(new Set()) // IDs des mouvements cochés pour justif multiple
   const [panneauJustif, setPanneauJustif] = useState(null) // { ids:[...], url:'', code:'LODE' } ou null
   const [selecteurFacture, setSelecteurFacture] = useState(null) // { tx } : lier une facture d'achat à un mouvement
-  const [rapprochementAuto, setRapprochementAuto] = useState(false) // panneau de rapprochement par lot
   const [aideOuverte, setAideOuverte] = useState(false)
   const [apercu, setApercu] = useState(null) // { tx, x, y } — aperçu au survol du montant
   const [apercuFacture, setApercuFacture] = useState(null) // { url } — aperçu PDF au survol de la date
@@ -289,18 +287,6 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
     setTxSelection(prev => prev && prev.id === tx.id ? { ...prev, facture_url: facture.url, rapproche: true, facture_thumb_url: null } : prev)
     setSelecteurFacture(null)
     fetch('https://n8n.srv1082740.hstgr.cloud/webhook/backfill-thumbs2', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' }).catch(()=>{})
-  }
-
-  // Fin du rapprochement automatique par lot : répercuter les liens créés dans l'état local
-  function terminerRapprochementAuto(paires) {
-    if (paires.length > 0) {
-      const parId = new Map(paires.map(p => [p.tx.id, p.facture]))
-      setTransactions(prev => prev.map(t => parId.has(t.id)
-        ? { ...t, facture_url: parId.get(t.id).url, rapproche: true, facture_thumb_url: null }
-        : t))
-    }
-    setRapprochementAuto(false)
-    alert(paires.length > 0 ? `✅ ${paires.length} mouvement(s) rapproché(s) automatiquement.` : 'Aucune correspondance sélectionnée.')
   }
 
   // Lier via URL collée manuellement (secours) depuis le sélecteur
@@ -508,15 +494,6 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
             }}>{lab}</button>
           ))}
         </div>
-        {onglet === 'mouvements' && (
-          <button onClick={()=>setRapprochementAuto(true)} title="Détecter automatiquement les factures correspondant aux mouvements non justifiés" style={{
-            marginBottom:'6px', padding:'7px 14px', borderRadius:'7px', border:`1px solid ${color}40`, background:'#fff', color,
-            cursor:'pointer', fontSize:'12.5px', fontWeight:'700', fontFamily:"'Source Sans Pro', sans-serif",
-            display:'flex', alignItems:'center', gap:'6px', flexShrink:0
-          }}>
-            <i className="ti ti-wand" style={{ fontSize:'15px' }} /> Rapprochement auto
-          </button>
-        )}
       </div>
 
       {onglet === 'factures' ? (
@@ -923,15 +900,6 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
           onChoisir={lierFactureChoisie}
           onCollerUrl={lierFactureUrl}
           onClose={()=>setSelecteurFacture(null)}
-        />
-      )}
-
-      {rapprochementAuto && (
-        <RapprochementAuto
-          societeCode={societeCodes[0]}
-          transactions={transactions}
-          onClose={()=>setRapprochementAuto(false)}
-          onTermine={terminerRapprochementAuto}
         />
       )}
 
