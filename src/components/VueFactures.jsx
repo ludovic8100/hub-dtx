@@ -354,7 +354,7 @@ function PanneauLierPaiement({ facture, color, onClose, onLier }) {
       let out = []; let from = 0
       for (;;) {
         const { data, error } = await supabase.from('transactions').select(cols)
-          .eq('comptes_bancaires.societes.code', soc).is('facture_url', null).lt('montant', 0)
+          .eq('comptes_bancaires.societes.code', soc).is('facture_url', null)
           .order('date_valeur', { ascending: false }).range(from, from + 999)
         if (error || !data) break
         out = out.concat(data)
@@ -401,7 +401,7 @@ function PanneauLierPaiement({ facture, color, onClose, onLier }) {
         <div style={{ padding: '12px 20px', borderBottom: '1px solid #f1f5f9' }}>
           <input value={recherche} onChange={e => setRecherche(e.target.value)} placeholder="Rechercher sur tout : contrepartie, IBAN, communication, montant, date…" autoFocus
             style={{ width: '100%', padding: '9px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', fontFamily: FONT, boxSizing: 'border-box' }} />
-          {!recherche && montantCible > 0 && <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px' }}>{tous.length} mouvements non liés · triés par montant proche de {fmt(-montantCible)}</div>}
+          {!recherche && montantCible > 0 && <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px' }}>{tous.length} mouvements non liés · triés par montant proche de {fmt(montantCible)}</div>}
           {recherche && <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px' }}>{mouvements.length} résultat{mouvements.length > 1 ? 's' : ''}</div>}
         </div>
         <div style={{ overflowY: 'auto', flex: 1 }}>
