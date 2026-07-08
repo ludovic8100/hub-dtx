@@ -126,7 +126,7 @@ function SyncMiniButton({ sync, onDark, compact }) {
     setTimeout(() => { loadLastSync() }, 55000)
   }
   const running = state === 'running'
-  const statusCol = lastExec?.status === 'error' ? '#f87171' : lastExec?.status === 'success' ? (onDark ? '#86efac' : '#16a34a') : (onDark ? 'rgba(255,255,255,0.6)' : '#94a3b8')
+  const statusCol = lastExec?.status === 'error' ? '#dc2626' : lastExec?.status === 'success' ? '#16a34a' : '#94a3b8'
   const bg = onDark
     ? (running ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.92)')
     : (running ? '#f1f5f9' : (state==='ok' ? '#f0fdf4' : state==='error' ? '#fef2f2' : '#fff'))
@@ -135,8 +135,8 @@ function SyncMiniButton({ sync, onDark, compact }) {
   const border = onDark ? '1px solid rgba(255,255,255,0.3)' : '1px solid #e2e8f0'
 
   const label = compact ? (sync.labelCourt || sync.label) : sync.label
-  const dateSync = (sync.key === 'iban' && lastSync)
-    ? new Date(lastSync).toLocaleString('fr-BE', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }).replace(',', ' ·')
+  const dateSync = sync.key === 'iban'
+    ? (lastSync ? new Date(lastSync).toLocaleString('fr-BE', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }).replace(',', ' ·') : 'jamais')
     : null
   return (
     <div style={{ display:'inline-flex', flexDirection:'column', alignItems:'stretch', gap:'2px', flexShrink:0 }}>
@@ -157,8 +157,8 @@ function SyncMiniButton({ sync, onDark, compact }) {
     </button>
     {dateSync && (
       <span title="Dernière synchro des données (heure belge)"
-        style={{ fontSize:'10px', fontWeight:'600', color: onDark ? 'rgba(255,255,255,0.9)' : '#64748b', display:'inline-flex', alignItems:'center', justifyContent:'center', gap:'3px', whiteSpace:'nowrap' }}>
-        <i className="ti ti-clock" style={{ fontSize:'11px' }} />{dateSync}
+        style={{ fontSize:'10px', fontWeight:'600', color:'#1e293b', background:'rgba(255,255,255,0.9)', padding:'1px 6px', borderRadius:'6px', display:'inline-flex', alignItems:'center', justifyContent:'center', gap:'3px', whiteSpace:'nowrap', alignSelf:'center' }}>
+        <i className="ti ti-clock" style={{ fontSize:'11px', color:'#64748b' }} />{dateSync}
       </span>
     )}
     </div>
