@@ -82,6 +82,7 @@ function VueConsolidee({ comptes }) {
 export default function ComptabiliteView({ societeCodes, color, colorDark, titre }) {
   const [comptes, setComptes] = useState([])
   const [transactions, setTransactions] = useState([])
+  const [facturesParTx, setFacturesParTx] = useState({}) // { transaction_id: nb de factures liées } -> badge +N
   const [loading, setLoading] = useState(true)
   const [loadingTx, setLoadingTx] = useState(false)
   const [filtre, setFiltre] = useState({ compte: 'tous', type: 'tous', libelle: '', periodes: [], categorie: 'toutes', facture: 'toutes' })
@@ -168,6 +169,21 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       enriched.sort((a,b) => (b._date || '').localeCompare(a._date || ''))
       setTransactions(enriched)
       setLoadingTx(false)
+      // Compter les factures liées par mouvement (badge +N si un paiement couvre plusieurs factures)
+      try {
+        const cnt = {}
+        let f2 = 0
+        for (;;) {
+          let q = supabase.from('factures_achat').select('transaction_id').not('transaction_id', 'is', null).range(f2, f2 + 999)
+          if (societeCodes && societeCodes.length) q = q.in('societe', societeCodes)
+          const { data: fd, error: fe } = await q
+          if (fe || !fd) break
+          for (const r of fd) { if (r.transaction_id) cnt[r.transaction_id] = (cnt[r.transaction_id] || 0) + 1 }
+          if (fd.length < 1000) break
+          f2 += 1000
+        }
+        setFacturesParTx(cnt)
+      } catch {}
     })()
   }, [comptes.map(c=>c.id).join(',')])
 
@@ -732,10 +748,15 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                       )}
                       <div style={{ display:'flex', alignItems:'center', gap:'8px' }} onClick={e=>e.stopPropagation()}>
                         {t.facture_url ? (
+<span style={{ position:'relative', display:'inline-flex' }}>
                           <button onClick={()=>ouvrirFactureLiee(t)} title={`Facture liée :\n${cheminFacture(t.facture_url)}\n\nCliquer pour ouvrir`} style={{
                             display:'flex', alignItems:'center', justifyContent:'center', width:'30px', height:'30px',
                             borderRadius:'7px', border:'none', background:'#16a34a', color:'#fff', cursor:'pointer', fontSize:'16px', fontWeight:'700'
                           }}>✓</button>
+                          {facturesParTx[t.id] > 1 && (
+                            <span title={`${facturesParTx[t.id]} factures liées à ce mouvement`} style={{ position:'absolute', top:'-6px', right:'-7px', minWidth:'17px', height:'17px', padding:'0 3px', boxSizing:'border-box', borderRadius:'9px', background:'#0f172a', color:'#fff', fontSize:'10px', fontWeight:'800', lineHeight:'17px', textAlign:'center', boxShadow:'0 0 0 2px #fff' }}>+{facturesParTx[t.id] - 1}</span>
+                          )}
+                          </span>
                         ) : t.sans_facture ? (
                           <button onClick={()=>marquerSansFacture(t, false)} title="Sans facture nécessaire — cliquer pour annuler" style={{
                             display:'flex', alignItems:'center', justifyContent:'center', width:'30px', height:'30px',
@@ -766,10 +787,15 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                       style={{ width:'15px', height:'15px', cursor:'pointer', accentColor:color, flexShrink:0 }} />
                   )}
                   {t.facture_url ? (
+<span style={{ position:'relative', display:'inline-flex' }}>
                     <button onClick={()=>ouvrirFactureLiee(t)} title={`Facture liée :\n${cheminFacture(t.facture_url)}\n\nCliquer pour ouvrir dans SharePoint`} style={{
                       display:'flex', alignItems:'center', justifyContent:'center', width:'26px', height:'26px',
                       borderRadius:'6px', border:'none', background:'#16a34a', color:'#fff', cursor:'pointer', fontSize:'15px', fontWeight:'700'
                     }}>✓</button>
+                    {facturesParTx[t.id] > 1 && (
+                      <span title={`${facturesParTx[t.id]} factures liées à ce mouvement`} style={{ position:'absolute', top:'-6px', right:'-7px', minWidth:'16px', height:'16px', padding:'0 3px', boxSizing:'border-box', borderRadius:'8px', background:'#0f172a', color:'#fff', fontSize:'10px', fontWeight:'800', lineHeight:'16px', textAlign:'center', boxShadow:'0 0 0 2px #fff' }}>+{facturesParTx[t.id] - 1}</span>
+                    )}
+                    </span>
                   ) : t.sans_facture ? (
                     <button onClick={()=>marquerSansFacture(t, false)} title="Sans facture nécessaire — cliquer pour annuler" style={{
                       display:'flex', alignItems:'center', justifyContent:'center', width:'26px', height:'26px',
