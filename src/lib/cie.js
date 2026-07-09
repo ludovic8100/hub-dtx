@@ -39,12 +39,14 @@ export function resolveCie(nomBrut, cies) {
   const key = normCie(nomBrut)
   if (!key) return fallback
   const firstTok = key.split(' ')[0]
+  const keyNS = key.replace(/ /g, '')  // version "collée" pour acronymes pointés (D.A.S. -> das)
   let best = null
   for (const c of cies) {
     const cands = [normCie(c.nom), normCie(c.nom_court), normCie(c.code)].filter(Boolean)
     for (const cand of cands) {
+      const candNS = cand.replace(/ /g, '')
       let score = 0
-      if (cand === key) score = 3
+      if (cand === key || (candNS === keyNS && keyNS.length >= 2)) score = 3
       else if (cand.split(' ')[0] === firstTok && firstTok.length >= 2) score = 2
       else if ((cand.length >= 3 && key.startsWith(cand)) || (key.length >= 3 && cand.startsWith(key))) score = 1
       if (score && (!best || score > best.score)) best = { c, score }
