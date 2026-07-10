@@ -1395,6 +1395,47 @@ function Fiche({ client, onClose, onOpenDossier }) {
 // ══════════════════════════
 // PAGE PRINCIPALE
 // ══════════════════════════
+// ── Bloc « derniers consultés » (réutilisé pour perso + bureau) ──
+function RecentsBlock({ title, icon, rows, onOpen, showWho, empty }) {
+  return (
+    <div style={{padding:'4px 0'}}>
+      <div style={{display:'flex',alignItems:'center',gap:7,padding:'12px 16px 6px'}}>
+        <i className={`ti ${icon}`} style={{fontSize:15,color:'#0d9488'}}/>
+        <span style={{fontSize:13,fontWeight:800,color:NAVY}}>{title}</span>
+        {rows&&rows.length>0&&<span style={{fontSize:11,color:'#94a3b8'}}>({rows.length})</span>}
+      </div>
+      {rows===null ? (
+        <p style={{padding:'4px 16px 12px',color:'#94a3b8',fontSize:12.5}}>Chargement…</p>
+      ) : !rows.length ? (
+        <p style={{padding:'4px 16px 12px',color:'#94a3b8',fontSize:12.5}}>{empty}</p>
+      ) : (
+        <div style={{overflowX:'auto'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+            <thead><tr style={{background:'#f8fafc'}}>
+              {['Client','N° Dossier','Localité','Consulté le'].concat(showWho?['Par']:[]).map(h=>(
+                <th key={h} style={{textAlign:'left',padding:'9px 16px',fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',whiteSpace:'nowrap',borderBottom:'1px solid #e2e8f0'}}>{h}</th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {rows.map((c,i)=>(
+                <tr key={c.dossier} onClick={()=>onOpen(c.dossier)} style={{cursor:'pointer',borderBottom:'1px solid #f1f5f9',background:i%2===0?'#fff':'#fafafe'}}
+                  onMouseEnter={e=>e.currentTarget.style.background='#f0fdfa'}
+                  onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'#fff':'#fafafe'}>
+                  <td style={{padding:'9px 16px',fontWeight:600,color:'#1e293b'}}>{c.nom} {c.prenom}</td>
+                  <td style={{padding:'9px 16px',fontFamily:'monospace',fontSize:12,color:NAVY}}>{c.dossier}</td>
+                  <td style={{padding:'9px 16px',color:'#64748b'}}>{c.localite||'—'}</td>
+                  <td style={{padding:'9px 16px',color:'#64748b',whiteSpace:'nowrap'}}>{c.consulte_at?new Date(c.consulte_at).toLocaleString('fr-BE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—'}</td>
+                  {showWho&&<td style={{padding:'9px 16px',color:'#64748b'}}>{c.consultant_code||'—'}</td>}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function DynassurClients() {
   const [myCode,setMyCode]   = useState(null)
   const [myBureau,setMyBureau] = useState(null)
@@ -1412,7 +1453,8 @@ export default function DynassurClients() {
   const [contactFilter,setContactFilter] = useState('tous')   // tous | m1 | m3 | m6 | m12 | a2 | a2p
   const [relance,setRelance]   = useState(null)               // null = pas encore chargé
   const [kpiModal,setKpiModal] = useState(null)               // { titre, rows } | 'loading' | null
-  const [recents,setRecents] = useState(null)                 // 20 derniers clients consultés par le bureau (partagé)
+  const [recentsPerso,setRecentsPerso] = useState(null)   // vos derniers clients consultés
+  const [recentsBureau,setRecentsBureau] = useState(null) // ceux de votre bureau (hors vous)
   const meRef = useRef({ code:null, bureau:null })            // référence fraîche pour le log de consultation
   // Calcule la liste des clients derrière un KPI (réutilise « relance » = tous les clients)
   const openKpi = useCallback(async(kind)=>{
@@ -1477,19 +1519,22 @@ export default function DynassurClients() {
     try{
       await supabase.from('clients_consultes').upsert(
         { bureau:String(bureau), dossier:String(c.dossier), consultant_code:code||null, nom:c.nom||null, prenom:c.prenom||null, localite:c.localite||null, consulte_at:new Date().toISOString() },
-        { onConflict:'bureau,dossier' })
+        { onConflict:'consultant_code,dossier' })
     }catch(e){}
   }
 
-  // 20 derniers clients consultés par le bureau du collaborateur
+  // Derniers clients consultés : les vôtres + ceux de votre bureau (partagé)
   const loadRecents = useCallback(async()=>{
-    if(!myBureau) return
-    const { data } = await supabase.from('clients_consultes')
-      .select('dossier,nom,prenom,localite,consultant_code,consulte_at')
-      .eq('bureau',String(myBureau)).order('consulte_at',{ascending:false}).limit(20)
-    setRecents(data||[])
-  },[myBureau])
-  useEffect(()=>{ if(!selected && myBureau) loadRecents() },[myBureau,selected,loadRecents])
+    if(!myCode) return
+    const cols='dossier,nom,prenom,localite,consultant_code,consulte_at'
+    const perso = supabase.from('clients_consultes').select(cols).eq('consultant_code',myCode).order('consulte_at',{ascending:false}).limit(12)
+    const bureau = myBureau
+      ? supabase.from('clients_consultes').select(cols).eq('bureau',String(myBureau)).neq('consultant_code',myCode).order('consulte_at',{ascending:false}).limit(12)
+      : Promise.resolve({data:[]})
+    const [{data:pp},{data:bb}] = await Promise.all([perso,bureau])
+    setRecentsPerso(pp||[]); setRecentsBureau(bb||[])
+  },[myCode,myBureau])
+  useEffect(()=>{ if(!selected && myCode) loadRecents() },[myCode,myBureau,selected,loadRecents])
 
   const load = useCallback(async(search,sc,p)=>{
     setLoading(true)
@@ -1593,7 +1638,7 @@ export default function DynassurClients() {
                 <div style={{display:'flex',alignItems:'center',gap:8}}>
                   <i className={modeRecents?"ti ti-history":"ti ti-calendar-heart"} style={{fontSize:18,color:'#0d9488'}}/>
                   <span style={{fontSize:15,fontWeight:800,color:NAVY}}>{modeRecents?'Derniers clients consultés':'Relance clients'}</span>
-                  <span style={{fontSize:12,color:'#94a3b8'}}>{modeRecents?`· 20 dernières fiches ouvertes par votre bureau${myBureauLib?` (${myBureauLib})`:''}`:'· trie les clients par ancienneté du dernier contact'}</span>
+                  <span style={{fontSize:12,color:'#94a3b8'}}>{modeRecents?'· vos dernières fiches et celles de votre bureau':'· trie les clients par ancienneté du dernier contact'}</span>
                 </div>
                 <div style={{display:'flex',gap:8,marginLeft:'auto',flexWrap:'wrap'}}>
                   <select value={scope} onChange={e=>setScope(e.target.value)} style={{padding:'7px 10px',borderRadius:8,border:'1px solid #e2e8f0',fontSize:13,fontFamily:'inherit',color:NAVY,background:'#fff'}}>
@@ -1613,36 +1658,10 @@ export default function DynassurClients() {
               </div>
 
               {modeRecents?(
-                (recents && recents.length)?(
-                  <div style={{overflowX:'auto'}}>
-                    <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-                      <thead><tr style={{background:'#f8fafc'}}>
-                        {['Client','N° Dossier','Localité','Consulté le','Par'].map(h=>(
-                          <th key={h} style={{textAlign:'left',padding:'9px 16px',fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',whiteSpace:'nowrap',borderBottom:'1px solid #e2e8f0'}}>{h}</th>
-                        ))}
-                      </tr></thead>
-                      <tbody>
-                        {recents.map((c,i)=>(
-                          <tr key={c.dossier} onClick={()=>openDossier(c.dossier)} style={{cursor:'pointer',borderBottom:'1px solid #f1f5f9',background:i%2===0?'#fff':'#fafafe'}}
-                            onMouseEnter={e=>e.currentTarget.style.background='#f0fdfa'}
-                            onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'#fff':'#fafafe'}>
-                            <td style={{padding:'9px 16px',fontWeight:600,color:'#1e293b'}}>{c.nom} {c.prenom}</td>
-                            <td style={{padding:'9px 16px',fontFamily:'monospace',fontSize:12,color:NAVY}}>{c.dossier}</td>
-                            <td style={{padding:'9px 16px',color:'#64748b'}}>{c.localite||'—'}</td>
-                            <td style={{padding:'9px 16px',color:'#64748b',whiteSpace:'nowrap'}}>{c.consulte_at?new Date(c.consulte_at).toLocaleString('fr-BE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—'}</td>
-                            <td style={{padding:'9px 16px',color:'#64748b'}}>{c.consultant_code||'—'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ):(myBureau===null && myCode)?(
-                  <p style={{padding:30,textAlign:'center',color:'#94a3b8'}}>Bureau non déterminé pour votre compte — utilisez la recherche pour ouvrir un client.</p>
-                ):recents===null?(
-                  <p style={{padding:30,textAlign:'center',color:'#94a3b8'}}>Chargement…</p>
-                ):(
-                  <p style={{padding:30,textAlign:'center',color:'#94a3b8'}}>Aucune fiche consultée récemment dans votre bureau. Utilisez la recherche pour ouvrir un client.</p>
-                )
+                <div style={{padding:'6px 0 4px'}}>
+                  <RecentsBlock title="Vos derniers clients consultés" icon="ti-user" rows={recentsPerso} onOpen={openDossier} showWho={false} empty="Vous n'avez pas encore consulté de fiche — ouvrez un client via la recherche."/>
+                  <RecentsBlock title={`Votre bureau${myBureauLib?` — ${myBureauLib}`:''}`} icon="ti-building" rows={recentsBureau} onOpen={openDossier} showWho={true} empty="Aucune fiche consultée récemment par vos collègues."/>
+                </div>
               ):relance===null?(
                 <p style={{padding:30,textAlign:'center',color:'#94a3b8'}}>Chargement de la relance…</p>
               ):!relanceView.length?(
