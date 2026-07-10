@@ -59,6 +59,14 @@ const MODULES_ADMIN = [
   { key: 'admin_liens', label: 'Liens cassés', icon: 'ti-unlink', path: '/admin/liens-casses' },
 ]
 
+// Tri des modules d'une société : Tableau de bord toujours en tête, le reste par ordre alphabétique
+const orderModules = arr => [...arr].sort((a, b) => {
+  const ad = /dashboard/.test(a.key) || a.key === 'acc_holding'
+  const bd = /dashboard/.test(b.key) || b.key === 'acc_holding'
+  if (ad !== bd) return ad ? -1 : 1
+  return a.label.localeCompare(b.label, 'fr', { sensitivity: 'base' })
+})
+
 // ── Recherche client universelle (Dynassur), intégrée au menu ──
 function ClientSearch({ accentLight }) {
   const navigate = useNavigate()
@@ -124,7 +132,7 @@ export default function Sidebar() {
   const accentLight = cfg.colorAccent
 
   const currentModules = activeSociete && MODULES[activeSociete]
-    ? MODULES[activeSociete].filter(m => isAdmin || perms[m.key])
+    ? orderModules(MODULES[activeSociete].filter(m => isAdmin || perms[m.key]))
     : []
 
   const NavItem = ({ item }) => {

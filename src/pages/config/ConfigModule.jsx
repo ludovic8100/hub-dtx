@@ -169,7 +169,7 @@ export default function ConfigModule() {
     if (uSoc !== 'toutes' && !(u.role === 'admin' || u[uSoc])) return false
     if (uModule !== 'tous' && !(u.role === 'admin' || u[uModule])) return false
     return true
-  })
+  }).sort((a, b) => (a.nom || a.user_email || '').localeCompare(b.nom || b.user_email || '', 'fr', { sensitivity: 'base' }))
 
   const TABS = [['societes', '🏢 Sociétés'], ['documents', '📄 Documents'], ['users', '👥 Utilisateurs & accès']]
 
@@ -192,7 +192,7 @@ export default function ConfigModule() {
         {(tab === 'societes' || tab === 'documents') && !loading && (
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,220px) 1fr', gap: 18, alignItems: 'start' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {societes.map(s => (
+              {[...societes].sort((a, b) => (a.nom || '').localeCompare(b.nom || '', 'fr', { sensitivity: 'base' })).map(s => (
                 <button key={s.id} onClick={() => setSelSoc({ ...s })} style={{
                   textAlign: 'left', padding: '10px 12px', borderRadius: 10, cursor: 'pointer', fontWeight: 700,
                   border: selSoc?.id === s.id ? `2px solid ${s.couleur || '#1e293b'}` : '1px solid #e2e8f0',
@@ -332,8 +332,6 @@ export default function ConfigModule() {
                       })()}
                     </label>
                     <Toggle label="Actif" on={!!selUser.actif} onClick={() => setSelUser(u => ({ ...u, actif: !u.actif }))} />
-                    <Toggle label="Voir les commissions" on={!!selUser.voir_commissions} onClick={() => setSelUser(u => ({ ...u, voir_commissions: !u.voir_commissions }))} />
-                    <Toggle label="Appel" on={!!selUser.appel} onClick={() => setSelUser(u => ({ ...u, appel: !u.appel }))} />
                   </div>
                 </div>
 
@@ -361,10 +359,17 @@ export default function ConfigModule() {
                       </div>
                       {grp.pages.length > 0 && (
                         <div style={{ padding: '6px 10px', opacity: selUser[grp.acc] ? 1 : .45, pointerEvents: selUser[grp.acc] ? 'auto' : 'none' }}>
-                          {grp.pages.map(([pg, plabel]) => {
+                          {[...grp.pages].sort((a, b) => (a[0] === 'dashboard') !== (b[0] === 'dashboard') ? (a[0] === 'dashboard' ? -1 : 1) : a[1].localeCompare(b[1], 'fr', { sensitivity: 'base' })).map(([pg, plabel]) => {
                             const col = `${grp.pfx}_${pg}`
                             return <Toggle key={col} label={plabel} on={!!selUser[col]} small onClick={() => setSelUser(u => ({ ...u, [col]: !u[col] }))} />
                           })}
+                          {grp.acc === 'acc_dynassur' && (
+                            <div style={{ borderTop: '1px dashed #e2e8f0', marginTop: 6, paddingTop: 6 }}>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 2 }}>Permissions</div>
+                              <Toggle label="Voir les commissions" on={!!selUser.voir_commissions} small onClick={() => setSelUser(u => ({ ...u, voir_commissions: !u.voir_commissions }))} />
+                              <Toggle label="Appel" on={!!selUser.appel} small onClick={() => setSelUser(u => ({ ...u, appel: !u.appel }))} />
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
