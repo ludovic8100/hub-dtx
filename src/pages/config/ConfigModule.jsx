@@ -42,6 +42,8 @@ export default function ConfigModule() {
   const [uStatut, setUStatut] = useState('tous')
   const [uSoc, setUSoc] = useState('toutes')
   const [uModule, setUModule] = useState('tous')
+  const [bureaux, setBureaux] = useState([])            // ref_bureaux (adresses)
+  const [collabBureau, setCollabBureau] = useState({})  // code collaborateur -> bureau_id
 
   useEffect(() => {
     if (!isAdmin) { setLoading(false); return }
@@ -49,6 +51,10 @@ export default function ConfigModule() {
       const { data: socs } = await supabase.from('societes').select('*').order('code')
       const { data: us } = await supabase.from('user_permissions').select('*').order('nom', { nullsFirst: false })
       setSocietes(socs || []); setUsers(us || [])
+      const { data: brx } = await supabase.from('ref_bureaux').select('id,libelle,actif').eq('actif', true).order('libelle')
+      const { data: cbs } = await supabase.from('collaborateurs').select('code,bureau_id')
+      setBureaux(brx || [])
+      const mB = {}; (cbs || []).forEach(c => { if (c.code) mB[c.code.toUpperCase()] = c.bureau_id }); setCollabBureau(mB)
       if (socs?.length) setSelSoc({ ...socs.find(s => s.entite_key) || socs[0] })
       setLoading(false)
     })()
@@ -79,6 +85,20 @@ export default function ConfigModule() {
     setSelSoc(s => ({ ...s, logo_url: data.publicUrl }))
     setSaving(false)
     notify('✓ Logo chargé — clique « Enregistrer » pour valider')
+  }
+
+  const userCodeOf = u => (u?.collab_code || (u?.user_email || '').split('@')[0] || '').toUpperCase()
+  async function setBureau(bureauId) {
+    if (!selUser) return
+    const code = userCodeOf(selUser)
+    if (!code || !(code in collabBureau)) { notify('❌ Aucun collaborateur lié au code ' + (code || '?')); return }
+    setSaving(true)
+    const val = bureauId === '' ? null : Number(bureauId)
+    const { error } = await supabase.from('collaborateurs').update({ bureau_id: val }).eq('code', code)
+    setSaving(false)
+    if (error) { notify('❌ ' + error.message); return }
+    setCollabBureau(m => ({ ...m, [code]: val }))
+    notify('✓ Bureau attribué')
   }
 
   async function saveUser() {
@@ -268,6 +288,18 @@ export default function ConfigModule() {
                         <option value="user">Utilisateur</option>
                         <option value="admin">Administrateur</option>
                       </select>
+                    </label>
+                    <label style={{ fontSize: 13, fontWeight: 600, color: '#475569', display: 'flex', gap: 6, alignItems: 'center' }}>
+                      Bureau
+                      {(() => {
+                        const code = userCodeOf(selUser)
+                        return (code in collabBureau)
+                          ? <select value={collabBureau[code] ?? ''} onChange={e => setBureau(e.target.value)} style={{ ...inp, padding: '6px 8px', minWidth: 210 }}>
+                              <option value="">— Aucun —</option>
+                              {bureaux.map(b => <option key={b.id} value={b.id}>{b.libelle}</option>)}
+                            </select>
+                          : <span style={{ fontSize: 12, color: '#94a3b8' }}>aucun collaborateur (code {code || '?'})</span>
+                      })()}
                     </label>
                     <Toggle label="Actif" on={!!selUser.actif} onClick={() => setSelUser(u => ({ ...u, actif: !u.actif }))} />
                     <Toggle label="Voir les commissions" on={!!selUser.voir_commissions} onClick={() => setSelUser(u => ({ ...u, voir_commissions: !u.voir_commissions }))} />
