@@ -1325,6 +1325,8 @@ export default function DynassurClients() {
   const [contactFilter,setContactFilter] = useState('tous')   // tous | m1 | m3 | m6 | m12 | a2 | a2p
   const [relance,setRelance]   = useState(null)               // null = pas encore chargé
   const [kpiModal,setKpiModal] = useState(null)               // { titre, rows } | 'loading' | null
+  const [recents,setRecents] = useState(null)                 // 20 derniers clients consultés par le bureau (partagé)
+  const meRef = useRef({ code:null, bureau:null })            // référence fraîche pour le log de consultation
   // Calcule la liste des clients derrière un KPI (réutilise « relance » = tous les clients)
   const openKpi = useCallback(async(kind)=>{
     const all = relance || []
@@ -1376,6 +1378,30 @@ export default function DynassurClients() {
     supabase.from('clients').select('*',{count:'exact',head:true}).eq('bureau',myBureau).then(({count})=>setCounts(c=>({...c,bureau:count||0})))
   },[myBureau])
 
+  // Référence fraîche du collaborateur (code + bureau) pour la journalisation des consultations
+  useEffect(()=>{ meRef.current={ code:myCode, bureau:myBureau } },[myCode,myBureau])
+
+  // Journalise l'ouverture d'une fiche, partagée au niveau du bureau (upsert : une ligne par client/bureau)
+  async function logConsultation(c){
+    const { code, bureau } = meRef.current
+    if(!c?.dossier || !bureau) return
+    try{
+      await supabase.from('clients_consultes').upsert(
+        { bureau, dossier:String(c.dossier), consultant_code:code||null, nom:c.nom||null, prenom:c.prenom||null, localite:c.localite||null, consulte_at:new Date().toISOString() },
+        { onConflict:'bureau,dossier' })
+    }catch(e){}
+  }
+
+  // 20 derniers clients consultés par le bureau du collaborateur
+  const loadRecents = useCallback(async()=>{
+    if(!myBureau) return
+    const { data } = await supabase.from('clients_consultes')
+      .select('dossier,nom,prenom,localite,consultant_code,consulte_at')
+      .eq('bureau',myBureau).order('consulte_at',{ascending:false}).limit(20)
+    setRecents(data||[])
+  },[myBureau])
+  useEffect(()=>{ if(!selected && myBureau) loadRecents() },[myBureau,selected,loadRecents])
+
   const load = useCallback(async(search,sc,p)=>{
     setLoading(true)
     let qb=supabase.from('clients').select('id,dossier,nom,prenom,cp,localite,gsm,tel_fixe,gsm_e164,telfixe_e164,email,rue,num_maison,boite,date_naissance,etat_civil,sexe,sa_code,sa_nom,gestionnaire_code,gestionnaire_nom,bureau,classe,alerte',{count:'exact'})
@@ -1421,7 +1447,7 @@ export default function DynassurClients() {
   const openDossier = useCallback(async(dossier)=>{
     if(!dossier) return
     const{data}=await supabase.from('clients').select('id,dossier,nom,prenom,cp,localite,gsm,tel_fixe,gsm_e164,telfixe_e164,email,rue,num_maison,boite,date_naissance,etat_civil,sexe,sa_code,sa_nom,gestionnaire_code,gestionnaire_nom,bureau,classe,alerte').eq('dossier',dossier).limit(1)
-    if(data&&data[0]){ setSelected(data[0]); pushRecentClient(data[0]); window.scrollTo({top:0,behavior:'smooth'}) }
+    if(data&&data[0]){ setSelected(data[0]); pushRecentClient(data[0]); logConsultation(data[0]); window.scrollTo({top:0,behavior:'smooth'}) }
   },[])
 
   // Ouverture directe / recherche depuis le menu : réagit à ?dossier= au montage ET aux navigations
@@ -1453,6 +1479,7 @@ export default function DynassurClients() {
   if(relanceActif) relanceView = relanceView.filter(c=>c.tranche===contactFilter)
   if(q.length>=2){ const s=q.toLowerCase(); relanceView = relanceView.filter(c=>`${c.nom} ${c.prenom} ${c.dossier}`.toLowerCase().includes(s)) }
   const relanceShow = relanceView.slice(0,500)
+  const modeRecents = q.length<2 && contactFilter==='tous'   // vue par défaut = derniers clients consultés du bureau
 
   return(
     <Layout currentPage="Clients">
@@ -1475,9 +1502,9 @@ export default function DynassurClients() {
             <div style={{background:'#fff',borderRadius:12,border:'1px solid #e2e8f0',overflow:'hidden'}}>
               <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',padding:'12px 16px',borderBottom:'1px solid #f1f5f9'}}>
                 <div style={{display:'flex',alignItems:'center',gap:8}}>
-                  <i className="ti ti-calendar-heart" style={{fontSize:18,color:'#0d9488'}}/>
-                  <span style={{fontSize:15,fontWeight:800,color:NAVY}}>Relance clients</span>
-                  <span style={{fontSize:12,color:'#94a3b8'}}>· trie les clients par ancienneté du dernier contact</span>
+                  <i className={modeRecents?"ti ti-history":"ti ti-calendar-heart"} style={{fontSize:18,color:'#0d9488'}}/>
+                  <span style={{fontSize:15,fontWeight:800,color:NAVY}}>{modeRecents?'Derniers clients consultés':'Relance clients'}</span>
+                  <span style={{fontSize:12,color:'#94a3b8'}}>{modeRecents?`· 20 dernières fiches ouvertes par votre bureau${myBureau?` (${myBureau})`:''}`:'· trie les clients par ancienneté du dernier contact'}</span>
                 </div>
                 <div style={{display:'flex',gap:8,marginLeft:'auto',flexWrap:'wrap'}}>
                   <select value={scope} onChange={e=>setScope(e.target.value)} style={{padding:'7px 10px',borderRadius:8,border:'1px solid #e2e8f0',fontSize:13,fontFamily:'inherit',color:NAVY,background:'#fff'}}>
@@ -1496,7 +1523,38 @@ export default function DynassurClients() {
                 </div>
               </div>
 
-              {relance===null?(
+              {modeRecents?(
+                (recents && recents.length)?(
+                  <div style={{overflowX:'auto'}}>
+                    <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+                      <thead><tr style={{background:'#f8fafc'}}>
+                        {['Client','N° Dossier','Localité','Consulté le','Par'].map(h=>(
+                          <th key={h} style={{textAlign:'left',padding:'9px 16px',fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',whiteSpace:'nowrap',borderBottom:'1px solid #e2e8f0'}}>{h}</th>
+                        ))}
+                      </tr></thead>
+                      <tbody>
+                        {recents.map((c,i)=>(
+                          <tr key={c.dossier} onClick={()=>openDossier(c.dossier)} style={{cursor:'pointer',borderBottom:'1px solid #f1f5f9',background:i%2===0?'#fff':'#fafafe'}}
+                            onMouseEnter={e=>e.currentTarget.style.background='#f0fdfa'}
+                            onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'#fff':'#fafafe'}>
+                            <td style={{padding:'9px 16px',fontWeight:600,color:'#1e293b'}}>{c.nom} {c.prenom}</td>
+                            <td style={{padding:'9px 16px',fontFamily:'monospace',fontSize:12,color:NAVY}}>{c.dossier}</td>
+                            <td style={{padding:'9px 16px',color:'#64748b'}}>{c.localite||'—'}</td>
+                            <td style={{padding:'9px 16px',color:'#64748b',whiteSpace:'nowrap'}}>{c.consulte_at?new Date(c.consulte_at).toLocaleString('fr-BE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—'}</td>
+                            <td style={{padding:'9px 16px',color:'#64748b'}}>{c.consultant_code||'—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ):(myBureau===null && myCode)?(
+                  <p style={{padding:30,textAlign:'center',color:'#94a3b8'}}>Bureau non déterminé pour votre compte — utilisez la recherche pour ouvrir un client.</p>
+                ):recents===null?(
+                  <p style={{padding:30,textAlign:'center',color:'#94a3b8'}}>Chargement…</p>
+                ):(
+                  <p style={{padding:30,textAlign:'center',color:'#94a3b8'}}>Aucune fiche consultée récemment dans votre bureau. Utilisez la recherche pour ouvrir un client.</p>
+                )
+              ):relance===null?(
                 <p style={{padding:30,textAlign:'center',color:'#94a3b8'}}>Chargement de la relance…</p>
               ):!relanceView.length?(
                 <p style={{padding:30,textAlign:'center',color:'#94a3b8'}}>Aucun client pour ce filtre.</p>
