@@ -44,6 +44,8 @@ export default function ConfigModule() {
   const [uModule, setUModule] = useState('tous')
   const [bureaux, setBureaux] = useState([])            // ref_bureaux (adresses)
   const [collabBureau, setCollabBureau] = useState({})  // code collaborateur -> bureau_id
+  const [sel, setSel] = useState(() => new Set())       // ids user cochés (attribution groupée)
+  const [bulkBureau, setBulkBureau] = useState('')      // bureau cible de l'attribution groupée
 
   useEffect(() => {
     if (!isAdmin) { setLoading(false); return }
@@ -99,6 +101,21 @@ export default function ConfigModule() {
     if (error) { notify('❌ ' + error.message); return }
     setCollabBureau(m => ({ ...m, [code]: val }))
     notify('✓ Bureau attribué')
+  }
+
+  const toggleSel = id => setSel(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  async function assignBulk() {
+    if (!bulkBureau || !sel.size) return
+    const val = Number(bulkBureau)
+    const codes = [...new Set(users.filter(u => sel.has(u.id)).map(u => userCodeOf(u)).filter(c => c && (c in collabBureau)))]
+    if (!codes.length) { notify('❌ Aucun collaborateur lié aux utilisateurs cochés'); return }
+    setSaving(true)
+    const { error } = await supabase.from('collaborateurs').update({ bureau_id: val }).in('code', codes)
+    setSaving(false)
+    if (error) { notify('❌ ' + error.message); return }
+    setCollabBureau(m => { const n = { ...m }; codes.forEach(c => { n[c] = val }); return n })
+    setSel(new Set()); setBulkBureau('')
+    notify(`✓ ${codes.length} collaborateur(s) rattaché(s) au bureau`)
   }
 
   async function saveUser() {
@@ -257,20 +274,33 @@ export default function ConfigModule() {
               </select>
               <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 'auto' }}>{usersFiltres.length} / {users.length}</span>
             </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 14, alignItems: 'center', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '8px 12px' }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#475569' }}>Attribution groupée d'un bureau</span>
+              <button onClick={() => setSel(new Set(usersFiltres.map(u => u.id)))} style={{ ...btnGhost }}>Tout cocher ({usersFiltres.length})</button>
+              {sel.size > 0 && <button onClick={() => setSel(new Set())} style={{ ...btnGhost }}>Décocher</button>}
+              <select value={bulkBureau} onChange={e => setBulkBureau(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 220 }}>
+                <option value="">Choisir un bureau…</option>
+                {bureaux.map(b => <option key={b.id} value={b.id}>{b.libelle}</option>)}
+              </select>
+              <button onClick={assignBulk} disabled={!bulkBureau || !sel.size || saving} style={{ ...btn('#1e293b'), padding: '8px 16px', fontSize: 14, opacity: (!bulkBureau || !sel.size || saving) ? .5 : 1 }}>Attribuer ({sel.size})</button>
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,280px) 1fr', gap: 18, alignItems: 'start' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: '70vh', overflowY: 'auto' }}>
               {usersFiltres.map(u => (
-                <button key={u.id} onClick={() => setSelUser({ ...u })} style={{
-                  textAlign: 'left', padding: '9px 12px', borderRadius: 9, cursor: 'pointer',
-                  border: selUser?.id === u.id ? '2px solid #1e293b' : '1px solid #e2e8f0',
-                  background: selUser?.id === u.id ? '#f8fafc' : '#fff',
-                }}>
-                  <div style={{ fontWeight: 700, color: '#1e293b', fontSize: 14 }}>{u.nom || u.user_email}</div>
-                  <div style={{ fontSize: 11, color: '#94a3b8' }}>{u.user_email}
-                    {u.role === 'admin' && <span style={{ color: '#7c3aed', fontWeight: 700 }}> · admin</span>}
-                    {!u.actif && <span style={{ color: '#dc2626', fontWeight: 700 }}> · inactif</span>}
-                  </div>
-                </button>
+                <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input type="checkbox" checked={sel.has(u.id)} onChange={() => toggleSel(u.id)} style={{ width: 16, height: 16, cursor: 'pointer', flexShrink: 0 }} />
+                  <button onClick={() => setSelUser({ ...u })} style={{
+                    flex: 1, minWidth: 0, textAlign: 'left', padding: '9px 12px', borderRadius: 9, cursor: 'pointer',
+                    border: selUser?.id === u.id ? '2px solid #1e293b' : '1px solid #e2e8f0',
+                    background: selUser?.id === u.id ? '#f8fafc' : '#fff',
+                  }}>
+                    <div style={{ fontWeight: 700, color: '#1e293b', fontSize: 14 }}>{u.nom || u.user_email}</div>
+                    <div style={{ fontSize: 11, color: '#94a3b8' }}>{u.user_email}
+                      {u.role === 'admin' && <span style={{ color: '#7c3aed', fontWeight: 700 }}> · admin</span>}
+                      {!u.actif && <span style={{ color: '#dc2626', fontWeight: 700 }}> · inactif</span>}
+                    </div>
+                  </button>
+                </div>
               ))}
             </div>
 
@@ -303,10 +333,12 @@ export default function ConfigModule() {
                     </label>
                     <Toggle label="Actif" on={!!selUser.actif} onClick={() => setSelUser(u => ({ ...u, actif: !u.actif }))} />
                     <Toggle label="Voir les commissions" on={!!selUser.voir_commissions} onClick={() => setSelUser(u => ({ ...u, voir_commissions: !u.voir_commissions }))} />
+                    <Toggle label="Appel" on={!!selUser.appel} onClick={() => setSelUser(u => ({ ...u, appel: !u.appel }))} />
                   </div>
                 </div>
 
                 <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <button onClick={saveUser} disabled={saving} style={{ ...btn('#1e293b'), padding: '9px 18px', fontSize: 14, opacity: saving ? .6 : 1 }}>{saving ? '…' : '💾 Enregistrer'}</button>
                   <button onClick={renvoyerAcces} disabled={saving} style={{ ...btn('#0080BD'), padding: '9px 16px', fontSize: 14, opacity: saving ? .6 : 1 }}>📧 {selUser.date_envoi_acces ? 'Renvoyer' : 'Envoyer'} les accès</button>
                   <span style={{ fontSize: 12, color: '#94a3b8' }}>
                     {selUser.date_envoi_acces ? `Accès envoyés le ${new Date(selUser.date_envoi_acces).toLocaleDateString('fr-BE')}` : 'Accès jamais envoyés'}
@@ -339,9 +371,6 @@ export default function ConfigModule() {
                   ))}
                 </div>
 
-                <div style={{ marginTop: 18, display: 'flex', justifyContent: 'flex-end' }}>
-                  <button onClick={saveUser} disabled={saving} style={{ ...btn('#1e293b'), opacity: saving ? .6 : 1 }}>{saving ? '…' : 'Enregistrer'}</button>
-                </div>
               </div>
             ) : <div style={{ color: '#94a3b8', padding: 20 }}>Sélectionne un utilisateur.</div>}
             </div>
