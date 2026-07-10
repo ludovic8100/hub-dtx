@@ -8,7 +8,7 @@ import { bootstrapConfigs } from '../../lib/bootstrapConfigs'
 // ─── Définition des accès par société (colonnes réelles de user_permissions) ───
 const ACCES = [
   { acc: 'acc_dynassur', label: 'Dynassur', pfx: 'dyn',  couleur: '#0080BD',
-    pages: [['dashboard', 'Tableau de bord'], ['taches', 'Tâches'], ['clients', 'Clients'], ['production', 'Production'], ['bordereaux', 'Bordereaux'], ['chiffres', 'Chiffres'], ['objectifs', 'Objectifs'], ['compagnies', 'Compagnies'], ['sinistres', 'Sinistres'], ['rdv', 'RDV / Agenda'], ['banque', 'Banque'], ['comptabilite', 'Comptabilité'], ['devis', 'Devis & Factures']] },
+    pages: [['dashboard', 'Tableau de bord'], ['taches', 'Tâches'], ['clients', 'Clients'], ['production', 'Production'], ['bordereaux', 'Bordereaux'], ['chiffres', 'Chiffres'], ['objectifs', 'Objectifs'], ['compagnies', 'Compagnies'], ['sinistres', 'Sinistres'], ['rdv', 'RDV / Agenda'], ['appels', 'Appels'], ['rentabilite', 'Rentabilité'], ['banque', 'Banque'], ['comptabilite', 'Comptabilité'], ['devis', 'Devis & Factures']] },
   { acc: 'acc_dtx', label: 'DTX', pfx: 'dtx', couleur: '#1B3A6B',
     pages: [['dashboard', 'Tableau de bord'], ['immobilier', 'Immobilier'], ['vehicules', 'Véhicules'], ['trading', 'Trading'], ['comptabilite', 'Comptabilité'], ['devis', 'Devis & Factures']] },
   { acc: 'acc_lode', label: 'LODE', pfx: 'lode', couleur: '#F97316',
@@ -367,7 +367,6 @@ export default function ConfigModule() {
                             <div style={{ borderTop: '1px dashed #e2e8f0', marginTop: 6, paddingTop: 6 }}>
                               <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 2 }}>Permissions</div>
                               <Toggle label="Voir les commissions" on={!!selUser.voir_commissions} small onClick={() => setSelUser(u => ({ ...u, voir_commissions: !u.voir_commissions }))} />
-                              <Toggle label="Appel" on={!!selUser.appel} small onClick={() => setSelUser(u => ({ ...u, appel: !u.appel }))} />
                             </div>
                           )}
                         </div>

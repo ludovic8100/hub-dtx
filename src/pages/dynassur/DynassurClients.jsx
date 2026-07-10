@@ -1042,7 +1042,7 @@ function Fiche({ client, onClose, onOpenDossier }) {
   const [contrats,setContrats]=useState([]); const [taches,setTaches]=useState([]); const [rdvs,setRdvs]=useState([]); const [groupe,setGroupe]=useState([]); const [objets,setObjets]=useState([]); const [appels,setAppels]=useState([]); const [loadF,setLoadF]=useState(true)
   const [sinistres,setSinistres]=useState([])
   const { perms, isAdmin }=useAuth()
-  const canAppel = isAdmin || !!perms?.appel
+  const canAppel = isAdmin || !!perms?.dyn_appels
   const [commercial,setCommercial]=useState('')
   const [bureauClient,setBureauClient]=useState('')
   const [cies,setCies]=useState([])
