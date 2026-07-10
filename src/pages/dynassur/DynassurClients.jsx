@@ -1043,6 +1043,8 @@ function Fiche({ client, onClose, onOpenDossier }) {
   const [sinistres,setSinistres]=useState([])
   const { perms, isAdmin }=useAuth()
   const canAppel = isAdmin || !!perms?.appel
+  const [commercial,setCommercial]=useState('')
+  const [bureauClient,setBureauClient]=useState('')
   const [cies,setCies]=useState([])
   const ref=useRef(null)
   useEffect(()=>{ getCompagnies().then(setCies) },[])
@@ -1066,9 +1068,27 @@ function Fiche({ client, onClose, onOpenDossier }) {
       ;(c||[]).forEach(r=>{ const k=r.police||JSON.stringify(r); if(!seen.has(k)){ seen.add(k); uniq.push(r) } })
       const pren=(client.prenom||'').trim().toLowerCase()
       const sinF=(si||[]).filter(x=>!pren||String(x.sinistre_nom||'').toLowerCase().includes(pren)).sort((a,b)=>String(b.date_ouverture||'').localeCompare(String(a.date_ouverture||'')))
+      const polices=[...new Set((c||[]).map(r=>r.police).filter(Boolean))]
+      if(polices.length){
+        supabase.from('mouvements_production').select('delegue_contrat').in('police',polices).then(({data:mv})=>{
+          const cnt={}; (mv||[]).forEach(m=>{ const d=(m.delegue_contrat||'').trim(); if(d) cnt[d]=(cnt[d]||0)+1 })
+          const best=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0]; setCommercial(best?best[0]:'')
+        })
+      } else setCommercial('')
       setContrats(uniq); setTaches(t||[]); setRdvs(rv||[]); setGroupe(gr||[]); setObjets(ob||[]); setAppels(ap||[]); setSinistres(sinF); setLoadF(false)
     })
   },[client.dossier,client.id,canAppel])
+
+  // Bureau (agence) du client = bureau du gestionnaire du dossier
+  useEffect(()=>{
+    setBureauClient('')
+    const gc=client.gestionnaire_code
+    if(!gc) return
+    supabase.from('collaborateurs').select('bureau_id').eq('code',gc).limit(1).then(({data})=>{
+      const bid=data?.[0]?.bureau_id
+      if(bid) supabase.from('ref_bureaux').select('libelle').eq('id',bid).limit(1).then(({data:bb})=>setBureauClient(bb?.[0]?.libelle||('Bureau '+bid)))
+    })
+  },[client.dossier,client.gestionnaire_code])
 
   const initiales=`${(client.prenom||'?')[0]||''}${(client.nom||'?')[0]||''}`.toUpperCase()
   const actifs=contrats.filter(c=>c.situation==='En cours').length
@@ -1249,6 +1269,8 @@ function Fiche({ client, onClose, onOpenDossier }) {
     {icon:'ti-calendar',l:'Naissance',v:client.date_naissance?`${fmtDateLong(client.date_naissance)}${age?` · ${age.ans} ans`:''}`:'—'},
     {icon:'ti-user',l:'Gestionnaire',v:client.gestionnaire_nom||'—'},
     {icon:'ti-user-star',l:'Sous-agent',v:client.sa_nom||'—'},
+    {icon:'ti-briefcase',l:'Commercial',v:commercial||'—'},
+    {icon:'ti-building',l:'Bureau',v:bureauClient||'—'},
   ]
 
   return(
@@ -1263,9 +1285,15 @@ function Fiche({ client, onClose, onOpenDossier }) {
               <span>#{client.dossier}</span>
               {client.etat_civil&&<span>{client.etat_civil}</span>}
               {client.sexe&&<span>{client.sexe}</span>}
-              {client.bureau&&<span>{client.bureau}</span>}
+              {bureauClient&&<span>{bureauClient}</span>}
             </div>
           </div>
+          {client.alerte&&(
+            <div title={client.alerte} style={{display:'flex',alignItems:'center',gap:6,background:'#fff7ed',border:'1px solid #fed7aa',borderRadius:8,padding:'5px 10px',color:'#c2410c',fontSize:12,fontWeight:700,maxWidth:300,flexShrink:0}}>
+              <i className="ti ti-alert-triangle" style={{fontSize:15,flexShrink:0}}/>
+              <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{client.alerte}</span>
+            </div>
+          )}
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
             {[{v:actifs,l:'Actifs'},{v:contrats.length,l:'Contrats'}].map(k=>(
               <div key={k.l} style={{textAlign:'center',background:'rgba(255,255,255,0.15)',borderRadius:8,padding:'5px 12px'}}>
@@ -1308,12 +1336,6 @@ function Fiche({ client, onClose, onOpenDossier }) {
       </div>
 
       <div style={{padding:'16px 20px'}}>
-        {client.alerte&&(
-          <div style={{background:'#fff7ed',border:'1px solid #fed7aa',borderRadius:8,padding:'8px 14px',marginBottom:12,display:'flex',gap:8,fontSize:13,color:'#c2410c',alignItems:'center'}}>
-            <i className="ti ti-alert-triangle" style={{fontSize:16}}/><strong>Alerte :</strong>{client.alerte}
-          </div>
-        )}
-
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(132px,1fr))',gap:10,marginBottom:16}}>
           {SECTIONS.map(s=>{
             const on=active.key===s.key
