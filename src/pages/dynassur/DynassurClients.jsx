@@ -1281,10 +1281,10 @@ function Fiche({ client, onClose, onOpenDossier }) {
   const fmtD = x => x ? String(x).split('-').reverse().join('/') : ''
   const ciExpire = dPlus?.ci_valide_au && new Date(dPlus.ci_valide_au) < new Date(new Date().toDateString())
   const dpItems = dPlus ? [
-    dPlus.iban && {icon:'ti-building-bank', l:'Compte bancaire', v:dPlus.iban, sub: dPlus.iban_type==='etranger'?'IBAN étranger':'IBAN belge'},
-    (dPlus.numero_ci||dPlus.ci_valide_au) && {icon:'ti-id', l:"Carte d'identité", v:dPlus.numero_ci||'—', sub: dPlus.ci_valide_au?`valide jusqu'au ${fmtD(dPlus.ci_valide_au)}`:null, warn: ciExpire?'expirée':null},
+    dPlus.iban && {icon:'ti-building-bank', l:'Compte bancaire', v:dPlus.iban, sub: dPlus.iban_type==='etranger'?'IBAN étranger':null},
+    (dPlus.numero_ci||dPlus.ci_valide_au) && {icon:'ti-id', l:"Carte d'identité", v:dPlus.numero_ci||'—', sub: dPlus.ci_valide_au?`jusqu'au ${fmtD(dPlus.ci_valide_au)}`:null, warn: ciExpire?'expirée':null},
     dPlus.permis_numero && {icon:'ti-car', l:'Permis', v:dPlus.permis_numero},
-    dPlus.numero_bce && {icon:'ti-briefcase', l:'N° BCE', v:dPlus.numero_bce},
+    dPlus.numero_bce && {icon:'ti-building-store', l:'N° BCE', v:dPlus.numero_bce},
     dPlus.numero_tva && {icon:'ti-receipt-tax', l:'N° TVA', v:dPlus.numero_tva},
   ].filter(Boolean) : []
 
@@ -1347,30 +1347,20 @@ function Fiche({ client, onClose, onOpenDossier }) {
               </div>
             </div>
           ))}
+          {dpItems.map(r=>(
+            <div key={r.l} style={{display:'flex',alignItems:'flex-start',gap:8}}>
+              <i className={`ti ${r.icon}`} style={{fontSize:14,color:'rgba(255,255,255,0.6)',marginTop:2,flexShrink:0}}/>
+              <div style={{minWidth:0}}>
+                <div style={{fontSize:9,color:'rgba(255,255,255,0.55)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.05em'}}>{r.l}</div>
+                <div style={{fontSize:13,color:'#fff',wordBreak:'break-word'}}>{r.v}{r.warn&&<span style={{marginLeft:6,fontSize:10,fontWeight:700,color:'#fecaca'}}>{r.warn}</span>}</div>
+                {r.sub&&<div style={{fontSize:11,color:'rgba(255,255,255,0.6)',marginTop:1}}>{r.sub}</div>}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
       <div style={{padding:'16px 20px'}}>
-        {dpItems.length>0 && (
-          <div style={{border:'1px solid #e2e8f0',borderRadius:11,padding:'12px 14px',marginBottom:16,background:'#f8fafc'}}>
-            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
-              <div style={{fontSize:10,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'.05em'}}>Données complémentaires</div>
-              {dPlus?.a_verifier && <span title="Brio expose plusieurs valeurs historiques pour ce dossier ; certaines ont été laissées vides." style={{fontSize:10,fontWeight:700,color:'#c2410c',background:'#fff7ed',border:'1px solid #fed7aa',borderRadius:6,padding:'1px 7px',cursor:'help'}}>à vérifier</span>}
-            </div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:'10px 18px'}}>
-              {dpItems.map(r=>(
-                <div key={r.l} style={{display:'flex',alignItems:'flex-start',gap:8}}>
-                  <i className={`ti ${r.icon}`} style={{fontSize:15,color:BLUE,marginTop:2,flexShrink:0}}/>
-                  <div style={{minWidth:0}}>
-                    <div style={{fontSize:9,color:'#94a3b8',fontWeight:700,textTransform:'uppercase',letterSpacing:'.05em'}}>{r.l}</div>
-                    <div style={{fontSize:14,color:NAVY,fontWeight:600,wordBreak:'break-word'}}>{r.v}{r.warn&&<span style={{marginLeft:6,fontSize:10,fontWeight:700,color:'#dc2626'}}>{r.warn}</span>}</div>
-                    {r.sub&&<div style={{fontSize:11,color:'#64748b',marginTop:1}}>{r.sub}</div>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(132px,1fr))',gap:10,marginBottom:16}}>
           {SECTIONS.map(s=>{
             const on=active.key===s.key
