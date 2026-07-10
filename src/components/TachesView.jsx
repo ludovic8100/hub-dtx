@@ -6,7 +6,7 @@ import { StatBanner } from './ui/AccountableUI'
 import { useAuth } from '../lib/auth'
 
 const NAVY = '#0D2F5E', BLUE = '#0080BD'
-const OUVERT = ['todo', 'en_cours', 'en_attente', 'retard']
+const OUVERT = ['todo', 'en_cours', 'in_progress', 'en_attente', 'retard']
 const JOURS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
 const MOIS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre']
 const ENTS = [['dynassur', 'Dynassur'], ['dtx', 'DTX'], ['lode', 'LODE'], ['hexagroup', 'Hexagroup'], ['prive', 'Privé'], ['groupe', 'Groupe']]
@@ -17,9 +17,10 @@ const ACC = { dynassur: 'acc_dynassur', dtx: 'acc_dtx', lode: 'acc_lode', hexagr
 const STATUT_STYLE = {
   retard: { bg: '#fee2e2', color: '#dc2626', label: 'En retard' },
   todo: { bg: '#dbeafe', color: '#1d4ed8', label: 'À faire' },
-  en_cours: { bg: '#dbeafe', color: '#1d4ed8', label: 'En cours' },
+  en_cours: { bg: '#dcfce7', color: '#16a34a', label: 'En cours' },
+  in_progress: { bg: '#dcfce7', color: '#16a34a', label: 'En cours' },
   en_attente: { bg: '#f1f5f9', color: '#64748b', label: 'En attente' },
-  terminee: { bg: '#dcfce7', color: '#15803d', label: 'Clôturée' },
+  terminee: { bg: '#f1f5f9', color: '#64748b', label: 'Clôturée' },
 }
 const RDV_STYLE = { bg: '#ede9fe', color: '#7c3aed', label: 'RDV' }
 const SOC = { dynassur: { s: 'DYN', c: '#0080BD' }, dtx: { s: 'DTX', c: '#94a3b8' }, lode: { s: 'LODE', c: '#ea580c' }, hexagroup: { s: 'HEXA', c: '#dc2626' }, prive: { s: 'PRIVÉ', c: '#0d9488' }, groupe: { s: 'GRP', c: '#7c3aed' } }
@@ -96,7 +97,7 @@ function Field({ l, children }) { return <div><div style={{ fontSize: 11, fontWe
 function TaskRow({ t, onClick }) {
   const late = !t._rdv && isOpen(t) && ekey(t) && ekey(t) < key(new Date())
   const st = styleOf(t); const soc = t.entite ? SOC[t.entite] : null
-  return <button onClick={onClick} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center', width: '100%', textAlign: 'left', padding: '9px 12px', borderRadius: 8, border: '1px solid #eef2f7', background: late ? '#fff5f5' : '#fff', cursor: 'pointer', marginBottom: 4 }}>
+  return <button onClick={onClick} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center', width: '100%', textAlign: 'left', padding: '9px 12px', borderRadius: 8, border: '1px solid #eef2f7', borderLeft: `5px solid ${st.color}`, background: st.bg, cursor: 'pointer', marginBottom: 4 }}>
     <span style={{ minWidth: 0 }}>
       <span style={{ display: 'block', fontSize: 13.5, fontWeight: late ? 700 : 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.titre}</span>
       <span style={{ fontSize: 11, color: '#94a3b8', display: 'flex', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
@@ -106,7 +107,7 @@ function TaskRow({ t, onClick }) {
         {t.categorie && !t._rdv && <span>• {t.categorie}</span>}
       </span>
     </span>
-    <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 5, background: st.bg, color: st.color, whiteSpace: 'nowrap' }}>{st.label}</span>
+    <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 5, background: st.color, color: '#fff', whiteSpace: 'nowrap' }}>{st.label}</span>
   </button>
 }
 function DayCell({ d, inMonth, parJour, todayKey, selDay, onPick, onTask, detailed }) {
