@@ -311,7 +311,7 @@ export default function ConfigModule() {
                     <div style={{ fontWeight: 800, fontSize: 18, color: '#1e293b' }}>{selUser.nom || selUser.user_email}</div>
                     <div style={{ fontSize: 12, color: '#94a3b8' }}>{selUser.user_email}</div>
                   </div>
-                  <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
                     <label style={{ fontSize: 13, fontWeight: 600, color: '#475569', display: 'flex', gap: 6, alignItems: 'center' }}>
                       Rôle
                       <select value={selUser.role || 'user'} onChange={e => setSelUser(u => ({ ...u, role: e.target.value }))} style={{ ...inp, padding: '6px 8px' }}>
