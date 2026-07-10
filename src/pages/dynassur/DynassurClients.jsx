@@ -1040,6 +1040,9 @@ function Foyer({ client, onOpenDossier }) {
 
 function Fiche({ client, onClose, onOpenDossier }) {
   const [contrats,setContrats]=useState([]); const [taches,setTaches]=useState([]); const [rdvs,setRdvs]=useState([]); const [groupe,setGroupe]=useState([]); const [objets,setObjets]=useState([]); const [appels,setAppels]=useState([]); const [loadF,setLoadF]=useState(true)
+  const [sinistres,setSinistres]=useState([])
+  const { perms, isAdmin }=useAuth()
+  const canAppel = isAdmin || !!perms?.appel
   const [cies,setCies]=useState([])
   const ref=useRef(null)
   useEffect(()=>{ getCompagnies().then(setCies) },[])
@@ -1055,14 +1058,17 @@ function Fiche({ client, onClose, onOpenDossier }) {
         : Promise.resolve({data:[]}),
       supabase.from('parentes').select('groupe_nom,groupe_type,membre_nom,nb_polices,prime_totale').eq('dossier_principal',client.dossier),
       supabase.from('objets_risque').select('police,type_risque,garantie,situation,compagnie,domaine,description,date_effet').eq('dossier',client.dossier),
-      (()=>{ const nums=[client.gsm_e164,client.telfixe_e164].filter(Boolean); return nums.length ? supabase.from('appels').select('id,direction,numero_externe,numero_e164,agent,duree,debut,nom_3cx').in('numero_e164',nums).order('debut',{ascending:false}).limit(50) : Promise.resolve({data:[]}) })(),
-    ]).then(([{data:c},{data:t},{data:rv},{data:gr},{data:ob},{data:ap}])=>{
+      (()=>{ const nums=[client.gsm_e164,client.telfixe_e164].filter(Boolean); return (canAppel&&nums.length) ? supabase.from('appels').select('id,direction,numero_externe,numero_e164,agent,duree,debut,nom_3cx').in('numero_e164',nums).order('debut',{ascending:false}).limit(50) : Promise.resolve({data:[]}) })(),
+      client.nom ? supabase.from('sinistres').select('reference_sinistre,garantie,domaine,etat,etat_code,responsabilite,date_ouverture,date_etat,sinistre_nom').ilike('sinistre_nom','%'+client.nom+'%').limit(200) : Promise.resolve({data:[]}),
+    ]).then(([{data:c},{data:t},{data:rv},{data:gr},{data:ob},{data:ap},{data:si}])=>{
       // Dédoublonnage par police (les imports créent des lignes identiques) — on garde la plus récente
       const seen=new Set(); const uniq=[]
       ;(c||[]).forEach(r=>{ const k=r.police||JSON.stringify(r); if(!seen.has(k)){ seen.add(k); uniq.push(r) } })
-      setContrats(uniq); setTaches(t||[]); setRdvs(rv||[]); setGroupe(gr||[]); setObjets(ob||[]); setAppels(ap||[]); setLoadF(false)
+      const pren=(client.prenom||'').trim().toLowerCase()
+      const sinF=(si||[]).filter(x=>!pren||String(x.sinistre_nom||'').toLowerCase().includes(pren)).sort((a,b)=>String(b.date_ouverture||'').localeCompare(String(a.date_ouverture||'')))
+      setContrats(uniq); setTaches(t||[]); setRdvs(rv||[]); setGroupe(gr||[]); setObjets(ob||[]); setAppels(ap||[]); setSinistres(sinF); setLoadF(false)
     })
-  },[client.dossier,client.id])
+  },[client.dossier,client.id,canAppel])
 
   const initiales=`${(client.prenom||'?')[0]||''}${(client.nom||'?')[0]||''}`.toUpperCase()
   const actifs=contrats.filter(c=>c.situation==='En cours').length
@@ -1183,6 +1189,38 @@ function Fiche({ client, onClose, onOpenDossier }) {
       </div>
     )}]:[]),
     { key:'objets', icon:'ti-shield', title:'Objets de risque', col:'#7c3aed', count:objets.length, body:(<ObjetsDetail objets={objets} loading={loadF} cies={cies}/>) },
+    { key:'sinistres', icon:'ti-alert-triangle', title:'Sinistres', col:'#dc2626', count:sinistres.length, body:(
+      loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:!sinistres.length?
+        <p style={{color:'#16a34a',fontSize:12}}>✓ Aucun sinistre</p>:(
+        <div>
+          <div style={{fontSize:11,color:'#b45309',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:7,padding:'6px 10px',marginBottom:10,display:'flex',alignItems:'center',gap:6}}><i className="ti ti-info-circle"/>Rapprochement par nom de l'assuré (pas de clé exacte disponible) — vérifiez qu'il s'agit bien de ce client.</div>
+          <div style={{overflowX:'auto'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+            <thead><tr style={{textAlign:'left',color:'#64748b',borderBottom:'1px solid #e2e8f0'}}>
+              <th style={{padding:'6px 8px',fontWeight:700,whiteSpace:'nowrap'}}>Réf.</th>
+              <th style={{padding:'6px 8px',fontWeight:700}}>Objet / garantie</th>
+              <th style={{padding:'6px 8px',fontWeight:700,whiteSpace:'nowrap'}}>Ouverture</th>
+              <th style={{padding:'6px 8px',fontWeight:700,whiteSpace:'nowrap'}}>Clôture</th>
+              <th style={{padding:'6px 8px',fontWeight:700}}>Responsabilité</th>
+              <th style={{padding:'6px 8px',fontWeight:700,whiteSpace:'nowrap'}}>État</th>
+            </tr></thead>
+            <tbody>
+              {sinistres.map((s,i)=>{ const clos=String(s.etat||'').toLowerCase().startsWith('cl')||s.etat_code==='1'; return(
+                <tr key={i} style={{borderBottom:'1px solid #f1f5f9'}}>
+                  <td style={{padding:'6px 8px',fontWeight:700,color:NAVY,whiteSpace:'nowrap'}}>{s.reference_sinistre||'—'}</td>
+                  <td style={{padding:'6px 8px',color:'#1e293b'}}>{s.garantie||'—'}</td>
+                  <td style={{padding:'6px 8px',whiteSpace:'nowrap'}}>{fmtDate(s.date_ouverture)}</td>
+                  <td style={{padding:'6px 8px',whiteSpace:'nowrap',color:clos?'#1e293b':'#94a3b8'}}>{clos?fmtDate(s.date_etat):'en cours'}</td>
+                  <td style={{padding:'6px 8px',color:'#475569'}}>{s.responsabilite||'—'}</td>
+                  <td style={{padding:'6px 8px',whiteSpace:'nowrap'}}><span style={{fontSize:10,fontWeight:800,padding:'2px 7px',borderRadius:5,background:clos?'#f1f5f9':'#fef3c7',color:clos?'#64748b':'#92400e'}}>{s.etat||(clos?'Clôturé':'En cours')}</span></td>
+                </tr>
+              )})}
+            </tbody>
+          </table>
+          </div>
+        </div>
+      )
+    )},
     { key:'contrats', icon:'ti-file-text', title:'Contrats', col:BLUE, count:contrats.length, body:(<div><Analyse360 client={client} contrats={contrats}/><div style={{marginTop:14}}><VueContrats client={client} objets={objets} contratsClient={contrats} garantiesParPolice={garantiesParPolice} cies={cies} onOpenDossier={onOpenDossier} loadF={loadF} previewContrat={previewContrat} openContrat={openContrat} leaveContrat={leaveContrat}/></div></div>) },
     { key:'primes', icon:'ti-cash', title:'Primes & commissions', col:'#16a34a', count:null, body:(<Primes dossier={client.dossier}/>) },
     { key:'taches', icon:'ti-checkbox', title:'Tâches', col:'#f59e0b', count:taches.length, body:(
@@ -1260,7 +1298,7 @@ function Fiche({ client, onClose, onOpenDossier }) {
               <i className={`ti ${r.icon}`} style={{fontSize:14,color:'rgba(255,255,255,0.6)',marginTop:2,flexShrink:0}}/>
               <div style={{minWidth:0}}>
                 <div style={{fontSize:9,color:'rgba(255,255,255,0.55)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.05em'}}>{r.l}</div>
-                {r.tel&&r.v!=='—'
+                {canAppel&&r.tel&&r.v!=='—'
                   ?<a href={`tel:${r.tel}`} title="Appeler" style={{fontSize:13,color:'#fff',wordBreak:'break-word',textDecoration:'none',borderBottom:'1px dotted rgba(255,255,255,0.6)'}}>{r.v}</a>
                   :<div style={{fontSize:13,color:'#fff',wordBreak:'break-word'}}>{r.v}</div>}
               </div>
@@ -1313,6 +1351,8 @@ function Fiche({ client, onClose, onOpenDossier }) {
 export default function DynassurClients() {
   const [myCode,setMyCode]   = useState(null)
   const [myBureau,setMyBureau] = useState(null)
+  const [bureauCodes,setBureauCodes] = useState([])  // codes des collaborateurs de mon bureau (agence)
+  const [myBureauLib,setMyBureauLib] = useState('')
   const [kpis,setKpis]       = useState(null)
   const [counts,setCounts]   = useState({mine:0,bureau:0,total:0})
   const [scope,setScope]     = useState('all')
@@ -1361,8 +1401,10 @@ export default function DynassurClients() {
       if(!user) return
       const code=user.email?.split('@')[0]?.toUpperCase()
       setMyCode(code)
-      supabase.from('clients').select('bureau').eq('gestionnaire_code',code).limit(1)
-        .then(({data})=>{ if(data?.[0]?.bureau) setMyBureau(data[0].bureau) })
+      supabase.from('collaborateurs').select('bureau_id').eq('code',code).limit(1)
+        .then(({data})=>{ const bid=data?.[0]?.bureau_id; if(bid){ setMyBureau(bid)
+          supabase.from('collaborateurs').select('code').eq('bureau_id',bid).then(({data:cc})=>setBureauCodes((cc||[]).map(x=>x.code).filter(Boolean)))
+          supabase.from('ref_bureaux').select('libelle').eq('id',bid).limit(1).then(({data:bb})=>setMyBureauLib(bb?.[0]?.libelle||('Bureau '+bid))) } })
     })
     supabase.rpc('get_clients_kpis').then(({data,error})=>{ if(!error&&data) setKpis(data) })
     supabase.from('clients').select('*',{count:'exact',head:true}).then(({count})=>setCounts(c=>({...c,total:count||0})))
@@ -1374,9 +1416,9 @@ export default function DynassurClients() {
   },[myCode])
 
   useEffect(()=>{
-    if(!myBureau) return
-    supabase.from('clients').select('*',{count:'exact',head:true}).eq('bureau',myBureau).then(({count})=>setCounts(c=>({...c,bureau:count||0})))
-  },[myBureau])
+    if(!bureauCodes.length){ setCounts(c=>({...c,bureau:0})); return }
+    supabase.from('clients').select('*',{count:'exact',head:true}).in('gestionnaire_code',bureauCodes).then(({count})=>setCounts(c=>({...c,bureau:count||0})))
+  },[bureauCodes])
 
   // Référence fraîche du collaborateur (code + bureau) pour la journalisation des consultations
   useEffect(()=>{ meRef.current={ code:myCode, bureau:myBureau } },[myCode,myBureau])
@@ -1387,7 +1429,7 @@ export default function DynassurClients() {
     if(!c?.dossier || !bureau) return
     try{
       await supabase.from('clients_consultes').upsert(
-        { bureau, dossier:String(c.dossier), consultant_code:code||null, nom:c.nom||null, prenom:c.prenom||null, localite:c.localite||null, consulte_at:new Date().toISOString() },
+        { bureau:String(bureau), dossier:String(c.dossier), consultant_code:code||null, nom:c.nom||null, prenom:c.prenom||null, localite:c.localite||null, consulte_at:new Date().toISOString() },
         { onConflict:'bureau,dossier' })
     }catch(e){}
   }
@@ -1397,7 +1439,7 @@ export default function DynassurClients() {
     if(!myBureau) return
     const { data } = await supabase.from('clients_consultes')
       .select('dossier,nom,prenom,localite,consultant_code,consulte_at')
-      .eq('bureau',myBureau).order('consulte_at',{ascending:false}).limit(20)
+      .eq('bureau',String(myBureau)).order('consulte_at',{ascending:false}).limit(20)
     setRecents(data||[])
   },[myBureau])
   useEffect(()=>{ if(!selected && myBureau) loadRecents() },[myBureau,selected,loadRecents])
@@ -1407,11 +1449,11 @@ export default function DynassurClients() {
     let qb=supabase.from('clients').select('id,dossier,nom,prenom,cp,localite,gsm,tel_fixe,gsm_e164,telfixe_e164,email,rue,num_maison,boite,date_naissance,etat_civil,sexe,sa_code,sa_nom,gestionnaire_code,gestionnaire_nom,bureau,classe,alerte',{count:'exact'})
     if(search.length>=2) qb=qb.or(`nom.ilike.%${search}%,prenom.ilike.%${search}%,dossier.ilike.%${search}%,email.ilike.%${search}%,gsm.ilike.%${search}%`)
     if(sc==='mine'&&myCode) qb=qb.eq('gestionnaire_code',myCode)
-    else if(sc==='bureau'&&myBureau) qb=qb.eq('bureau',myBureau)
+    else if(sc==='bureau'&&bureauCodes.length) qb=qb.in('gestionnaire_code',bureauCodes)
     const{data,count}=await qb.order('nom').range(p*PER,(p+1)*PER-1)
     const seen=new Set(); const uniq=(data||[]).filter(c=>{ if(!c.dossier||seen.has(c.dossier))return false; seen.add(c.dossier); return true })
     setClients(uniq); setTotal(count||0); setLoading(false)
-  },[myCode,myBureau])
+  },[myCode,myBureau,bureauCodes])
 
   // Données de relance : dernier contact (RDV passé lié) par client
   const loadRelance = useCallback(async()=>{
@@ -1464,14 +1506,14 @@ export default function DynassurClients() {
 
   const SCOPES=[
     { val:'mine',   icon:'ti-user',   label:'Mes clients',  nb:counts.mine,  pct:pctMine,   col:'#0080BD', note:myCode },
-    { val:'bureau', icon:'ti-building',label:'Mon bureau',  nb:counts.bureau,pct:pctBureau, col:'#7c3aed', note:myBureau },
+    { val:'bureau', icon:'ti-building',label:'Mon bureau',  nb:counts.bureau,pct:pctBureau, col:'#7c3aed', note:myBureauLib },
     { val:'all',    icon:'ti-users',  label:'Tous Dynassur',nb:counts.total, pct:'100',     col:'#16a34a', note:'Dynassur' },
   ]
 
   // Vue relance (dernier contact), filtrée par scope + tranche + recherche
   const relanceBase = (relance||[]).filter(c =>
     scope==='mine'   ? (myCode && c.gestionnaire_code===myCode)
-    : scope==='bureau' ? (myBureau && c.bureau===myBureau)
+    : scope==='bureau' ? (bureauCodes.length>0 && bureauCodes.includes(c.gestionnaire_code))
     : true)
   const relanceCounts = TRANCHES.reduce((a,t)=>{ a[t.val]=relanceBase.filter(c=>c.tranche===t.val).length; return a },{})
   const relanceActif = contactFilter!=='tous'
@@ -1504,7 +1546,7 @@ export default function DynassurClients() {
                 <div style={{display:'flex',alignItems:'center',gap:8}}>
                   <i className={modeRecents?"ti ti-history":"ti ti-calendar-heart"} style={{fontSize:18,color:'#0d9488'}}/>
                   <span style={{fontSize:15,fontWeight:800,color:NAVY}}>{modeRecents?'Derniers clients consultés':'Relance clients'}</span>
-                  <span style={{fontSize:12,color:'#94a3b8'}}>{modeRecents?`· 20 dernières fiches ouvertes par votre bureau${myBureau?` (${myBureau})`:''}`:'· trie les clients par ancienneté du dernier contact'}</span>
+                  <span style={{fontSize:12,color:'#94a3b8'}}>{modeRecents?`· 20 dernières fiches ouvertes par votre bureau${myBureauLib?` (${myBureauLib})`:''}`:'· trie les clients par ancienneté du dernier contact'}</span>
                 </div>
                 <div style={{display:'flex',gap:8,marginLeft:'auto',flexWrap:'wrap'}}>
                   <select value={scope} onChange={e=>setScope(e.target.value)} style={{padding:'7px 10px',borderRadius:8,border:'1px solid #e2e8f0',fontSize:13,fontFamily:'inherit',color:NAVY,background:'#fff'}}>
