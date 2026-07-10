@@ -10,14 +10,14 @@ const ACCES = [
   { acc: 'acc_dynassur', label: 'Dynassur', pfx: 'dyn',  couleur: '#0080BD',
     pages: [['dashboard', 'Tableau de bord'], ['taches', 'Tâches'], ['clients', 'Clients'], ['production', 'Production'], ['bordereaux', 'Bordereaux'], ['chiffres', 'Chiffres'], ['objectifs', 'Objectifs'], ['compagnies', 'Compagnies'], ['sinistres', 'Sinistres'], ['rdv', 'RDV / Agenda'], ['appels', 'Appels'], ['rentabilite', 'Rentabilité'], ['banque', 'Banque'], ['comptabilite', 'Comptabilité'], ['devis', 'Devis & Factures']] },
   { acc: 'acc_dtx', label: 'DTX', pfx: 'dtx', couleur: '#1B3A6B',
-    pages: [['dashboard', 'Tableau de bord'], ['immobilier', 'Immobilier'], ['vehicules', 'Véhicules'], ['trading', 'Trading'], ['comptabilite', 'Comptabilité'], ['devis', 'Devis & Factures']] },
+    pages: [['dashboard', 'Tableau de bord'], ['taches', 'Tâches'], ['immobilier', 'Immobilier'], ['vehicules', 'Véhicules'], ['trading', 'Trading'], ['comptabilite', 'Comptabilité'], ['devis', 'Devis & Factures']] },
   { acc: 'acc_lode', label: 'LODE', pfx: 'lode', couleur: '#F97316',
-    pages: [['dashboard', 'Tableau de bord'], ['clients', 'Clients'], ['banque', 'Banque'], ['comptabilite', 'Comptabilité'], ['devis', 'Devis & Factures']] },
+    pages: [['dashboard', 'Tableau de bord'], ['taches', 'Tâches'], ['clients', 'Clients'], ['banque', 'Banque'], ['comptabilite', 'Comptabilité'], ['devis', 'Devis & Factures']] },
   { acc: 'acc_hexagroup', label: 'Hexagroup', pfx: 'hex', couleur: '#ec4899',
-    pages: [['dashboard', 'Tableau de bord'], ['banque', 'Banque'], ['comptabilite', 'Comptabilité']] },
+    pages: [['dashboard', 'Tableau de bord'], ['taches', 'Tâches'], ['banque', 'Banque'], ['comptabilite', 'Comptabilité']] },
   { acc: 'acc_prive', label: 'Privé', pfx: 'prive', couleur: '#22c55e',
-    pages: [['dashboard', 'Tableau de bord'], ['banque', 'Banque'], ['comptabilite', 'Comptabilité']] },
-  { acc: 'acc_holding', label: 'Groupe (consolidé)', pfx: null, couleur: '#7c3aed', pages: [] },
+    pages: [['dashboard', 'Tableau de bord'], ['taches', 'Tâches'], ['banque', 'Banque'], ['comptabilite', 'Comptabilité']] },
+  { acc: 'acc_holding', label: 'Groupe (consolidé)', pfx: 'grp', couleur: '#7c3aed', pages: [['taches', 'Tâches']] },
 ]
 
 const FIELDS_SOC = [
