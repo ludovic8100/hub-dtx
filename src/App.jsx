@@ -54,6 +54,12 @@ import HexagroupComptabilite from './pages/hexagroup/HexagroupComptabilite'
 import DashboardPrive     from './pages/prive/DashboardPrive'
 import PriveBanque        from './pages/prive/PriveBanque'
 import PriveComptabilite  from './pages/prive/PriveComptabilite'
+import DynassurNotesFrais  from './pages/dynassur/DynassurNotesFrais'
+import DtxNotesFrais        from './pages/dtx/DtxNotesFrais'
+import LodeNotesFrais       from './pages/lode/LodeNotesFrais'
+import HexagroupNotesFrais  from './pages/hexagroup/HexagroupNotesFrais'
+import PriveNotesFrais      from './pages/prive/PriveNotesFrais'
+import GroupeNotesFrais     from './pages/groupe/GroupeNotesFrais'
 
 function ProtectedRoute({ children, requireAdmin = false }) {
   const { user, perms, loading } = useAuth()
@@ -102,6 +108,12 @@ export default function App() {
           <Route path="/hexagroup/taches"     element={<P><HexagroupTaches /></P>} />
           <Route path="/prive/taches"         element={<P><PriveTaches /></P>} />
           <Route path="/groupe/taches"        element={<P><GroupeTaches /></P>} />
+          <Route path="/dynassur/notes-frais"  element={<P><DynassurNotesFrais /></P>} />
+          <Route path="/dtx/notes-frais"       element={<P><DtxNotesFrais /></P>} />
+          <Route path="/lode/notes-frais"      element={<P><LodeNotesFrais /></P>} />
+          <Route path="/hexagroup/notes-frais" element={<P><HexagroupNotesFrais /></P>} />
+          <Route path="/prive/notes-frais"     element={<P><PriveNotesFrais /></P>} />
+          <Route path="/groupe/notes-frais"    element={<P><GroupeNotesFrais /></P>} />
           <Route path="/dynassur/clients"      element={<P><DynassurClients /></P>} />
           <Route path="/dynassur/production"   element={<P><DynassurProduction /></P>} />
           <Route path="/dynassur/bordereaux"   element={<P><DynassurBordereaux /></P>} />
