@@ -6,7 +6,7 @@ import { StatBanner } from './ui/AccountableUI'
 import { useAuth } from '../lib/auth'
 
 const NAVY = '#0D2F5E'
-const KM_TAUX_DEFAUT = 0.4415 // barème belge indicatif — ajustable par ligne
+const KM_TAUX_DEFAUT = 0.4761 // barème belge secteur privé 01/07/2026–30/06/2027 (circ. 767) — ajustable par ligne
 const CAT_KM = 'Kilométrique'
 const CATEGORIES = ['Repas / restaurant', 'Carburant', CAT_KM, 'Parking / péage', 'Hôtel / déplacement', 'Fournitures', 'Télécom', 'Autre']
 const TVA_TAUX = [0, 6, 12, 21]
