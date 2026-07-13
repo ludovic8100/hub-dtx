@@ -1271,7 +1271,7 @@ function Fiche({ client, onClose, onOpenDossier }) {
   const coordItems=[
     {icon:'ti-device-mobile',l:'GSM',v:gsm||'—',tel:client.gsm_e164||gsm},
     {icon:'ti-phone',l:'Fixe',v:fixe||'—',tel:client.telfixe_e164||fixe},
-    {icon:'ti-mail',l:'Email',v:client.email||'—'},
+    {icon:'ti-mail',l:'Email',v:client.email||'—',mail:client.email},
     {icon:'ti-calendar',l:'Naissance',v:client.date_naissance?`${fmtDateLong(client.date_naissance)}${age?` · ${age.ans} ans`:''}`:'—'},
     {icon:'ti-user',l:'Gestionnaire',v:client.gestionnaire_nom||'—'},
     {icon:'ti-user-star',l:'Sous-agent',v:client.sa_nom||'—'},
@@ -1343,6 +1343,8 @@ function Fiche({ client, onClose, onOpenDossier }) {
                 <div style={{fontSize:9,color:'rgba(255,255,255,0.55)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.05em'}}>{r.l}</div>
                 {canAppel&&r.tel&&r.v!=='—'
                   ?<a href={`tel:${r.tel}`} title="Appeler" style={{fontSize:13,color:'#fff',wordBreak:'break-word',textDecoration:'none',borderBottom:'1px dotted rgba(255,255,255,0.6)'}}>{r.v}</a>
+                  :r.mail&&r.v!=='—'
+                  ?<a href={`mailto:${r.mail}`} title="Envoyer un email" style={{fontSize:13,color:'#fff',wordBreak:'break-word',textDecoration:'none'}}>{r.v}</a>
                   :<div style={{fontSize:13,color:'#fff',wordBreak:'break-word'}}>{r.v}</div>}
               </div>
             </div>
