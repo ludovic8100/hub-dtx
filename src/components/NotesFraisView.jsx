@@ -4,6 +4,7 @@ import Layout from './Layout'
 import { ENTITES } from '../lib/entites'
 import { StatBanner } from './ui/AccountableUI'
 import { useAuth } from '../lib/auth'
+import { genererPdfNote } from '../lib/notesFraisPdf'
 
 const NAVY = '#0D2F5E'
 const KM_TAUX_DEFAUT = 0.4761 // barème belge secteur privé 01/07/2026–30/06/2027 (circ. 767) — ajustable par ligne
@@ -139,9 +140,8 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
     const head = {
       societe: entiteKey, titre: (sel.titre || '').trim() || null, periode: (sel.periode || '').trim() || null, note: (sel.note || '').trim() || null,
       auteur_email: sel.auteur_email || myEmail, auteur_code: sel.auteur_code || myCode, auteur_nom: sel.auteur_nom || myNom,
-      statut: valider ? 'validee' : (sel.statut || 'brouillon'),
+      statut: (sel.statut === 'validee' ? 'validee' : 'brouillon'),
     }
-    if (valider) head.validee_at = new Date().toISOString()
     let noteId = sel.id
     if (noteId) {
       const { error } = await supabase.from('notes_frais').update(head).eq('id', noteId)
@@ -162,21 +162,47 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
       const { error } = await supabase.from('notes_frais_lignes').insert(rows)
       if (error) { setBusy(false); alert('Erreur (lignes) : ' + error.message); return }
     }
+    if (valider) {
+      const { data: v, error: ev } = await supabase.rpc('nf_valider', { p_note_id: noteId })
+      if (ev) { setBusy(false); alert('Validation \u00e9chou\u00e9e : ' + ev.message); return }
+      try {
+        const blob = await genererPdfNote({
+          entiteKey,
+          note: { ...sel, id: noteId, numero: v?.numero, total: v?.total, validee_at: new Date().toISOString(), titre: head.titre, periode: head.periode },
+          lignes: calc, benefNom: v?.benef_nom, benefIban: v?.benef_iban,
+        })
+        const path = `${entiteKey}/pieces/${noteId}.pdf`
+        const up = await supabase.storage.from('notes-frais').upload(path, blob, { upsert: true, contentType: 'application/pdf' })
+        if (!up.error) {
+          const { data: su } = await supabase.storage.from('notes-frais').createSignedUrl(path, 60 * 60 * 24 * 365)
+          await supabase.rpc('nf_set_piece', { p_note_id: noteId, p_path: path, p_url: su?.signedUrl || null })
+        }
+      } catch (e) { console.error('Pi\u00e8ce PDF note de frais :', e) }
+    }
     setBusy(false); setSel(null); setLignes([]); loadNotes()
   }
 
   async function delNote(n) {
     if (!window.confirm('Supprimer définitivement cette note de frais et ses justificatifs ?')) return
+    if (n.facture_achat_id) { try { await supabase.rpc('nf_devalider', { p_note_id: n.id }) } catch { } }
     const { data: ls } = await supabase.from('notes_frais_lignes').select('justificatif_path').eq('note_id', n.id)
     const paths = (ls || []).map(x => x.justificatif_path).filter(Boolean)
+    if (n.piece_pdf_path) paths.push(n.piece_pdf_path)
     if (paths.length) { try { await supabase.storage.from('notes-frais').remove(paths) } catch { } }
     await supabase.from('notes_frais').delete().eq('id', n.id)
     setSel(null); setLignes([]); loadNotes()
   }
   async function rouvrir() {
     if (!sel?.id) return
-    await supabase.from('notes_frais').update({ statut: 'brouillon', validee_at: null }).eq('id', sel.id)
-    setSel(s => ({ ...s, statut: 'brouillon' })); loadNotes()
+    const { error } = await supabase.rpc('nf_devalider', { p_note_id: sel.id })
+    if (error) { alert('Erreur : ' + error.message); return }
+    setSel(s => ({ ...s, statut: 'brouillon', validee_at: null, facture_achat_id: null })); loadNotes()
+  }
+  async function telechargerPiece() {
+    if (!sel?.piece_pdf_path) { alert('Pi\u00e8ce PDF non disponible.'); return }
+    const { data, error } = await supabase.storage.from('notes-frais').createSignedUrl(sel.piece_pdf_path, 3600)
+    if (error || !data?.signedUrl) { alert('Impossible d\u2019ouvrir la pi\u00e8ce PDF.'); return }
+    window.open(data.signedUrl, '_blank', 'noopener')
   }
 
   // ── liste filtrée ──
@@ -258,7 +284,7 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
           <div style={{ marginTop: 18 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
               <button onClick={() => { setSel(null); setLignes([]) }} style={btn('#fff', '#475569', '1px solid #e2e8f0')}>← Retour</button>
-              <div style={{ fontSize: 18, fontWeight: 800, color: NAVY }}>{sel.id ? 'Note de frais' : 'Nouvelle note de frais'}</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: NAVY }}>{sel.numero || (sel.id ? 'Note de frais' : 'Nouvelle note de frais')}</div>
               <Badge s={sel.statut} />
               {sel.id && isAdmin && scope === 'all' && sel.auteur_email?.toLowerCase() !== myEmail &&
                 <span style={{ fontSize: 12, color: '#64748b' }}>· {sel.auteur_nom || sel.auteur_email}</span>}
@@ -266,7 +292,10 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
 
             {lockEdit && <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', padding: '10px 14px', borderRadius: 10, marginBottom: 16, fontSize: 13, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               <span>Note validée le {fmtD(sel.validee_at)} — lecture seule.</span>
-              <button onClick={rouvrir} style={{ ...btn('#fff', '#166534', '1px solid #86efac'), padding: '6px 12px', fontSize: 12.5 }}>Repasser en brouillon</button>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {sel.piece_pdf_path && <button onClick={telechargerPiece} style={{ ...btn('#166534'), padding: '6px 12px', fontSize: 12.5 }}>Télécharger la pièce PDF</button>}
+                <button onClick={rouvrir} style={{ ...btn('#fff', '#166534', '1px solid #86efac'), padding: '6px 12px', fontSize: 12.5 }}>Repasser en brouillon</button>
+              </div>
             </div>}
 
             <Card titre="Informations">

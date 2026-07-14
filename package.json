@@ -12,6 +12,8 @@
     "@supabase/supabase-js": "^2.45.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
+    "jspdf": "^2.5.2",
+    "qrcode": "^1.5.4",
     "react-router-dom": "^6.26.0"
   },
   "devDependencies": {
