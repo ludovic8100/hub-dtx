@@ -124,7 +124,7 @@ export default function App() {
           <Route path="/dynassur/sinistres"    element={<P><DynassurSinistres /></P>} />
           <Route path="/dynassur/rdv"          element={<P><DynassurRdv /></P>} />
           <Route path="/dynassur/appels"       element={<P><DynassurAppels /></P>} />
-          <Route path="/dynassur/banque"       element={<P><DynassurBanque /></P>} />
+          <Route path="/dynassur/banque"       element={<A><DynassurBanque /></A>} />
           <Route path="/dynassur/comptabilite" element={<P><DynassurComptabilite /></P>} />
           <Route path="/dynassur/rentabilite" element={<P><DynassurRentabilite /></P>} />
 
@@ -142,17 +142,17 @@ export default function App() {
           <Route path="/dtx/devis-factures"  element={<P><DtxDevisFactures /></P>} />
           <Route path="/dynassur/devis-factures" element={<P><DynDevisFactures /></P>} />
           <Route path="/config" element={<P><ConfigModule /></P>} />
-          <Route path="/lode/banque"        element={<P><LodeBanque /></P>} />
+          <Route path="/lode/banque"        element={<A><LodeBanque /></A>} />
           <Route path="/lode/comptabilite"  element={<P><LodeComptabilite /></P>} />
 
           {/* Hexagroup */}
           <Route path="/hexagroup"               element={<P><DashboardHexagroup /></P>} />
-          <Route path="/hexagroup/banque"        element={<P><HexagroupBanque /></P>} />
+          <Route path="/hexagroup/banque"        element={<A><HexagroupBanque /></A>} />
           <Route path="/hexagroup/comptabilite"  element={<P><HexagroupComptabilite /></P>} />
 
           {/* Privé */}
           <Route path="/prive"               element={<P><DashboardPrive /></P>} />
-          <Route path="/prive/banque"        element={<P><PriveBanque /></P>} />
+          <Route path="/prive/banque"        element={<A><PriveBanque /></A>} />
           <Route path="/prive/comptabilite"  element={<P><PriveComptabilite /></P>} />
 
           {/* Admin */}
