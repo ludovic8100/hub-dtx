@@ -8,6 +8,7 @@ import AdminUsers         from './pages/AdminUsers'
 import SyncCenter         from './pages/admin/SyncCenter'
 import RdvCategories      from './pages/admin/RdvCategories'
 import LiensCasses       from './pages/admin/LiensCasses'
+import AdminNotesFrais    from './pages/admin/AdminNotesFrais'
 
 import DashboardGroupe    from './pages/groupe/DashboardGroupe'
 
@@ -159,6 +160,7 @@ export default function App() {
           <Route path="/admin/sync" element={<A><SyncCenter /></A>} />
           <Route path="/admin/rdv-categories" element={<A><RdvCategories /></A>} />
           <Route path="/admin/liens-casses" element={<A><LiensCasses /></A>} />
+          <Route path="/admin/notes-frais" element={<A><AdminNotesFrais /></A>} />
 
           <Route path="/" element={<P><RootRedirect /></P>} />
           <Route path="*" element={<Navigate to="/" replace />} />

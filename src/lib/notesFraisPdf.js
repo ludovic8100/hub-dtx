@@ -51,7 +51,7 @@ function truncate(doc, txt, maxw) {
  * @param {string} o.benefIban
  * @returns {Promise<Blob>}
  */
-export async function genererPdfNote({ entiteKey = 'dynassur', note = {}, lignes = [], benefNom = '', benefIban = '' }) {
+export async function genererPdfNote({ entiteKey = 'dynassur', note = {}, lignes = [], benefNom = '', benefIban = '', sigImage = '', sigNom = '', sigAt = null, valideParNom = '', valideAt = null }) {
   const ent = ENTITES[entiteKey] || ENTITES.dynassur
   const COL = hx(ent.color), DARK = hx(ent.colorDark || ent.color)
   const doc = new jsPDF({ unit: 'pt', format: 'a4', compress: true })
@@ -190,6 +190,26 @@ export async function genererPdfNote({ entiteKey = 'dynassur', note = {}, lignes
   const nj = rows.filter(r => !r.km).length
   doc.setTextColor(...GREY); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5)
   doc.text(`${nj} justificatif(s) annexé(s) — voir ci-après. Ligne(s) kilométrique(s) : indemnité sans justificatif.`, MX, ey + eh + 18)
+
+  // ───────── SIGNATURES ─────────
+  let sy = ey + eh + 36
+  const sigBlkH = 96, halfW = (CW - 16) / 2
+  if (sy + sigBlkH > H - 50) { footer(doc, note.numero); doc.addPage(); sy = 64 }
+  const sigBox = (bx, title) => {
+    doc.setFillColor(252, 252, 253); doc.setDrawColor(...LINE); doc.setLineWidth(1)
+    doc.roundedRect(bx, sy, halfW, sigBlkH, 6, 6, 'FD')
+    doc.setTextColor(...GREY); doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.text(title, bx + 12, sy + 16)
+    doc.setDrawColor(...LINE); doc.setLineWidth(0.6); doc.line(bx + 12, sy + 70, bx + halfW - 12, sy + 70)
+  }
+  sigBox(MX, 'COLLABORATEUR')
+  sigBox(MX + halfW + 16, 'VISA — ADMINISTRATEUR')
+  if (sigImage) { try { const d = await dims(sigImage); drawContain(doc, sigImage, d.w, d.h, MX + 12, sy + 22, halfW - 24, 44) } catch { /* ignore */ } }
+  doc.setTextColor(...DGREY); doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.text(truncate(doc, sigNom || note.auteur_nom || '—', halfW - 24), MX + 12, sy + 84)
+  doc.setTextColor(...GREY); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.text('Signé le ' + fmtD(sigAt), MX + halfW - 12, sy + 84, { align: 'right' })
+  const vx = MX + halfW + 16
+  doc.setTextColor(...GREEN); doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.text('Bon pour accord', vx + 12, sy + 44)
+  doc.setTextColor(...DGREY); doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.text(truncate(doc, valideParNom || '—', halfW - 24), vx + 12, sy + 84)
+  doc.setTextColor(...GREY); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.text('Approuvé le ' + fmtD(valideAt), vx + halfW - 12, sy + 84, { align: 'right' })
 
   footer(doc, note.numero)
 
