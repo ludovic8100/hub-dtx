@@ -36,6 +36,11 @@ function calcLigne(l) {
 // ── styles partagés ──
 const inp = { padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 14, color: '#1e293b', width: '100%', boxSizing: 'border-box', fontFamily: 'inherit' }
 const btn = (bg, col = '#fff', border = 'none') => ({ padding: '9px 16px', borderRadius: 9, border, background: bg, color: col, fontSize: 14, fontWeight: 700, cursor: 'pointer' })
+const sheetInp = { border: 'none', borderBottom: '1px solid #e2e8f0', background: 'transparent', padding: '5px 3px', fontSize: 13, color: '#1e293b', width: '100%', boxSizing: 'border-box', fontFamily: 'inherit' }
+const tdS = { padding: '6px 8px', borderBottom: '1px solid #eef2f7', verticalAlign: 'middle' }
+const thS = { padding: '9px 8px', textAlign: 'left', fontSize: 10, fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: '.03em', whiteSpace: 'nowrap' }
+const infoLbl = { fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 3 }
+const infoVal = { fontSize: 14, fontWeight: 700, color: '#1e293b' }
 function Card({ titre, sous, right, children }) {
   return (
     <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden', marginBottom: 20 }}>
@@ -279,12 +284,12 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
           </>
         )}
 
-        {/* ═══════════ VUE ÉDITION ═══════════ */}
+        {/* ═══════════ VUE ÉDITION (feuille document) ═══════════ */}
         {sel && (
-          <div style={{ marginTop: 18 }}>
+          <div style={{ maxWidth: 920, margin: '18px auto 40px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
               <button onClick={() => { setSel(null); setLignes([]) }} style={btn('#fff', '#475569', '1px solid #e2e8f0')}>← Retour</button>
-              <div style={{ fontSize: 18, fontWeight: 800, color: NAVY }}>{sel.numero || (sel.id ? 'Note de frais' : 'Nouvelle note de frais')}</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: NAVY }}>{sel.numero || (sel.id ? 'Note de frais' : 'Nouvelle note de frais')}</div>
               <Badge s={sel.statut} />
               {sel.id && isAdmin && scope === 'all' && sel.auteur_email?.toLowerCase() !== myEmail &&
                 <span style={{ fontSize: 12, color: '#64748b' }}>· {sel.auteur_nom || sel.auteur_email}</span>}
@@ -298,78 +303,116 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
               </div>
             </div>}
 
-            <Card titre="Informations">
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 14 }}>
-                <Field l="Titre"><input disabled={lockEdit} value={sel.titre || ''} onChange={e => setSel(s => ({ ...s, titre: e.target.value }))} placeholder="Ex : Déplacements juillet" style={inp} /></Field>
-                <Field l="Période"><input disabled={lockEdit} value={sel.periode || ''} onChange={e => setSel(s => ({ ...s, periode: e.target.value }))} placeholder="Ex : Juillet 2026" style={inp} /></Field>
-                <Field l="Commentaire"><input disabled={lockEdit} value={sel.note || ''} onChange={e => setSel(s => ({ ...s, note: e.target.value }))} style={inp} /></Field>
+            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 3px rgba(15,23,42,.07)' }}>
+
+              <div style={{ background: ENT.color, padding: '18px 24px', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+                <div style={{ width: 54, height: 54, borderRadius: 12, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+                  {ENT.logo ? <img src={ENT.logo} alt="" style={{ maxWidth: '78%', maxHeight: '78%', objectFit: 'contain' }} />
+                    : <span style={{ fontSize: 26, fontWeight: 800, color: ENT.color }}>{(ENT.label || '?').trim()[0]}</span>}
+                </div>
+                <div style={{ flex: 1, minWidth: 160 }}>
+                  <div style={{ color: '#fff', fontSize: 20, fontWeight: 800, letterSpacing: '.01em' }}>NOTE DE FRAIS</div>
+                  <div style={{ color: 'rgba(255,255,255,.85)', fontSize: 12.5 }}>Pièce justificative de remboursement</div>
+                </div>
+                <div style={{ textAlign: 'right', color: '#fff' }}>
+                  <div style={{ fontWeight: 800, fontSize: 14 }}>{ENT.label}</div>
+                  {sel.numero && <div style={{ fontSize: 12, opacity: .85, marginTop: 2 }}>{sel.numero}</div>}
+                </div>
               </div>
-            </Card>
 
-            <Card titre="Lignes de frais" sous="Justificatif obligatoire sur chaque ligne, sauf les lignes kilométriques."
-              right={!lockEdit && <button onClick={addLigne} style={btn(ACCENT)}>+ Ajouter une ligne</button>}>
-              {!calc.length ? <div style={{ padding: 14, color: '#94a3b8' }}>Aucune ligne. Cliquez sur « Ajouter une ligne ».</div>
-                : <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {calc.map(l => {
-                    const km = isKm(l)
-                    const justifManquant = !km && !l.justificatif_path
-                    return (
-                      <div key={l._key} style={{ border: `1px solid ${justifManquant ? '#fecaca' : '#e2e8f0'}`, borderRadius: 10, padding: 12, background: justifManquant ? '#fff7f7' : '#fff' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10, alignItems: 'end' }}>
-                          <Field l="Date"><input type="date" disabled={lockEdit} value={l.date || ''} onChange={e => updLigne(l._key, { date: e.target.value })} style={inp} /></Field>
-                          <Field l="Catégorie">
-                            <select disabled={lockEdit} value={l.categorie || ''} onChange={e => setCategorie(l._key, e.target.value)} style={inp}>
-                              <option value="">— Choisir —</option>
-                              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                            </select>
-                          </Field>
-                          <Field l="Description"><input disabled={lockEdit} value={l.description || ''} onChange={e => updLigne(l._key, { description: e.target.value })} style={inp} /></Field>
+              <div style={{ padding: '18px 24px', borderBottom: '1px solid #eef2f7' }}>
+                <input disabled={lockEdit} value={sel.titre || ''} onChange={e => setSel(s => ({ ...s, titre: e.target.value }))} placeholder="Intitulé de la note (ex : Frais de juillet)"
+                  style={{ ...sheetInp, fontSize: 19, fontWeight: 800, color: NAVY, borderBottom: lockEdit ? '1px solid transparent' : '1px solid #e2e8f0', marginBottom: 14 }} />
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 16 }}>
+                  <div><div style={infoLbl}>Émetteur</div><div style={infoVal}>{ENT.label}</div></div>
+                  <div><div style={infoLbl}>Collaborateur</div><div style={infoVal}>{sel.auteur_nom || myNom || myEmail}</div></div>
+                  <div><div style={infoLbl}>Période</div><input disabled={lockEdit} value={sel.periode || ''} onChange={e => setSel(s => ({ ...s, periode: e.target.value }))} placeholder="Ex : Juillet 2026" style={{ ...sheetInp, borderBottom: lockEdit ? '1px solid transparent' : '1px solid #e2e8f0' }} /></div>
+                  <div><div style={infoLbl}>Statut</div><div style={{ ...infoVal, display: 'flex', alignItems: 'center', gap: 8 }}><Badge s={sel.statut} />{sel.validee_at && <span style={{ fontSize: 12, fontWeight: 500, color: '#94a3b8' }}>le {fmtD(sel.validee_at)}</span>}</div></div>
+                </div>
+                <div style={{ marginTop: 14 }}><div style={infoLbl}>Commentaire</div><input disabled={lockEdit} value={sel.note || ''} onChange={e => setSel(s => ({ ...s, note: e.target.value }))} placeholder="Remarque éventuelle" style={{ ...sheetInp, borderBottom: lockEdit ? '1px solid transparent' : '1px solid #e2e8f0' }} /></div>
+              </div>
 
-                          {km ? <>
-                            <Field l="Distance (km)"><input disabled={lockEdit} inputMode="decimal" value={l.km_distance ?? ''} onChange={e => updLigne(l._key, { km_distance: e.target.value })} style={inp} /></Field>
-                            <Field l="Taux (€/km)"><input disabled={lockEdit} inputMode="decimal" value={l.km_taux ?? ''} onChange={e => updLigne(l._key, { km_taux: e.target.value })} style={inp} /></Field>
-                            <Field l="Montant"><div style={{ ...inp, background: '#f8fafc', fontWeight: 700 }}>{eur(l.montant_ttc)}</div></Field>
-                          </> : <>
-                            <Field l="Montant TTC (€)"><input disabled={lockEdit} inputMode="decimal" value={l.montant_ttc ?? ''} onChange={e => updLigne(l._key, { montant_ttc: e.target.value })} style={inp} /></Field>
-                            <Field l="TVA">
-                              <select disabled={lockEdit} value={l.taux_tva} onChange={e => updLigne(l._key, { taux_tva: e.target.value })} style={inp}>
-                                {TVA_TAUX.map(t => <option key={t} value={t}>{t} %</option>)}
+              <div style={{ padding: '16px 24px 8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8, gap: 10, flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: NAVY }}>Détail des dépenses</div>
+                  <div style={{ fontSize: 11.5, color: '#94a3b8' }}>Un justificatif par ligne (sauf lignes kilométriques).</div>
+                </div>
+                <div style={{ overflowX: 'auto', border: '1px solid #eef2f7', borderRadius: 10 }}>
+                  <table style={{ width: '100%', minWidth: 760, borderCollapse: 'collapse', fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ background: ENT.color }}>
+                        <th style={thS}>Date</th>
+                        <th style={thS}>Catégorie</th>
+                        <th style={{ ...thS, minWidth: 170 }}>Description</th>
+                        <th style={thS}>Montant</th>
+                        <th style={thS}>TVA</th>
+                        <th style={{ ...thS, textAlign: 'right' }}>HT</th>
+                        <th style={{ ...thS, textAlign: 'right' }}>TTC</th>
+                        <th style={thS}>Justificatif</th>
+                        <th style={{ ...thS, width: 28 }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {!calc.length && <tr><td colSpan={9} style={{ padding: 18, textAlign: 'center', color: '#94a3b8' }}>Aucune ligne. Ajoutez une première dépense ci-dessous.</td></tr>}
+                      {calc.map(l => {
+                        const km = isKm(l)
+                        const jm = !km && !l.justificatif_path
+                        return (
+                          <tr key={l._key} style={{ background: jm ? '#fff7f7' : '#fff' }}>
+                            <td style={tdS}><input type="date" disabled={lockEdit} value={l.date || ''} onChange={e => updLigne(l._key, { date: e.target.value })} style={{ ...sheetInp, minWidth: 118 }} /></td>
+                            <td style={tdS}>
+                              <select disabled={lockEdit} value={l.categorie || ''} onChange={e => setCategorie(l._key, e.target.value)} style={{ ...sheetInp, minWidth: 118 }}>
+                                <option value="">—</option>
+                                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                               </select>
-                            </Field>
-                            <Field l="HT / TVA"><div style={{ ...inp, background: '#f8fafc', fontSize: 12.5 }}>{eur(l.montant_ht)} <span style={{ color: '#94a3b8' }}>· TVA {eur(l.montant_tva)}</span></div></Field>
-                          </>}
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
-                          {km ? <span style={{ fontSize: 12, color: '#94a3b8' }}>Ligne kilométrique — aucun justificatif requis.</span>
-                            : l.justificatif_path ? <>
-                              <span style={{ fontSize: 12.5, color: '#16a34a', fontWeight: 600 }}>✓ {l.justificatif_nom || 'Justificatif joint'}</span>
-                              <button onClick={() => viewJustif(l.justificatif_path)} style={{ ...btn('#fff', ACCENT, `1px solid ${ACCENT}`), padding: '4px 10px', fontSize: 12 }}>Voir</button>
-                              {!lockEdit && <button onClick={() => removeJustif(l._key, l.justificatif_path)} style={{ ...btn('#fff', '#dc2626', '1px solid #fecaca'), padding: '4px 10px', fontSize: 12 }}>Retirer</button>}
-                            </> : <>
-                              <span style={{ fontSize: 12.5, color: '#dc2626', fontWeight: 600 }}>Justificatif requis</span>
-                              {!lockEdit && <label style={{ ...btn('#fff', ACCENT, `1px solid ${ACCENT}`), padding: '5px 12px', fontSize: 12.5, cursor: 'pointer', display: 'inline-block' }}>
-                                Joindre un fichier
-                                <input type="file" accept="image/*,application/pdf" style={{ display: 'none' }} onChange={e => { uploadJustif(l._key, e.target.files?.[0]); e.target.value = '' }} />
-                              </label>}
-                            </>}
-                          <div style={{ flex: 1 }} />
-                          {!lockEdit && <button onClick={() => delLigne(l._key)} style={{ ...btn('#fff', '#dc2626', '1px solid #fecaca'), padding: '5px 12px', fontSize: 12.5 }}>Supprimer la ligne</button>}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>}
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 24, marginTop: 16, paddingTop: 14, borderTop: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
-                <div style={{ textAlign: 'right' }}><div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Total HT</div><div style={{ fontSize: 16, fontWeight: 700 }}>{eur(totHT)}</div></div>
-                <div style={{ textAlign: 'right' }}><div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>TVA</div><div style={{ fontSize: 16, fontWeight: 700 }}>{eur(totTVA)}</div></div>
-                <div style={{ textAlign: 'right' }}><div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Total TTC</div><div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{eur(totTTC)}</div></div>
+                            </td>
+                            <td style={tdS}><input disabled={lockEdit} value={l.description || ''} onChange={e => updLigne(l._key, { description: e.target.value })} placeholder={km ? 'Trajet' : 'Description'} style={sheetInp} /></td>
+                            <td style={tdS}>
+                              {km
+                                ? <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                                    <input disabled={lockEdit} inputMode="decimal" value={l.km_distance ?? ''} onChange={e => updLigne(l._key, { km_distance: e.target.value })} placeholder="km" style={{ ...sheetInp, width: 46 }} />
+                                    <span style={{ color: '#94a3b8', fontSize: 11 }}>×</span>
+                                    <input disabled={lockEdit} inputMode="decimal" value={l.km_taux ?? ''} onChange={e => updLigne(l._key, { km_taux: e.target.value })} style={{ ...sheetInp, width: 56 }} />
+                                  </div>
+                                : <input disabled={lockEdit} inputMode="decimal" value={l.montant_ttc ?? ''} onChange={e => updLigne(l._key, { montant_ttc: e.target.value })} placeholder="0,00" style={{ ...sheetInp, width: 78 }} />}
+                            </td>
+                            <td style={tdS}>{km ? <span style={{ color: '#cbd5e1' }}>—</span>
+                              : <select disabled={lockEdit} value={l.taux_tva} onChange={e => updLigne(l._key, { taux_tva: e.target.value })} style={{ ...sheetInp, width: 62 }}>{TVA_TAUX.map(t => <option key={t} value={t}>{t}%</option>)}</select>}</td>
+                            <td style={{ ...tdS, textAlign: 'right', color: '#475569', whiteSpace: 'nowrap' }}>{eur(l.montant_ht)}</td>
+                            <td style={{ ...tdS, textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>{eur(l.montant_ttc)}</td>
+                            <td style={tdS}>
+                              {km ? <span style={{ color: '#cbd5e1' }}>—</span>
+                                : l.justificatif_path
+                                  ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
+                                      <button onClick={() => viewJustif(l.justificatif_path)} title={l.justificatif_nom || 'Justificatif'} style={{ ...btn('#fff', ACCENT, `1px solid ${ACCENT}`), padding: '3px 9px', fontSize: 11.5 }}>📎 Voir</button>
+                                      {!lockEdit && <button onClick={() => removeJustif(l._key, l.justificatif_path)} title="Retirer" style={{ ...btn('#fff', '#dc2626', '1px solid #fecaca'), padding: '3px 8px', fontSize: 11.5 }}>✕</button>}
+                                    </span>
+                                  : (!lockEdit
+                                      ? <label style={{ ...btn('#fff', '#dc2626', '1px solid #fecaca'), padding: '4px 10px', fontSize: 11.5, cursor: 'pointer', display: 'inline-block', whiteSpace: 'nowrap' }}>
+                                          📎 Joindre
+                                          <input type="file" accept="image/*,application/pdf" style={{ display: 'none' }} onChange={e => { uploadJustif(l._key, e.target.files?.[0]); e.target.value = '' }} />
+                                        </label>
+                                      : <span style={{ color: '#dc2626', fontSize: 12 }}>manquant</span>)}
+                            </td>
+                            <td style={{ ...tdS, textAlign: 'center' }}>{!lockEdit && <button onClick={() => delLigne(l._key)} title="Supprimer la ligne" style={{ border: 'none', background: 'transparent', color: '#cbd5e1', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 2 }}>✕</button>}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {!lockEdit && <button onClick={addLigne} style={{ ...btn('#fff', ACCENT, `1px dashed ${ACCENT}`), width: '100%', marginTop: 10, padding: '10px', fontWeight: 700 }}>+ Ajouter une ligne</button>}
               </div>
-            </Card>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 30 }}>
-              <div>{sel.id && <button onClick={() => delNote(sel)} style={btn('#fff', '#dc2626', '1px solid #fecaca')}>Supprimer la note</button>}</div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 28, padding: '14px 24px 20px', borderTop: '1px solid #eef2f7', flexWrap: 'wrap' }}>
+                <div style={{ textAlign: 'right' }}><div style={infoLbl}>Total HT</div><div style={{ fontSize: 16, fontWeight: 700 }}>{eur(totHT)}</div></div>
+                <div style={{ textAlign: 'right' }}><div style={infoLbl}>TVA</div><div style={{ fontSize: 16, fontWeight: 700 }}>{eur(totTVA)}</div></div>
+                <div style={{ textAlign: 'right' }}><div style={infoLbl}>Total à rembourser</div><div style={{ fontSize: 22, fontWeight: 800, color: ACCENT }}>{eur(totTTC)}</div></div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginTop: 16 }}>
+              <div>{sel.id && !lockEdit && <button onClick={() => delNote(sel)} style={btn('#fff', '#dc2626', '1px solid #fecaca')}>Supprimer la note</button>}</div>
               {!lockEdit && <div style={{ display: 'flex', gap: 10 }}>
                 <button onClick={() => save(false)} disabled={busy} style={{ ...btn('#fff', NAVY, '1px solid #cbd5e1'), opacity: busy ? .5 : 1 }}>Enregistrer le brouillon</button>
                 <button onClick={() => save(true)} disabled={busy} style={{ ...btn('#16a34a'), opacity: busy ? .5 : 1 }}>Valider la note</button>
