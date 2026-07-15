@@ -317,7 +317,7 @@ export default function DashboardDynassur() {
         </div>
 
         <div style={{ marginTop:18 }}>
-          <BlocComptes societeCode="DYNASSUR" color="#0080BD" />
+          {isAdmin && <BlocComptes societeCode="DYNASSUR" color="#0080BD" />}
         </div>
 
       </div>

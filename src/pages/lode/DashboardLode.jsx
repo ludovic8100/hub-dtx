@@ -31,7 +31,7 @@ function KpiCard({ label, value, icon, color, sub }) {
 }
 
 export default function DashboardLode() {
-  const { perms, user } = useAuth()
+  const { perms, user, isAdmin } = useAuth()
   const [taches, setTaches] = useState([])
   const [txStats, setTxStats] = useState({ entrees: 0, sorties: 0 })
   const [loading, setLoading] = useState(true)
@@ -88,7 +88,7 @@ export default function DashboardLode() {
         </div>
 
         <div style={{ marginBottom: 22 }}>
-          <BlocComptes societeCode="LODE" color={C} />
+          {isAdmin && <BlocComptes societeCode="LODE" color={C} />}
         </div>
 
         <DataCard>
