@@ -182,6 +182,23 @@ export default function AdminUsers() {
                 </div>
               </div>
 
+              {/* Coordonnées de remboursement */}
+              <div style={{ padding: '16px 24px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+                  IBAN (remboursement notes de frais)
+                </label>
+                <input
+                  type="text"
+                  value={selected.iban || ''}
+                  onChange={e => setSelected(prev => ({ ...prev, iban: e.target.value }))}
+                  placeholder="BE00 0000 0000 0000"
+                  style={{ width: '100%', maxWidth: '340px', padding: '8px 10px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '14px', color: '#1e293b', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                />
+                <div style={{ fontSize: '11.5px', color: '#94a3b8', marginTop: '6px' }}>
+                  Utilisé pour générer le QR de paiement SEPA sur la pièce PDF de la note de frais.
+                </div>
+              </div>
+
               {/* Modules par section */}
               <div style={{ padding: '20px 24px' }}>
                 {MODULES.map(section => (
