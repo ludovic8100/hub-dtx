@@ -5,6 +5,7 @@ import { ENTITES } from '../lib/entites'
 import { StatBanner } from './ui/AccountableUI'
 import { useAuth } from '../lib/auth'
 import { genererPdfNote } from '../lib/notesFraisPdf'
+import QRCode from 'qrcode'
 
 const NAVY = '#0D2F5E'
 const KM_TAUX_DEFAUT = 0.4761 // barème belge secteur privé 01/07/2026–30/06/2027 (circ. 767) — ajustable par ligne
@@ -76,6 +77,8 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
   const [sel, setSel] = useState(null)       // note en cours d'édition (id=null = nouvelle)
   const [lignes, setLignes] = useState([])
   const [busy, setBusy] = useState(false)
+  const [benefIban, setBenefIban] = useState('')
+  const [qrUrl, setQrUrl] = useState('')
 
   const loadNotes = useCallback(async () => {
     setLoading(true)
@@ -133,6 +136,27 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
   const totTVA = calc.reduce((s, l) => s + l.montant_tva, 0)
   const totHT = totTTC - totTVA
   const lockEdit = sel && sel.statut === 'validee'
+
+  useEffect(() => {
+    setBenefIban(''); setQrUrl('')
+    const email = sel?.auteur_email
+    if (!email) return
+    let ok = true
+    supabase.from('user_permissions').select('iban').ilike('user_email', email).maybeSingle()
+      .then(({ data }) => { if (ok) setBenefIban((data?.iban || '').trim()) })
+    return () => { ok = false }
+  }, [sel?.id, sel?.auteur_email])
+
+  useEffect(() => {
+    const iban = (benefIban || '').replace(/\s+/g, '').toUpperCase()
+    if (!sel || sel.statut !== 'validee' || iban.length < 15) { setQrUrl(''); return }
+    const benef = (sel.auteur_nom || myNom || 'Beneficiaire').slice(0, 70)
+    const montant = Number(sel.total || totTTC || 0)
+    const payload = ['BCD', '002', '1', 'SCT', '', benef, iban, `EUR${montant.toFixed(2)}`, '', '', sel.numero || '', ''].join('\n')
+    let ok = true
+    QRCode.toDataURL(payload, { margin: 1, width: 260 }).then(u => { if (ok) setQrUrl(u) }).catch(() => { if (ok) setQrUrl('') })
+    return () => { ok = false }
+  }, [sel?.id, sel?.statut, sel?.numero, sel?.total, benefIban, myNom])
 
   async function save(valider = false) {
     if (!sel || busy) return
@@ -409,6 +433,28 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
                 <div style={{ textAlign: 'right' }}><div style={infoLbl}>TVA</div><div style={{ fontSize: 16, fontWeight: 700 }}>{eur(totTVA)}</div></div>
                 <div style={{ textAlign: 'right' }}><div style={infoLbl}>Total à rembourser</div><div style={{ fontSize: 22, fontWeight: 800, color: ACCENT }}>{eur(totTTC)}</div></div>
               </div>
+
+              {sel.statut === 'validee' && (
+                <div style={{ borderTop: '1px solid #eef2f7', background: '#f8fafc', padding: '18px 24px', display: 'flex', gap: 22, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: 200 }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: NAVY, marginBottom: 8 }}>Remboursement</div>
+                    <div style={{ fontSize: 13, color: '#475569', lineHeight: 1.8 }}>
+                      Bénéficiaire : <b style={{ color: '#1e293b' }}>{sel.auteur_nom || myNom || '—'}</b><br />
+                      IBAN : {benefIban ? <b style={{ color: '#1e293b' }}>{benefIban}</b> : <b style={{ color: '#dc2626' }}>à renseigner</b>}<br />
+                      Communication : <b style={{ color: '#1e293b' }}>{sel.numero || '—'}</b><br />
+                      Montant : <b style={{ color: ACCENT }}>{eur(sel.total || totTTC)}</b>
+                    </div>
+                  </div>
+                  {qrUrl
+                    ? <div style={{ textAlign: 'center' }}>
+                        <img src={qrUrl} alt="QR paiement SEPA" style={{ width: 154, height: 154, border: '1px solid #e2e8f0', borderRadius: 12, background: '#fff', padding: 6, boxSizing: 'border-box' }} />
+                        <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 5 }}>Scannez avec votre appli bancaire</div>
+                      </div>
+                    : <div style={{ maxWidth: 230, fontSize: 12.5, color: '#dc2626', background: '#fff', border: '1px solid #fecaca', borderRadius: 12, padding: 14, lineHeight: 1.5 }}>
+                        Pas de QR : renseignez l'IBAN du bénéficiaire dans <b>Administration › Utilisateurs</b>, puis repassez la note en brouillon et re-validez.
+                      </div>}
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginTop: 16 }}>
