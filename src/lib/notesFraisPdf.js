@@ -3,7 +3,7 @@
 // totaux, encart remboursement avec QR de paiement SEPA (EPC), annexe justificatifs.
 import { jsPDF } from 'jspdf'
 import QRCode from 'qrcode'
-import { fmtIban, epcPayload } from './epc'
+import { fmtIban, ibanEspace, epcPayload } from './epc'
 import { ENTITES } from './entites'
 import { supabase } from './supabase'
 
@@ -16,7 +16,6 @@ const hx = h => { h = String(h || '#000000').replace('#', ''); return [parseInt(
 const tint = (rgb, k) => rgb.map(c => Math.round(c * k + 255 * (1 - k)))
 const eur = n => (Number(n) || 0).toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
 const fmtD = d => { try { return d ? new Date(d).toLocaleDateString('fr-BE') : '—' } catch { return '—' } }
-const fmtIban = s => String(s || '').replace(/\s+/g, '').replace(/(.{4})/g, '$1 ').trim()
 const isKm = l => (l.categorie === CAT_KM)
 
 // fetch (png/svg) -> blob URL local -> Image -> canvas -> PNG dataURL (+ dims), sans taint CORS
@@ -175,7 +174,7 @@ export async function genererPdfNote({ entiteKey = 'dynassur', note = {}, lignes
                    : 'IBAN du bénéficiaire non renseigné — QR de paiement indisponible', MX + 16, ey + 36)
   const rk = (yy, k, v) => { doc.setTextColor(...GREY); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.text(String(k).toUpperCase(), MX + 16, yy); doc.setTextColor(...DGREY); doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.text(String(v || '—'), MX + 16, yy + 13) }
   rk(ey + 54, 'Bénéficiaire', benefNom || note.auteur_nom || '—')
-  rk(ey + 82, 'IBAN', hasIban ? fmtIban(ibanRaw) : 'À renseigner')
+  rk(ey + 82, 'IBAN', hasIban ? ibanEspace(ibanRaw) : 'À renseigner')
   doc.setTextColor(...GREY); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.text('COMMUNICATION', MX + 250, ey + 54)
   doc.setTextColor(...DGREY); doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.text(note.numero || '—', MX + 250, ey + 67)
   doc.setTextColor(...GREY); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.text('MONTANT', MX + 250, ey + 82)
