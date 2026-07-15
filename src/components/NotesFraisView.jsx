@@ -7,6 +7,7 @@ import { useAuth } from '../lib/auth'
 import { genererPdfNote } from '../lib/notesFraisPdf'
 import { ibanEspace } from '../lib/epc'
 import QRCode from 'qrcode'
+import SignaturePad from './ui/SignaturePad'
 
 const NAVY = '#0D2F5E'
 const KM_TAUX_DEFAUT = 0.4761 // barème belge secteur privé 01/07/2026–30/06/2027 (circ. 767) — ajustable par ligne
@@ -15,6 +16,7 @@ const CATEGORIES = ['Repas / restaurant', 'Carburant', CAT_KM, 'Parking / péage
 const TVA_TAUX = [0, 6, 12, 21]
 const STATUTS = {
   brouillon: { label: 'Brouillon', bg: '#f1f5f9', color: '#64748b' },
+  soumise: { label: 'Soumise', bg: '#fef3c7', color: '#b45309' },
   validee: { label: 'Validée', bg: '#dcfce7', color: '#16a34a' },
 }
 
@@ -80,6 +82,8 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
   const [busy, setBusy] = useState(false)
   const [qrUrl, setQrUrl] = useState('')
   const [benefIban, setBenefIban] = useState('')
+  const [showSig, setShowSig] = useState(false)
+  const [sigImage, setSigImage] = useState('')
 
   const loadNotes = useCallback(async () => {
     setLoading(true)
@@ -136,7 +140,7 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
   const totTTC = calc.reduce((s, l) => s + l.montant_ttc, 0)
   const totTVA = calc.reduce((s, l) => s + l.montant_tva, 0)
   const totHT = totTTC - totTVA
-  const lockEdit = sel && sel.statut === 'validee'
+  const lockEdit = sel && sel.statut !== 'brouillon'
 
   useEffect(() => {
     setBenefIban(''); setQrUrl('')
@@ -159,18 +163,18 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
     return () => { ok = false }
   }, [sel?.id, sel?.statut, sel?.numero, sel?.total, benefIban, myNom])
 
-  async function save(valider = false) {
+  async function save(mode = 'brouillon', p_sig = null) {
     if (!sel || busy) return
-    if (valider) {
-      if (!calc.length) { alert('Ajoutez au moins une ligne avant de valider.'); return }
+    if (mode === 'soumettre') {
+      if (!calc.length) { alert('Ajoutez au moins une ligne avant de soumettre.'); return }
       const manq = calc.filter(l => !isKm(l) && !l.justificatif_path)
-      if (manq.length) { alert(`Validation impossible : ${manq.length} ligne(s) sans justificatif.\n\nChaque ligne doit avoir un justificatif joint, sauf les lignes kilométriques.`); return }
+      if (manq.length) { alert(`Soumission impossible : ${manq.length} ligne(s) sans justificatif.\n\nChaque ligne doit avoir un justificatif joint, sauf les lignes kilométriques.`); return }
     }
     setBusy(true)
     const head = {
       societe: entiteKey, titre: (sel.titre || '').trim() || null, periode: (sel.periode || '').trim() || null, note: (sel.note || '').trim() || null,
       auteur_email: sel.auteur_email || myEmail, auteur_code: sel.auteur_code || myCode, auteur_nom: sel.auteur_nom || myNom,
-      statut: (sel.statut === 'validee' ? 'validee' : 'brouillon'),
+      statut: 'brouillon',
     }
     let noteId = sel.id
     if (noteId) {
@@ -192,24 +196,18 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
       const { error } = await supabase.from('notes_frais_lignes').insert(rows)
       if (error) { setBusy(false); alert('Erreur (lignes) : ' + error.message); return }
     }
-    if (valider) {
-      const { data: v, error: ev } = await supabase.rpc('nf_valider', { p_note_id: noteId })
-      if (ev) { setBusy(false); alert('Validation \u00e9chou\u00e9e : ' + ev.message); return }
-      try {
-        const blob = await genererPdfNote({
-          entiteKey,
-          note: { ...sel, id: noteId, numero: v?.numero, total: v?.total, validee_at: new Date().toISOString(), titre: head.titre, periode: head.periode },
-          lignes: calc, benefNom: v?.benef_nom, benefIban: v?.benef_iban,
-        })
-        const path = `${entiteKey}/pieces/${noteId}.pdf`
-        const up = await supabase.storage.from('notes-frais').upload(path, blob, { upsert: true, contentType: 'application/pdf' })
-        if (!up.error) {
-          const { data: su } = await supabase.storage.from('notes-frais').createSignedUrl(path, 60 * 60 * 24 * 365)
-          await supabase.rpc('nf_set_piece', { p_note_id: noteId, p_path: path, p_url: su?.signedUrl || null })
-        }
-      } catch (e) { console.error('Pi\u00e8ce PDF note de frais :', e) }
+    if (mode === 'soumettre') {
+      const { error: es } = await supabase.rpc('nf_soumettre', { p_note_id: noteId, p_sig_type: 'dessin', p_sig_image: p_sig, p_sig_ref: null })
+      if (es) { setBusy(false); alert('Soumission échouée : ' + es.message); return }
     }
-    setBusy(false); setSel(null); setLignes([]); loadNotes()
+    setBusy(false); setShowSig(false); setSigImage(''); setSel(null); setLignes([]); loadNotes()
+  }
+
+  function demanderSignature() {
+    if (!calc.length) { alert('Ajoutez au moins une ligne avant de soumettre.'); return }
+    const manq = calc.filter(l => !isKm(l) && !l.justificatif_path)
+    if (manq.length) { alert(`Soumission impossible : ${manq.length} ligne(s) sans justificatif.\n\nChaque ligne doit avoir un justificatif joint, sauf les lignes kilométriques.`); return }
+    setSigImage(''); setShowSig(true)
   }
 
   async function delNote(n) {
@@ -320,12 +318,18 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
                 <span style={{ fontSize: 12, color: '#64748b' }}>· {sel.auteur_nom || sel.auteur_email}</span>}
             </div>
 
-            {lockEdit && <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', padding: '10px 14px', borderRadius: 10, marginBottom: 16, fontSize: 13, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <span>Note validée le {fmtD(sel.validee_at)} — lecture seule.</span>
+            {sel.statut === 'soumise' && <div style={{ background: '#fffbeb', border: '1px solid #fde68a', color: '#b45309', padding: '10px 14px', borderRadius: 10, marginBottom: 16, fontSize: 13 }}>
+              Note soumise le {fmtD(sel.soumise_at)} — en attente de validation par un administrateur (lecture seule).
+            </div>}
+            {sel.statut === 'validee' && <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', padding: '10px 14px', borderRadius: 10, marginBottom: 16, fontSize: 13, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <span>Note validée le {fmtD(sel.validee_at)}{sel.valide_par_nom ? ` par ${sel.valide_par_nom}` : ''} — lecture seule.</span>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {sel.piece_pdf_path && <button onClick={telechargerPiece} style={{ ...btn('#166534'), padding: '6px 12px', fontSize: 12.5 }}>Télécharger la pièce PDF</button>}
                 <button onClick={rouvrir} style={{ ...btn('#fff', '#166534', '1px solid #86efac'), padding: '6px 12px', fontSize: 12.5 }}>Repasser en brouillon</button>
               </div>
+            </div>}
+            {sel.statut === 'brouillon' && sel.refus_motif && <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', padding: '10px 14px', borderRadius: 10, marginBottom: 16, fontSize: 13, lineHeight: 1.5 }}>
+              <b>Note renvoyée</b>{sel.refus_at ? ` le ${fmtD(sel.refus_at)}` : ''} : {sel.refus_motif}<br />Corrigez puis soumettez à nouveau.
             </div>}
 
             <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 3px rgba(15,23,42,.07)' }}>
@@ -458,12 +462,26 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginTop: 16 }}>
-              <div>{sel.id && !lockEdit && <button onClick={() => delNote(sel)} style={btn('#fff', '#dc2626', '1px solid #fecaca')}>Supprimer la note</button>}</div>
+              <div>{sel.id && sel.statut === 'brouillon' && <button onClick={() => delNote(sel)} style={btn('#fff', '#dc2626', '1px solid #fecaca')}>Supprimer la note</button>}</div>
               {!lockEdit && <div style={{ display: 'flex', gap: 10 }}>
-                <button onClick={() => save(false)} disabled={busy} style={{ ...btn('#fff', NAVY, '1px solid #cbd5e1'), opacity: busy ? .5 : 1 }}>Enregistrer le brouillon</button>
-                <button onClick={() => save(true)} disabled={busy} style={{ ...btn('#16a34a'), opacity: busy ? .5 : 1 }}>Valider la note</button>
+                <button onClick={() => save('brouillon')} disabled={busy} style={{ ...btn('#fff', NAVY, '1px solid #cbd5e1'), opacity: busy ? .5 : 1 }}>Enregistrer le brouillon</button>
+                <button onClick={demanderSignature} disabled={busy} style={{ ...btn('#16a34a'), opacity: busy ? .5 : 1 }}>Soumettre pour validation</button>
               </div>}
             </div>
+
+            {showSig && (
+              <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 1000 }}>
+                <div style={{ background: '#fff', borderRadius: 14, padding: 22, width: 'min(520px,100%)', boxShadow: '0 10px 40px rgba(0,0,0,.25)' }}>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: NAVY, marginBottom: 6 }}>Signature — soumission de la note</div>
+                  <div style={{ fontSize: 13, color: '#475569', marginBottom: 14, lineHeight: 1.5 }}>En signant, vous certifiez que les frais déclarés sont exacts et réellement engagés. Cette signature sera apposée sur la pièce justificative.</div>
+                  <SignaturePad width={472} height={170} onChange={setSigImage} />
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+                    <button onClick={() => { setShowSig(false); setSigImage('') }} disabled={busy} style={btn('#fff', '#475569', '1px solid #e2e8f0')}>Annuler</button>
+                    <button onClick={() => save('soumettre', sigImage)} disabled={busy || !sigImage} style={{ ...btn('#16a34a'), opacity: (busy || !sigImage) ? .5 : 1 }}>Confirmer et soumettre</button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
