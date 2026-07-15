@@ -3,6 +3,7 @@
 // totaux, encart remboursement avec QR de paiement SEPA (EPC), annexe justificatifs.
 import { jsPDF } from 'jspdf'
 import QRCode from 'qrcode'
+import { fmtIban, epcPayload } from './epc'
 import { ENTITES } from './entites'
 import { supabase } from './supabase'
 
@@ -80,12 +81,11 @@ export async function genererPdfNote({ entiteKey = 'dynassur', note = {}, lignes
   const mono = entiteKey === 'hexagroup' ? 'H' : entiteKey === 'groupe' ? 'G' : (ent.label || '?')[0]
 
   // QR EPC (si IBAN valide)
-  const ibanRaw = String(benefIban || '').replace(/\s+/g, '').toUpperCase()
+  const ibanRaw = fmtIban(benefIban)
   const hasIban = ibanRaw.length >= 15
   let qr = null
   if (hasIban) {
-    const payload = ['BCD', '002', '1', 'SCT', '', (benefNom || ''), ibanRaw,
-      'EUR' + tTTC.toFixed(2), '', '', (note.numero || ''), ''].join('\n')
+    const payload = epcPayload({ benefNom, iban: ibanRaw, montant: tTTC, communication: note.numero })
     try { qr = await QRCode.toDataURL(payload, { errorCorrectionLevel: 'M', margin: 1, width: 240, color: { dark: '#0f172a', light: '#ffffff' } }) } catch { qr = null }
   }
 

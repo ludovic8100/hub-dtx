@@ -5,6 +5,7 @@ import { ENTITES } from '../lib/entites'
 import { StatBanner } from './ui/AccountableUI'
 import { useAuth } from '../lib/auth'
 import { genererPdfNote } from '../lib/notesFraisPdf'
+import { ibanEspace } from '../lib/epc'
 import QRCode from 'qrcode'
 
 const NAVY = '#0D2F5E'
@@ -77,8 +78,8 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
   const [sel, setSel] = useState(null)       // note en cours d'édition (id=null = nouvelle)
   const [lignes, setLignes] = useState([])
   const [busy, setBusy] = useState(false)
-  const [benefIban, setBenefIban] = useState('')
   const [qrUrl, setQrUrl] = useState('')
+  const [benefIban, setBenefIban] = useState('')
 
   const loadNotes = useCallback(async () => {
     setLoading(true)
@@ -433,14 +434,13 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
                 <div style={{ textAlign: 'right' }}><div style={infoLbl}>TVA</div><div style={{ fontSize: 16, fontWeight: 700 }}>{eur(totTVA)}</div></div>
                 <div style={{ textAlign: 'right' }}><div style={infoLbl}>Total à rembourser</div><div style={{ fontSize: 22, fontWeight: 800, color: ACCENT }}>{eur(totTTC)}</div></div>
               </div>
-
               {sel.statut === 'validee' && (
                 <div style={{ borderTop: '1px solid #eef2f7', background: '#f8fafc', padding: '18px 24px', display: 'flex', gap: 22, alignItems: 'center', flexWrap: 'wrap' }}>
                   <div style={{ flex: 1, minWidth: 200 }}>
                     <div style={{ fontSize: 13, fontWeight: 800, color: NAVY, marginBottom: 8 }}>Remboursement</div>
                     <div style={{ fontSize: 13, color: '#475569', lineHeight: 1.8 }}>
                       Bénéficiaire : <b style={{ color: '#1e293b' }}>{sel.auteur_nom || myNom || '—'}</b><br />
-                      IBAN : {benefIban ? <b style={{ color: '#1e293b' }}>{benefIban}</b> : <b style={{ color: '#dc2626' }}>à renseigner</b>}<br />
+                      IBAN : {benefIban ? <b style={{ color: '#1e293b' }}>{ibanEspace(benefIban)}</b> : <b style={{ color: '#dc2626' }}>à renseigner</b>}<br />
                       Communication : <b style={{ color: '#1e293b' }}>{sel.numero || '—'}</b><br />
                       Montant : <b style={{ color: ACCENT }}>{eur(sel.total || totTTC)}</b>
                     </div>
@@ -451,7 +451,7 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
                         <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 5 }}>Scannez avec votre appli bancaire</div>
                       </div>
                     : <div style={{ maxWidth: 230, fontSize: 12.5, color: '#dc2626', background: '#fff', border: '1px solid #fecaca', borderRadius: 12, padding: 14, lineHeight: 1.5 }}>
-                        Pas de QR : renseignez l'IBAN du bénéficiaire dans <b>Administration › Utilisateurs</b>, puis repassez la note en brouillon et re-validez.
+                        Pas de QR : renseignez l'IBAN du bénéficiaire dans <b>Administration › Utilisateurs</b>, puis rouvrez cette note (le QR s'affiche ici). Pour que le PDF téléchargeable contienne aussi le QR, repassez ensuite la note en brouillon et re-validez.
                       </div>}
                 </div>
               )}
