@@ -8,17 +8,6 @@ const N8N_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxNzZlZWRiMy03Zj
 
 export const SYNCS = [
   {
-    key: 'import',
-    label: 'Import Brio',
-    labelCourt: 'Import',
-    desc: 'Clients, contrats, production, quittances, famille et objets de risque depuis les CSV Brio (SharePoint).',
-    icon: 'ti-database-import',
-    color: '#0080BD',
-    webhook: 'run-import-dynassur',
-    workflowId: 'XveWrHrBybFWp2B0',
-    tables: ['clients', 'contrats', 'mouvements_production', 'quittances', 'famille', 'risques'],
-  },
-  {
     key: 'iban',
     label: 'Comptes bancaires',
     labelCourt: 'BANQUE',
