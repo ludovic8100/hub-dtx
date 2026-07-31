@@ -8,6 +8,17 @@ const N8N_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxNzZlZWRiMy03Zj
 
 export const SYNCS = [
   {
+    key: 'import',
+    label: 'Recharger depuis Qlik',
+    labelCourt: 'Qlik',
+    tooltip: 'Relance l\'import Brio → Supabase (arrière-plan, données à jour dans quelques minutes)',
+    desc: 'Déclenche le reload Qlik BRIO → Supabase : clients, contrats, production, quittances, objets de risque, famille, segmentation et sinistres. Traitement en arrière-plan (quelques minutes).',
+    icon: 'ti-database-import',
+    color: '#0080BD',
+    apiEndpoint: '/api/reload-qlik',
+    tables: ['clients', 'contrats', 'mouvements_production', 'quittances', 'objets_risque'],
+  },
+  {
     key: 'iban',
     label: 'Comptes bancaires',
     labelCourt: 'BANQUE',
@@ -49,6 +60,23 @@ export async function triggerWorkflow(webhook, workflowId) {
   return { ok: false }
 }
 
+
+// Déclenche une synchro : fonction serverless (apiEndpoint, ex. reload Qlik)
+// ou workflow n8n (webhook + workflowId).
+export async function triggerSync(sync) {
+  if (sync.apiEndpoint) {
+    try {
+      const { data } = await supabase.auth.getSession()
+      const token = data?.session?.access_token || ''
+      const r = await fetch(sync.apiEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      })
+      return { ok: r.ok, method: 'api' }
+    } catch { return { ok: false } }
+  }
+  return triggerWorkflow(sync.webhook, sync.workflowId)
+}
 
 // Liste étendue pour les boutons compacts (inclut rapprochement factures)
 export const SYNC_BUTTONS = [
@@ -103,7 +131,7 @@ function SyncMiniButton({ sync, onDark, compact }) {
 
   const run = async () => {
     setState('running')
-    const result = await triggerWorkflow(sync.webhook, sync.workflowId)
+    const result = await triggerSync(sync)
     setState(result.ok ? 'ok' : 'error')
     setTimeout(() => { loadLastSync(); setState('idle') }, 8000)
     // second rafraîchissement après la fin probable du run (~55s)
@@ -219,17 +247,21 @@ export function SyncCard({ sync }) {
 
   const run = async () => {
     setState('running'); setMsg(null); setMethod(null)
-    const result = await triggerWorkflow(sync.webhook, sync.workflowId)
+    const result = await triggerSync(sync)
     if (result.ok) {
       setState('ok'); setMethod(result.method)
-      setMsg(result.method === 'webhook'
-        ? 'Synchronisation lancée via webhook.'
-        : 'Workflow relancé via API n8n. Les données se mettent à jour en arrière-plan.')
+      setMsg(result.method === 'api'
+        ? 'Reload Qlik lancé. Les données seront à jour dans quelques minutes.'
+        : result.method === 'webhook'
+          ? 'Synchronisation lancée via webhook.'
+          : 'Workflow relancé via API n8n. Les données se mettent à jour en arrière-plan.')
       setLastRun(new Date())
       setTimeout(() => { loadCounts(); loadLastExec() }, 8000)
     } else {
       setState('error')
-      setMsg('Le serveur webhook n8n est inactif. Redémarre n8n (docker restart n8n), puis réessaie.')
+      setMsg(sync.apiEndpoint
+        ? "Échec du lancement. Vérifie la variable GITHUB_DISPATCH_TOKEN dans Vercel (Settings → Environment Variables)."
+        : 'Le serveur webhook n8n est inactif. Redémarre n8n (docker restart n8n), puis réessaie.')
     }
   }
 

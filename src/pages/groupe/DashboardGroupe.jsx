@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
 import { ENTITES } from '../../lib/entites'
 import { StatBanner, PrimaryButton } from '../../components/ui/AccountableUI'
-import { SYNCS, SyncCard, WebhookStatus } from '../../components/SyncCards'
+import { SYNCS, SyncCard, WebhookStatus, triggerSync } from '../../components/SyncCards'
 import { SyncButtonsRow } from '../../components/SyncCards'
 
 // ── Constantes ──
@@ -446,7 +446,7 @@ function BlocSync() {
 
   const syncAll = async () => {
     setSyncingAll(true)
-    await Promise.all(SYNCS.map(s => triggerWorkflow(s.webhook, s.workflowId)))
+    await Promise.all(SYNCS.map(s => triggerSync(s)))
     setSyncingAll(false)
   }
 
