@@ -319,9 +319,9 @@ export function SyncCard({ sync }) {
           <i className="ti ti-reload" />
         </button>
         {lastRun && <span style={{ fontSize:11, color:'#94a3b8' }}>Lancé à {lastRun.toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'})}</span>}
-        <a href={`https://n8n.srv1082740.hstgr.cloud/workflow/${sync.workflowId}`} target="_blank" rel="noopener noreferrer"
+        <a href={sync.apiEndpoint ? 'https://github.com/ludovic8100/hub-dtx/actions/workflows/qlik-sync.yml' : `https://n8n.srv1082740.hstgr.cloud/workflow/${sync.workflowId}`} target="_blank" rel="noopener noreferrer"
           style={{ marginLeft:'auto', fontSize:11, color:'#94a3b8', textDecoration:'none', display:'flex', alignItems:'center', gap:3 }}>
-          <i className="ti ti-external-link" style={{ fontSize:12 }} />n8n
+          <i className="ti ti-external-link" style={{ fontSize:12 }} />{sync.apiEndpoint ? 'GitHub' : 'n8n'}
         </a>
       </div>
     </div>
