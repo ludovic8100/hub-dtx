@@ -15,8 +15,7 @@ export const SYNCS = [
     desc: 'Déclenche le reload Qlik BRIO → Supabase : clients, contrats, production, quittances, objets de risque, famille, segmentation et sinistres. Traitement en arrière-plan (quelques minutes).',
     icon: 'ti-database-import',
     color: '#0080BD',
-    webhook: 'reload-qlik',
-    workflowId: 'vhoNsoXrGetm5i4P',
+    apiEndpoint: '/api/reload-qlik',
     tables: ['clients', 'contrats', 'mouvements_production', 'quittances', 'objets_risque'],
   },
   {
