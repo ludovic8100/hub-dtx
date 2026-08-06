@@ -380,10 +380,6 @@ function PanneauLierPaiement({ facture, color, onClose, onLier }) {
   let mouvements = mots.length ? tous.filter(m => { const h = hayFor(m); return mots.every(w => h.includes(w)) }) : tous
   mouvements = [...mouvements].sort((a, b) => scoreCorrespondance(b, montantCible, facture) - scoreCorrespondance(a, montantCible, facture)).slice(0, 80)
 
-  // Suggestion automatique : le mouvement en tête si sa correspondance est forte (montant exact et un seul candidat à ce montant)
-  const suggestion = (!recherche && mouvements.length > 0) ? mouvements[0] : null
-  const montantExactCount = tous.filter(m => Math.abs(Math.abs(m.montant) - montantCible) < 0.01).length
-  const suggestionForte = suggestion && montantCible > 0 && Math.abs(Math.abs(suggestion.montant) - montantCible) < 0.01 && montantExactCount === 1
   const selMouvements = tous.filter(m => sel.includes(m.id))
   const sommeSel = selMouvements.reduce((s, m) => s + Math.abs(parseFloat(m.montant) || 0), 0)
   const ecartOk = montantCible > 0 && Math.abs(sommeSel - montantCible) < 0.01
@@ -395,16 +391,6 @@ function PanneauLierPaiement({ facture, color, onClose, onLier }) {
           <div style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a' }}>Rechercher un mouvement</div>
           <div style={{ fontSize: '12.5px', color: '#64748b', marginTop: '3px' }}>{(facture.nom || '').replace(/\.pdf$/i, '')} — <strong>{fmt(facture.montant)}</strong></div>
         </div>
-        {suggestionForte && (
-          <div style={{ margin: '12px 20px 0', padding: '10px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <i className="ti ti-sparkles" style={{ fontSize: '16px', color: '#16a34a' }} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '11px', fontWeight: '700', color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Correspondance trouvée</div>
-              <div style={{ fontSize: '13px', color: '#0f172a', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{suggestion.contrepartie_nom || suggestion.information_paiement || 'Mouvement'} · {fmtDate(suggestion.date_valeur || suggestion.date_execution)}</div>
-            </div>
-            <button onClick={() => onLier([suggestion])} style={{ padding: '7px 14px', borderRadius: '8px', border: 'none', background: '#16a34a', color: '#fff', cursor: 'pointer', fontSize: '12.5px', fontWeight: '700', fontFamily: FONT, whiteSpace: 'nowrap' }}>Lier ce paiement</button>
-          </div>
-        )}
         <div style={{ padding: '12px 20px', borderBottom: '1px solid #f1f5f9' }}>
           <input value={recherche} onChange={e => setRecherche(e.target.value)} placeholder="Rechercher sur tout : contrepartie, IBAN, communication, montant, date…" autoFocus
             style={{ width: '100%', padding: '9px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', fontFamily: FONT, boxSizing: 'border-box' }} />

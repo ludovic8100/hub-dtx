@@ -99,10 +99,6 @@ export default function SelecteurFactureAchat({ societeCode, montantCible, dateC
   let factures = mots.length ? tous.filter(f => { const h = hayFor(f); return mots.every(w => h.includes(w)) }) : tous
   factures = [...factures].sort((a, b) => scoreCorrespondance(b, cible, dateCible, contrepartieCible) - scoreCorrespondance(a, cible, dateCible, contrepartieCible)).slice(0, 80)
 
-  // Suggestion automatique : la facture arrivant en tête si sa correspondance est forte (montant exact et une seule candidate à ce montant)
-  const suggestion = (!recherche && factures.length > 0) ? factures[0] : null
-  const montantExactCount = tous.filter(f => Math.abs((parseFloat(f.montant) || 0) - cible) < 0.01).length
-  const suggestionForte = suggestion && cible > 0 && Math.abs((parseFloat(suggestion.montant) || 0) - cible) < 0.01 && montantExactCount === 1
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT }} onClick={onClose}>
@@ -111,16 +107,6 @@ export default function SelecteurFactureAchat({ societeCode, montantCible, dateC
           <div style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a' }}>Lier une facture</div>
           <div style={{ fontSize: '12.5px', color: '#64748b', marginTop: '3px' }}>{sousTitre ? sousTitre : (<>Mouvement de <strong>{fmt(montantCible)}</strong>{societeCode ? ` · ${societeCode}` : ''}</>)}</div>
         </div>
-        {suggestionForte && (
-          <div style={{ margin: '12px 20px 0', padding: '10px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <i className="ti ti-sparkles" style={{ fontSize: '16px', color: '#16a34a' }} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '11px', fontWeight: '700', color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Correspondance trouvée</div>
-              <div style={{ fontSize: '13px', color: '#0f172a', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(suggestion.nom || '').replace(/\.pdf$/i, '')} · {fmtDate(suggestion.date_facture)}</div>
-            </div>
-            <button onClick={() => onChoisir(suggestion)} style={{ padding: '7px 14px', borderRadius: '8px', border: 'none', background: '#16a34a', color: '#fff', cursor: 'pointer', fontSize: '12.5px', fontWeight: '700', fontFamily: FONT, whiteSpace: 'nowrap' }}>Lier cette facture</button>
-          </div>
-        )}
         <div style={{ padding: '12px 20px', borderBottom: '1px solid #f1f5f9' }}>
           <input value={recherche} onChange={e => setRecherche(e.target.value)} placeholder="Rechercher sur tout : nom, fournisseur, numéro, montant, date…" autoFocus
             style={{ width: '100%', padding: '9px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', fontFamily: FONT, boxSizing: 'border-box' }} />
