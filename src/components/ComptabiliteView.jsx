@@ -217,15 +217,25 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   async function creerCategorie(txIdAAssigner) {
     const nom = nouvelleCat.nom.trim()
     if (!nom) { alert('Donne un nom à la catégorie.'); return }
-    const { data, error } = await supabase
-      .from('categories')
-      .insert({ nom, type: nouvelleCat.type, couleur: nouvelleCat.couleur, entites: (societeCodes && societeCodes.length ? societeCodes : null) })
-      .select()
-      .single()
-    if (error) { alert('Erreur création catégorie : ' + error.message); return }
+    // Réutiliser une catégorie existante de même nom (aucun doublon) et lui rattacher l'entité courante
+    const { data: existante } = await supabase.from('categories').select('*').ilike('nom', nom).maybeSingle()
+    let catId
+    if (existante) {
+      catId = existante.id
+      const ents = existante.entites || []
+      const manquantes = (societeCodes || []).filter(c => !ents.includes(c))
+      if (manquantes.length) await supabase.from('categories').update({ entites: [...ents, ...manquantes] }).eq('id', existante.id)
+    } else {
+      const { data, error } = await supabase
+        .from('categories')
+        .insert({ nom, type: nouvelleCat.type, couleur: nouvelleCat.couleur, entites: (societeCodes && societeCodes.length ? societeCodes : null) })
+        .select().single()
+      if (error) { alert(error.code === '23505' ? `La catégorie « ${nom} » existe déjà.` : 'Erreur création catégorie : ' + error.message); return }
+      catId = data.id
+    }
     await chargerCategories()
     setNouvelleCat({ ouvert: false, nom: '', type: 'depense', couleur: '#0080BD' })
-    if (txIdAAssigner && data?.id) await assignerCategorie(txIdAAssigner, data.id)
+    if (txIdAAssigner && catId) await assignerCategorie(txIdAAssigner, catId)
   }
 
   // Assigner une catégorie à une transaction

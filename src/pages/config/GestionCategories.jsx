@@ -47,8 +47,9 @@ export default function GestionCategories() {
     const nom = nouv.nom.trim()
     if (!nom) { notify('Donne un nom à la catégorie.'); return }
     if (!nouv.entites.length) { notify('Coche au moins une entité.'); return }
+    if (cats.some(c => (c.nom || '').trim().toLowerCase() === nom.toLowerCase())) { notify(`« ${nom} » existe déjà. Modifie-la plutôt (coche l'entité voulue).`); return }
     const { error } = await supabase.from('categories').insert({ nom, type: nouv.type, couleur: nouv.couleur, entites: nouv.entites })
-    if (error) { notify('Erreur : ' + error.message); return }
+    if (error) { notify(error.code === '23505' ? `« ${nom} » existe déjà.` : 'Erreur : ' + error.message); return }
     setNouv({ nom: '', type: 'depense', couleur: '#0080BD', entites: [] })
     await charger(); notify('Catégorie ajoutée.')
   }
@@ -58,8 +59,9 @@ export default function GestionCategories() {
     const entites = catEntites(cat)
     if (!nom) { notify('Le nom ne peut pas être vide.'); return }
     if (!entites.length) { notify('Coche au moins une entité.'); return }
+    if (cats.some(c => c.id !== cat.id && (c.nom || '').trim().toLowerCase() === nom.toLowerCase())) { notify(`Une autre catégorie s'appelle déjà « ${nom} ».`); return }
     const { error } = await supabase.from('categories').update({ nom, type: champ(cat, 'type'), couleur: champ(cat, 'couleur'), entites }).eq('id', cat.id)
-    if (error) { notify('Erreur : ' + error.message); return }
+    if (error) { notify(error.code === '23505' ? `« ${nom} » existe déjà.` : 'Erreur : ' + error.message); return }
     setEdits(p => { const n = { ...p }; delete n[cat.id]; return n })
     await charger(); notify('Catégorie modifiée.')
   }
