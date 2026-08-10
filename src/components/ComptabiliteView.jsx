@@ -205,11 +205,13 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
 
   // Charger les catégories
   async function chargerCategories() {
-    const { data } = await supabase.from('categories').select('*').order('nom')
+    let q = supabase.from('categories').select('*').order('nom')
+    if (societeCodes && societeCodes.length) q = q.or('societe.is.null,societe.in.(' + societeCodes.join(',') + ')')
+    const { data } = await q
     setCategories(data || [])
     return data || []
   }
-  useEffect(() => { chargerCategories() }, [])
+  useEffect(() => { chargerCategories() }, [societeCodes.join(',')])
 
   // Créer une catégorie manuellement (et l'assigner à la transaction en cours si fournie)
   const [nouvelleCat, setNouvelleCat] = useState({ ouvert: false, nom: '', type: 'depense', couleur: '#0080BD' })
@@ -218,7 +220,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
     if (!nom) { alert('Donne un nom à la catégorie.'); return }
     const { data, error } = await supabase
       .from('categories')
-      .insert({ nom, type: nouvelleCat.type, couleur: nouvelleCat.couleur })
+      .insert({ nom, type: nouvelleCat.type, couleur: nouvelleCat.couleur, societe: societeCodes[0] || null })
       .select()
       .single()
     if (error) { alert('Erreur création catégorie : ' + error.message); return }
