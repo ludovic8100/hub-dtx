@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { bootstrapConfigs } from '../../lib/bootstrapConfigs'
 import GestionCategories from './GestionCategories'
+import { RdvCategoriesPanel } from '../admin/RdvCategories'
 
 // ─── Définition des accès par société (colonnes réelles de user_permissions) ───
 const ACCES = [
@@ -172,7 +173,7 @@ export default function ConfigModule() {
     return true
   }).sort((a, b) => (a.nom || a.user_email || '').localeCompare(b.nom || b.user_email || '', 'fr', { sensitivity: 'base' }))
 
-  const TABS = [['societes', '🏢 Sociétés'], ['documents', '📄 Documents'], ['users', '👥 Utilisateurs & accès'], ['categories', '🏷️ Catégories']]
+  const TABS = [['societes', '🏢 Sociétés'], ['documents', '📄 Documents'], ['users', '👥 Utilisateurs & accès'], ['categories', '🏷️ Catégories compta'], ['categoriesrdv', '📅 Catégories RDV']]
 
   return (
     <Layout currentPage="Configuration">
@@ -190,6 +191,8 @@ export default function ConfigModule() {
         {loading && <div style={{ color: '#94a3b8', padding: 20 }}>Chargement…</div>}
 
         {tab === 'categories' && <GestionCategories />}
+
+        {tab === 'categoriesrdv' && <RdvCategoriesPanel />}
 
         {/* ─────────── SOCIÉTÉS & DOCUMENTS ─────────── */}
         {(tab === 'societes' || tab === 'documents') && !loading && (

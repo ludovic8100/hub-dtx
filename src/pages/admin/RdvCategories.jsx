@@ -11,7 +11,7 @@ const TYPE_OPTS = ['client', 'fiscalite', 'interne', 'formation', 'compagnie', '
 
 const blank = () => ({ id: null, code: '', libelle: '', entite: 'DYNASSUR', type: 'client', couleur: '#0080BD', sync_enabled: true, actif: true, ordre: 0, _new: true })
 
-export default function RdvCategories() {
+export function RdvCategoriesPanel() {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(null)
@@ -66,7 +66,7 @@ export default function RdvCategories() {
   const td = { padding: '8px 12px', verticalAlign: 'middle' }
 
   return (
-    <Layout>
+    <>
       <StatBanner
         color={G.color} colorDark={G.colorDark}
         title="Catégories RDV" subtitle="Pilote la synchro agenda : seules les catégories actives + synchro sont remontées d'Outlook"
@@ -148,6 +148,10 @@ export default function RdvCategories() {
           </div>
         )}
       </div>
-    </Layout>
+    </>
   )
+}
+
+export default function RdvCategories() {
+  return <Layout><RdvCategoriesPanel /></Layout>
 }
