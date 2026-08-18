@@ -128,23 +128,23 @@ function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, s
       <KpiRow kpis={kpis} actif={filtre.statut} onClic={(v) => setFiltre(f => ({ ...f, statut: f.statut === v ? 'toutes' : v }))} />
       <FiltreBar filtre={filtre} setFiltre={setFiltre} anneesDispo={anneesDispo} societesDispo={multiSociete ? societesDispo : null} placeholder="Nom de facture…" reset={() => setFiltre({ statut: 'toutes', recherche: '', annee: '', societe: '' })} />
       <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-        <Ligne header cols={multiSociete ? ['110px', '110px', '1fr', '120px', '130px', '46px'] : ['110px', '110px', '1fr', '130px', '46px']}
-          items={multiSociete ? ['Statut', 'Date', 'Facture', 'Société', 'Montant', ''] : ['Statut', 'Date', 'Facture', 'Montant', '']} />
+        <Ligne header cols={multiSociete ? ['120px', '110px', '110px', '1fr', '130px', '46px'] : ['110px', '110px', '1fr', '130px', '46px']}
+          items={multiSociete ? ['Société', 'Statut', 'Date', 'Facture', 'Montant', ''] : ['Statut', 'Date', 'Facture', 'Montant', '']} />
         {facturesPage.length === 0 && <div style={{ padding: '50px', textAlign: 'center', color: '#94a3b8' }}>Aucune facture</div>}
         {facturesPage.map((f, i) => {
           const payee = !!f.transaction_id
           const cells = [
+            ...(multiSociete ? [<span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: '600' }}>{f.societe}</span>] : []),
             <span onClick={(e) => { e.stopPropagation(); payee ? delierPaiement(f) : setLierPaiement(f) }} style={{ cursor: 'pointer' }}
               title={payee ? (vente ? 'Encaissée — cliquer pour délier le mouvement' : 'Payée — cliquer pour délier le paiement') : 'Cliquer pour retrouver et lier le mouvement'}>
               <Badge payee={payee} labelPayee={vente ? "✓ Encaissée" : "✓ Payée"} labelNon="🔍 Rechercher mouvement" />
             </span>,
             <span style={{ fontSize: '12.5px', color: '#64748b', fontWeight: '600' }}>{fmtDate(f.date_facture)}</span>,
             <span style={{ fontSize: '13px', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '10px' }}>{(f.nom || '').replace(/\.pdf$/i, '')}</span>,
-            ...(multiSociete ? [<span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: '600' }}>{f.societe}</span>] : []),
             <span style={{ textAlign: 'right', display: 'block', fontSize: '13.5px', fontWeight: '700', color: f.montant == null ? '#cbd5e1' : '#0f172a' }}>{f.montant == null ? '—' : fmt(f.montant)}</span>,
             <button onClick={(e) => { e.stopPropagation(); basculerSens(f) }} title={vente ? 'Reclasser dans les Achats' : 'Reclasser dans les Ventes'} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '30px', height: '30px', margin: '0 auto', borderRadius: '7px', border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', cursor: 'pointer' }}><i className="ti ti-transfer" style={{ fontSize: '16px' }} /></button>,
           ]
-          return <Ligne key={f.fichier_id} cols={multiSociete ? ['110px', '110px', '1fr', '120px', '130px', '46px'] : ['110px', '110px', '1fr', '130px', '46px']} items={cells} onClick={() => ouvrir(f)} clickable={!!f.url} alt={i % 2 === 1} title={f.nom} />
+          return <Ligne key={f.fichier_id} cols={multiSociete ? ['120px', '110px', '110px', '1fr', '130px', '46px'] : ['110px', '110px', '1fr', '130px', '46px']} items={cells} onClick={() => ouvrir(f)} clickable={!!f.url} alt={i % 2 === 1} title={f.nom} />
         })}
       </div>
       <Pagination page={page} totalPages={totalPages} setPage={setPage} total={filtrees.length} />
