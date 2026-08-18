@@ -97,9 +97,20 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
     setLignes((data || []).map(l => ({ ...l, _key: l.id })))
     setSel(n)
   }
-  function newNote() {
+  const capMois = x => x ? x.charAt(0).toUpperCase() + x.slice(1) : x
+  async function titreAutoUnique(periode) {
+    const base = `${capMois(periode)} - ${myCode}`.trim()
+    const { data } = await supabase.from('notes_frais').select('titre').eq('societe', entiteKey).ilike('titre', base + '%')
+    const pris = new Set((data || []).map(x => (x.titre || '').trim().toLowerCase()))
+    if (!pris.has(base.toLowerCase())) return base
+    let i = 2
+    while (pris.has(`${base} (${i})`.toLowerCase())) i++
+    return `${base} (${i})`
+  }
+  async function newNote() {
     const periode = new Date().toLocaleDateString('fr-BE', { month: 'long', year: 'numeric' })
-    setSel({ id: null, societe: entiteKey, titre: '', periode, statut: 'brouillon', note: '', auteur_email: myEmail, auteur_code: myCode, auteur_nom: myNom })
+    const titre = await titreAutoUnique(periode)
+    setSel({ id: null, societe: entiteKey, titre, periode, statut: 'brouillon', note: '', auteur_email: myEmail, auteur_code: myCode, auteur_nom: myNom })
     setLignes([])
   }
   function addLigne() {
@@ -170,6 +181,13 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
       if (manq.length) { alert(`Soumission impossible : ${manq.length} ligne(s) sans justificatif.\n\nChaque ligne doit avoir un justificatif joint, sauf les lignes kilométriques.`); return }
     }
     setBusy(true)
+    const titreTrim = (sel.titre || '').trim()
+    if (titreTrim) {
+      let qDup = supabase.from('notes_frais').select('id').eq('societe', entiteKey).ilike('titre', titreTrim)
+      if (sel.id) qDup = qDup.neq('id', sel.id)
+      const { data: dup } = await qDup.limit(1)
+      if (dup && dup.length) { setBusy(false); alert('Une note porte déjà ce titre pour cette société. Choisissez un intitulé différent.'); return }
+    }
     const head = {
       societe: entiteKey, titre: (sel.titre || '').trim() || null, periode: (sel.periode || '').trim() || null, note: (sel.note || '').trim() || null,
       auteur_email: sel.auteur_email || myEmail, auteur_code: sel.auteur_code || myCode, auteur_nom: sel.auteur_nom || myNom,
@@ -294,8 +312,9 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
                             <td style={{ padding: '9px 10px', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>{eur(n.total)}</td>
                             <td style={{ padding: '9px 10px' }}><Badge s={n.statut} /></td>
                             <td style={{ padding: '9px 10px', color: '#94a3b8' }}>{fmtD(n.created_at)}</td>
-                            <td style={{ padding: '9px 10px', textAlign: 'right' }}>
+                            <td style={{ padding: '9px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>
                               <button onClick={() => openNote(n)} style={{ ...btn('#fff', ACCENT, `1px solid ${ACCENT}`), padding: '5px 12px', fontSize: 12.5 }}>{n.statut === 'validee' ? 'Voir' : 'Ouvrir'}</button>
+                              {n.statut === 'brouillon' && <button onClick={() => delNote(n)} title="Supprimer le brouillon" style={{ ...btn('#fff', '#dc2626', '1px solid #fecaca'), padding: '5px 9px', fontSize: 12.5, marginLeft: 6 }}>🗑</button>}
                             </td>
                           </tr>
                         ))}
@@ -461,7 +480,7 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginTop: 16 }}>
-              <div>{sel.id && sel.statut === 'brouillon' && <button onClick={() => delNote(sel)} style={btn('#fff', '#dc2626', '1px solid #fecaca')}>Supprimer la note</button>}</div>
+              <div>{sel.id && sel.statut === 'brouillon' && <button onClick={() => delNote(sel)} style={btn('#fff', '#dc2626', '1px solid #fecaca')}>Supprimer le brouillon</button>}</div>
               {!lockEdit && <div style={{ display: 'flex', gap: 10 }}>
                 <button onClick={() => save('brouillon')} disabled={busy} style={{ ...btn('#fff', NAVY, '1px solid #cbd5e1'), opacity: busy ? .5 : 1 }}>Enregistrer le brouillon</button>
                 <button onClick={demanderSignature} disabled={busy} style={{ ...btn('#16a34a'), opacity: busy ? .5 : 1 }}>Soumettre pour validation</button>
