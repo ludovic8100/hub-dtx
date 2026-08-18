@@ -16,6 +16,7 @@ const MODULES = {
     { key: 'dyn_clients',      label: 'Clients',           icon: 'ti-users',            path: '/dynassur/clients' },
     { key: 'dyn_production',   label: 'Production',        icon: 'ti-chart-line',       path: '/dynassur/production' },
     { key: 'dyn_bordereaux',   label: 'Bordereaux',        icon: 'ti-file-invoice',     path: '/dynassur/bordereaux' },
+    { key: 'dyn_credits',      label: 'Crédits',           icon: 'ti-cash-banknote',    path: '/dynassur/credits' },
     { key: 'dyn_chiffres',     label: 'Chiffres',          icon: 'ti-report-analytics', path: '/dynassur/chiffres' },
     { key: 'dyn_objectifs',    label: 'Objectifs',         icon: 'ti-target',           path: '/dynassur/objectifs' },
     { key: 'dyn_compagnies',   label: 'Compagnies',        icon: 'ti-building',         path: '/dynassur/compagnies' },

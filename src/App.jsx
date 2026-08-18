@@ -29,6 +29,7 @@ import DynassurSinistres   from './pages/dynassur/DynassurSinistres'
 import DynassurBanque      from './pages/dynassur/DynassurBanque'
 import DynassurComptabilite from './pages/dynassur/DynassurComptabilite'
 import DynassurRentabilite from './pages/dynassur/DynassurRentabilite'
+import DynassurCredits     from './pages/dynassur/DynassurCredits'
 import DynassurRdv         from './pages/dynassur/DynassurRdv'
 import DynassurAppels      from './pages/dynassur/DynassurAppels'
 
@@ -123,6 +124,7 @@ export default function App() {
           <Route path="/dynassur/clients"      element={<P need="dyn_clients"><DynassurClients /></P>} />
           <Route path="/dynassur/production"   element={<P need="dyn_production"><DynassurProduction /></P>} />
           <Route path="/dynassur/bordereaux"   element={<P need="dyn_bordereaux"><DynassurBordereaux /></P>} />
+          <Route path="/dynassur/credits"      element={<P need="dyn_credits"><DynassurCredits /></P>} />
           <Route path="/dynassur/chiffres"     element={<P need="dyn_chiffres"><DynassurChiffres /></P>} />
           <Route path="/dynassur/objectifs"    element={<P need="dyn_objectifs"><DynassurObjectifs /></P>} />
           <Route path="/dynassur/compagnies"   element={<P need="dyn_compagnies"><DynassurCompagnies /></P>} />

@@ -10,7 +10,7 @@ import { RdvCategoriesPanel } from '../admin/RdvCategories'
 // ─── Définition des accès par société (colonnes réelles de user_permissions) ───
 const ACCES = [
   { acc: 'acc_dynassur', label: 'Dynassur', pfx: 'dyn',  couleur: '#0080BD',
-    pages: [['dashboard', 'Tableau de bord'], ['taches', 'Tâches'], ['clients', 'Clients'], ['production', 'Production'], ['bordereaux', 'Bordereaux'], ['chiffres', 'Chiffres'], ['objectifs', 'Objectifs'], ['compagnies', 'Compagnies'], ['sinistres', 'Sinistres'], ['rdv', 'RDV / Agenda'], ['appels', 'Appels'], ['rentabilite', 'Rentabilité'], ['banque', 'Banque'], ['comptabilite', 'Comptabilité'], ['devis', 'Devis & Factures'], ['notesfrais', 'Notes de frais']] },
+    pages: [['dashboard', 'Tableau de bord'], ['taches', 'Tâches'], ['clients', 'Clients'], ['production', 'Production'], ['bordereaux', 'Bordereaux'], ['credits', 'Crédits'], ['chiffres', 'Chiffres'], ['objectifs', 'Objectifs'], ['compagnies', 'Compagnies'], ['sinistres', 'Sinistres'], ['rdv', 'RDV / Agenda'], ['appels', 'Appels'], ['rentabilite', 'Rentabilité'], ['banque', 'Banque'], ['comptabilite', 'Comptabilité'], ['devis', 'Devis & Factures'], ['notesfrais', 'Notes de frais']] },
   { acc: 'acc_dtx', label: 'DTX', pfx: 'dtx', couleur: '#1B3A6B',
     pages: [['dashboard', 'Tableau de bord'], ['taches', 'Tâches'], ['immobilier', 'Immobilier'], ['vehicules', 'Véhicules'], ['trading', 'Trading'], ['comptabilite', 'Comptabilité'], ['devis', 'Devis & Factures'], ['notesfrais', 'Notes de frais']] },
   { acc: 'acc_lode', label: 'LODE', pfx: 'lode', couleur: '#F97316',
