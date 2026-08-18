@@ -419,8 +419,9 @@ function PanneauLierPaiement({ facture, color, onClose, onLier, tousComptes = fa
                 <div style={{ display: 'flex', alignItems: 'center', gap: '11px', minWidth: 0 }}>
                   <span style={{ width: '18px', height: '18px', flexShrink: 0, borderRadius: '5px', border: sel.includes(m.id) ? 'none' : '2px solid #cbd5e1', background: sel.includes(m.id) ? color : '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{sel.includes(m.id) && <i className="ti ti-check" style={{ fontSize: '12px', color: '#fff' }} />}</span>
                   <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.contrepartie_nom || m.information_paiement || 'Mouvement'}</div>
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.contrepartie_nom || 'Mouvement'}</div>
                   <div style={{ fontSize: '11.5px', color: '#94a3b8' }}>{fmtDate(m.date_valeur || m.date_execution)} · {m.comptes_bancaires?.banque || ''}{tousComptes && m.comptes_bancaires?.societes?.code ? ` · ${m.comptes_bancaires.societes.code}` : ''}</div>
+                  {m.information_paiement && <div title={m.information_paiement} style={{ fontSize: '11px', color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '1px' }}><i className="ti ti-file-description" style={{ fontSize: '11px', color: '#cbd5e1', marginRight: '3px' }} />{m.information_paiement.replace(/[\r\n]+/g, ' · ').replace(/\s+/g, ' ').trim()}</div>}
                 </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
