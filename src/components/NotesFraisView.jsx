@@ -86,7 +86,7 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
 
   const loadNotes = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.from('notes_frais').select('*').eq('societe', entiteKey).order('created_at', { ascending: false })
+    const { data } = await supabase.from('notes_frais').select('*').eq('societe', entiteKey).order('titre', { ascending: false, nullsFirst: false })
     setNotes(data || [])
     setLoading(false)
   }, [entiteKey])
@@ -98,8 +98,8 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
     setSel(n)
   }
   const capMois = x => x ? x.charAt(0).toUpperCase() + x.slice(1) : x
-  async function titreAutoUnique(periode) {
-    const base = `${capMois(periode)} - ${myCode}`.trim()
+  async function titreAutoUnique(baseLabel) {
+    const base = `${baseLabel} - ${myCode}`.trim()
     const { data } = await supabase.from('notes_frais').select('titre').eq('societe', entiteKey).ilike('titre', base + '%')
     const pris = new Set((data || []).map(x => (x.titre || '').trim().toLowerCase()))
     if (!pris.has(base.toLowerCase())) return base
@@ -108,8 +108,10 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
     return `${base} (${i})`
   }
   async function newNote() {
-    const periode = new Date().toLocaleDateString('fr-BE', { month: 'long', year: 'numeric' })
-    const titre = await titreAutoUnique(periode)
+    const d = new Date()
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const periode = capMois(d.toLocaleDateString('fr-BE', { month: 'long', year: 'numeric' }))
+    const titre = await titreAutoUnique(iso)
     setSel({ id: null, societe: entiteKey, titre, periode, statut: 'brouillon', note: '', auteur_email: myEmail, auteur_code: myCode, auteur_nom: myNom })
     setLignes([])
   }
