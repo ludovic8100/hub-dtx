@@ -198,7 +198,7 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
       const { error } = await supabase.from('notes_frais').update(head).eq('id', noteId)
       if (error) { setBusy(false); alert('Erreur (en-tête) : ' + error.message); return }
     } else {
-      const { data, error } = await supabase.from('notes_frais').insert(head).select('id').single()
+      const { data, error } = await supabase.from('notes_frais').insert(head).select('id, numero').single()
       if (error) { setBusy(false); alert('Erreur (création) : ' + error.message); return }
       noteId = data.id
     }
@@ -295,6 +295,7 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
                   : <div style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}>
                       <thead><tr style={{ textAlign: 'left', color: '#94a3b8', fontSize: 11, textTransform: 'uppercase' }}>
+                        <th style={{ padding: '8px 10px' }}>N°</th>
                         <th style={{ padding: '8px 10px' }}>Titre</th>
                         <th style={{ padding: '8px 10px' }}>Période</th>
                         {isAdmin && scope === 'all' && <th style={{ padding: '8px 10px' }}>Auteur</th>}
@@ -306,6 +307,7 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
                       <tbody>
                         {visibles.map(n => (
                           <tr key={n.id} style={{ borderTop: '1px solid #eef2f7' }}>
+                            <td style={{ padding: '9px 10px', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap' }}>{n.numero || <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                             <td style={{ padding: '9px 10px', fontWeight: 600, color: '#1e293b' }}>{n.titre || <span style={{ color: '#cbd5e1' }}>(sans titre)</span>}</td>
                             <td style={{ padding: '9px 10px', color: '#475569' }}>{n.periode || '—'}</td>
                             {isAdmin && scope === 'all' && <td style={{ padding: '9px 10px', color: '#475569' }}>{n.auteur_nom || n.auteur_code || n.auteur_email}</td>}
