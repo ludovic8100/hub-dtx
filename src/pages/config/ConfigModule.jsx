@@ -44,6 +44,8 @@ export default function ConfigModule() {
   const [uStatut, setUStatut] = useState('tous')
   const [uSoc, setUSoc] = useState('toutes')
   const [uModule, setUModule] = useState('tous')
+  const [uRole, setURole] = useState('tous')
+  const [uBureau, setUBureau] = useState('tous')
   const [bureaux, setBureaux] = useState([])            // ref_bureaux (adresses)
   const [collabBureau, setCollabBureau] = useState({})  // code collaborateur -> bureau_id
   const [sel, setSel] = useState(() => new Set())       // ids user cochés (attribution groupée)
@@ -92,6 +94,7 @@ export default function ConfigModule() {
   }
 
   const userCodeOf = u => (u?.collab_code || (u?.user_email || '').split('@')[0] || '').toUpperCase()
+  const bureauLabelOf = u => { const b = bureaux.find(x => x.id === collabBureau[userCodeOf(u)]); return b ? b.libelle : null }
   async function setBureau(bureauId) {
     if (!selUser) return
     const code = userCodeOf(selUser)
@@ -165,9 +168,15 @@ export default function ConfigModule() {
 
   const usersFiltres = users.filter(u => {
     const q = uSearch.trim().toLowerCase()
-    if (q && !((u.nom || '').toLowerCase().includes(q) || (u.user_email || '').toLowerCase().includes(q))) return false
+    if (q && !((u.nom || '').toLowerCase().includes(q) || (u.user_email || '').toLowerCase().includes(q) || (u.collab_code || '').toLowerCase().includes(q))) return false
     if (uStatut === 'actifs' && !u.actif) return false
     if (uStatut === 'inactifs' && u.actif) return false
+    if (uRole !== 'tous' && (u.role || 'user') !== uRole) return false
+    if (uBureau !== 'tous') {
+      const bid = collabBureau[userCodeOf(u)]
+      if (uBureau === 'sans') { if (bid != null) return false }
+      else if (String(bid) !== uBureau) return false
+    }
     if (uSoc !== 'toutes' && !(u.role === 'admin' || u[uSoc])) return false
     if (uModule !== 'tous' && !(u.role === 'admin' || u[uModule])) return false
     return true
@@ -264,7 +273,12 @@ export default function ConfigModule() {
         {tab === 'users' && !loading && (
           <div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 14, alignItems: 'center' }}>
-              <input value={uSearch} onChange={e => setUSearch(e.target.value)} placeholder="Rechercher (nom ou email)…" style={{ ...inp, maxWidth: 260 }} />
+              <input value={uSearch} onChange={e => setUSearch(e.target.value)} placeholder="Rechercher (nom, email, code)…" style={{ ...inp, maxWidth: 230 }} />
+              <select value={uRole} onChange={e => setURole(e.target.value)} style={{ ...inp, width: 'auto' }}>
+                <option value="tous">Rôle : tous</option>
+                <option value="admin">Administrateurs</option>
+                <option value="user">Utilisateurs</option>
+              </select>
               <select value={uStatut} onChange={e => setUStatut(e.target.value)} style={{ ...inp, width: 'auto' }}>
                 <option value="tous">Statut : tous</option>
                 <option value="actifs">Actifs</option>
@@ -274,10 +288,18 @@ export default function ConfigModule() {
                 <option value="toutes">Société : toutes</option>
                 {ACCES.map(g => <option key={g.acc} value={g.acc}>{g.label}</option>)}
               </select>
+              <select value={uBureau} onChange={e => setUBureau(e.target.value)} style={{ ...inp, width: 'auto' }}>
+                <option value="tous">Bureau : tous</option>
+                {bureaux.map(b => <option key={b.id} value={String(b.id)}>{b.libelle}</option>)}
+                <option value="sans">— Sans bureau —</option>
+              </select>
               <select value={uModule} onChange={e => setUModule(e.target.value)} style={{ ...inp, width: 'auto' }}>
-                <option value="tous">Module : tous</option>
+                <option value="tous">Accès page : tous</option>
                 {ACCES.flatMap(g => g.pages.map(([pg, pl]) => <option key={`${g.pfx}_${pg}`} value={`${g.pfx}_${pg}`}>{g.label} · {pl}</option>))}
               </select>
+              {(uSearch || uRole !== 'tous' || uStatut !== 'tous' || uSoc !== 'toutes' || uBureau !== 'tous' || uModule !== 'tous') && (
+                <button onClick={() => { setUSearch(''); setURole('tous'); setUStatut('tous'); setUSoc('toutes'); setUBureau('tous'); setUModule('tous') }} style={{ ...btnGhost }}>✕ Réinitialiser</button>
+              )}
               <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 'auto' }}>{usersFiltres.length} / {users.length}</span>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 14, alignItems: 'center', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '8px 12px' }}>
@@ -300,10 +322,18 @@ export default function ConfigModule() {
                     border: selUser?.id === u.id ? '2px solid #1e293b' : '1px solid #e2e8f0',
                     background: selUser?.id === u.id ? '#f8fafc' : '#fff',
                   }}>
-                    <div style={{ fontWeight: 700, color: '#1e293b', fontSize: 14 }}>{u.nom || u.user_email}</div>
-                    <div style={{ fontSize: 11, color: '#94a3b8' }}>{u.user_email}
-                      {u.role === 'admin' && <span style={{ color: '#7c3aed', fontWeight: 700 }}> · admin</span>}
-                      {!u.actif && <span style={{ color: '#dc2626', fontWeight: 700 }}> · inactif</span>}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 700, color: '#1e293b', fontSize: 14 }}>{u.nom || u.user_email}</span>
+                      {u.role === 'admin' && <span style={{ fontSize: 10, fontWeight: 800, color: '#7c3aed', background: '#f5f3ff', borderRadius: 5, padding: '1px 6px' }}>ADMIN</span>}
+                      {!u.actif && <span style={{ fontSize: 10, fontWeight: 800, color: '#dc2626', background: '#fef2f2', borderRadius: 5, padding: '1px 6px' }}>INACTIF</span>}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{u.user_email}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', marginTop: 5 }}>
+                      {u.role === 'admin'
+                        ? <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: '#7c3aed', borderRadius: 5, padding: '2px 7px' }}>Toutes sociétés</span>
+                        : ACCES.filter(g => u[g.acc]).map(g => <span key={g.acc} style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: g.couleur, borderRadius: 5, padding: '2px 7px' }}>{g.label}</span>)}
+                      {u.role !== 'admin' && !ACCES.some(g => u[g.acc]) && <span style={{ fontSize: 10, color: '#cbd5e1', fontStyle: 'italic' }}>aucune société</span>}
+                      {(() => { const bl = bureauLabelOf(u); return bl ? <span style={{ fontSize: 10, color: '#64748b', background: '#f1f5f9', borderRadius: 5, padding: '2px 7px' }}>🏢 {bl}</span> : null })()}
                     </div>
                   </button>
                 </div>
