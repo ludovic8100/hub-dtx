@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react'
 import { supabase } from '../lib/supabase'
 
 const NAVY = '#0D2F5E'
@@ -108,7 +108,7 @@ export function fmtDerniereExec(at) {
 }
 
 // Bouton compact unique avec dernière exécution
-function SyncMiniButton({ sync, onDark, compact }) {
+const SyncMiniButton = forwardRef(function SyncMiniButton({ sync, onDark, compact }, ref) {
   const [state, setState] = useState('idle')
   const [lastSync, setLastSync] = useState(null)
   const [errMsg, setErrMsg] = useState(null)
@@ -162,6 +162,7 @@ function SyncMiniButton({ sync, onDark, compact }) {
       setState('error'); setErrMsg("Échec de l'appel. Réessaie."); setShowErr(true)
     }
   }
+  useImperativeHandle(ref, () => ({ run }))
   const running = state === 'running'
   const bg = onDark
     ? (running ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.92)')
@@ -204,17 +205,36 @@ function SyncMiniButton({ sync, onDark, compact }) {
       )}
     </div>
   )
-}
+})
 
 // Ligne de boutons de synchronisation manuelle (avec dernière exécution)
 export function SyncButtonsRow({ only, style, onDark, compact }) {
   const list = only ? SYNC_BUTTONS.filter(s => only.includes(s.key)) : SYNC_BUTTONS
+  const refs = useRef([])
+  const [allRunning, setAllRunning] = useState(false)
+  const syncAll = async () => {
+    if (allRunning) return
+    setAllRunning(true)
+    try { await Promise.all(refs.current.map(r => (r && r.run ? r.run() : null))) } catch {}
+    setAllRunning(false)
+  }
   return (
     <div style={{ display:'flex', gap: compact ? '6px' : '8px', flexWrap:'wrap', alignItems:'center', ...style }}>
-      <span title="Mettre à jour" style={{ fontSize:'11px', fontWeight:'700', color: onDark ? 'rgba(255,255,255,0.85)' : '#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em', marginRight:'2px', display:'inline-flex', alignItems:'center' }}>
-        <i className="ti ti-refresh" style={{ fontSize:'14px' }} />{!compact && <span style={{ marginLeft:'4px' }}>Mettre à jour</span>}
-      </span>
-      {list.map(s => <SyncMiniButton key={s.key} sync={s} onDark={onDark} compact={compact} />)}
+      <button onClick={syncAll} disabled={allRunning} title="Lancer toutes les synchronisations"
+        style={{
+          display:'inline-flex', alignItems:'center', gap: compact ? '5px' : '6px',
+          padding: compact ? '4px 9px' : '7px 12px', borderRadius: compact ? '7px' : '8px',
+          border: onDark ? '1px solid rgba(255,255,255,0.35)' : '1px solid #0f172a',
+          background: allRunning ? (onDark ? 'rgba(255,255,255,0.7)' : '#334155') : (onDark ? 'rgba(255,255,255,0.92)' : '#0f172a'),
+          color: onDark ? '#1e293b' : '#fff',
+          cursor: allRunning ? 'wait' : 'pointer', fontSize: compact ? '11.5px' : '12px', fontWeight:'700',
+          fontFamily:"'Source Sans Pro', sans-serif", whiteSpace:'nowrap', flexShrink:0,
+          textTransform:'uppercase', letterSpacing:'0.03em', marginRight:'2px'
+        }}>
+        <i className={`ti ${allRunning ? 'ti-loader-2' : 'ti-refresh'}`} style={{ fontSize: compact ? '13px' : '14px', animation: allRunning ? 'spin 1s linear infinite' : 'none' }} />
+        {!compact && <span>Tout synchroniser</span>}
+      </button>
+      {list.map((s, i) => <SyncMiniButton key={s.key} ref={el => { refs.current[i] = el }} sync={s} onDark={onDark} compact={compact} />)}
     </div>
   )
 }
