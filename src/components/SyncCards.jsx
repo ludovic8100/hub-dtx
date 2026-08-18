@@ -117,13 +117,15 @@ const SyncMiniButton = forwardRef(function SyncMiniButton({ sync, onDark, compac
   // Date réelle de la dernière synchro : soldes bancaires (BANQUE) ou factures d'achat (DÉPENSES)
   const loadLastSync = async () => {
     try {
-      if (sync.key === 'iban') {
-        const { data } = await supabase.from('comptes_bancaires')
-          .select('date_synchro').not('date_synchro', 'is', null)
-          .order('date_synchro', { ascending: false }).limit(1)
-        if (data && data[0]) setLastSync(data[0].date_synchro)
-      } else if (sync.key === 'rapprochement') {
-        const { data } = await supabase.from('factures_achat')
+      if (sync.workflowId) {
+        const res = await fetch(`${N8N_API}/executions?workflowId=${sync.workflowId}&limit=1`, { headers: { 'X-N8N-API-KEY': N8N_KEY } })
+        if (res.ok) {
+          const d = await res.json()
+          const e = d.data && d.data[0]
+          if (e) setLastSync(e.stoppedAt || e.startedAt)
+        }
+      } else if (sync.key === 'import') {
+        const { data } = await supabase.from('clients')
           .select('updated_at').not('updated_at', 'is', null)
           .order('updated_at', { ascending: false }).limit(1)
         if (data && data[0]) setLastSync(data[0].updated_at)
@@ -187,7 +189,7 @@ const SyncMiniButton = forwardRef(function SyncMiniButton({ sync, onDark, compac
         <i className={`ti ${running ? 'ti-loader-2' : (state==='ok' ? 'ti-check' : state==='error' ? 'ti-x' : sync.icon)}`}
           style={{ color: iconCol, fontSize: compact ? '14px' : '15px', animation: running ? 'spin 1s linear infinite' : 'none' }} />
         <span>{label}</span>
-        {(sync.key === 'iban' || sync.key === 'rapprochement') && (
+        {lastSync && (
           <span title="Dernière synchro (heure belge)" style={{ display:'inline-flex', alignItems:'center', gap:'4px', paddingLeft:'6px', borderLeft:'1px solid #e2e8f0', color:'#334155', fontSize: compact ? '10px' : '11px', fontWeight:'600' }}>
             <i className="ti ti-clock" style={{ fontSize: compact ? '11px' : '12px', color:'#64748b' }} />
             {dateSync}
