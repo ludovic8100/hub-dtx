@@ -98,20 +98,11 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
     setSel(n)
   }
   const capMois = x => x ? x.charAt(0).toUpperCase() + x.slice(1) : x
-  async function titreAutoUnique(baseLabel) {
-    const base = `${baseLabel} - ${myCode}`.trim()
-    const { data } = await supabase.from('notes_frais').select('titre').eq('societe', entiteKey).ilike('titre', base + '%')
-    const pris = new Set((data || []).map(x => (x.titre || '').trim().toLowerCase()))
-    if (!pris.has(base.toLowerCase())) return base
-    let i = 2
-    while (pris.has(`${base} (${i})`.toLowerCase())) i++
-    return `${base} (${i})`
-  }
   async function newNote() {
     const d = new Date()
-    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const jour = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
     const periode = capMois(d.toLocaleDateString('fr-BE', { month: 'long', year: 'numeric' }))
-    const titre = await titreAutoUnique(iso)
+    const titre = `${jour} - NF - ${myCode}`
     setSel({ id: null, societe: entiteKey, titre, periode, statut: 'brouillon', note: '', auteur_email: myEmail, auteur_code: myCode, auteur_nom: myNom })
     setLignes([])
   }
@@ -183,13 +174,6 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
       if (manq.length) { alert(`Soumission impossible : ${manq.length} ligne(s) sans justificatif.\n\nChaque ligne doit avoir un justificatif joint, sauf les lignes kilométriques.`); return }
     }
     setBusy(true)
-    const titreTrim = (sel.titre || '').trim()
-    if (titreTrim) {
-      let qDup = supabase.from('notes_frais').select('id').eq('societe', entiteKey).ilike('titre', titreTrim)
-      if (sel.id) qDup = qDup.neq('id', sel.id)
-      const { data: dup } = await qDup.limit(1)
-      if (dup && dup.length) { setBusy(false); alert('Une note porte déjà ce titre pour cette société. Choisissez un intitulé différent.'); return }
-    }
     const head = {
       societe: entiteKey, titre: (sel.titre || '').trim() || null, periode: (sel.periode || '').trim() || null, note: (sel.note || '').trim() || null,
       auteur_email: sel.auteur_email || myEmail, auteur_code: sel.auteur_code || myCode, auteur_nom: sel.auteur_nom || myNom,
@@ -372,7 +356,7 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
               </div>
 
               <div style={{ padding: '18px 24px', borderBottom: '1px solid #eef2f7' }}>
-                <input disabled={lockEdit} value={sel.titre || ''} onChange={e => setSel(s => ({ ...s, titre: e.target.value }))} placeholder="Intitulé de la note (ex : Frais de juillet)"
+                <input disabled={lockEdit} value={sel.titre || ''} onChange={e => setSel(s => ({ ...s, titre: e.target.value }))} placeholder="ex : 20260819 - NF - LDE"
                   style={{ ...sheetInp, fontSize: 19, fontWeight: 800, color: NAVY, borderBottom: lockEdit ? '1px solid transparent' : '1px solid #e2e8f0', marginBottom: 14 }} />
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 16 }}>
                   <div><div style={infoLbl}>Émetteur</div><div style={infoVal}>{ENT.label}</div></div>
