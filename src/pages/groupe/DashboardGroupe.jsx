@@ -5,7 +5,6 @@ import Layout from '../../components/Layout'
 import { ENTITES } from '../../lib/entites'
 import { StatBanner, PrimaryButton } from '../../components/ui/AccountableUI'
 import VueFactures from '../../components/VueFactures'
-import { SYNCS, SyncCard, WebhookStatus, triggerSync } from '../../components/SyncCards'
 import { SyncButtonsRow } from '../../components/SyncCards'
 
 // ── Constantes ──
@@ -440,39 +439,6 @@ function BlocTresorerie({ comptes, transactions, loading }) {
 }
 
 // ══════════════════════════
-// BLOC SYNC — cartes complètes du centre de synchro
-// ══════════════════════════
-function BlocSync() {
-  const [syncingAll, setSyncingAll] = useState(false)
-
-  const syncAll = async () => {
-    setSyncingAll(true)
-    await Promise.all(SYNCS.map(s => triggerSync(s)))
-    setSyncingAll(false)
-  }
-
-  return (
-    <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
-      <BlocHeader icon="ti-refresh" title="Synchronisations"
-        right={
-          <button onClick={syncAll} disabled={syncingAll}
-            style={{ display:'flex', alignItems:'center', gap:6, background:syncingAll?'rgba(255,255,255,0.1)':'rgba(255,255,255,0.15)', color:'#fff', border:'1px solid rgba(255,255,255,0.25)', borderRadius:7, padding:'6px 14px', cursor:syncingAll?'wait':'pointer', fontSize:12, fontWeight:700, transition:'background 0.15s' }}>
-            <i className={`ti ${syncingAll?'ti-loader-2':'ti-refresh'}`} style={syncingAll?{animation:'spin 1s linear infinite'}:{}} />
-            {syncingAll ? 'En cours…' : 'Tout synchroniser'}
-          </button>
-        }
-      />
-      <div style={{ padding:14 }}>
-        <WebhookStatus />
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:12 }}>
-          {SYNCS.map(s => <SyncCard key={s.key} sync={s} />)}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ══════════════════════════
 // BLOC 4 — Production Dynassur (entièrement cliquable)
 // ══════════════════════════
 function BlocProduction({ loading: loadingExt }) {
@@ -682,11 +648,6 @@ export default function DashboardGroupe() {
 
         <div style={{ marginBottom:20 }}>
           <SyncButtonsRow />
-        </div>
-
-        {/* 1 — Synchronisations tout en haut */}
-        <div style={{ marginBottom:24 }}>
-          <BlocSync />
         </div>
 
         {/* 2 — KPIs */}

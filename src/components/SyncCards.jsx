@@ -111,6 +111,8 @@ export function fmtDerniereExec(at) {
 function SyncMiniButton({ sync, onDark, compact }) {
   const [state, setState] = useState('idle')
   const [lastSync, setLastSync] = useState(null)
+  const [errMsg, setErrMsg] = useState(null)
+  const [showErr, setShowErr] = useState(false)
 
   // Date réelle de la dernière synchro : soldes bancaires (BANQUE) ou factures d'achat (DÉPENSES)
   const loadLastSync = async () => {
@@ -130,13 +132,35 @@ function SyncMiniButton({ sync, onDark, compact }) {
   }
   useEffect(() => { loadLastSync() }, [])
 
+  const msgErreur = (result) => {
+    if (!sync.apiEndpoint) return "Le serveur n8n n'a pas répondu. Vérifie que n8n est actif, puis réessaie."
+    if (result?.status === 401) return "Session expirée. Déconnecte-toi et reconnecte-toi au hub, puis réessaie."
+    if (result?.status === 500) return "Variable GITHUB_DISPATCH_TOKEN manquante dans Vercel (Settings → Environment Variables)."
+    if (result?.status === 502) return "GitHub a refusé le déclenchement : le token GITHUB_DISPATCH_TOKEN est invalide ou insuffisant."
+    return "Échec de la synchronisation. Réessaie."
+  }
+
   const run = async () => {
-    setState('running')
-    const result = await triggerSync(sync)
-    setState(result.ok ? 'ok' : 'error')
-    setTimeout(() => { loadLastSync(); setState('idle') }, 8000)
-    // second rafraîchissement après la fin probable du run (~55s)
-    setTimeout(() => { loadLastSync() }, 55000)
+    if (state === 'running') return
+    setState('running'); setErrMsg(null); setShowErr(false)
+    let done = false
+    const guard = setTimeout(() => {
+      if (!done) { setState('error'); setErrMsg("Délai dépassé — le service n'a pas répondu. Réessaie."); setShowErr(true) }
+    }, 45000)
+    try {
+      const result = await triggerSync(sync)
+      done = true; clearTimeout(guard)
+      if (result.ok) {
+        setState('ok')
+        setTimeout(() => { loadLastSync(); setState('idle') }, 8000)
+        setTimeout(() => { loadLastSync() }, 55000)
+      } else {
+        setState('error'); setErrMsg(msgErreur(result)); setShowErr(true)
+      }
+    } catch {
+      done = true; clearTimeout(guard)
+      setState('error'); setErrMsg("Échec de l'appel. Réessaie."); setShowErr(true)
+    }
   }
   const running = state === 'running'
   const bg = onDark
@@ -144,30 +168,41 @@ function SyncMiniButton({ sync, onDark, compact }) {
     : (running ? '#f1f5f9' : (state==='ok' ? '#f0fdf4' : state==='error' ? '#fef2f2' : '#fff'))
   const txtCol = onDark ? '#1e293b' : '#334155'
   const iconCol = running ? '#94a3b8' : (state==='ok' ? '#16a34a' : state==='error' ? '#dc2626' : sync.color)
-  const border = onDark ? '1px solid rgba(255,255,255,0.3)' : '1px solid #e2e8f0'
+  const border = onDark ? '1px solid rgba(255,255,255,0.3)' : (state==='error' ? '1px solid #fecaca' : '1px solid #e2e8f0')
 
   const label = compact ? (sync.labelCourt || sync.label) : sync.label
   const dateSync = lastSync
     ? new Date(lastSync).toLocaleString('fr-BE', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }).replace(',', ' ·')
     : '—'
   return (
-    <button onClick={run} disabled={running} title={sync.tooltip || sync.label}
-      style={{
-        display:'flex', alignItems:'center', gap: compact ? '5px' : '7px', padding: compact ? '4px 9px' : '7px 12px', borderRadius: compact ? '7px' : '8px',
-        border, background: bg,
-        cursor: running ? 'wait' : 'pointer', fontSize: compact ? '11.5px' : '12px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif",
-        color: txtCol, whiteSpace:'nowrap', flexShrink:0
-      }}>
-      <i className={`ti ${running ? 'ti-loader-2' : (state==='ok' ? 'ti-check' : state==='error' ? 'ti-x' : sync.icon)}`}
-        style={{ color: iconCol, fontSize: compact ? '14px' : '15px', animation: running ? 'spin 1s linear infinite' : 'none' }} />
-      <span>{label}</span>
-      {(sync.key === 'iban' || sync.key === 'rapprochement') && (
-        <span title="Dernière synchro (heure belge)" style={{ display:'inline-flex', alignItems:'center', gap:'4px', paddingLeft:'6px', borderLeft:'1px solid #e2e8f0', color:'#334155', fontSize: compact ? '10px' : '11px', fontWeight:'600' }}>
-          <i className="ti ti-clock" style={{ fontSize: compact ? '11px' : '12px', color:'#64748b' }} />
-          {dateSync}
-        </span>
+    <div style={{ position:'relative', flexShrink:0 }}>
+      <button onClick={run} disabled={running} title={state==='error' ? 'Échec — cliquer pour réessayer' : (sync.tooltip || sync.label)}
+        style={{
+          display:'flex', alignItems:'center', gap: compact ? '5px' : '7px', padding: compact ? '4px 9px' : '7px 12px', borderRadius: compact ? '7px' : '8px',
+          border, background: bg,
+          cursor: running ? 'wait' : 'pointer', fontSize: compact ? '11.5px' : '12px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif",
+          color: txtCol, whiteSpace:'nowrap'
+        }}>
+        <i className={`ti ${running ? 'ti-loader-2' : (state==='ok' ? 'ti-check' : state==='error' ? 'ti-x' : sync.icon)}`}
+          style={{ color: iconCol, fontSize: compact ? '14px' : '15px', animation: running ? 'spin 1s linear infinite' : 'none' }} />
+        <span>{label}</span>
+        {(sync.key === 'iban' || sync.key === 'rapprochement') && (
+          <span title="Dernière synchro (heure belge)" style={{ display:'inline-flex', alignItems:'center', gap:'4px', paddingLeft:'6px', borderLeft:'1px solid #e2e8f0', color:'#334155', fontSize: compact ? '10px' : '11px', fontWeight:'600' }}>
+            <i className="ti ti-clock" style={{ fontSize: compact ? '11px' : '12px', color:'#64748b' }} />
+            {dateSync}
+          </span>
+        )}
+      </button>
+      {showErr && errMsg && (
+        <div style={{ position:'absolute', top:'calc(100% + 6px)', left:0, zIndex:50, minWidth:'240px', maxWidth:'340px', background:'#fff', border:'1px solid #fecaca', borderRadius:'8px', boxShadow:'0 8px 24px rgba(0,0,0,0.15)', padding:'10px 12px' }}>
+          <div style={{ display:'flex', alignItems:'flex-start', gap:'8px' }}>
+            <i className="ti ti-alert-triangle" style={{ color:'#dc2626', fontSize:'16px', marginTop:'1px' }} />
+            <div style={{ flex:1, fontSize:'12px', color:'#334155', lineHeight:1.45 }}>{errMsg}</div>
+            <button onClick={(e) => { e.stopPropagation(); setShowErr(false) }} style={{ border:'none', background:'none', cursor:'pointer', color:'#94a3b8', fontSize:'16px', lineHeight:1, padding:0 }}>✕</button>
+          </div>
+        </div>
       )}
-    </button>
+    </div>
   )
 }
 
