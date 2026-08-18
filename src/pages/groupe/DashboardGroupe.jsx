@@ -667,7 +667,7 @@ export default function DashboardGroupe() {
         <div style={{ marginBottom:24, background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
           <BlocHeader icon="ti-file-invoice" title="Factures à pointer" />
           <div style={{ padding:16 }}>
-            <VueFactures societeCodes={['DYNASSUR','DTX','LODE','HEXAGROUP','PRIVE']} color={ENTITES.groupe.color} tousComptes statutDefaut="nonpayees" />
+            <VueFactures societeCodes={['DYNASSUR','DTX','LODE','HEXAGROUP','PRIVE']} color={ENTITES.groupe.color} tousComptes statutDefaut="nonpayees" masquerMontant />
           </div>
         </div>
 

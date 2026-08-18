@@ -30,23 +30,24 @@ async function chargerTout(table, select, filtreSociete, filtreSens) {
   return out
 }
 
-export default function VueFactures({ societeCodes, color, sens = 'achat', tousComptes = false, statutDefaut = 'toutes' }) {
+export default function VueFactures({ societeCodes, color, sens = 'achat', tousComptes = false, statutDefaut = 'toutes', masquerMontant = false }) {
   // Achats et Ventes viennent tous deux de factures_achat (documents SharePoint), filtrés par `sens`.
   return (
     <div style={{ fontFamily: FONT }}>
-      <VueAchats societeCodes={societeCodes} color={color} sens={sens} tousComptes={tousComptes} statutDefaut={statutDefaut} />
+      <VueAchats societeCodes={societeCodes} color={color} sens={sens} tousComptes={tousComptes} statutDefaut={statutDefaut} masquerMontant={masquerMontant} />
     </div>
   )
 }
 
 /* ─────────────── ACHATS (factures fournisseurs, dossier SharePoint) ─────────────── */
-function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, statutDefaut = 'toutes' }) {
+function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, statutDefaut = 'toutes', masquerMontant = false }) {
   const vente = sens === 'vente'
   const [factures, setFactures] = useState([])
   const [loading, setLoading] = useState(true)
   const [filtre, setFiltre] = useState({ statut: statutDefaut, recherche: '', annee: '', societe: '' })
   const [page, setPage] = useState(1)
   const [lierPaiement, setLierPaiement] = useState(null) // facture en cours de liaison à un mouvement
+  const [txAVerifier, setTxAVerifier] = useState([]) // mouvements sortants sans facture (paiements à vérifier)
   const PAR_PAGE = 100
 
   // Lier une facture à un mouvement bancaire (écrit les DEUX côtés du lien)
@@ -88,6 +89,28 @@ function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, s
       })
   }, [societeCodes.join(','), sens])
 
+  // Paiements à vérifier : mouvements SORTANTS sans facture liée, ni justifiés « sans facture », ni « en attente »
+  useEffect(() => {
+    let annule = false
+    ;(async () => {
+      let out = []; let from = 0
+      for (;;) {
+        const { data, error } = await supabase.from('transactions')
+          .select('date_valeur,date_execution,comptes_bancaires!inner(societes!inner(code))')
+          .lt('montant', 0).is('facture_url', null)
+          .not('sans_facture', 'is', true).not('en_attente_facture', 'is', true)
+          .in('comptes_bancaires.societes.code', societeCodes)
+          .range(from, from + 999)
+        if (error || !data) break
+        out = out.concat(data)
+        if (data.length < 1000) break
+        from += 1000
+      }
+      if (!annule) setTxAVerifier(out)
+    })()
+    return () => { annule = true }
+  }, [societeCodes.join(',')])
+
   useEffect(() => { setPage(1) }, [filtre.statut, filtre.recherche, filtre.annee, filtre.societe])
 
   const anneesDispo = [...new Set(factures.map(f => (f.date_facture || '').substring(0, 4)).filter(Boolean))].sort((a, b) => b - a)
@@ -109,10 +132,23 @@ function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, s
   const total = baseFiltre.length
   const nbPayees = baseFiltre.filter(f => f.transaction_id).length
   const nbNonPayees = total - nbPayees
+  // Paiements à vérifier, recalculés selon les mêmes filtres année + société
+  const nbPaiementsAVerifier = txAVerifier.filter(t => {
+    const code = t.comptes_bancaires?.societes?.code
+    if (filtre.societe && code !== filtre.societe) return false
+    if (filtre.annee && !((t.date_valeur || t.date_execution || '').startsWith(filtre.annee))) return false
+    return true
+  }).length
   const totalPages = Math.ceil(filtrees.length / PAR_PAGE)
   const facturesPage = filtrees.slice((page - 1) * PAR_PAGE, page * PAR_PAGE)
   const multiSociete = societeCodes.length > 1
   const ouvrir = (f) => { if (f.url) window.open(f.url, '_blank', 'noopener,noreferrer') }
+  const cols = multiSociete
+    ? (masquerMontant ? ['120px', '110px', '110px', '1fr', '46px'] : ['120px', '110px', '110px', '1fr', '130px', '46px'])
+    : (masquerMontant ? ['110px', '110px', '1fr', '46px'] : ['110px', '110px', '1fr', '130px', '46px'])
+  const entetes = multiSociete
+    ? (masquerMontant ? ['Société', 'Statut', 'Date', 'Facture', ''] : ['Société', 'Statut', 'Date', 'Facture', 'Montant', ''])
+    : (masquerMontant ? ['Statut', 'Date', 'Facture', ''] : ['Statut', 'Date', 'Facture', 'Montant', ''])
 
   if (loading) return <div style={{ padding: '50px', textAlign: 'center', color: '#94a3b8' }}>Chargement…</div>
 
@@ -124,6 +160,7 @@ function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, s
     { label: 'Total achats', value: total, c: color, sub: `${nbPayees} payées • ${nbNonPayees} à vérifier` },
     { label: 'Payées', value: nbPayees, c: '#16a34a', sub: 'liées à un paiement', clic: 'payees' },
     { label: 'Factures à vérifier', value: nbNonPayees, c: '#dc2626', sub: 'aucun paiement lié', clic: 'nonpayees' },
+    { label: 'Paiements à vérifier', value: nbPaiementsAVerifier, c: '#ea580c', sub: 'mouvement sans facture' },
   ]
 
   return (
@@ -131,8 +168,7 @@ function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, s
       <KpiRow kpis={kpis} actif={filtre.statut} onClic={(v) => setFiltre(f => ({ ...f, statut: f.statut === v ? 'toutes' : v }))} />
       <FiltreBar filtre={filtre} setFiltre={setFiltre} anneesDispo={anneesDispo} societesDispo={multiSociete ? societesDispo : null} placeholder="Nom de facture…" reset={() => setFiltre({ statut: 'toutes', recherche: '', annee: '', societe: '' })} />
       <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-        <Ligne header cols={multiSociete ? ['120px', '110px', '110px', '1fr', '130px', '46px'] : ['110px', '110px', '1fr', '130px', '46px']}
-          items={multiSociete ? ['Société', 'Statut', 'Date', 'Facture', 'Montant', ''] : ['Statut', 'Date', 'Facture', 'Montant', '']} />
+        <Ligne header cols={cols} items={entetes} />
         {facturesPage.length === 0 && <div style={{ padding: '50px', textAlign: 'center', color: '#94a3b8' }}>Aucune facture</div>}
         {facturesPage.map((f, i) => {
           const payee = !!f.transaction_id
@@ -144,10 +180,10 @@ function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, s
             </span>,
             <span style={{ fontSize: '12.5px', color: '#64748b', fontWeight: '600' }}>{fmtDate(f.date_facture)}</span>,
             <span style={{ fontSize: '13px', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '10px' }}>{(f.nom || '').replace(/\.pdf$/i, '')}</span>,
-            <span style={{ textAlign: 'right', display: 'block', fontSize: '13.5px', fontWeight: '700', color: f.montant == null ? '#cbd5e1' : '#0f172a' }}>{f.montant == null ? '—' : fmt(f.montant)}</span>,
+            ...(masquerMontant ? [] : [<span style={{ textAlign: 'right', display: 'block', fontSize: '13.5px', fontWeight: '700', color: f.montant == null ? '#cbd5e1' : '#0f172a' }}>{f.montant == null ? '—' : fmt(f.montant)}</span>]),
             <button onClick={(e) => { e.stopPropagation(); basculerSens(f) }} title={vente ? 'Reclasser dans les Achats' : 'Reclasser dans les Ventes'} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '30px', height: '30px', margin: '0 auto', borderRadius: '7px', border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', cursor: 'pointer' }}><i className="ti ti-transfer" style={{ fontSize: '16px' }} /></button>,
           ]
-          return <Ligne key={f.fichier_id} cols={multiSociete ? ['120px', '110px', '110px', '1fr', '130px', '46px'] : ['110px', '110px', '1fr', '130px', '46px']} items={cells} onClick={() => ouvrir(f)} clickable={!!f.url} alt={i % 2 === 1} title={f.nom} />
+          return <Ligne key={f.fichier_id} cols={cols} items={cells} onClick={() => ouvrir(f)} clickable={!!f.url} alt={i % 2 === 1} title={f.nom} />
         })}
       </div>
       <Pagination page={page} totalPages={totalPages} setPage={setPage} total={filtrees.length} />
