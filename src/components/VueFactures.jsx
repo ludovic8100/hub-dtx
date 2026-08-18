@@ -92,18 +92,23 @@ function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, s
 
   const anneesDispo = [...new Set(factures.map(f => (f.date_facture || '').substring(0, 4)).filter(Boolean))].sort((a, b) => b - a)
   const societesDispo = [...new Set(factures.map(f => f.societe).filter(Boolean))].sort()
-  const filtrees = factures.filter(f => {
-    const payee = !!f.transaction_id
-    if (filtre.statut === 'payees' && !payee) return false
-    if (filtre.statut === 'nonpayees' && payee) return false
+  // Base filtrée par année + société + recherche (PAS par statut) : les KPI se calculent
+  // dessus et se recalculent donc à chaque changement de filtre année/société.
+  const baseFiltre = factures.filter(f => {
     if (filtre.societe && f.societe !== filtre.societe) return false
     if (filtre.annee && !(f.date_facture || '').startsWith(filtre.annee)) return false
     if (filtre.recherche && !(f.nom || '').toLowerCase().includes(filtre.recherche.toLowerCase())) return false
     return true
   })
-  const nbPayees = factures.filter(f => f.transaction_id).length
-  const nbNonPayees = factures.length - nbPayees
-  const montantNonPaye = factures.filter(f => !f.transaction_id).reduce((s, f) => s + (parseFloat(f.montant) || 0), 0)
+  const filtrees = baseFiltre.filter(f => {
+    const payee = !!f.transaction_id
+    if (filtre.statut === 'payees' && !payee) return false
+    if (filtre.statut === 'nonpayees' && payee) return false
+    return true
+  })
+  const total = baseFiltre.length
+  const nbPayees = baseFiltre.filter(f => f.transaction_id).length
+  const nbNonPayees = total - nbPayees
   const totalPages = Math.ceil(filtrees.length / PAR_PAGE)
   const facturesPage = filtrees.slice((page - 1) * PAR_PAGE, page * PAR_PAGE)
   const multiSociete = societeCodes.length > 1
@@ -112,15 +117,13 @@ function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, s
   if (loading) return <div style={{ padding: '50px', textAlign: 'center', color: '#94a3b8' }}>Chargement…</div>
 
   const kpis = vente ? [
-    { label: 'Total ventes', value: factures.length, c: color, sub: `${nbPayees} encaissées • ${nbNonPayees} à vérifier` },
+    { label: 'Total ventes', value: total, c: color, sub: `${nbPayees} encaissées • ${nbNonPayees} à vérifier` },
     { label: 'Encaissées', value: nbPayees, c: '#16a34a', sub: 'liées à un mouvement', clic: 'payees' },
-    { label: 'À encaisser', value: nbNonPayees, c: '#dc2626', sub: 'aucun mouvement lié', clic: 'nonpayees' },
-    { label: 'Montant à encaisser', value: fmt(montantNonPaye), c: '#dc2626', sub: 'total non rapproché' },
+    { label: 'Factures à encaisser', value: nbNonPayees, c: '#dc2626', sub: 'aucun mouvement lié', clic: 'nonpayees' },
   ] : [
-    { label: 'Total achats', value: factures.length, c: color, sub: `${nbPayees} payées • ${nbNonPayees} à vérifier` },
+    { label: 'Total achats', value: total, c: color, sub: `${nbPayees} payées • ${nbNonPayees} à vérifier` },
     { label: 'Payées', value: nbPayees, c: '#16a34a', sub: 'liées à un paiement', clic: 'payees' },
-    { label: 'Paiement à vérifier', value: nbNonPayees, c: '#dc2626', sub: 'aucun paiement lié', clic: 'nonpayees' },
-    { label: 'Montant à vérifier', value: fmt(montantNonPaye), c: '#dc2626', sub: 'total non réglé' },
+    { label: 'Factures à vérifier', value: nbNonPayees, c: '#dc2626', sub: 'aucun paiement lié', clic: 'nonpayees' },
   ]
 
   return (
