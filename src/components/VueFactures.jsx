@@ -398,9 +398,18 @@ function PanneauLierPaiement({ facture, color, onClose, onLier, tousComptes = fa
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: '14px', width: 'min(620px, 94vw)', maxHeight: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
-          <div style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a' }}>Rechercher un mouvement</div>
-          <div style={{ fontSize: '12.5px', color: '#64748b', marginTop: '3px' }}>{(facture.nom || '').replace(/\.pdf$/i, '')} — <strong>{fmt(facture.montant)}</strong></div>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {facture.fichier_id && (
+            <img src={`https://n8n.srv1082740.hstgr.cloud/webhook/apercu-facture?fid=${facture.fichier_id}`} alt=""
+              onClick={() => facture.url && window.open(facture.url, '_blank', 'noopener,noreferrer')}
+              onError={e => { e.currentTarget.style.display = 'none' }}
+              title="Ouvrir la facture"
+              style={{ width: '46px', height: '60px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #e2e8f0', flexShrink: 0, cursor: facture.url ? 'pointer' : 'default', background: '#f8fafc' }} />
+          )}
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a' }}>Rechercher un mouvement</div>
+            <div style={{ fontSize: '12.5px', color: '#64748b', marginTop: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(facture.nom || '').replace(/\.pdf$/i, '')} — <strong>{fmt(facture.montant)}</strong></div>
+          </div>
         </div>
         <div style={{ padding: '12px 20px', borderBottom: '1px solid #f1f5f9' }}>
           <input value={recherche} onChange={e => setRecherche(e.target.value)} placeholder="Rechercher sur tout : contrepartie, IBAN, communication, montant, date…" autoFocus
