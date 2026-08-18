@@ -430,7 +430,7 @@ function PanneauLierPaiement({ facture, color, onClose, onLier, tousComptes = fa
                   <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: '13px', fontWeight: '600', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.contrepartie_nom || 'Mouvement'}</div>
                   <div style={{ fontSize: '11.5px', color: '#94a3b8' }}>{fmtDate(m.date_valeur || m.date_execution)} · {m.comptes_bancaires?.banque || ''}{tousComptes && m.comptes_bancaires?.societes?.code ? ` · ${m.comptes_bancaires.societes.code}` : ''}</div>
-                  {m.information_paiement && <div title={m.information_paiement} style={{ fontSize: '11px', color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '1px' }}><i className="ti ti-file-description" style={{ fontSize: '11px', color: '#cbd5e1', marginRight: '3px' }} />{m.information_paiement.replace(/[\r\n]+/g, ' · ').replace(/\s+/g, ' ').trim()}</div>}
+                  {m.information_paiement && <div title={m.information_paiement} style={{ fontSize: '11px', color: '#64748b', overflow: 'hidden', marginTop: '2px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', lineHeight: '1.4', wordBreak: 'break-word' }}><i className="ti ti-file-description" style={{ fontSize: '11px', color: '#cbd5e1', marginRight: '3px' }} />{m.information_paiement.replace(/[\r\n]+/g, ' · ').replace(/\s+/g, ' ').trim()}</div>}
                 </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
