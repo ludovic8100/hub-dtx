@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
 import { ENTITES } from '../../lib/entites'
 import { StatBanner, PrimaryButton } from '../../components/ui/AccountableUI'
+import VueFactures from '../../components/VueFactures'
 import { SYNCS, SyncCard, WebhookStatus, triggerSync } from '../../components/SyncCards'
 import { SyncButtonsRow } from '../../components/SyncCards'
 
@@ -699,6 +700,14 @@ export default function DashboardGroupe() {
         {/* 3 — Comptes bancaires pleine largeur */}
         <div style={{ marginBottom:24 }}>
           <BlocBanque comptes={comptes} loading={loading} />
+        </div>
+
+        {/* 3b — Factures à pointer (toutes sociétés, tous comptes) */}
+        <div style={{ marginBottom:24, background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
+          <BlocHeader icon="ti-file-invoice" title="Factures à pointer" />
+          <div style={{ padding:16 }}>
+            <VueFactures societeCodes={['DYNASSUR','DTX','LODE','HEXAGROUP','PRIVE']} color={ENTITES.groupe.color} tousComptes statutDefaut="nonpayees" />
+          </div>
         </div>
 
         {/* 4 — Tâches pleine largeur */}

@@ -30,21 +30,21 @@ async function chargerTout(table, select, filtreSociete, filtreSens) {
   return out
 }
 
-export default function VueFactures({ societeCodes, color, sens = 'achat' }) {
+export default function VueFactures({ societeCodes, color, sens = 'achat', tousComptes = false, statutDefaut = 'toutes' }) {
   // Achats et Ventes viennent tous deux de factures_achat (documents SharePoint), filtrés par `sens`.
   return (
     <div style={{ fontFamily: FONT }}>
-      <VueAchats societeCodes={societeCodes} color={color} sens={sens} />
+      <VueAchats societeCodes={societeCodes} color={color} sens={sens} tousComptes={tousComptes} statutDefaut={statutDefaut} />
     </div>
   )
 }
 
 /* ─────────────── ACHATS (factures fournisseurs, dossier SharePoint) ─────────────── */
-function VueAchats({ societeCodes, color, sens = 'achat' }) {
+function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, statutDefaut = 'toutes' }) {
   const vente = sens === 'vente'
   const [factures, setFactures] = useState([])
   const [loading, setLoading] = useState(true)
-  const [filtre, setFiltre] = useState({ statut: 'toutes', recherche: '', annee: '' })
+  const [filtre, setFiltre] = useState({ statut: statutDefaut, recherche: '', annee: '', societe: '' })
   const [page, setPage] = useState(1)
   const [lierPaiement, setLierPaiement] = useState(null) // facture en cours de liaison à un mouvement
   const PAR_PAGE = 100
@@ -88,13 +88,15 @@ function VueAchats({ societeCodes, color, sens = 'achat' }) {
       })
   }, [societeCodes.join(','), sens])
 
-  useEffect(() => { setPage(1) }, [filtre.statut, filtre.recherche, filtre.annee])
+  useEffect(() => { setPage(1) }, [filtre.statut, filtre.recherche, filtre.annee, filtre.societe])
 
   const anneesDispo = [...new Set(factures.map(f => (f.date_facture || '').substring(0, 4)).filter(Boolean))].sort((a, b) => b - a)
+  const societesDispo = [...new Set(factures.map(f => f.societe).filter(Boolean))].sort()
   const filtrees = factures.filter(f => {
     const payee = !!f.transaction_id
     if (filtre.statut === 'payees' && !payee) return false
     if (filtre.statut === 'nonpayees' && payee) return false
+    if (filtre.societe && f.societe !== filtre.societe) return false
     if (filtre.annee && !(f.date_facture || '').startsWith(filtre.annee)) return false
     if (filtre.recherche && !(f.nom || '').toLowerCase().includes(filtre.recherche.toLowerCase())) return false
     return true
@@ -124,7 +126,7 @@ function VueAchats({ societeCodes, color, sens = 'achat' }) {
   return (
     <>
       <KpiRow kpis={kpis} actif={filtre.statut} onClic={(v) => setFiltre(f => ({ ...f, statut: f.statut === v ? 'toutes' : v }))} />
-      <FiltreBar filtre={filtre} setFiltre={setFiltre} anneesDispo={anneesDispo} placeholder="Nom de facture…" reset={() => setFiltre({ statut: 'toutes', recherche: '', annee: '' })} />
+      <FiltreBar filtre={filtre} setFiltre={setFiltre} anneesDispo={anneesDispo} societesDispo={multiSociete ? societesDispo : null} placeholder="Nom de facture…" reset={() => setFiltre({ statut: 'toutes', recherche: '', annee: '', societe: '' })} />
       <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
         <Ligne header cols={multiSociete ? ['110px', '110px', '1fr', '120px', '130px', '46px'] : ['110px', '110px', '1fr', '130px', '46px']}
           items={multiSociete ? ['Statut', 'Date', 'Facture', 'Société', 'Montant', ''] : ['Statut', 'Date', 'Facture', 'Montant', '']} />
@@ -146,7 +148,7 @@ function VueAchats({ societeCodes, color, sens = 'achat' }) {
         })}
       </div>
       <Pagination page={page} totalPages={totalPages} setPage={setPage} total={filtrees.length} />
-      {lierPaiement && <PanneauLierPaiement facture={lierPaiement} color={color} onClose={() => setLierPaiement(null)} onLier={(tx) => lierTransaction(lierPaiement, tx)} />}
+      {lierPaiement && <PanneauLierPaiement facture={lierPaiement} color={color} tousComptes={tousComptes} onClose={() => setLierPaiement(null)} onLier={(tx) => lierTransaction(lierPaiement, tx)} />}
     </>
   )
 }
@@ -242,7 +244,7 @@ function KpiRow({ kpis, actif, onClic }) {
   )
 }
 
-function FiltreBar({ filtre, setFiltre, anneesDispo, placeholder, reset }) {
+function FiltreBar({ filtre, setFiltre, anneesDispo, placeholder, reset, societesDispo }) {
   return (
     <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '14px 16px', marginBottom: '14px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
@@ -268,7 +270,16 @@ function FiltreBar({ filtre, setFiltre, anneesDispo, placeholder, reset }) {
           {anneesDispo.map(a => <option key={a} value={a}>{a}</option>)}
         </select>
       </div>
-      {(filtre.statut !== 'toutes' || filtre.recherche || filtre.annee) && (
+      {societesDispo && societesDispo.length > 1 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+          <label style={{ fontSize: '10px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Société</label>
+          <select value={filtre.societe || ''} onChange={e => setFiltre(f => ({ ...f, societe: e.target.value }))} style={{ padding: '7px 10px', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '13px', fontFamily: FONT, cursor: 'pointer' }}>
+            <option value="">Toutes</option>
+            {societesDispo.map(sc => <option key={sc} value={sc}>{sc}</option>)}
+          </select>
+        </div>
+      )}
+      {(filtre.statut !== 'toutes' || filtre.recherche || filtre.annee || filtre.societe) && (
         <button onClick={reset} style={{ padding: '7px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', fontFamily: FONT }}>Réinitialiser</button>
       )}
     </div>
@@ -339,7 +350,7 @@ function scoreCorrespondance(m, montantCible, facture) {
 }
 
 /* ─────────────── Panneau : lier un paiement à une facture d'achat ─────────────── */
-function PanneauLierPaiement({ facture, color, onClose, onLier }) {
+function PanneauLierPaiement({ facture, color, onClose, onLier, tousComptes = false }) {
   const [tous, setTous] = useState([])
   const [loading, setLoading] = useState(true)
   const [recherche, setRecherche] = useState('')
@@ -357,9 +368,9 @@ function PanneauLierPaiement({ facture, color, onClose, onLier }) {
     ;(async () => {
       let out = []; let from = 0
       for (;;) {
-        const { data, error } = await supabase.from('transactions').select(cols)
-          .eq('comptes_bancaires.societes.code', soc).is('facture_url', null)
-          .order('date_valeur', { ascending: false }).range(from, from + 999)
+        let q = supabase.from('transactions').select(cols).is('facture_url', null)
+        if (!tousComptes) q = q.eq('comptes_bancaires.societes.code', soc)
+        const { data, error } = await q.order('date_valeur', { ascending: false }).range(from, from + 999)
         if (error || !data) break
         out = out.concat(data)
         if (data.length < 1000) break
@@ -409,7 +420,7 @@ function PanneauLierPaiement({ facture, color, onClose, onLier }) {
                   <span style={{ width: '18px', height: '18px', flexShrink: 0, borderRadius: '5px', border: sel.includes(m.id) ? 'none' : '2px solid #cbd5e1', background: sel.includes(m.id) ? color : '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{sel.includes(m.id) && <i className="ti ti-check" style={{ fontSize: '12px', color: '#fff' }} />}</span>
                   <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: '13px', fontWeight: '600', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.contrepartie_nom || m.information_paiement || 'Mouvement'}</div>
-                  <div style={{ fontSize: '11.5px', color: '#94a3b8' }}>{fmtDate(m.date_valeur || m.date_execution)} · {m.comptes_bancaires?.banque || ''}</div>
+                  <div style={{ fontSize: '11.5px', color: '#94a3b8' }}>{fmtDate(m.date_valeur || m.date_execution)} · {m.comptes_bancaires?.banque || ''}{tousComptes && m.comptes_bancaires?.societes?.code ? ` · ${m.comptes_bancaires.societes.code}` : ''}</div>
                 </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
