@@ -72,7 +72,8 @@ export async function triggerSync(sync) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       })
-      return { ok: r.ok, method: 'api' }
+      const body = await r.json().catch(() => ({}))
+      return { ok: r.ok, method: 'api', status: r.status, error: body.error }
     } catch { return { ok: false } }
   }
   return triggerWorkflow(sync.webhook, sync.workflowId)
@@ -259,9 +260,15 @@ export function SyncCard({ sync }) {
       setTimeout(() => { loadCounts(); loadLastExec() }, 8000)
     } else {
       setState('error')
-      setMsg(sync.apiEndpoint
-        ? "Échec du lancement. Vérifie la variable GITHUB_DISPATCH_TOKEN dans Vercel (Settings → Environment Variables)."
-        : 'Le serveur webhook n8n est inactif. Redémarre n8n (docker restart n8n), puis réessaie.')
+      setMsg(!sync.apiEndpoint
+        ? 'Le serveur webhook n8n est inactif. Redémarre n8n (docker restart n8n), puis réessaie.'
+        : result.status === 401
+          ? 'Session expirée. Déconnecte-toi et reconnecte-toi au hub, puis réessaie.'
+          : result.status === 500
+            ? 'Variable GITHUB_DISPATCH_TOKEN manquante dans Vercel (Settings → Environment Variables).'
+            : result.status === 502
+              ? 'GitHub a refusé le déclenchement : le token GITHUB_DISPATCH_TOKEN est invalide ou insuffisant.'
+              : 'Échec du lancement du reload Qlik.')
     }
   }
 

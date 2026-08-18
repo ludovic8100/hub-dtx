@@ -8,6 +8,10 @@
 
 const REPO = 'ludovic8100/hub-dtx'
 const WORKFLOW = 'qlik-sync.yml'
+// Clé publishable Supabase (publique, identique au front src/lib/supabase.js).
+// On n'utilise plus SUPABASE_ANON_KEY : les clés JWT legacy ont été désactivées (migration sécurité).
+const SB_URL = 'https://tndwonqdbeszkcztkzqe.supabase.co'
+const SB_KEY = 'sb_publishable_xBt6ZaZGh5trEloyMCNRuA_MN-jesVJ'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'method' })
@@ -16,8 +20,8 @@ export default async function handler(req, res) {
   try {
     const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '')
     if (!token) return res.status(401).json({ ok: false, error: 'no token' })
-    const u = await fetch(`${process.env.SUPABASE_URL}/auth/v1/user`, {
-      headers: { apikey: process.env.SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` },
+    const u = await fetch(`${SB_URL}/auth/v1/user`, {
+      headers: { apikey: SB_KEY, Authorization: `Bearer ${token}` },
     })
     if (!u.ok) return res.status(401).json({ ok: false, error: 'invalid session' })
   } catch (e) { return res.status(401).json({ ok: false, error: 'auth failed' }) }

@@ -3,6 +3,9 @@
 // Sécurité : n'accepte que les appels d'un utilisateur connecté au Hub (JWT Supabase vérifié).
 // Variables d'env (Vercel) : AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, SUPABASE_URL, SUPABASE_ANON_KEY
 
+const SB_URL = 'https://tndwonqdbeszkcztkzqe.supabase.co'
+const SB_KEY = 'sb_publishable_xBt6ZaZGh5trEloyMCNRuA_MN-jesVJ'  // publique, identique au front (clés JWT legacy désactivées)
+
 const ENTITES = {
   lode: { from: 'info@lode-group.be', cc: 'contact@lode-group.be', nom: 'LODE',     couleur: '#ea580c', dark: '#7c2d12' },
   dtx:  { from: 'info@dtx-group.be',  cc: null,                     nom: 'DTX',      couleur: '#475569', dark: '#1e293b' },
@@ -15,8 +18,8 @@ export default async function handler(req, res) {
   try {
     const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '')
     if (!token) return res.status(401).json({ ok: false, error: 'no token' })
-    const u = await fetch(`${process.env.SUPABASE_URL}/auth/v1/user`, {
-      headers: { apikey: process.env.SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` },
+    const u = await fetch(`${SB_URL}/auth/v1/user`, {
+      headers: { apikey: SB_KEY, Authorization: `Bearer ${token}` },
     })
     if (!u.ok) return res.status(401).json({ ok: false, error: 'invalid session' })
   } catch (e) { return res.status(401).json({ ok: false, error: 'auth failed' }) }
