@@ -114,22 +114,21 @@ const SyncMiniButton = forwardRef(function SyncMiniButton({ sync, onDark, compac
   const [errMsg, setErrMsg] = useState(null)
   const [showErr, setShowErr] = useState(false)
 
-  // Date réelle de la dernière synchro : soldes bancaires (BANQUE) ou factures d'achat (DÉPENSES)
+  // Heure du dernier CHANGEMENT DE DONNEE pour cette synchro (permet de voir si elle a
+  // reellement modifie quelque chose, au-dela de la couleur du bouton) : chaque bouton pointe
+  // vers la table qu'il alimente.
   const loadLastSync = async () => {
     try {
-      if (sync.workflowId) {
-        const res = await fetch(`${N8N_API}/executions?workflowId=${sync.workflowId}&limit=1`, { headers: { 'X-N8N-API-KEY': N8N_KEY } })
-        if (res.ok) {
-          const d = await res.json()
-          const e = d.data && d.data[0]
-          if (e) setLastSync(e.stoppedAt || e.startedAt)
-        }
-      } else if (sync.key === 'import') {
-        const { data } = await supabase.from('clients')
-          .select('updated_at').not('updated_at', 'is', null)
-          .order('updated_at', { ascending: false }).limit(1)
-        if (data && data[0]) setLastSync(data[0].updated_at)
-      }
+      let table, col
+      if (sync.key === 'iban') { table = 'comptes_bancaires'; col = 'date_synchro' }
+      else if (sync.key === 'rapprochement') { table = 'factures_achat'; col = 'updated_at' }
+      else if (sync.key === 'bordereaux') { table = 'bordereaux'; col = 'created_at' }
+      else if (sync.key === 'import') { table = 'quittances'; col = 'created_at' }
+      if (!table) return
+      const { data } = await supabase.from(table)
+        .select(col).not(col, 'is', null)
+        .order(col, { ascending: false }).limit(1)
+      if (data && data[0]) setLastSync(data[0][col])
     } catch {}
   }
   useEffect(() => { loadLastSync() }, [])
