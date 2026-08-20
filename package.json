@@ -14,7 +14,8 @@
     "react-dom": "^18.3.0",
     "jspdf": "^2.5.2",
     "qrcode": "^1.5.4",
-    "react-router-dom": "^6.26.0"
+    "react-router-dom": "^6.26.0",
+    "pdf-lib": "^1.17.1"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.0",

@@ -6,6 +6,7 @@ import QRCode from 'qrcode'
 import { fmtIban, ibanEspace, epcPayload } from './epc'
 import { ENTITES } from './entites'
 import { supabase } from './supabase'
+import { PDFDocument } from 'pdf-lib'
 
 const W = 595.28, H = 841.89, MX = 44, RX = W - 44, CW = RX - MX
 const GREY = [100, 116, 139], DGREY = [30, 41, 59], MGREY = [71, 85, 105]
@@ -213,29 +214,80 @@ export async function genererPdfNote({ entiteKey = 'dynassur', note = {}, lignes
 
   footer(doc, note.numero)
 
-  // ───────── ANNEXE JUSTIFICATIFS ─────────
-  const justifs = rows.filter(r => !r.km && r.justificatif_path)
-  if (justifs.length) {
-    doc.addPage(); annexeHeader(doc, ent, COL, DARK, note.numero)
-    let ay = 58 + 26
-    for (const j of justifs) {
-      const isImg = /\.(png|jpe?g|webp|gif|bmp)$/i.test(j.justificatif_nom || '') || /image\//i.test(j.justificatif_nom || '')
-      let embed = null
-      if (isImg) { try { const su = await supabase.storage.from('notes-frais').createSignedUrl(j.justificatif_path, 3600); if (su?.data?.signedUrl) { const d = await imgDataURL(su.data.signedUrl); embed = d } } catch { embed = null } }
-      const bh = embed ? 300 : 96
-      if (ay + bh + 16 > H - 50) { footer(doc, note.numero); doc.addPage(); annexeHeader(doc, ent, COL, DARK, note.numero, true); ay = 58 + 26 }
-      doc.setFillColor(248, 250, 252); doc.setDrawColor(...LINE); doc.setLineWidth(1); doc.roundedRect(MX, ay, CW, bh, 6, 6, 'FD')
-      doc.setFillColor(...COL); doc.rect(MX, ay, CW, 3, 'F')
-      doc.setTextColor(...DGREY); doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5); doc.text(`${j.cat} — ${eur(j.ttc)}`, MX + 14, ay + 22)
-      doc.setTextColor(...GREY); doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.text(truncate(doc, j.justificatif_nom || 'Justificatif', CW - 28), MX + 14, ay + 38)
-      if (embed) { const dd = await dims(embed.dataURL); drawContain(doc, embed.dataURL, dd.w, dd.h, MX + 14, ay + 46, CW - 28, bh - 58) }
-      else { doc.setTextColor(148, 163, 184); doc.setFont('helvetica', 'italic'); doc.setFontSize(9); doc.text('Justificatif PDF joint (consultable depuis la ligne de la note).', MX + 14, ay + 62) }
-      ay += bh + 16
-    }
-    footer(doc, note.numero)
-  }
+  // ───────── FUSION DES JUSTIFICATIFS (vrais PDF + images) ─────────
+  footer(doc, note.numero)
+  const noteBytes = doc.output('arraybuffer')
 
-  return doc.output('blob')
+  // Récupérer les justificatifs (hors lignes km)
+  const justifs = rows.filter(r => !r.km && r.justificatif_path)
+  if (!justifs.length) return doc.output('blob')
+
+  try {
+    const merged = await PDFDocument.create()
+    // 1) Ajouter la/les page(s) de la note
+    const noteDoc = await PDFDocument.load(noteBytes)
+    const notePages = await merged.copyPages(noteDoc, noteDoc.getPageIndices())
+    notePages.forEach(p => merged.addPage(p))
+
+    // 2) Ajouter chaque justificatif après
+    for (const j of justifs) {
+      try {
+        const su = await supabase.storage.from('notes-frais').createSignedUrl(j.justificatif_path, 3600)
+        if (!su?.data?.signedUrl) continue
+        const resp = await fetch(su.data.signedUrl)
+        if (!resp.ok) continue
+        const buf = await resp.arrayBuffer()
+        const nom = (j.justificatif_nom || '').toLowerCase()
+        const isPdf = nom.endsWith('.pdf') || (resp.headers.get('content-type') || '').includes('pdf')
+
+        if (isPdf) {
+          // Fusionner toutes les pages du PDF justificatif
+          const src = await PDFDocument.load(buf, { ignoreEncryption: true })
+          const pages = await merged.copyPages(src, src.getPageIndices())
+          pages.forEach(p => merged.addPage(p))
+        } else {
+          // Image : l'embarquer sur une page A4 pleine
+          let img
+          if (nom.endsWith('.png') || (resp.headers.get('content-type') || '').includes('png')) {
+            img = await merged.embedPng(buf)
+          } else {
+            try { img = await merged.embedJpg(buf) } catch { 
+              // format non supporté par pdf-lib (webp, gif) -> convertir via canvas
+              const conv = await imgToPngBytes(su.data.signedUrl)
+              img = await merged.embedPng(conv)
+            }
+          }
+          const page = merged.addPage([595.28, 841.89])
+          const iw = img.width, ih = img.height
+          const maxW = 595.28 - 72, maxH = 841.89 - 100
+          const r = Math.min(maxW / iw, maxH / ih)
+          const w = iw * r, h = ih * r
+          page.drawImage(img, { x: (595.28 - w) / 2, y: (841.89 - h) / 2, width: w, height: h })
+        }
+      } catch (e) { /* justificatif illisible -> on continue */ }
+    }
+
+    const out = await merged.save()
+    return new Blob([out], { type: 'application/pdf' })
+  } catch (e) {
+    // En cas d'échec de fusion, retourner au moins la note seule
+    return doc.output('blob')
+  }
+}
+
+// Convertit une image (webp/gif...) en PNG bytes via canvas
+async function imgToPngBytes(url) {
+  const r = await fetch(url); const blob = await r.blob(); const obj = URL.createObjectURL(blob)
+  try {
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = obj })
+    const cv = document.createElement('canvas'); cv.width = img.naturalWidth || 800; cv.height = img.naturalHeight || 800
+    cv.getContext('2d').drawImage(img, 0, 0)
+    const dataUrl = cv.toDataURL('image/png')
+    const b64 = dataUrl.split(',')[1]
+    const bin = atob(b64); const arr = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
+    return arr.buffer
+  } finally { URL.revokeObjectURL(obj) }
 }
 
 function footer(doc, numero) {
@@ -243,11 +295,4 @@ function footer(doc, numero) {
   doc.setTextColor(...GREY); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5)
   doc.text('Pièce générée par Hub DTX — document interne à joindre en comptabilité.', MX, H - 26)
   doc.text(String(numero || ''), RX, H - 26, { align: 'right' })
-}
-function annexeHeader(doc, ent, COL, DARK, numero, suite) {
-  const BH = 58
-  doc.setFillColor(...COL); doc.rect(0, 0, W, BH, 'F'); doc.setFillColor(...DARK); doc.rect(0, 0, 7, BH, 'F')
-  doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(14)
-  doc.text('ANNEXE — JUSTIFICATIFS' + (suite ? ' (suite)' : ''), MX, 37)
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.text(`${ent.label} · ${numero || ''}`, RX, 37, { align: 'right' })
 }
