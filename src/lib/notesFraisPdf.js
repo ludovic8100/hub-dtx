@@ -6,7 +6,7 @@ import QRCode from 'qrcode'
 import { fmtIban, ibanEspace, epcPayload } from './epc'
 import { ENTITES } from './entites'
 import { supabase } from './supabase'
-import { PDFDocument } from 'pdf-lib'
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 
 const W = 595.28, H = 841.89, MX = 44, RX = W - 44, CW = RX - MX
 const GREY = [100, 116, 139], DGREY = [30, 41, 59], MGREY = [71, 85, 105]
@@ -90,34 +90,33 @@ export async function genererPdfNote({ entiteKey = 'dynassur', note = {}, lignes
   }
 
   // ───────── EN-TÊTE ─────────
-  const BH = 96
+  const BH = 62
   doc.setFillColor(...COL); doc.rect(0, 0, W, BH, 'F')
   doc.setFillColor(...DARK); doc.rect(0, 0, 7, BH, 'F')
-  const ls = 66, lx = MX, ly = (BH - ls) / 2
+  const ls = 44, lx = MX, ly = (BH - ls) / 2
   doc.setFillColor(...WHITE); doc.setDrawColor(...tint(COL, .25)); doc.setLineWidth(0.8)
   doc.roundedRect(lx, ly, ls, ls, 10, 10, 'FD')
   if (logo) { drawContain(doc, logo.dataURL, logo.w, logo.h, lx + 9, ly + 9, ls - 18, ls - 18) }
   else { doc.setTextColor(...COL); doc.setFont('helvetica', 'bold'); doc.setFontSize(ls * 0.5); doc.text(mono, lx + ls / 2, ly + ls / 2 + ls * 0.17, { align: 'center' }) }
   const tx = MX + ls + 20
-  doc.setTextColor(...WHITE); doc.setFont('helvetica', 'bold'); doc.setFontSize(21); doc.text('NOTE DE FRAIS', tx, 45)
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.text('Pièce justificative de remboursement', tx, 64)
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.text(ent.label || '', RX, 44, { align: 'right' })
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(235, 240, 245); doc.text('Hub DTX', RX, 60, { align: 'right' })
+  doc.setTextColor(...WHITE); doc.setFont('helvetica', 'bold'); doc.setFontSize(17); doc.text('NOTE DE FRAIS', tx, 30)
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.text('Pièce justificative de remboursement', tx, 45)
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.text(ent.label || '', RX, 37, { align: 'right' })
 
   // ───────── INFOS ─────────
   const lbl = (x, y, t) => { doc.setTextColor(...GREY); doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.text(String(t).toUpperCase(), x, y) }
   const val = (x, y, t, col = DGREY, sz = 10.5) => { doc.setTextColor(...col); doc.setFont('helvetica', 'bold'); doc.setFontSize(sz); doc.text(String(t || '—'), x, y) }
   const c1 = MX, c2 = MX + 205, c3 = MX + 375
-  lbl(c1, 126, 'Émetteur'); val(c1, 140, ent.label)
-  lbl(c1, 158, 'Collaborateur'); val(c1, 172, benefNom || note.auteur_nom || '—')
-  lbl(c2, 126, 'N° de note'); val(c2, 140, note.numero || '—')
-  lbl(c2, 158, 'Période'); val(c2, 172, note.periode || '—')
-  lbl(c3, 126, 'Statut'); doc.setTextColor(...GREEN); doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5); doc.text('VALIDÉE', c3, 140)
-  doc.setTextColor(...GREY); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.text('le ' + fmtD(note.validee_at), c3, 154)
+  lbl(c1, 92, 'Émetteur'); val(c1, 106, ent.label)
+  lbl(c1, 124, 'Collaborateur'); val(c1, 138, benefNom || note.auteur_nom || '—')
+  lbl(c2, 92, 'N° de note'); val(c2, 106, note.numero || '—')
+  lbl(c2, 124, 'Période'); val(c2, 138, note.periode || '—')
+  lbl(c3, 92, 'Statut'); doc.setTextColor(...GREEN); doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5); doc.text('VALIDÉE', c3, 106)
+  doc.setTextColor(...GREY); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.text('le ' + fmtD(note.validee_at), c3, 120)
 
   // ───────── TITRE ─────────
-  doc.setTextColor(...DARK); doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.text(note.titre || 'Note de frais', MX, 196)
-  doc.setFillColor(...COL); doc.rect(MX, 201, 44, 3, 'F')
+  doc.setTextColor(...DARK); doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.text(note.titre || 'Note de frais', MX, 162)
+  doc.setFillColor(...COL); doc.rect(MX, 167, 44, 3, 'F')
 
   // ───────── TABLEAU ─────────
   const cols = [['Date', 60, 'l'], ['Catégorie', 92, 'l'], ['Description', 200, 'l'], ['HT', 52, 'r'], ['TVA', 47, 'r'], ['TTC', 56, 'r']]
@@ -128,7 +127,7 @@ export async function genererPdfNote({ entiteKey = 'dynassur', note = {}, lignes
     cols.forEach((c, i) => { c[2] === 'l' ? doc.text(c[0], xs[i] + 7, top + 14) : doc.text(c[0], xs[i + 1] - 7, top + 14, { align: 'right' }) })
     return top + 21
   }
-  let cy = drawTableHeader(214)
+  let cy = drawTableHeader(180)
   const rowH = 24, ROWLIMIT = H - 60
   rows.forEach((r, i) => {
     if (cy + rowH > ROWLIMIT) { // saut de page tableau
@@ -224,13 +223,26 @@ export async function genererPdfNote({ entiteKey = 'dynassur', note = {}, lignes
 
   try {
     const merged = await PDFDocument.create()
+    const helvB = await merged.embedFont(StandardFonts.HelveticaBold)
     // 1) Ajouter la/les page(s) de la note
     const noteDoc = await PDFDocument.load(noteBytes)
     const notePages = await merged.copyPages(noteDoc, noteDoc.getPageIndices())
     notePages.forEach(p => merged.addPage(p))
 
     // 2) Ajouter chaque justificatif après
+    const colB = [COL[0]/255, COL[1]/255, COL[2]/255]
+    // Bandeau nom de fichier en haut d'une page
+    const bandeau = (page, texte) => {
+      const pw = page.getWidth(), ph = page.getHeight()
+      page.drawRectangle({ x: 0, y: ph - 22, width: pw, height: 22, color: rgb(colB[0], colB[1], colB[2]) })
+      let t = 'Justificatif : ' + texte
+      // tronquer si trop long
+      const maxChars = Math.floor((pw - 24) / 5.2)
+      if (t.length > maxChars) t = t.slice(0, maxChars - 1) + '…'
+      page.drawText(t, { x: 12, y: ph - 15, size: 9, font: helvB, color: rgb(1, 1, 1) })
+    }
     for (const j of justifs) {
+      const nomAff = j.justificatif_nom || 'Justificatif'
       try {
         const su = await supabase.storage.from('notes-frais').createSignedUrl(j.justificatif_path, 3600)
         if (!su?.data?.signedUrl) continue
@@ -241,28 +253,26 @@ export async function genererPdfNote({ entiteKey = 'dynassur', note = {}, lignes
         const isPdf = nom.endsWith('.pdf') || (resp.headers.get('content-type') || '').includes('pdf')
 
         if (isPdf) {
-          // Fusionner toutes les pages du PDF justificatif
           const src = await PDFDocument.load(buf, { ignoreEncryption: true })
           const pages = await merged.copyPages(src, src.getPageIndices())
-          pages.forEach(p => merged.addPage(p))
+          pages.forEach((p, idx) => { merged.addPage(p); bandeau(p, nomAff + (pages.length > 1 ? ` (page ${idx+1}/${pages.length})` : '')) })
         } else {
-          // Image : l'embarquer sur une page A4 pleine
           let img
           if (nom.endsWith('.png') || (resp.headers.get('content-type') || '').includes('png')) {
             img = await merged.embedPng(buf)
           } else {
-            try { img = await merged.embedJpg(buf) } catch { 
-              // format non supporté par pdf-lib (webp, gif) -> convertir via canvas
+            try { img = await merged.embedJpg(buf) } catch {
               const conv = await imgToPngBytes(su.data.signedUrl)
               img = await merged.embedPng(conv)
             }
           }
           const page = merged.addPage([595.28, 841.89])
           const iw = img.width, ih = img.height
-          const maxW = 595.28 - 72, maxH = 841.89 - 100
+          const maxW = 595.28 - 72, maxH = 841.89 - 130
           const r = Math.min(maxW / iw, maxH / ih)
           const w = iw * r, h = ih * r
-          page.drawImage(img, { x: (595.28 - w) / 2, y: (841.89 - h) / 2, width: w, height: h })
+          page.drawImage(img, { x: (595.28 - w) / 2, y: (841.89 - h) / 2 - 15, width: w, height: h })
+          bandeau(page, nomAff)
         }
       } catch (e) { /* justificatif illisible -> on continue */ }
     }
