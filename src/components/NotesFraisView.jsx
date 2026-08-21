@@ -118,6 +118,20 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
     setLignes(ls => [...ls, { _key: uid(), id: null, date: todayISO(), categorie: '', description: '', montant_ttc: '', taux_tva: 21, km_distance: '', km_taux: KM_TAUX_DEFAUT, justificatif_path: null, justificatif_nom: null }])
   }
   const updLigne = (k, patch) => setLignes(ls => ls.map(l => l._key === k ? { ...l, ...patch } : l))
+  // Force l'insertion d'un separateur decimal quand on tape , ou . (touche clavier ou pave num)
+  const decimalKeyDown = (k, field) => (e) => {
+    if (e.key === ',' || e.key === '.' || e.key === 'Decimal') {
+      e.preventDefault()
+      const inp = e.target
+      const val = String(inp.value || '')
+      const start = inp.selectionStart ?? val.length
+      const end = inp.selectionEnd ?? val.length
+      if (val.includes('.')) return  // deja un separateur -> ne rien faire
+      const next = val.slice(0, start) + '.' + val.slice(end)
+      updLigne(k, { [field]: next })
+      requestAnimationFrame(() => { try { inp.setSelectionRange(start + 1, start + 1) } catch {} })
+    }
+  }
   const delLigne = async (k) => {
     const l = lignes.find(x => x._key === k)
     if (l?.justificatif_path) { try { await supabase.storage.from('notes-frais').remove([l.justificatif_path]) } catch { } }
@@ -413,11 +427,11 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
                             <td style={tdS}>
                               {km
                                 ? <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                                    <input disabled={lockEdit} value={l.km_distance ?? ''} onChange={e => updLigne(l._key, { km_distance: e.target.value })} placeholder="km" style={{ ...sheetInp, width: 46 }} />
+                                    <input disabled={lockEdit} value={l.km_distance ?? ''} onKeyDown={decimalKeyDown(l._key, 'km_distance')} onChange={e => updLigne(l._key, { km_distance: e.target.value })} placeholder="km" style={{ ...sheetInp, width: 46 }} />
                                     <span style={{ color: '#94a3b8', fontSize: 11 }}>×</span>
-                                    <input disabled={lockEdit} value={l.km_taux ?? ''} onChange={e => updLigne(l._key, { km_taux: e.target.value })} style={{ ...sheetInp, width: 56 }} />
+                                    <input disabled={lockEdit} value={l.km_taux ?? ''} onKeyDown={decimalKeyDown(l._key, 'km_taux')} onChange={e => updLigne(l._key, { km_taux: e.target.value })} style={{ ...sheetInp, width: 56 }} />
                                   </div>
-                                : <input disabled={lockEdit} value={l.montant_ttc ?? ''} onChange={e => updLigne(l._key, { montant_ttc: e.target.value })} placeholder="0,00" style={{ ...sheetInp, width: 78 }} />}
+                                : <input disabled={lockEdit} value={l.montant_ttc ?? ''} onKeyDown={decimalKeyDown(l._key, 'montant_ttc')} onChange={e => updLigne(l._key, { montant_ttc: e.target.value })} placeholder="0,00" style={{ ...sheetInp, width: 78 }} />}
                             </td>
                             <td style={tdS}>{km ? <span style={{ color: '#cbd5e1' }}>—</span>
                               : <select disabled={lockEdit} value={l.taux_tva} onChange={e => updLigne(l._key, { taux_tva: e.target.value })} style={{ ...sheetInp, width: 62 }}>{TVA_TAUX.map(t => <option key={t} value={t}>{t}%</option>)}</select>}</td>
