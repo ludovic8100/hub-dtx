@@ -151,7 +151,7 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
   const totTTC = calc.reduce((s, l) => s + l.montant_ttc, 0)
   const totTVA = calc.reduce((s, l) => s + l.montant_tva, 0)
   const totHT = totTTC - totTVA
-  const lockEdit = sel && sel.statut !== 'brouillon'
+  const lockEdit = sel && sel.statut !== 'brouillon' && !isAdmin
 
   useEffect(() => {
     setBenefIban(''); setQrUrl('')
