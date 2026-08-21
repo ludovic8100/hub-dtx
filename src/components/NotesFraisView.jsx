@@ -79,7 +79,7 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
   const myNom = perms?.nom || ''
   const ENT = ENTITES[entiteKey] || ENTITES.dynassur
   const ACCENT = ENT.color
-  const showTVA = entiteKey !== 'dynassur'  // Dynassur : pas de TVA (courtage exonere)
+  const showTVA = entiteKey === 'lode'  // Seul LODE deduit la TVA ; autres entites : pas de TVA
 
   const [loading, setLoading] = useState(true)
   const [notes, setNotes] = useState([])
