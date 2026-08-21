@@ -54,6 +54,7 @@ function truncate(doc, txt, maxw) {
  */
 export async function genererPdfNote({ entiteKey = 'dynassur', note = {}, lignes = [], benefNom = '', benefIban = '', sigImage = '', sigNom = '', sigAt = null, valideParNom = '', valideAt = null }) {
   const ent = ENTITES[entiteKey] || ENTITES.dynassur
+  const showTVA = entiteKey === 'lode'  // Seul LODE affiche TVA/HT
   const COL = hx(ent.color), DARK = hx(ent.colorDark || ent.color)
   const doc = new jsPDF({ unit: 'pt', format: 'a4', compress: true })
   doc.setProperties({ title: `Note de frais ${note.numero || ''} — ${ent.label}` })
@@ -119,7 +120,9 @@ export async function genererPdfNote({ entiteKey = 'dynassur', note = {}, lignes
   doc.setFillColor(...COL); doc.rect(MX, 167, 44, 3, 'F')
 
   // ───────── TABLEAU ─────────
-  const cols = [['Date', 60, 'l'], ['Catégorie', 92, 'l'], ['Description', 200, 'l'], ['HT', 52, 'r'], ['TVA', 47, 'r'], ['TTC', 56, 'r']]
+  const cols = showTVA
+    ? [['Date', 60, 'l'], ['Catégorie', 92, 'l'], ['Description', 200, 'l'], ['HT', 52, 'r'], ['TVA', 47, 'r'], ['TTC', 56, 'r']]
+    : [['Date', 70, 'l'], ['Catégorie', 110, 'l'], ['Description', 231, 'l'], ['Montant', 96, 'r']]
   const xs = [MX]; cols.forEach(c => xs.push(xs[xs.length - 1] + c[1]))
   const drawTableHeader = top => {
     doc.setFillColor(...COL); doc.rect(MX, top, CW, 21, 'F')
@@ -141,9 +144,13 @@ export async function genererPdfNote({ entiteKey = 'dynassur', note = {}, lignes
     doc.text(r.date, xs[0] + 7, cy + 16)
     doc.text(truncate(doc, r.cat, cols[1][1] - 12), xs[1] + 7, cy + 16)
     doc.text(truncate(doc, r.desc, cols[2][1] - 12), xs[2] + 7, cy + 16)
-    doc.text(eur(r.ht), xs[4] - 7, cy + 16, { align: 'right' })
-    doc.text(r.km ? '—' : eur(r.tva), xs[5] - 7, cy + 16, { align: 'right' })
-    doc.setFont('helvetica', 'bold'); doc.text(eur(r.ttc), xs[6] - 7, cy + 16, { align: 'right' })
+    if (showTVA) {
+      doc.text(eur(r.ht), xs[4] - 7, cy + 16, { align: 'right' })
+      doc.text(r.km ? '—' : eur(r.tva), xs[5] - 7, cy + 16, { align: 'right' })
+      doc.setFont('helvetica', 'bold'); doc.text(eur(r.ttc), xs[6] - 7, cy + 16, { align: 'right' })
+    } else {
+      doc.setFont('helvetica', 'bold'); doc.text(eur(r.ttc), xs[4] - 7, cy + 16, { align: 'right' })
+    }
     cy += rowH
   })
   doc.setDrawColor(...LINE); doc.setLineWidth(1); doc.line(MX, cy, RX, cy)
@@ -158,11 +165,17 @@ export async function genererPdfNote({ entiteKey = 'dynassur', note = {}, lignes
     doc.setTextColor(...(big ? DARK : MGREY)); doc.setFont('helvetica', big ? 'bold' : 'normal'); doc.setFontSize(big ? 11 : 9.5); doc.text(label, tx0 + 12, yy)
     doc.setTextColor(...(big ? COL : DGREY)); doc.setFont('helvetica', 'bold'); doc.setFontSize(big ? 15 : 10); doc.text(eur(value), RX - 12, yy, { align: 'right' })
   }
-  totline(ty + 14, 'Total HT', tHT)
-  totline(ty + 31, 'Total TVA', tTVA)
-  doc.setDrawColor(...tint(COL, .4)); doc.setLineWidth(1); doc.line(tx0 + 12, ty + 40, RX - 12, ty + 40)
-  doc.setFillColor(...tint(COL, .07)); doc.roundedRect(tx0, ty + 46, tw, 24, 5, 5, 'F')
-  totline(ty + 62, 'TOTAL À REMBOURSER', tTTC, true)
+  let tyBase = ty
+  if (showTVA) {
+    totline(ty + 14, 'Total HT', tHT)
+    totline(ty + 31, 'Total TVA', tTVA)
+    doc.setDrawColor(...tint(COL, .4)); doc.setLineWidth(1); doc.line(tx0 + 12, ty + 40, RX - 12, ty + 40)
+    tyBase = ty
+  } else {
+    tyBase = ty - 34  // pas de lignes HT/TVA -> remonter le bloc total
+  }
+  doc.setFillColor(...tint(COL, .07)); doc.roundedRect(tx0, tyBase + 46, tw, 24, 5, 5, 'F')
+  totline(tyBase + 62, 'TOTAL À REMBOURSER', tTTC, true)
 
   // ───────── ENCART REMBOURSEMENT ─────────
   const eh = 122, ey = ty + 88
