@@ -79,6 +79,7 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
   const myNom = perms?.nom || ''
   const ENT = ENTITES[entiteKey] || ENTITES.dynassur
   const ACCENT = ENT.color
+  const showTVA = entiteKey !== 'dynassur'  // Dynassur : pas de TVA (courtage exonere)
 
   const [loading, setLoading] = useState(true)
   const [notes, setNotes] = useState([])
@@ -115,7 +116,7 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
     setLignes([])
   }
   function addLigne() {
-    setLignes(ls => [...ls, { _key: uid(), id: null, date: todayISO(), categorie: '', description: '', montant_ttc: '', taux_tva: 21, km_distance: '', km_taux: KM_TAUX_DEFAUT, justificatif_path: null, justificatif_nom: null }])
+    setLignes(ls => [...ls, { _key: uid(), id: null, date: todayISO(), categorie: '', description: '', montant_ttc: '', taux_tva: showTVA ? 21 : 0, km_distance: '', km_taux: KM_TAUX_DEFAUT, justificatif_path: null, justificatif_nom: null }])
   }
   const updLigne = (k, patch) => setLignes(ls => ls.map(l => l._key === k ? { ...l, ...patch } : l))
   const delLigne = async (k) => {
@@ -388,8 +389,8 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
                         <th style={thS}>Catégorie</th>
                         <th style={{ ...thS, minWidth: 170 }}>Description</th>
                         <th style={thS}>Montant</th>
-                        <th style={thS}>TVA</th>
-                        <th style={{ ...thS, textAlign: 'right' }}>HT</th>
+                        {showTVA && <th style={thS}>TVA</th>}
+                        {showTVA && <th style={{ ...thS, textAlign: 'right' }}>HT</th>}
                         <th style={{ ...thS, textAlign: 'right' }}>TTC</th>
                         <th style={thS}>Justificatif</th>
                         <th style={{ ...thS, width: 28 }}></th>
@@ -420,9 +421,9 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
                                   </div>
                                 : <input disabled={lockEdit} value={raw.montant_ttc ?? ''} onChange={e => updLigne(l._key, { montant_ttc: e.target.value })} placeholder="0,00" style={{ ...sheetInp, width: 78 }} />}
                             </td>
-                            <td style={tdS}>{km ? <span style={{ color: '#cbd5e1' }}>—</span>
-                              : <select disabled={lockEdit} value={l.taux_tva} onChange={e => updLigne(l._key, { taux_tva: e.target.value })} style={{ ...sheetInp, width: 62 }}>{TVA_TAUX.map(t => <option key={t} value={t}>{t}%</option>)}</select>}</td>
-                            <td style={{ ...tdS, textAlign: 'right', color: '#475569', whiteSpace: 'nowrap' }}>{eur(l.montant_ht)}</td>
+                            {showTVA && <td style={tdS}>{km ? <span style={{ color: '#cbd5e1' }}>—</span>
+                              : <select disabled={lockEdit} value={l.taux_tva} onChange={e => updLigne(l._key, { taux_tva: e.target.value })} style={{ ...sheetInp, width: 62 }}>{TVA_TAUX.map(t => <option key={t} value={t}>{t}%</option>)}</select>}</td>}
+                            {showTVA && <td style={{ ...tdS, textAlign: 'right', color: '#475569', whiteSpace: 'nowrap' }}>{eur(l.montant_ht)}</td>}
                             <td style={{ ...tdS, textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>{eur(l.montant_ttc)}</td>
                             <td style={tdS}>
                               {km ? <span style={{ color: '#cbd5e1' }}>—</span>
@@ -449,8 +450,8 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 28, padding: '14px 24px 20px', borderTop: '1px solid #eef2f7', flexWrap: 'wrap' }}>
-                <div style={{ textAlign: 'right' }}><div style={infoLbl}>Total HT</div><div style={{ fontSize: 16, fontWeight: 700 }}>{eur(totHT)}</div></div>
-                <div style={{ textAlign: 'right' }}><div style={infoLbl}>TVA</div><div style={{ fontSize: 16, fontWeight: 700 }}>{eur(totTVA)}</div></div>
+                {showTVA && <div style={{ textAlign: 'right' }}><div style={infoLbl}>Total HT</div><div style={{ fontSize: 16, fontWeight: 700 }}>{eur(totHT)}</div></div>}
+                {showTVA && <div style={{ textAlign: 'right' }}><div style={infoLbl}>TVA</div><div style={{ fontSize: 16, fontWeight: 700 }}>{eur(totTVA)}</div></div>}
                 <div style={{ textAlign: 'right' }}><div style={infoLbl}>Total à rembourser</div><div style={{ fontSize: 22, fontWeight: 800, color: ACCENT }}>{eur(totTTC)}</div></div>
               </div>
               {sel.statut === 'validee' && (
