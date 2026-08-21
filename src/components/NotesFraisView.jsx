@@ -413,11 +413,11 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
                             <td style={tdS}>
                               {km
                                 ? <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                                    <input disabled={lockEdit} inputMode="decimal" value={l.km_distance ?? ''} onChange={e => updLigne(l._key, { km_distance: e.target.value })} placeholder="km" style={{ ...sheetInp, width: 46 }} />
+                                    <input disabled={lockEdit} value={l.km_distance ?? ''} onChange={e => updLigne(l._key, { km_distance: e.target.value })} placeholder="km" style={{ ...sheetInp, width: 46 }} />
                                     <span style={{ color: '#94a3b8', fontSize: 11 }}>×</span>
-                                    <input disabled={lockEdit} inputMode="decimal" value={l.km_taux ?? ''} onChange={e => updLigne(l._key, { km_taux: e.target.value })} style={{ ...sheetInp, width: 56 }} />
+                                    <input disabled={lockEdit} value={l.km_taux ?? ''} onChange={e => updLigne(l._key, { km_taux: e.target.value })} style={{ ...sheetInp, width: 56 }} />
                                   </div>
-                                : <input disabled={lockEdit} inputMode="decimal" value={l.montant_ttc ?? ''} onChange={e => updLigne(l._key, { montant_ttc: e.target.value })} placeholder="0,00" style={{ ...sheetInp, width: 78 }} />}
+                                : <input disabled={lockEdit} value={l.montant_ttc ?? ''} onChange={e => updLigne(l._key, { montant_ttc: e.target.value })} placeholder="0,00" style={{ ...sheetInp, width: 78 }} />}
                             </td>
                             <td style={tdS}>{km ? <span style={{ color: '#cbd5e1' }}>—</span>
                               : <select disabled={lockEdit} value={l.taux_tva} onChange={e => updLigne(l._key, { taux_tva: e.target.value })} style={{ ...sheetInp, width: 62 }}>{TVA_TAUX.map(t => <option key={t} value={t}>{t}%</option>)}</select>}</td>
