@@ -61,6 +61,7 @@ const MODULES = {
 
 const MODULES_ADMIN = [
   { key: 'admin_config', label: 'Paramètres', icon: 'ti-settings', path: '/config' },
+  { key: 'admin_users', label: 'Utilisateurs', icon: 'ti-users', path: '/admin/users' },
   { key: 'admin_notes_frais', label: 'Notes de frais', icon: 'ti-receipt', path: '/admin/notes-frais' },
   { key: 'admin_sync', label: 'Synchronisation', icon: 'ti-refresh', path: '/admin/sync' },
   { key: 'admin_liens', label: 'Liens cassés', icon: 'ti-unlink', path: '/admin/liens-casses' },
