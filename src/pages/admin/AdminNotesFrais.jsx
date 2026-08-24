@@ -84,6 +84,23 @@ export default function AdminNotesFrais() {
     setBusy(false)
   }
 
+  async function voirPdf() {
+    if (!sel) return
+    try {
+      const blob = await genererPdfNote({
+        entiteKey: sel.societe,
+        note: { ...sel, total: sel.total || totTTC },
+        lignes,
+        benefNom: sel.benef_nom || '', benefIban: sel.benef_iban || '',
+        sigImage: sel.sig_image, sigNom: sel.sig_nom, sigAt: sel.sig_at,
+        valideParNom: myNom,
+      })
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank')
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+    } catch (e) { notify(false, 'Aperçu PDF impossible : ' + (e.message || e)) }
+  }
+
   async function refuser() {
     if (!sel || busy) return
     if (!motif.trim()) { notify(false, 'Indiquez un motif de renvoi.'); return }
@@ -125,7 +142,10 @@ export default function AdminNotesFrais() {
 
         {sel && (
           <div style={{ maxWidth: 900, margin: '16px auto 40px' }}>
-            <button onClick={() => { setSel(null); setLignes([]) }} style={{ ...btn('#fff', '#475569', '1px solid #e2e8f0'), marginBottom: 14 }}>← Retour à la liste</button>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
+              <button onClick={() => { setSel(null); setLignes([]) }} style={btn('#fff', '#475569', '1px solid #e2e8f0')}>← Retour à la liste</button>
+              <button onClick={voirPdf} style={btn('#fff', NAVY, '1px solid #cbd5e1')}>📄 Voir le PDF (note + justificatifs)</button>
+            </div>
             <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 22 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
                 <div>
@@ -143,9 +163,7 @@ export default function AdminNotesFrais() {
                   {['Date', 'Catégorie', 'Description', 'HT', 'TVA', 'TTC', 'Justif.'].map((h, i) => <th key={i} style={{ padding: '8px 8px', textAlign: (i > 2 && i < 6) ? 'right' : (i === 6 ? 'center' : 'left'), fontSize: 10.5, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', borderBottom: '1px solid #e2e8f0' }}>{h}</th>)}
                 </tr></thead>
                 <tbody>
-                  {lignes.map((l, i) => {
-                    const jn = l.justificatif_nom || (l.justificatif_path ? l.justificatif_path.split('/').pop().replace(/^[^-]+-/, '') : '')
-                    return (
+                  {lignes.map((l, i) => (
                     <tr key={i}>
                       <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9' }}>{fmtD(l.date)}</td>
                       <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9' }}>{l.categorie || '—'}</td>
@@ -153,12 +171,9 @@ export default function AdminNotesFrais() {
                       <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', textAlign: 'right' }}>{eur(l.montant_ht)}</td>
                       <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', textAlign: 'right' }}>{isKm(l) ? '—' : eur(l.montant_tva)}</td>
                       <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', textAlign: 'right', fontWeight: 700 }}>{eur(l.montant_ttc)}</td>
-                      <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', textAlign: 'center' }}>{isKm(l) ? '—' : l.justificatif_path
-                        ? <button onClick={async () => { const { data } = await supabase.storage.from('notes-frais').createSignedUrl(l.justificatif_path, 3600); if (data?.signedUrl) window.open(data.signedUrl, '_blank') }} title={jn} style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block', verticalAlign: 'middle', border: '1px solid #e2e8f0', background: '#fff', color: ENT(sel.societe).color, borderRadius: 6, padding: '3px 8px', fontSize: 11.5, cursor: 'pointer' }}>📎 {jn}</button>
-                        : <span style={{ color: '#dc2626' }}>⚠</span>}</td>
+                      <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', textAlign: 'center' }}>{isKm(l) ? '—' : (l.justificatif_path ? '✓' : '⚠')}</td>
                     </tr>
-                    )
-                  })}
+                  ))}
                 </tbody>
               </table>
 
