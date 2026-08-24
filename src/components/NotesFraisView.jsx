@@ -147,6 +147,7 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
     if (path) { try { await supabase.storage.from('notes-frais').remove([path]) } catch { } }
     updLigne(k, { justificatif_path: null, justificatif_nom: null })
   }
+  const pieceNom = l => l.justificatif_nom || (l.justificatif_path ? l.justificatif_path.split('/').pop().replace(/^[^-]+-/, '') : '')
 
   const calc = lignes.map(l => ({ ...l, ...calcLigne(l) }))
   const totTTC = calc.reduce((s, l) => s + l.montant_ttc, 0)
@@ -430,7 +431,7 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
                                 : l.justificatif_path
                                   ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
                                       <button onClick={() => viewJustif(l.justificatif_path)} title={l.justificatif_nom || 'Justificatif'} style={{ ...btn('#fff', ACCENT, `1px solid ${ACCENT}`), padding: '3px 9px', fontSize: 11.5 }}>📎 Voir</button>
-                                      {l.justificatif_nom && <span title={l.justificatif_nom} style={{ maxWidth: 170, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11.5, color: '#64748b', display: 'inline-block', verticalAlign: 'middle' }}>{l.justificatif_nom}</span>}
+                                      {pieceNom(l) && <span title={pieceNom(l)} style={{ maxWidth: 170, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11.5, color: '#64748b', display: 'inline-block', verticalAlign: 'middle' }}>{pieceNom(l)}</span>}
                                       {!lockEdit && <button onClick={() => removeJustif(l._key, l.justificatif_path)} title="Retirer" style={{ ...btn('#fff', '#dc2626', '1px solid #fecaca'), padding: '3px 8px', fontSize: 11.5 }}>✕</button>}
                                     </span>
                                   : (!lockEdit

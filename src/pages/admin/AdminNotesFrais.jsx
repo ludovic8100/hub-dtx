@@ -143,7 +143,9 @@ export default function AdminNotesFrais() {
                   {['Date', 'Catégorie', 'Description', 'HT', 'TVA', 'TTC', 'Justif.'].map((h, i) => <th key={i} style={{ padding: '8px 8px', textAlign: (i > 2 && i < 6) ? 'right' : (i === 6 ? 'center' : 'left'), fontSize: 10.5, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', borderBottom: '1px solid #e2e8f0' }}>{h}</th>)}
                 </tr></thead>
                 <tbody>
-                  {lignes.map((l, i) => (
+                  {lignes.map((l, i) => {
+                    const jn = l.justificatif_nom || (l.justificatif_path ? l.justificatif_path.split('/').pop().replace(/^[^-]+-/, '') : '')
+                    return (
                     <tr key={i}>
                       <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9' }}>{fmtD(l.date)}</td>
                       <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9' }}>{l.categorie || '—'}</td>
@@ -151,9 +153,12 @@ export default function AdminNotesFrais() {
                       <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', textAlign: 'right' }}>{eur(l.montant_ht)}</td>
                       <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', textAlign: 'right' }}>{isKm(l) ? '—' : eur(l.montant_tva)}</td>
                       <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', textAlign: 'right', fontWeight: 700 }}>{eur(l.montant_ttc)}</td>
-                      <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', textAlign: 'center' }}>{isKm(l) ? '—' : (l.justificatif_path ? '✓' : '⚠')}</td>
+                      <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', textAlign: 'center' }}>{isKm(l) ? '—' : l.justificatif_path
+                        ? <button onClick={async () => { const { data } = await supabase.storage.from('notes-frais').createSignedUrl(l.justificatif_path, 3600); if (data?.signedUrl) window.open(data.signedUrl, '_blank') }} title={jn} style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block', verticalAlign: 'middle', border: '1px solid #e2e8f0', background: '#fff', color: ENT(sel.societe).color, borderRadius: 6, padding: '3px 8px', fontSize: 11.5, cursor: 'pointer' }}>📎 {jn}</button>
+                        : <span style={{ color: '#dc2626' }}>⚠</span>}</td>
                     </tr>
-                  ))}
+                    )
+                  })}
                 </tbody>
               </table>
 
