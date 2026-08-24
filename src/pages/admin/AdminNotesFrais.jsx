@@ -78,6 +78,9 @@ export default function AdminNotesFrais() {
           await supabase.rpc('nf_set_piece', { p_note_id: sel.id, p_path: path, p_url: su?.signedUrl || null })
         }
       } catch (e) { console.error('Pièce PDF :', e) }
+      try {
+        fetch('https://n8n.srv1082740.hstgr.cloud/webhook/nf-notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: 'validee', societe: sel.societe, numero: v?.numero, titre: sel.titre, periode: sel.periode, total: v?.total ?? totTTC, auteur_nom: sel.auteur_nom, auteur_email: sel.auteur_email }) }).catch(() => {})
+      } catch { /* notification best-effort */ }
       notify(true, `Note ${v?.numero || ''} approuvée — pièce et dépense générées.`)
       setSel(null); setLignes([]); load()
     } catch (e) { notify(false, 'Échec de la validation : ' + (e.message || e)) }

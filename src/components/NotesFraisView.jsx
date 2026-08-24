@@ -212,6 +212,10 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
     if (mode === 'soumettre') {
       const { error: es } = await supabase.rpc('nf_soumettre', { p_note_id: noteId, p_sig_type: 'dessin', p_sig_image: p_sig, p_sig_ref: null })
       if (es) { setBusy(false); alert('Soumission échouée : ' + es.message); return }
+      try {
+        const { data: nn } = await supabase.from('notes_frais').select('numero').eq('id', noteId).single()
+        fetch('https://n8n.srv1082740.hstgr.cloud/webhook/nf-notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: 'soumise', societe: entiteKey, numero: nn?.numero, titre: head.titre, periode: head.periode, total: totTTC, auteur_nom: head.auteur_nom, auteur_email: head.auteur_email, admin_email: 'lde@dynassur.be' }) }).catch(() => {})
+      } catch { /* notification best-effort */ }
     }
     setBusy(false); setShowSig(false); setSigImage(''); setSel(null); setLignes([]); loadNotes()
   }
