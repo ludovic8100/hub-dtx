@@ -103,6 +103,8 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const [page, setPage] = useState(1)
   const [categories, setCategories] = useState([])
   const [employes, setEmployes] = useState([])
+  const [ventilations, setVentilations] = useState({})
+  const [ventilDraft, setVentilDraft] = useState(null)
   const [txSelection, setTxSelection] = useState(null)
   const [selection, setSelection] = useState(new Set()) // IDs des mouvements cochés pour justif multiple
   const [selecteurFacture, setSelecteurFacture] = useState(null) // { tx } (un mouvement) ou { ids, code, montant } (sélection multiple)
@@ -220,6 +222,21 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       .then(({ data }) => setEmployes(data || []))
   }, [])
 
+  async function chargerVentilations() {
+    let all = [], from = 0
+    while (true) {
+      const { data } = await supabase.from('transaction_ventilation').select('*').range(from, from + 999)
+      if (!data || !data.length) break
+      all = all.concat(data)
+      if (data.length < 1000) break
+      from += 1000
+    }
+    const map = {}
+    for (const v of all) { (map[v.transaction_id] = map[v.transaction_id] || []).push(v) }
+    setVentilations(map)
+  }
+  useEffect(() => { chargerVentilations() }, [])
+
   // Créer une catégorie manuellement (et l'assigner à la transaction en cours si fournie)
   const [nouvelleCat, setNouvelleCat] = useState({ ouvert: false, nom: '', type: 'depense', couleur: '#0080BD' })
   async function creerCategorie(txIdAAssigner) {
@@ -266,6 +283,29 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const sousCatsDe = (parentId) => categories.filter(c => c.parent_id === parentId)
   const parentIdDe = (id) => { const c = catParId(id); return c ? (c.parent_id || c.id) : '' }
   const sousIdDe = (id) => { const c = catParId(id); return (c && c.parent_id) ? c.id : '' }
+
+  // Ventilation d'une transaction entre plusieurs employés
+  function ouvrirVentil(t) {
+    const ex = ventilations[t.id] || []
+    setVentilDraft({ txId: t.id, lignes: ex.length ? ex.map(v => ({ employe_id: String(v.employe_id), montant: String(v.montant) })) : [{ employe_id: '', montant: '' }] })
+  }
+  async function enregistrerVentilation() {
+    if (!ventilDraft) return
+    const { txId, lignes } = ventilDraft
+    const valides = lignes.filter(l => l.employe_id && Number(l.montant) > 0).map(l => ({ transaction_id: txId, employe_id: Number(l.employe_id), montant: Number(l.montant) }))
+    await supabase.from('transaction_ventilation').delete().eq('transaction_id', txId)
+    if (valides.length) await supabase.from('transaction_ventilation').insert(valides)
+    await supabase.from('transactions').update({ employe_id: null }).eq('id', txId)
+    setTransactions(prev => prev.map(t => t.id === txId ? { ...t, employe_id: null } : t))
+    setTxSelection(prev => prev ? { ...prev, employe_id: null } : prev)
+    await chargerVentilations()
+    setVentilDraft(null)
+  }
+  async function supprimerVentilation(txId) {
+    await supabase.from('transaction_ventilation').delete().eq('transaction_id', txId)
+    await chargerVentilations()
+    setVentilDraft(null)
+  }
 
   // Appliquer une catégorie à TOUTES les transactions d'une contrepartie + créer une règle
   async function appliquerParContrepartie(contrepartie, categorieId) {
@@ -424,8 +464,16 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       const okIds = [filtre.categorie, ...categories.filter(c => c.parent_id === filtre.categorie).map(c => c.id)]
       if (!okIds.includes(t.categorie_id)) return false
     }
-    if (filtre.employe === 'aucun' && t.employe_id) return false
-    if (filtre.employe !== 'tous' && filtre.employe !== 'aucun' && String(t.employe_id || '') !== String(filtre.employe)) return false
+    if (filtre.employe !== 'tous') {
+      const parts = ventilations[t.id] || []
+      if (filtre.employe === 'aucun') {
+        if (t.employe_id || parts.length) return false
+      } else {
+        const direct = String(t.employe_id || '') === String(filtre.employe)
+        const via = parts.some(v => String(v.employe_id) === String(filtre.employe))
+        if (!direct && !via) return false
+      }
+    }
     return true
   })
   // Filtrage complet = + critère facture
@@ -1244,10 +1292,61 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                 </div>
                 <div style={{ marginBottom:'18px' }}>
                   <div style={{ fontSize:'12px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'8px' }}>Bénéficiaire (employé)</div>
-                  <select value={t.employe_id || ''} onChange={e=>assignerEmploye(t.id, e.target.value ? Number(e.target.value) : null)} style={{ width:'100%', padding:'10px 12px', border:'1px solid #e2e8f0', borderRadius:'8px', fontSize:'14px', fontFamily:"'Source Sans Pro', sans-serif", cursor:'pointer' }}>
-                    <option value="">— Aucun —</option>
-                    {employes.map(em => <option key={em.id} value={em.id}>{em.nom_complet || em.code}</option>)}
-                  </select>
+                  {(() => {
+                    const selSt = { width:'100%', padding:'10px 12px', border:'1px solid #e2e8f0', borderRadius:'8px', fontSize:'14px', fontFamily:"'Source Sans Pro', sans-serif", cursor:'pointer' }
+                    const linkSt = { marginTop:'8px', width:'100%', padding:'9px 12px', borderRadius:'8px', fontSize:'13px', fontWeight:'600', border:'1px dashed #cbd5e1', background:'#f8fafc', color:'#475569', cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }
+                    const ventil = ventilations[t.id] || []
+                    const enEdition = ventilDraft && ventilDraft.txId === t.id
+                    if (enEdition) {
+                      const total = ventilDraft.lignes.reduce((s, l) => s + (Number(l.montant) || 0), 0)
+                      const abs = Math.abs(Number(t.montant) || 0)
+                      const reste = abs - total
+                      return (
+                        <div style={{ border:'1px solid #e2e8f0', borderRadius:'8px', padding:'12px', background:'#f8fafc' }}>
+                          {ventilDraft.lignes.map((l, i) => (
+                            <div key={i} style={{ display:'flex', gap:'8px', marginBottom:'8px' }}>
+                              <select value={l.employe_id || ''} onChange={e => { const v = e.target.value; setVentilDraft(d => ({ ...d, lignes: d.lignes.map((x, j) => j === i ? { ...x, employe_id: v } : x) })) }} style={{ ...selSt, flex:1, padding:'8px 10px', fontSize:'13px' }}>
+                                <option value="">— Employé —</option>
+                                {employes.map(em => <option key={em.id} value={em.id}>{em.nom_complet || em.code}</option>)}
+                              </select>
+                              <input type="number" step="0.01" value={l.montant} onChange={e => { const v = e.target.value; setVentilDraft(d => ({ ...d, lignes: d.lignes.map((x, j) => j === i ? { ...x, montant: v } : x) })) }} placeholder="Montant €" style={{ width:'110px', padding:'8px 10px', border:'1px solid #e2e8f0', borderRadius:'6px', fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif", boxSizing:'border-box' }} />
+                              <button onClick={() => setVentilDraft(d => ({ ...d, lignes: d.lignes.filter((_, j) => j !== i) }))} title="Retirer" style={{ width:'34px', border:'1px solid #fecaca', borderRadius:'6px', background:'#fff', color:'#dc2626', cursor:'pointer', flexShrink:0 }}>✕</button>
+                            </div>
+                          ))}
+                          <div style={{ display:'flex', gap:'8px', marginBottom:'10px' }}>
+                            <button onClick={() => setVentilDraft(d => ({ ...d, lignes: [...d.lignes, { employe_id:'', montant:'' }] }))} style={{ flex:1, padding:'8px', borderRadius:'6px', fontSize:'12.5px', fontWeight:'600', border:'1px dashed #cbd5e1', background:'#fff', color:'#475569', cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>+ Ajouter un employé</button>
+                            <button onClick={() => { const n = ventilDraft.lignes.length || 1; const part = (abs / n); setVentilDraft(d => ({ ...d, lignes: d.lignes.map(x => ({ ...x, montant: part.toFixed(2) })) })) }} style={{ flex:1, padding:'8px', borderRadius:'6px', fontSize:'12.5px', fontWeight:'600', border:'1px solid #e2e8f0', background:'#fff', color:'#475569', cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>Répartir également</button>
+                          </div>
+                          <div style={{ fontSize:'13px', marginBottom:'10px', color:'#475569' }}>Réparti : <b>{fmt(total)}</b> / {fmt(abs)} — reste : <b style={{ color: Math.abs(reste) < 0.01 ? '#16a34a' : '#dc2626' }}>{fmt(reste)}</b></div>
+                          <div style={{ display:'flex', gap:'8px' }}>
+                            <button onClick={enregistrerVentilation} style={{ flex:1, padding:'9px 12px', borderRadius:'7px', fontSize:'13px', fontWeight:'700', border:'none', background:'#16a34a', color:'#fff', cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>Enregistrer la répartition</button>
+                            <button onClick={() => setVentilDraft(null)} style={{ padding:'9px 12px', borderRadius:'7px', fontSize:'13px', fontWeight:'600', border:'1px solid #e2e8f0', background:'#fff', color:'#64748b', cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>Annuler</button>
+                            {ventil.length > 0 && <button onClick={() => supprimerVentilation(t.id)} title="Supprimer la répartition" style={{ padding:'9px 12px', borderRadius:'7px', fontSize:'13px', fontWeight:'600', border:'1px solid #fecaca', background:'#fff', color:'#dc2626', cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>Supprimer</button>}
+                          </div>
+                        </div>
+                      )
+                    }
+                    if (ventil.length > 0) {
+                      return (
+                        <div>
+                          <div style={{ border:'1px solid #e2e8f0', borderRadius:'8px', padding:'10px 12px', marginBottom:'8px', background:'#fff' }}>
+                            <div style={{ fontSize:'12px', color:'#64748b', marginBottom:'6px' }}>⚖️ Réparti entre {ventil.length} employé(s) :</div>
+                            {ventil.map(v => { const em = employes.find(e => String(e.id) === String(v.employe_id)); return <div key={v.id} style={{ display:'flex', justifyContent:'space-between', fontSize:'13px', padding:'2px 0' }}><span>{em?.nom_complet || em?.code || ('#' + v.employe_id)}</span><b>{fmt(v.montant)}</b></div> })}
+                          </div>
+                          <button onClick={() => ouvrirVentil(t)} style={linkSt}>Modifier la répartition</button>
+                        </div>
+                      )
+                    }
+                    return (
+                      <div>
+                        <select value={t.employe_id || ''} onChange={e => assignerEmploye(t.id, e.target.value ? Number(e.target.value) : null)} style={selSt}>
+                          <option value="">— Aucun —</option>
+                          {employes.map(em => <option key={em.id} value={em.id}>{em.nom_complet || em.code}</option>)}
+                        </select>
+                        <button onClick={() => ouvrirVentil(t)} style={linkSt}>⚖️ Répartir entre plusieurs employés</button>
+                      </div>
+                    )
+                  })()}
                 </div>
                 <Row label="Contrepartie" value={t.contrepartie_nom} />
                 <Row label="IBAN contrepartie" value={t.contrepartie_iban} />
