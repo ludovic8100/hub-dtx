@@ -169,6 +169,9 @@ export default function Sidebar() {
     <nav style={{ flex:1, padding:'8px 8px 16px', overflowY:'auto' }}>
       {currentModules.map(m => <NavItem key={m.key} item={m} />)}
       {activeSociete === 'dynassur' && <ClientSearch accentLight={accentLight} />}
+      <div style={{ marginTop:'8px', paddingTop:'8px', borderTop:'1px solid rgba(255,255,255,0.08)' }}>
+        <NavItem item={{ key:'tickets', label:'Tickets', icon:'ti-ticket', path:'/tickets' }} />
+      </div>
       {isAdmin && (
         <div style={{ marginTop:'8px', paddingTop:'8px', borderTop:'1px solid rgba(255,255,255,0.08)' }}>
           <div style={{ fontSize:'10px', fontWeight:'700', color:'rgba(255,255,255,0.25)', letterSpacing:'0.1em', textTransform:'uppercase', padding:'8px 12px 5px' }}>

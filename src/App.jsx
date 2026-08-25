@@ -13,6 +13,7 @@ import AdminNotesFrais    from './pages/admin/AdminNotesFrais'
 import DashboardGroupe    from './pages/groupe/DashboardGroupe'
 
 import DashboardDynassur   from './pages/dynassur/DashboardDynassur'
+import Tickets             from './pages/Tickets'
 import DynassurTaches      from './pages/dynassur/DynassurTaches'
 import DtxTaches           from './pages/dtx/DtxTaches'
 import LodeTaches          from './pages/lode/LodeTaches'
@@ -164,6 +165,7 @@ export default function App() {
 
           {/* Admin */}
           <Route path="/admin/users" element={<A><AdminUsers /></A>} />
+          <Route path="/tickets" element={<P><Tickets /></P>} />
           <Route path="/admin/sync" element={<A><SyncCenter /></A>} />
           <Route path="/admin/rdv-categories" element={<A><RdvCategories /></A>} />
           <Route path="/admin/liens-casses" element={<A><LiensCasses /></A>} />
