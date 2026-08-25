@@ -70,6 +70,30 @@ function StatCard({ label, count, tickets, color }) {
   )
 }
 
+const ALERTE_WEBHOOK = 'https://n8n.srv1082740.hstgr.cloud/webhook/ticket-alerte'
+const HUB_URL = 'https://hub-dtx.vercel.app'
+
+// Envoie une alerte mail via le webhook n8n (ne bloque jamais l'UI)
+async function envoyerAlerte(destEmails, subject, htmlBody) {
+  const to = (destEmails || []).filter(Boolean)
+  if (!to.length) return
+  try {
+    await fetch(ALERTE_WEBHOOK, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to, subject, html: htmlBody }),
+    })
+  } catch (e) { /* silencieux : l'alerte ne doit pas casser l'action */ }
+}
+function mailTicket(t, intro) {
+  return `<div style="font-family:Arial,sans-serif;color:#1A3A6B">
+    <p>${intro}</p>
+    <p style="margin:14px 0"><b>Ticket #${t.id}</b> — ${t.titre || ''}<br>
+    <span style="color:#8A9BBE;font-size:13px">${t.ticket_categorie || ''}</span></p>
+    <p><a href="${HUB_URL}/tickets" style="background:#1E5799;color:#fff;text-decoration:none;padding:9px 16px;border-radius:8px;display:inline-block">Ouvrir le ticket</a></p>
+    <p style="color:#8A9BBE;font-size:12px;margin-top:16px">Hub DTX — notification automatique</p>
+  </div>`
+}
+
 export default function TicketsView() {
   const { perms, isAdmin } = useAuth()
   const myCode = (perms?.collab_code || perms?.code || (perms?.user_email || '').split('@')[0] || '').toUpperCase()
@@ -100,7 +124,7 @@ export default function TicketsView() {
       if (data.length < 1000) break
     }
     setTickets(all)
-    let c = []; try { const r = await supabase.from('collaborateurs').select('code,nom_complet,nom_sa_data,actif').eq('actif', true); c = r.data || [] } catch (e) { c = [] }
+    let c = []; try { const r = await supabase.from('collaborateurs').select('code,nom_complet,nom_sa_data,email,actif').eq('actif', true); c = r.data || [] } catch (e) { c = [] }
     setCollabs(c)
     setLoading(false)
   }, [])
@@ -269,6 +293,12 @@ function CreateModal({ collabs, myCode, onClose, onCreated }) {
         tache_id: data.id, auteur_code: myCode, type: 'systeme',
         message: f.gestionnaire ? `Ticket créé et assigné à ${f.gestionnaire.toUpperCase()}` : 'Ticket créé (non attribué)',
       })
+      // Alerte à l'assigné (si attribué à quelqu'un d'autre que le créateur)
+      const asg = f.gestionnaire ? f.gestionnaire.toUpperCase() : null
+      if (asg && asg !== myCode) {
+        const c = collabs.find(x => (x.code||'').toUpperCase() === asg)
+        if (c?.email) envoyerAlerte([c.email], `Ticket #${data.id} vous a été attribué`, mailTicket({ ...data }, `Bonjour,<br>Un nouveau ticket vous a été attribué par ${myCode}.`))
+      }
       onCreated()
     } catch (e) { setErr('Erreur : ' + (e.message || '')) }
     setSaving(false)
@@ -326,8 +356,13 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
   const sendReply = async () => {
     if (!reply.trim()) return
     setSending(true)
-    await supabase.from('tickets_messages').insert({ tache_id: t.id, auteur_code: myCode, auteur_nom: myNom, auteur_email: myEmail, message: reply.trim(), type: 'message' })
+    const txt = reply.trim()
+    await supabase.from('tickets_messages').insert({ tache_id: t.id, auteur_code: myCode, auteur_nom: myNom, auteur_email: myEmail, message: txt, type: 'message' })
     await supabase.from('taches').update({ derniere_activite: new Date().toISOString() }).eq('id', t.id)
+    // Alerte : concernés sauf auteur
+    const concernes = [...new Set([(t.gestionnaire||'').toUpperCase(), (t.cree_par||'').toUpperCase(), ...parts].filter(c => c && c !== myCode))]
+    const emails = emailsOf(concernes)
+    if (emails.length) envoyerAlerte(emails, `Nouveau message sur le ticket #${t.id}`, mailTicket(t, `Bonjour,<br>${myCode} a écrit un message sur ce ticket :<br><i>"${txt.slice(0,200)}"</i>`))
     setReply(''); setSending(false); await loadMsgs(); onChanged()
   }
 
@@ -335,9 +370,16 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
     await touch({ ticket_statut: nk }, `Statut : ${st(t.ticket_statut).label} → ${st(nk).label} (${myCode})`)
   }
   const assigner = async (code) => {
-    await touch({ gestionnaire: code ? code.toUpperCase() : null }, code ? `Assigné à ${code.toUpperCase()} (par ${myCode})` : `Attribution retirée (par ${myCode})`)
+    const c = code ? code.toUpperCase() : null
+    await touch({ gestionnaire: c }, c ? `Assigné à ${c} (par ${myCode})` : `Attribution retirée (par ${myCode})`)
+    if (c && c !== myCode) {
+      const em = emailOf(c)
+      if (em) envoyerAlerte([em], `Ticket #${t.id} vous a été attribué`, mailTicket(t, `Bonjour,<br>Le ticket suivant vous a été attribué par ${myCode}.`))
+    }
   }
   const parts = Array.isArray(t.participants) ? t.participants.map(x => (x || '').toUpperCase()) : []
+  const emailOf = code => { const c = collabs.find(x => (x.code || '').toUpperCase() === (code || '').toUpperCase()); return c?.email || null }
+  const emailsOf = codes => codes.map(emailOf).filter(Boolean)
   const addParticipant = async (code) => {
     if (!code) return
     const c = code.toUpperCase()
@@ -352,6 +394,11 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
   }
   const cloturer = async () => {
     await touch({ ticket_statut: 'cloture', cloture_par: myCode, statut: 'terminee', date_cloture: new Date().toISOString() }, `Ticket clôturé par ${myCode}`)
+    const createur = (t.cree_par || '').toUpperCase()
+    if (createur && createur !== myCode) {
+      const em = emailOf(createur)
+      if (em) envoyerAlerte([em], `Ticket #${t.id} clôturé`, mailTicket(t, `Bonjour,<br>Le ticket que vous avez créé a été clôturé par ${myCode}.`))
+    }
   }
 
   const s = st(t.ticket_statut), p = pr(t.priorite)
