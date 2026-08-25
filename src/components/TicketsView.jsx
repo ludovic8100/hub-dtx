@@ -52,11 +52,11 @@ function StatCard({ label, count, tickets, color }) {
   const total = count || 1
   return (
     <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ position: 'relative', background: '#fff', border: `1px solid ${C.border}`, borderRadius: 10, padding: '14px 16px', minWidth: 130, cursor: 'default' }}>
-      <div style={{ fontSize: 12, color: C.textL, marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 24, fontWeight: 800, color: color || NAVY }}>{count}</div>
+      style={{ position: 'relative', background: '#fff', border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', flex: 1, minWidth: 0, textAlign: 'center', cursor: 'default' }}>
+      <div style={{ fontSize: 10, color: C.textL, marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</div>
+      <div style={{ fontSize: 19, fontWeight: 800, color: color || NAVY, lineHeight: 1.1 }}>{count}</div>
       {hover && lignes.length > 0 && (
-        <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 50, marginTop: 4, background: '#fff', border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', minWidth: 180, boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}>
+        <div style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', zIndex: 50, marginTop: 4, background: '#fff', border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', minWidth: 180, boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}>
           <div style={{ fontSize: 10, textTransform: 'uppercase', color: C.textL, fontWeight: 700, marginBottom: 6 }}>Répartition</div>
           {lignes.map(([code, n]) => (
             <div key={code} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 12, padding: '2px 0' }}>
@@ -168,7 +168,7 @@ export default function TicketsView() {
         const parStatut = k => base.filter(t => t.ticket_statut === k)
         const actifs = base.filter(t => t.ticket_statut !== 'cloture')
         return (
-          <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'nowrap' }}>
             <StatCard label="Total" count={base.length} tickets={base} color={NAVY} />
             <StatCard label="Actifs" count={actifs.length} tickets={actifs} color={CYAN} />
             <StatCard label="En cours" count={parStatut('en_cours').length} tickets={parStatut('en_cours')} color="#E65100" />
