@@ -115,7 +115,7 @@ export default function TicketsView() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const sel = 'id,titre,description,ticket_categorie,ticket_statut,ticket_origine,priorite,gestionnaire,cree_par,cloture_par,user_email,derniere_activite,date_creation,created_at,dossier_client,client_id,participants'
+    const sel = 'id,titre,description,ticket_categorie,ticket_statut,ticket_origine,priorite,gestionnaire,cree_par,cloture_par,user_email,derniere_activite,date_creation,created_at,dossier_client,client_id,participants,checklist'
     let all = []
     for (let from = 0; ; from += 1000) {
       const { data, error } = await supabase.from('taches').select(sel).eq('is_ticket', true).order('derniere_activite', { ascending: false }).range(from, from + 999)
@@ -334,6 +334,22 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
   const [t, setT] = useState(ticket)
   const [msgs, setMsgs] = useState([])
   const [reply, setReply] = useState('')
+  const [checklist, setChecklist] = useState(Array.isArray(t.checklist) ? t.checklist : [])
+  const [newItem, setNewItem] = useState('')
+  const saveChecklist = async (next) => {
+    setChecklist(next)
+    await supabase.from('taches').update({ checklist: next, derniere_activite: new Date().toISOString() }).eq('id', t.id)
+    onChanged()
+  }
+  const addItem = () => {
+    if (!newItem.trim()) return
+    saveChecklist([...checklist, { id: Date.now(), texte: newItem.trim(), fait: false, remarque: '' }])
+    setNewItem('')
+  }
+  const toggleItem = (id) => saveChecklist(checklist.map(c => c.id === id ? { ...c, fait: !c.fait, fait_par: !c.fait ? myCode : null, fait_le: !c.fait ? new Date().toISOString() : null } : c))
+  const setRemarque = (id, v) => setChecklist(checklist.map(c => c.id === id ? { ...c, remarque: v } : c))
+  const saveRemarque = (id) => { const it = checklist.find(c => c.id === id); saveChecklist(checklist.map(c => c.id === id ? { ...c, remarque: it.remarque } : c)) }
+  const removeItem = (id) => saveChecklist(checklist.filter(c => c.id !== id))
   const [sending, setSending] = useState(false)
   const [loadingMsgs, setLoadingMsgs] = useState(true)
 
@@ -376,7 +392,11 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
   }
 
   const changeStatut = async (nk) => {
-    await touch({ ticket_statut: nk }, `Statut : ${st(t.ticket_statut).label} → ${st(nk).label} (${myCode})`)
+    const ancien = st(t.ticket_statut).label
+    await touch({ ticket_statut: nk }, `Statut : ${ancien} → ${st(nk).label} (${myCode})`)
+    // Prévenir les concernés de l'avancement (sauf celui qui change)
+    const emails = emailsOf(concernesSauf(myCode))
+    if (emails.length) envoyerAlerte(emails, `Ticket #${t.id} — ${st(nk).label}`, mailTicket(t, `Bonjour,<br>Le ticket a changé de statut : <b>${ancien} → ${st(nk).label}</b> (par ${myCode}).`))
   }
   const assigner = async (code) => {
     const c = code ? code.toUpperCase() : null
@@ -389,6 +409,7 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
   const parts = Array.isArray(t.participants) ? t.participants.map(x => (x || '').toUpperCase()) : []
   const emailOf = code => { const c = collabs.find(x => (x.code || '').toUpperCase() === (code || '').toUpperCase()); return c?.email || null }
   const emailsOf = codes => codes.map(emailOf).filter(Boolean)
+  const concernesSauf = (exclu) => [...new Set([(t.gestionnaire||'').toUpperCase(), (t.cree_par||'').toUpperCase(), ...parts].filter(c => c && c !== (exclu||'').toUpperCase()))]
   const addParticipant = async (code) => {
     if (!code) return
     const c = code.toUpperCase()
@@ -403,11 +424,9 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
   }
   const cloturer = async () => {
     await touch({ ticket_statut: 'cloture', cloture_par: myCode, statut: 'terminee', date_cloture: new Date().toISOString() }, `Ticket clôturé par ${myCode}`)
-    const createur = (t.cree_par || '').toUpperCase()
-    if (createur && createur !== myCode) {
-      const em = emailOf(createur)
-      if (em) envoyerAlerte([em], `Ticket #${t.id} clôturé`, mailTicket(t, `Bonjour,<br>Le ticket que vous avez créé a été clôturé par ${myCode}.`))
-    }
+    // Prévenir tous les concernés (créateur, assigné, participants) sauf celui qui clôture
+    const emails = emailsOf(concernesSauf(myCode))
+    if (emails.length) envoyerAlerte(emails, `Ticket #${t.id} clôturé`, mailTicket(t, `Bonjour,<br>Le ticket a été clôturé par ${myCode}.`))
   }
 
   const s = st(t.ticket_statut), p = pr(t.priorite)
@@ -463,6 +482,37 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
 
       {/* Description initiale */}
       {t.description && <div style={{ padding: '12px 20px', fontSize: 13, color: '#2D3748', borderBottom: `1px solid #EEF1F6`, background: '#fff' }}>{t.description}</div>}
+
+      {/* Checklist */}
+      <div style={{ padding: '12px 20px', borderBottom: `1px solid #EEF1F6`, background: '#fff' }}>
+        <div style={{ fontSize: 11, textTransform: 'uppercase', color: C.textL, fontWeight: 700, marginBottom: 8 }}>
+          Checklist {checklist.length > 0 && <span style={{ color: C.textM }}>· {checklist.filter(c => c.fait).length}/{checklist.length}</span>}
+        </div>
+        {checklist.length > 0 && (
+          <div style={{ height: 4, background: '#EEF1F6', borderRadius: 4, marginBottom: 12, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${Math.round(checklist.filter(c => c.fait).length / checklist.length * 100)}%`, background: C.ok, transition: 'width .2s' }} />
+          </div>
+        )}
+        {checklist.map(item => (
+          <div key={item.id} style={{ marginBottom: 8, padding: 8, background: item.fait ? '#F1F8F4' : C.bg, borderRadius: 8, border: `1px solid ${item.fait ? '#C8E6C9' : C.border}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input type="checkbox" checked={!!item.fait} onChange={() => toggleItem(item.id)} style={{ width: 17, height: 17, cursor: 'pointer', flexShrink: 0 }} />
+              <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: NAVY, textDecoration: item.fait ? 'line-through' : 'none', opacity: item.fait ? 0.6 : 1 }}>{item.texte}</span>
+              {item.fait && item.fait_par && <span style={{ fontSize: 10, color: C.textL }}>✓ {item.fait_par}</span>}
+              <span onClick={() => removeItem(item.id)} style={{ cursor: 'pointer', color: C.textL, fontSize: 14, padding: '0 4px' }}>×</span>
+            </div>
+            <input value={item.remarque || ''} onChange={e => setRemarque(item.id, e.target.value)} onBlur={() => saveRemarque(item.id)}
+              placeholder="Remarque (optionnel)…" style={{ ...S.input, marginTop: 6, fontSize: 12, padding: '5px 8px', background: '#fff' }} />
+          </div>
+        ))}
+        {t.ticket_statut !== 'cloture' && (
+          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+            <input value={newItem} onChange={e => setNewItem(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem() } }}
+              placeholder="Ajouter un point à la checklist…" style={{ ...S.input, fontSize: 13 }} />
+            <button onClick={addItem} style={{ ...S.btn('ghost'), padding: '7px 14px' }}>+ Ajouter</button>
+          </div>
+        )}
+      </div>
 
       {/* Fil de suivi */}
       <div style={{ flex: 1, overflowY: 'auto', padding: 20, background: C.bg, minHeight: 200 }}>
