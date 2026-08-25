@@ -217,12 +217,19 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
 
   useEffect(() => {
     let annule = false
-    supabase.from('employes').select('id, code, nom, entites, actif')
-      .eq('actif', true).order('nom')
+    // Bénéficiaires = comptes hub marqués « Employé », cloisonnés par domaine e-mail (dynassur / dtx…)
+    supabase.from('user_permissions').select('id, nom, user_email, est_employe')
+      .eq('est_employe', true)
       .then(({ data }) => {
         if (annule) return
-        const filtres = (data || []).filter(e => !e.entites || e.entites.length === 0 || (societeCodes || []).some(c => e.entites.includes(c)))
-        setEmployes(filtres.map(e => ({ ...e, nom_complet: e.nom })))
+        const tokens = (societeCodes || []).map(c => String(c).toLowerCase())
+        const filtres = (data || []).filter(u => {
+          const dom = ((u.user_email || '').toLowerCase().split('@')[1]) || ''
+          return tokens.length === 0 || tokens.some(t => dom.includes(t))
+        })
+        setEmployes(filtres
+          .map(u => ({ id: u.id, nom: u.nom || u.user_email, nom_complet: u.nom || u.user_email }))
+          .sort((a, b) => (a.nom || '').localeCompare(b.nom || '', 'fr', { sensitivity: 'base' })))
       })
     return () => { annule = true }
   }, [societeCodes.join(',')])
@@ -297,7 +304,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   async function enregistrerVentilation() {
     if (!ventilDraft) return
     const { txId, lignes } = ventilDraft
-    const valides = lignes.filter(l => l.employe_id && Number(l.montant) > 0).map(l => ({ transaction_id: txId, employe_id: Number(l.employe_id), montant: Number(l.montant) }))
+    const valides = lignes.filter(l => l.employe_id && Number(l.montant) > 0).map(l => ({ transaction_id: txId, employe_id: l.employe_id, montant: Number(l.montant) }))
     await supabase.from('transaction_ventilation').delete().eq('transaction_id', txId)
     if (valides.length) await supabase.from('transaction_ventilation').insert(valides)
     await supabase.from('transactions').update({ employe_id: null }).eq('id', txId)
@@ -1375,7 +1382,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                     }
                     return (
                       <div>
-                        <select value={t.employe_id || ''} onChange={e => assignerEmploye(t.id, e.target.value ? Number(e.target.value) : null)} style={selSt}>
+                        <select value={t.employe_id || ''} onChange={e => assignerEmploye(t.id, e.target.value || null)} style={selSt}>
                           <option value="">— Aucun —</option>
                           {employes.map(em => <option key={em.id} value={em.id}>{em.nom_complet || em.code}</option>)}
                         </select>

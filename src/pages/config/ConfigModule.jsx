@@ -406,6 +406,7 @@ export default function ConfigModule() {
                       })()}
                     </label>
                     <Toggle label="Actif" on={!!selUser.actif} onClick={() => setSelUser(u => ({ ...u, actif: !u.actif }))} />
+                    <Toggle label="Employé" on={!!selUser.est_employe} onClick={() => setSelUser(u => ({ ...u, est_employe: !u.est_employe }))} />
                   </div>
                 </div>
 
