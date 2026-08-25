@@ -102,6 +102,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const [tri, setTri] = useState({ col: 'date', sens: 'desc' })
   const [page, setPage] = useState(1)
   const [categories, setCategories] = useState([])
+  const [employes, setEmployes] = useState([])
   const [txSelection, setTxSelection] = useState(null)
   const [selection, setSelection] = useState(new Set()) // IDs des mouvements cochés pour justif multiple
   const [selecteurFacture, setSelecteurFacture] = useState(null) // { tx } (un mouvement) ou { ids, code, montant } (sélection multiple)
@@ -212,6 +213,13 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   }
   useEffect(() => { chargerCategories() }, [societeCodes.join(',')])
 
+  useEffect(() => {
+    supabase.from('collaborateurs').select('id, code, nom_complet')
+      .eq('actif', true).eq('est_sous_agent', false).eq('est_apporteur', false)
+      .order('nom_complet')
+      .then(({ data }) => setEmployes(data || []))
+  }, [])
+
   // Créer une catégorie manuellement (et l'assigner à la transaction en cours si fournie)
   const [nouvelleCat, setNouvelleCat] = useState({ ouvert: false, nom: '', type: 'depense', couleur: '#0080BD' })
   async function creerCategorie(txIdAAssigner) {
@@ -244,6 +252,20 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
     setTransactions(prev => prev.map(t => t.id === txId ? { ...t, categorie_id: categorieId } : t))
     setTxSelection(prev => prev ? { ...prev, categorie_id: categorieId } : prev)
   }
+
+  // Assigner un bénéficiaire (employé) à une transaction
+  async function assignerEmploye(txId, employeId) {
+    await supabase.from('transactions').update({ employe_id: employeId }).eq('id', txId)
+    setTransactions(prev => prev.map(t => t.id === txId ? { ...t, employe_id: employeId } : t))
+    setTxSelection(prev => prev ? { ...prev, employe_id: employeId } : prev)
+  }
+
+  // Helpers hiérarchie catégories (niveau 1 = parent_id null ; niveau 2 = sous-catégorie)
+  const catParId = (id) => categories.find(c => c.id === id)
+  const parentsCat = (type) => categories.filter(c => !c.parent_id && (!type || c.type === type))
+  const sousCatsDe = (parentId) => categories.filter(c => c.parent_id === parentId)
+  const parentIdDe = (id) => { const c = catParId(id); return c ? (c.parent_id || c.id) : '' }
+  const sousIdDe = (id) => { const c = catParId(id); return (c && c.parent_id) ? c.id : '' }
 
   // Appliquer une catégorie à TOUTES les transactions d'une contrepartie + créer une règle
   async function appliquerParContrepartie(contrepartie, categorieId) {
@@ -398,7 +420,10 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       if (!filtre.periodes.includes(ym)) return false
     }
     if (filtre.categorie === 'sans' && t.categorie_id) return false
-    if (filtre.categorie !== 'toutes' && filtre.categorie !== 'sans' && t.categorie_id !== filtre.categorie) return false
+    if (filtre.categorie !== 'toutes' && filtre.categorie !== 'sans') {
+      const okIds = [filtre.categorie, ...categories.filter(c => c.parent_id === filtre.categorie).map(c => c.id)]
+      if (!okIds.includes(t.categorie_id)) return false
+    }
     return true
   })
   // Filtrage complet = + critère facture
@@ -663,7 +688,17 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
           <select value={filtre.categorie} onChange={e=>setFiltre(f=>({...f,categorie:e.target.value}))} style={{ padding:'7px 10px', border:'1px solid #e2e8f0', borderRadius:'6px', fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif", cursor:'pointer' }}>
             <option value="toutes">Toutes</option>
             <option value="sans">⚠️ Sans catégorie</option>
-            {categories.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
+            {parentsCat().map(p => {
+              const enfants = sousCatsDe(p.id)
+              return enfants.length === 0
+                ? <option key={p.id} value={p.id}>{p.nom}</option>
+                : (
+                  <optgroup key={p.id} label={p.nom}>
+                    <option value={p.id}>{p.nom} (tout)</option>
+                    {enfants.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
+                  </optgroup>
+                )
+            })}
           </select>
         </div>
 
@@ -1136,15 +1171,26 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                 {/* Sélecteur catégorie */}
                 <div style={{ marginBottom:'18px' }}>
                   <div style={{ fontSize:'12px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'8px' }}>Catégorie</div>
-                  <select value={t.categorie_id || ''} onChange={e=>assignerCategorie(t.id, e.target.value || null)} style={{ width:'100%', padding:'10px 12px', border:'1px solid #e2e8f0', borderRadius:'8px', fontSize:'14px', fontFamily:"'Source Sans Pro', sans-serif", cursor:'pointer' }}>
+                  <select value={parentIdDe(t.categorie_id)} onChange={e=>assignerCategorie(t.id, e.target.value || null)} style={{ width:'100%', padding:'10px 12px', border:'1px solid #e2e8f0', borderRadius:'8px', fontSize:'14px', fontFamily:"'Source Sans Pro', sans-serif", cursor:'pointer' }}>
                     <option value="">— Non catégorisé —</option>
                     <optgroup label="Recettes">
-                      {categories.filter(c=>c.type==='recette').map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
+                      {parentsCat('recette').map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
                     </optgroup>
                     <optgroup label="Dépenses">
-                      {categories.filter(c=>c.type==='depense').map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
+                      {parentsCat('depense').map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
                     </optgroup>
                   </select>
+                  {(() => {
+                    const pid = parentIdDe(t.categorie_id)
+                    const enfants = pid ? sousCatsDe(pid) : []
+                    if (!enfants.length) return null
+                    return (
+                      <select value={sousIdDe(t.categorie_id)} onChange={e=>assignerCategorie(t.id, e.target.value || pid)} style={{ width:'100%', marginTop:'8px', padding:'10px 12px', border:'1px solid #e2e8f0', borderRadius:'8px', fontSize:'14px', fontFamily:"'Source Sans Pro', sans-serif", cursor:'pointer' }}>
+                        <option value="">— Sous-catégorie (optionnel) —</option>
+                        {enfants.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
+                      </select>
+                    )
+                  })()}
                   {t.categorie_id && t.contrepartie_nom && (
                     <button onClick={()=>appliquerParContrepartie(t.contrepartie_nom, t.categorie_id)} style={{ marginTop:'8px', width:'100%', padding:'9px 12px', borderRadius:'8px', fontSize:'13px', fontWeight:'600', border:`1px solid ${color}`, background:`${color}0d`, color, cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>
                       ⚡ Appliquer à toutes les transactions de « {t.contrepartie_nom} »
@@ -1181,6 +1227,13 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                       </div>
                     </div>
                   )}
+                </div>
+                <div style={{ marginBottom:'18px' }}>
+                  <div style={{ fontSize:'12px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'8px' }}>Bénéficiaire (employé)</div>
+                  <select value={t.employe_id || ''} onChange={e=>assignerEmploye(t.id, e.target.value ? Number(e.target.value) : null)} style={{ width:'100%', padding:'10px 12px', border:'1px solid #e2e8f0', borderRadius:'8px', fontSize:'14px', fontFamily:"'Source Sans Pro', sans-serif", cursor:'pointer' }}>
+                    <option value="">— Aucun —</option>
+                    {employes.map(em => <option key={em.id} value={em.id}>{em.nom_complet || em.code}</option>)}
+                  </select>
                 </div>
                 <Row label="Contrepartie" value={t.contrepartie_nom} />
                 <Row label="IBAN contrepartie" value={t.contrepartie_iban} />
