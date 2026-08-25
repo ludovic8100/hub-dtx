@@ -125,13 +125,44 @@ export default function ConfigModule() {
 
   async function saveUser() {
     if (!selUser) return
+    const estNouveau = !selUser.id
+    const email = (selUser.user_email || '').trim().toLowerCase()
+    if (!email) { notify('❌ L\'email est obligatoire'); return }
+    const nom = (selUser.nom || '').trim() || email
     setSaving(true)
-    const { id, created_at, updated_at, ...payload } = selUser
+    if (estNouveau) {
+      const { _nouveau, id, created_at, updated_at, ...rest } = selUser
+      const { data, error } = await supabase.from('user_permissions')
+        .insert({ ...rest, user_email: email, nom, actif: rest.actif ?? true, role: rest.role || 'user' })
+        .select().single()
+      setSaving(false)
+      if (error) { notify('❌ ' + (error.code === '23505' ? 'Un compte existe déjà avec cet email' : error.message)); return }
+      setUsers(prev => [...prev, data].sort((a, b) => (a.nom || a.user_email || '').localeCompare(b.nom || b.user_email || '', 'fr', { sensitivity: 'base' })))
+      setSelUser({ ...data })
+      notify('✓ Utilisateur créé')
+      return
+    }
+    const { id, created_at, updated_at, _nouveau, ...payload } = selUser
+    payload.user_email = email; payload.nom = nom
     const { error } = await supabase.from('user_permissions').update(payload).eq('id', id)
     setSaving(false)
     if (error) { notify('❌ ' + error.message); return }
-    setUsers(prev => prev.map(u => u.id === id ? { ...selUser } : u))
+    setUsers(prev => prev.map(u => u.id === id ? { ...selUser, user_email: email, nom } : u))
     notify('✓ Utilisateur enregistré')
+  }
+
+  async function deleteUser() {
+    if (!selUser?.id) { setSelUser(null); return }
+    if (!window.confirm(`Supprimer définitivement le compte « ${selUser.nom || selUser.user_email} » ?\n\nSon accès au hub sera retiré. Action irréversible.`)) return
+    setSaving(true)
+    const delId = selUser.id
+    const { error } = await supabase.from('user_permissions').delete().eq('id', delId)
+    setSaving(false)
+    if (error) { notify('❌ ' + error.message); return }
+    setUsers(prev => prev.filter(u => u.id !== delId))
+    setSel(s => { const n = new Set(s); n.delete(delId); return n })
+    setSelUser(null)
+    notify('✓ Utilisateur supprimé')
   }
 
   async function renvoyerAcces() {
@@ -300,6 +331,7 @@ export default function ConfigModule() {
               {(uSearch || uRole !== 'tous' || uStatut !== 'tous' || uSoc !== 'toutes' || uBureau !== 'tous' || uModule !== 'tous') && (
                 <button onClick={() => { setUSearch(''); setURole('tous'); setUStatut('tous'); setUSoc('toutes'); setUBureau('tous'); setUModule('tous') }} style={{ ...btnGhost }}>✕ Réinitialiser</button>
               )}
+              <button onClick={() => setSelUser({ _nouveau: true, nom: '', user_email: '', role: 'user', actif: true })} style={{ ...btn('#16a34a'), padding: '8px 14px', fontSize: 13 }}>➕ Nouvel utilisateur</button>
               <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 'auto' }}>{usersFiltres.length} / {users.length}</span>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 14, alignItems: 'center', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '8px 12px' }}>
@@ -343,9 +375,10 @@ export default function ConfigModule() {
             {selUser ? (
               <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 20 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-                  <div>
-                    <div style={{ fontWeight: 800, fontSize: 18, color: '#1e293b' }}>{selUser.nom || selUser.user_email}</div>
-                    <div style={{ fontSize: 12, color: '#94a3b8' }}>{selUser.user_email}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 250 }}>
+                    <input value={selUser.nom || ''} onChange={e => setSelUser(u => ({ ...u, nom: e.target.value }))} placeholder="Nom complet" style={{ ...inp, fontWeight: 700, fontSize: 16 }} />
+                    <input value={selUser.user_email || ''} onChange={e => setSelUser(u => ({ ...u, user_email: e.target.value }))} placeholder="email@societe.be" style={{ ...inp, fontSize: 12 }} />
+                    {!selUser.id && <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 600 }}>Nouveau compte — reconnu au 1ᵉʳ login Microsoft avec cet email</span>}
                   </div>
                   <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
                     <label style={{ fontSize: 13, fontWeight: 600, color: '#475569', display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -372,12 +405,13 @@ export default function ConfigModule() {
                 </div>
 
                 <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                  <button onClick={saveUser} disabled={saving} style={{ ...btn('#1e293b'), padding: '9px 18px', fontSize: 14, opacity: saving ? .6 : 1 }}>{saving ? '…' : '💾 Enregistrer'}</button>
-                  <button onClick={renvoyerAcces} disabled={saving} style={{ ...btn('#0080BD'), padding: '9px 16px', fontSize: 14, opacity: saving ? .6 : 1 }}>📧 {selUser.date_envoi_acces ? 'Renvoyer' : 'Envoyer'} les accès</button>
-                  <span style={{ fontSize: 12, color: '#94a3b8' }}>
+                  <button onClick={saveUser} disabled={saving} style={{ ...btn('#1e293b'), padding: '9px 18px', fontSize: 14, opacity: saving ? .6 : 1 }}>{saving ? '…' : (selUser.id ? '💾 Enregistrer' : '➕ Créer le compte')}</button>
+                  {selUser.id && <button onClick={renvoyerAcces} disabled={saving} style={{ ...btn('#0080BD'), padding: '9px 16px', fontSize: 14, opacity: saving ? .6 : 1 }}>📧 {selUser.date_envoi_acces ? 'Renvoyer' : 'Envoyer'} les accès</button>}
+                  {selUser.id && <span style={{ fontSize: 12, color: '#94a3b8' }}>
                     {selUser.date_envoi_acces ? `Accès envoyés le ${new Date(selUser.date_envoi_acces).toLocaleDateString('fr-BE')}` : 'Accès jamais envoyés'}
                     {selUser.premiere_connexion ? ` · 1ʳᵉ connexion le ${new Date(selUser.premiere_connexion).toLocaleDateString('fr-BE')}` : ' · pas encore connecté'}
-                  </span>
+                  </span>}
+                  <button onClick={selUser.id ? deleteUser : () => setSelUser(null)} disabled={saving} style={{ marginLeft: 'auto', padding: '9px 16px', fontSize: 14, fontWeight: 700, borderRadius: 8, cursor: 'pointer', border: '1px solid #fecaca', background: '#fff', color: '#dc2626' }}>{selUser.id ? '🗑 Supprimer' : '✕ Annuler'}</button>
                 </div>
 
                 {selUser.role === 'admin' && (
