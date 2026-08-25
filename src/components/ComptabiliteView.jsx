@@ -500,6 +500,21 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const totalEntrees = txFiltrees.filter(t=>parseFloat(t.montant)>0).reduce((s,t)=>s+parseFloat(t.montant),0)
   const totalSorties = txFiltrees.filter(t=>parseFloat(t.montant)<0).reduce((s,t)=>s+parseFloat(t.montant),0)
 
+  // Total réellement attribué à l'employé filtré (parts de ventilation, sinon montant plein)
+  const empFiltre = (filtre.employe !== 'tous' && filtre.employe !== 'aucun') ? employes.find(e => String(e.id) === String(filtre.employe)) : null
+  let totalAttribue = 0, nbDirect = 0, nbVentile = 0
+  if (empFiltre) {
+    for (const t of txFiltrees) {
+      const parts = ventilations[t.id] || []
+      if (parts.length) {
+        const p = parts.find(v => String(v.employe_id) === String(filtre.employe))
+        if (p) { totalAttribue += Math.abs(Number(p.montant) || 0); nbVentile++ }
+      } else if (String(t.employe_id || '') === String(filtre.employe)) {
+        totalAttribue += Math.abs(Number(t.montant) || 0); nbDirect++
+      }
+    }
+  }
+
   // Compteurs facture : respectent tous les filtres actifs (période, compte, etc.) sauf le critère facture
   const nbAvecFacture = txHorsFacture.filter(t => t.facture_url).length
   const nbSansFactureRequise = txHorsFacture.filter(t => !t.facture_url && t.sans_facture).length
@@ -780,10 +795,10 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
         </div>
 
         {/* Reset */}
-        {(filtre.compte!=='tous'||filtre.type!=='tous'||filtre.libelle||filtre.periodes.length>0||filtre.categorie!=='toutes'||filtre.facture!=='toutes') && (
+        {(filtre.compte!=='tous'||filtre.type!=='tous'||filtre.libelle||filtre.periodes.length>0||filtre.categorie!=='toutes'||filtre.facture!=='toutes'||filtre.employe!=='tous') && (
           <div style={{ display:'flex', flexDirection:'column', gap:'3px' }}>
             <label style={{ fontSize:'10px', color:'transparent' }}>.</label>
-            <button onClick={()=>setFiltre({compte:'tous',type:'tous',libelle:'',periodes:[],categorie:'toutes',facture:'toutes'})} style={{ padding:'7px 12px', borderRadius:'6px', fontSize:'12px', fontWeight:'600', cursor:'pointer', border:'1px solid #e2e8f0', background:'#fff', color:'#64748b' }}>
+            <button onClick={()=>setFiltre({compte:'tous',type:'tous',libelle:'',periodes:[],categorie:'toutes',facture:'toutes',employe:'tous'})} style={{ padding:'7px 12px', borderRadius:'6px', fontSize:'12px', fontWeight:'600', cursor:'pointer', border:'1px solid #e2e8f0', background:'#fff', color:'#64748b' }}>
               ✕ Reset
             </button>
           </div>
@@ -791,6 +806,22 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       </div>
 
       </div>{/* fin en-tête collant */}
+
+      {empFiltre && (
+        <div style={{ display:'flex', alignItems:'center', gap:'16px', flexWrap:'wrap', background:`${color}0d`, border:`1px solid ${color}33`, borderRadius:'12px', padding:'14px 18px', marginBottom:'12px' }}>
+          <div style={{ fontSize:'13px', fontWeight:'700', color:'#334155' }}>
+            <i className="ti ti-user" style={{ marginRight:'6px', color }} />
+            Total attribué à {empFiltre.nom_complet || empFiltre.code}
+          </div>
+          <div style={{ fontSize:'22px', fontWeight:'800', color }}>{fmt(totalAttribue)}</div>
+          <div style={{ fontSize:'12px', color:'#64748b' }}>
+            {nbDirect} dépense(s) directe(s){nbVentile > 0 ? ` · ${nbVentile} part(s) de facture partagée` : ''}
+          </div>
+          <div style={{ fontSize:'11px', color:'#94a3b8', flexBasis:'100%' }}>
+            Pour les factures partagées, seule la part de {empFiltre.nom_complet || empFiltre.code} est comptée ici (la liste ci-dessous affiche le montant total de chaque ligne bancaire).
+          </div>
+        </div>
+      )}
 
       {/* Tableau transactions pleine largeur */}
       <div style={{ background:'#fff', borderRadius:'12px', border:'1px solid #e2e8f0', overflow:'hidden' }}>
