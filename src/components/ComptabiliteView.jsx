@@ -85,7 +85,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const [facturesParTx, setFacturesParTx] = useState({}) // { transaction_id: nb de factures liées } -> badge +N
   const [loading, setLoading] = useState(true)
   const [loadingTx, setLoadingTx] = useState(false)
-  const [filtre, setFiltre] = useState({ compte: 'tous', type: 'tous', libelle: '', periodes: [], categorie: 'toutes', facture: 'toutes' })
+  const [filtre, setFiltre] = useState({ compte: 'tous', type: 'tous', libelle: '', periodes: [], categorie: 'toutes', facture: 'toutes', employe: 'tous' })
   const [onglet, setOnglet] = useState('mouvements') // 'mouvements' | 'factures'
   const [montantsMasques, setMontantsMasques] = useState(true) // masquer soldes/entrées/sorties par défaut
   const [periodeOuverte, setPeriodeOuverte] = useState(false)
@@ -189,7 +189,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   }, [comptes.map(c=>c.id).join(',')])
 
   // Reset pagination quand les filtres changent
-  useEffect(() => { setPage(1) }, [filtre.compte, filtre.type, filtre.libelle, filtre.periodes, filtre.categorie, filtre.facture])
+  useEffect(() => { setPage(1) }, [filtre.compte, filtre.type, filtre.libelle, filtre.periodes, filtre.categorie, filtre.facture, filtre.employe])
 
   // Au 1er chargement des transactions : cocher l'année en cours (2026) par défaut, si aucune période choisie
   const [periodeInitialisee, setPeriodeInitialisee] = useState(false)
@@ -424,6 +424,8 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       const okIds = [filtre.categorie, ...categories.filter(c => c.parent_id === filtre.categorie).map(c => c.id)]
       if (!okIds.includes(t.categorie_id)) return false
     }
+    if (filtre.employe === 'aucun' && t.employe_id) return false
+    if (filtre.employe !== 'tous' && filtre.employe !== 'aucun' && String(t.employe_id || '') !== String(filtre.employe)) return false
     return true
   })
   // Filtrage complet = + critère facture
@@ -701,6 +703,18 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
             })}
           </select>
         </div>
+
+        {/* Filtre employé (bénéficiaire) */}
+        {employes.length > 0 && (
+          <div style={{ display:'flex', flexDirection:'column', gap:'3px' }}>
+            <label style={{ fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em' }}>Employé</label>
+            <select value={filtre.employe} onChange={e=>setFiltre(f=>({...f,employe:e.target.value}))} style={{ padding:'7px 10px', border:'1px solid #e2e8f0', borderRadius:'6px', fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif", cursor:'pointer' }}>
+              <option value="tous">Tous</option>
+              <option value="aucun">— Sans bénéficiaire —</option>
+              {employes.map(em => <option key={em.id} value={em.id}>{em.nom_complet || em.code}</option>)}
+            </select>
+          </div>
+        )}
 
         {/* Filtre facture */}
         <div style={{ display:'flex', flexDirection:'column', gap:'3px' }}>
