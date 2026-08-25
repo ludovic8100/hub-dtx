@@ -61,7 +61,7 @@ export default function TicketsView() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const sel = 'id,titre,description,ticket_categorie,ticket_statut,ticket_origine,priorite,gestionnaire,cree_par,cloture_par,user_email,derniere_activite,date_creation,created_at,dossier_client,client_id'
+    const sel = 'id,titre,description,ticket_categorie,ticket_statut,ticket_origine,priorite,gestionnaire,cree_par,cloture_par,user_email,derniere_activite,date_creation,created_at,dossier_client,client_id,participants'
     let all = []
     for (let from = 0; ; from += 1000) {
       const { data, error } = await supabase.from('taches').select(sel).eq('is_ticket', true).order('derniere_activite', { ascending: false }).range(from, from + 999)
@@ -82,7 +82,8 @@ export default function TicketsView() {
   const visibles = tickets.filter(t => {
     const assigne = (t.gestionnaire || '').toUpperCase()
     const auteur = (t.cree_par || '').toUpperCase()
-    if (scope === 'mine' && !(assigne === myCode || auteur === myCode)) return false
+    const parts = Array.isArray(t.participants) ? t.participants.map(x => (x || '').toUpperCase()) : []
+    if (scope === 'mine' && !(assigne === myCode || auteur === myCode || parts.includes(myCode))) return false
     if (scope === 'unassigned' && assigne) return false
     // scope 'all' : tout (réservé admin)
     if (fCat !== 'tous' && t.ticket_categorie !== fCat) return false
@@ -279,6 +280,19 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
   const assigner = async (code) => {
     await touch({ gestionnaire: code ? code.toUpperCase() : null }, code ? `Assigné à ${code.toUpperCase()} (par ${myCode})` : `Attribution retirée (par ${myCode})`)
   }
+  const parts = Array.isArray(t.participants) ? t.participants.map(x => (x || '').toUpperCase()) : []
+  const addParticipant = async (code) => {
+    if (!code) return
+    const c = code.toUpperCase()
+    if (parts.includes(c) || c === (t.gestionnaire || '').toUpperCase()) return
+    const next = [...parts, c]
+    await touch({ participants: next }, `${c} ajouté aux participants (par ${myCode})`)
+  }
+  const removeParticipant = async (code) => {
+    const c = (code || '').toUpperCase()
+    const next = parts.filter(x => x !== c)
+    await touch({ participants: next }, `${c} retiré des participants (par ${myCode})`)
+  }
   const cloturer = async () => {
     await touch({ ticket_statut: 'cloture', cloture_par: myCode, statut: 'terminee', date_cloture: new Date().toISOString() }, `Ticket clôturé par ${myCode}`)
   }
@@ -312,6 +326,24 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
         {canManage && t.ticket_statut !== 'cloture' && (
           <select style={{ ...S.input, width: 'auto', padding: '5px 8px', fontSize: 12 }} value={t.ticket_statut} onChange={e => changeStatut(e.target.value)}>
             {STATUTS.filter(x => x.k !== 'cloture').map(x => <option key={x.k} value={x.k}>{x.label}</option>)}
+          </select>
+        )}
+      </div>
+
+      {/* Participants */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '10px 20px', background: '#FAFBFD', borderBottom: `1px solid #EEF1F6`, alignItems: 'center' }}>
+        <span style={{ fontSize: 12, color: C.textM, fontWeight: 600 }}>Participants :</span>
+        {parts.length === 0 && <span style={{ fontSize: 12, color: C.textL }}>aucun</span>}
+        {parts.map(pc => (
+          <span key={pc} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#E3F2FD', color: '#1565C0', borderRadius: 14, padding: '3px 10px', fontSize: 12, fontWeight: 600 }}>
+            {pc}
+            {t.ticket_statut !== 'cloture' && <span onClick={() => removeParticipant(pc)} style={{ cursor: 'pointer', color: '#1565C0', fontWeight: 700 }}>×</span>}
+          </span>
+        ))}
+        {t.ticket_statut !== 'cloture' && (
+          <select style={{ ...S.input, width: 'auto', padding: '4px 8px', fontSize: 12 }} value="" onChange={e => { addParticipant(e.target.value); e.target.value = '' }}>
+            <option value="">+ Ajouter…</option>
+            {collabs.filter(c => !parts.includes((c.code || '').toUpperCase()) && (c.code || '').toUpperCase() !== (t.gestionnaire || '').toUpperCase()).map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
           </select>
         )}
       </div>
