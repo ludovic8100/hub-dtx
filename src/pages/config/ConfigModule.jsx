@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { bootstrapConfigs } from '../../lib/bootstrapConfigs'
 import GestionCategories from './GestionCategories'
+import GestionEmployes from './GestionEmployes'
 import { RdvCategoriesPanel } from '../admin/RdvCategories'
 
 // ─── Définition des accès par société (colonnes réelles de user_permissions) ───
@@ -197,7 +198,10 @@ export default function ConfigModule() {
     </Layout>
   )
 
+  const DOMAINES_INTERNES = ['dynassur.be', 'dtx-group.be']
   const usersFiltres = users.filter(u => {
+    const dom = (u.user_email || '').split('@')[1]?.toLowerCase()
+    if (!dom || !DOMAINES_INTERNES.includes(dom)) return false  // externes (gmail, etc.) : jamais d'accès au hub
     const q = uSearch.trim().toLowerCase()
     if (q && !((u.nom || '').toLowerCase().includes(q) || (u.user_email || '').toLowerCase().includes(q) || (u.collab_code || '').toLowerCase().includes(q))) return false
     if (uStatut === 'actifs' && !u.actif) return false
@@ -213,7 +217,7 @@ export default function ConfigModule() {
     return true
   }).sort((a, b) => (a.nom || a.user_email || '').localeCompare(b.nom || b.user_email || '', 'fr', { sensitivity: 'base' }))
 
-  const TABS = [['societes', '🏢 Sociétés'], ['documents', '📄 Documents'], ['users', '👥 Utilisateurs & accès'], ['categories', '🏷️ Catégories compta'], ['categoriesrdv', '📅 Catégories RDV']]
+  const TABS = [['societes', '🏢 Sociétés'], ['documents', '📄 Documents'], ['users', '👥 Utilisateurs & accès'], ['employes', '🧑‍💼 Employés'], ['categories', '🏷️ Catégories compta'], ['categoriesrdv', '📅 Catégories RDV']]
 
   return (
     <Layout currentPage="Configuration">
@@ -230,6 +234,7 @@ export default function ConfigModule() {
         {flash && <div style={{ position: 'fixed', top: 16, right: 16, background: '#1e293b', color: '#fff', padding: '10px 16px', borderRadius: 10, zIndex: 50, fontWeight: 600 }}>{flash}</div>}
         {loading && <div style={{ color: '#94a3b8', padding: 20 }}>Chargement…</div>}
 
+        {tab === 'employes' && <GestionEmployes />}
         {tab === 'categories' && <GestionCategories />}
 
         {tab === 'categoriesrdv' && <RdvCategoriesPanel />}

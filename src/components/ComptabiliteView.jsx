@@ -216,11 +216,16 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   useEffect(() => { chargerCategories() }, [societeCodes.join(',')])
 
   useEffect(() => {
-    supabase.from('collaborateurs').select('id, code, nom_complet')
-      .eq('actif', true).eq('est_sous_agent', false).eq('est_apporteur', false)
-      .order('nom_complet')
-      .then(({ data }) => setEmployes(data || []))
-  }, [])
+    let annule = false
+    supabase.from('employes').select('id, code, nom, entites, actif')
+      .eq('actif', true).order('nom')
+      .then(({ data }) => {
+        if (annule) return
+        const filtres = (data || []).filter(e => !e.entites || e.entites.length === 0 || (societeCodes || []).some(c => e.entites.includes(c)))
+        setEmployes(filtres.map(e => ({ ...e, nom_complet: e.nom })))
+      })
+    return () => { annule = true }
+  }, [societeCodes.join(',')])
 
   async function chargerVentilations() {
     let all = [], from = 0
