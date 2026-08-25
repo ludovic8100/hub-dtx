@@ -41,6 +41,35 @@ const S = {
   label: { fontSize: 11, fontWeight: 700, color: C.textM, textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 5, display: 'block' },
 }
 
+
+// Carte stat avec répartition % par collaborateur au survol
+function StatCard({ label, count, tickets, color }) {
+  const [hover, setHover] = useState(false)
+  // répartition par assigné
+  const repartition = {}
+  tickets.forEach(t => { const k = (t.gestionnaire || '').toUpperCase() || 'Non attribué'; repartition[k] = (repartition[k] || 0) + 1 })
+  const lignes = Object.entries(repartition).sort((a, b) => b[1] - a[1])
+  const total = count || 1
+  return (
+    <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ position: 'relative', background: '#fff', border: `1px solid ${C.border}`, borderRadius: 10, padding: '14px 16px', minWidth: 130, cursor: 'default' }}>
+      <div style={{ fontSize: 12, color: C.textL, marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 24, fontWeight: 800, color: color || NAVY }}>{count}</div>
+      {hover && lignes.length > 0 && (
+        <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 50, marginTop: 4, background: '#fff', border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', minWidth: 180, boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}>
+          <div style={{ fontSize: 10, textTransform: 'uppercase', color: C.textL, fontWeight: 700, marginBottom: 6 }}>Répartition</div>
+          {lignes.map(([code, n]) => (
+            <div key={code} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 12, padding: '2px 0' }}>
+              <span style={{ color: NAVY, fontWeight: 600 }}>{code}</span>
+              <span style={{ color: C.textM }}>{n} · {Math.round(n / total * 100)}%</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function TicketsView() {
   const { perms, isAdmin } = useAuth()
   const myCode = (perms?.collab_code || perms?.code || (perms?.user_email || '').split('@')[0] || '').toUpperCase()
@@ -53,6 +82,7 @@ export default function TicketsView() {
   const [scope, setScope] = useState('mine')       // mine / unassigned / all
   const [fStatut, setFStatut] = useState('actifs') // actifs / tous / <statut>
   const [fCat, setFCat] = useState('tous')
+  const [fCollab, setFCollab] = useState('tous')
   const [showCreate, setShowCreate] = useState(false)
   const [sel, setSel] = useState(null)             // ticket ouvert (détail)
   const [mobile, setMobile] = useState(isMobile())
@@ -87,6 +117,11 @@ export default function TicketsView() {
     if (scope === 'unassigned' && assigne) return false
     // scope 'all' : tout (réservé admin)
     if (fCat !== 'tous' && t.ticket_categorie !== fCat) return false
+    if (fCollab !== 'tous') {
+      const fc = fCollab.toUpperCase()
+      const impliques = [(t.gestionnaire || '').toUpperCase(), ...parts]
+      if (!impliques.includes(fc)) return false
+    }
     if (fStatut === 'actifs' && t.ticket_statut === 'cloture') return false
     else if (fStatut !== 'actifs' && fStatut !== 'tous' && t.ticket_statut !== fStatut) return false
     return true
@@ -100,7 +135,7 @@ export default function TicketsView() {
       {/* Onglets */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }}>
         {[['mine', 'Mes tickets'], ['unassigned', 'À attribuer'], ...(isAdmin ? [['all', 'Tous']] : [])].map(([k, l]) => (
-          <button key={k} onClick={() => setScope(k)} style={{ ...S.btn(scope === k ? 'primary' : 'ghost'), padding: '8px 14px', borderRadius: 20, position: 'relative' }}>
+          <button key={k} onClick={() => { setScope(k); setFStatut(k === 'all' ? 'tous' : 'actifs') }} style={{ ...S.btn(scope === k ? 'primary' : 'ghost'), padding: '8px 14px', borderRadius: 20, position: 'relative' }}>
             {l}{k === 'unassigned' && nbUnassigned > 0 && <span style={{ background: C.danger, color: '#fff', borderRadius: 10, padding: '1px 7px', fontSize: 10, marginLeft: 5 }}>{nbUnassigned}</span>}
           </button>
         ))}
@@ -119,9 +154,30 @@ export default function TicketsView() {
           <option value="tous">Toutes catégories</option>
           {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
+        <select style={{ ...S.input, width: 'auto' }} value={fCollab} onChange={e => setFCollab(e.target.value)}>
+          <option value="tous">Tous collaborateurs</option>
+          {collabs.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
+        </select>
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: 12, color: C.textL, alignSelf: 'center' }}>{visibles.length} ticket(s)</span>
       </div>
+
+      {/* Stats */}
+      {(() => {
+        const base = scope === 'all' ? tickets : visibles
+        const parStatut = k => base.filter(t => t.ticket_statut === k)
+        const actifs = base.filter(t => t.ticket_statut !== 'cloture')
+        return (
+          <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+            <StatCard label="Total" count={base.length} tickets={base} color={NAVY} />
+            <StatCard label="Actifs" count={actifs.length} tickets={actifs} color={CYAN} />
+            <StatCard label="En cours" count={parStatut('en_cours').length} tickets={parStatut('en_cours')} color="#E65100" />
+            <StatCard label="En attente" count={parStatut('en_attente').length} tickets={parStatut('en_attente')} color="#7B1FA2" />
+            <StatCard label="Résolus" count={parStatut('resolu').length} tickets={parStatut('resolu')} color="#2E7D32" />
+            <StatCard label="Clôturés" count={parStatut('cloture').length} tickets={parStatut('cloture')} color="#546E7A" />
+          </div>
+        )
+      })()}
 
       {/* Liste */}
       {visibles.length === 0 ? (
@@ -134,7 +190,7 @@ export default function TicketsView() {
         <div style={{ background: '#fff', border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead><tr style={{ background: C.bg, color: C.textM }}>
-              {['#', 'Titre', 'Catégorie', 'Statut', 'Créé par', 'Assigné à', 'Maj'].map(h => <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, textTransform: 'uppercase', fontWeight: 700 }}>{h}</th>)}
+              {['#', 'Titre', 'Catégorie', 'Statut', 'Créé par', 'Assigné à', 'Participants', 'Maj'].map(h => <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, textTransform: 'uppercase', fontWeight: 700 }}>{h}</th>)}
             </tr></thead>
             <tbody>
               {visibles.map(t => {
@@ -147,6 +203,7 @@ export default function TicketsView() {
                     <td style={{ padding: '11px 14px' }}><span style={S.badge(s.bg, s.fg)}>{s.label}</span></td>
                     <td style={{ padding: '11px 14px', fontSize: 12 }}>{t.cree_par || '—'}</td>
                     <td style={{ padding: '11px 14px' }}>{t.gestionnaire ? <span style={S.avatar}>{(t.gestionnaire || '').slice(0, 3)}</span> : <span style={{ color: C.danger, fontWeight: 600, fontSize: 12 }}>⚠ À attribuer</span>}</td>
+                    <td style={{ padding: '11px 14px' }}>{(Array.isArray(t.participants) && t.participants.length) ? <span style={{ fontSize: 11, color: C.textM }}>{t.participants.join(', ')}</span> : <span style={{ color: C.textL, fontSize: 12 }}>—</span>}</td>
                     <td style={{ padding: '11px 14px', color: C.textL, fontSize: 12 }}>{rel(t.derniere_activite || t.created_at)}</td>
                   </tr>
                 )
