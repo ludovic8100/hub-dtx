@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth, SOCIETES_CONFIG } from '../lib/auth'
+import { useTicketsBadge } from '../lib/useTicketsBadge'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
@@ -131,6 +132,7 @@ function ClientSearch({ accentLight }) {
 
 export default function Sidebar() {
   const { perms, isAdmin, activeSociete } = useAuth()
+  const ticketsBadge = useTicketsBadge()
   const navigate = useNavigate()
   const location = useLocation()
   if (!perms) return null
@@ -158,9 +160,10 @@ export default function Sidebar() {
         onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}
       >
         <i className={`ti ${item.icon}`} style={{ fontSize:'16px', color: active ? accentLight : 'rgba(255,255,255,0.45)', width:'18px', flexShrink:0 }} />
-        <span style={{ fontSize:'13.5px', fontFamily:"'Source Sans Pro', sans-serif", color: active ? '#fff' : 'rgba(255,255,255,0.65)', fontWeight: active ? '600' : '400' }}>
+        <span style={{ fontSize:'13.5px', fontFamily:"'Source Sans Pro', sans-serif", color: active ? '#fff' : 'rgba(255,255,255,0.65)', fontWeight: active ? '600' : '400', flex:1 }}>
           {item.label}
         </span>
+        {item.badge > 0 && <span style={{ background:'#E74C3C', color:'#fff', borderRadius:'10px', fontSize:'11px', fontWeight:700, padding:'1px 7px', minWidth:'18px', textAlign:'center' }}>{item.badge}</span>}
       </div>
     )
   }
@@ -170,7 +173,7 @@ export default function Sidebar() {
       {currentModules.map(m => <NavItem key={m.key} item={m} />)}
       {activeSociete === 'dynassur' && <ClientSearch accentLight={accentLight} />}
       <div style={{ marginTop:'8px', paddingTop:'8px', borderTop:'1px solid rgba(255,255,255,0.08)' }}>
-        <NavItem item={{ key:'tickets', label:'Tickets', icon:'ti-ticket', path:'/tickets' }} />
+        <NavItem item={{ key:'tickets', label:'Tickets', icon:'ti-ticket', path:'/tickets', badge: ticketsBadge }} />
       </div>
       {isAdmin && (
         <div style={{ marginTop:'8px', paddingTop:'8px', borderTop:'1px solid rgba(255,255,255,0.08)' }}>

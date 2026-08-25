@@ -342,7 +342,16 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
     const { data } = await supabase.from('tickets_messages').select('*').eq('tache_id', t.id).order('created_at', { ascending: true })
     setMsgs(data || [])
     setLoadingMsgs(false)
-  }, [t.id])
+    // marquer comme lus pour moi les messages que je n'ai pas encore lus
+    const nonLus = (data || []).filter(m => !(Array.isArray(m.lu_par) ? m.lu_par : []).map(x => (x||'').toUpperCase()).includes(myCode))
+    if (nonLus.length) {
+      await Promise.all(nonLus.map(m => {
+        const lp = [...new Set([...(Array.isArray(m.lu_par) ? m.lu_par : []), myCode])]
+        return supabase.from('tickets_messages').update({ lu_par: lp }).eq('id', m.id)
+      }))
+      onChanged()
+    }
+  }, [t.id, myCode, onChanged])
   useEffect(() => { loadMsgs() }, [loadMsgs])
 
   const touch = async (patch, sysMsg) => {
