@@ -225,15 +225,39 @@ function Editeur({ type, doc, onClose, onSaved }) {
   const tot = calcTotaux(lignes, f.remise_pct)
   const set = (k, v) => setF(p => ({ ...p, [k]: v }))
   const setLigne = (i, k, v) => setLignes(p => p.map((l, j) => j === i ? { ...l, [k]: v } : l))
-  // Ajout de photos à une ligne : upload vers Supabase Storage, on garde l'URL publique
+  // Compresse/redimensionne une image avant upload (max 1400px, qualité 82%)
+  const compresserImage = (file) => new Promise((resolve) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const MAX = 1400
+      let { width, height } = img
+      if (width > MAX || height > MAX) {
+        if (width > height) { height = Math.round(height * MAX / width); width = MAX }
+        else { width = Math.round(width * MAX / height); height = MAX }
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = width; canvas.height = height
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height)
+      canvas.toBlob(
+        (blob) => resolve(blob || file),
+        'image/jpeg', 0.82
+      )
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file) }
+    img.src = url
+  })
+
+  // Ajout de photos à une ligne : compression puis upload vers Supabase Storage
   const ajouterPhotos = async (i, files) => {
     const imgs = []
     for (const file of files) {
       if (!file.type.startsWith('image/')) continue
       try {
-        const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
-        const chemin = `${type}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`
-        const { error } = await supabase.storage.from('devis-photos').upload(chemin, file, { upsert: true, contentType: file.type })
+        const blob = await compresserImage(file)
+        const chemin = `${type}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.jpg`
+        const { error } = await supabase.storage.from('devis-photos').upload(chemin, blob, { upsert: true, contentType: 'image/jpeg' })
         if (error) { alert('Upload photo : ' + error.message); continue }
         const { data } = supabase.storage.from('devis-photos').getPublicUrl(chemin)
         imgs.push({ url: data.publicUrl, nom: file.name, chemin })
