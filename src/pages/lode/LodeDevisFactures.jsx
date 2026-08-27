@@ -811,6 +811,110 @@ async function exportExcel(type, doc, lignes) {
   XLSX.writeFile(wb, `${isDevis ? L.devis : L.facture}_${doc.numero}.xlsx`)
 }
 
+// Export Word (.doc) éditable — via HTML que Word ouvre nativement
+async function exportWord(type, doc, lignes) {
+  const isDevis = type === 'devis'
+  const L = I18N[doc.langue] || I18N.fr
+  const cgv = CGV_I18N[doc.langue] || CGV_I18N.fr
+  const tot = calcTotaux(lignes, doc.remise_pct)
+  const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const eurW = n => (Number(n) || 0).toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
+
+  const lignesNormales = lignes.filter(l => !l.optionnelle)
+  const lignesOptions = lignes.filter(l => l.optionnelle)
+  const hasRem = lignes.some(x => Number(x.remise_pct) > 0)
+
+  // Récupère les photos en dataURL (Word les embarque)
+  const photoTag = async (photos) => {
+    if (!photos || !photos.length) return ''
+    let html = ''
+    for (const p of photos) {
+      const src = p.url || p
+      try {
+        const dataUrl = (typeof src === 'string' && src.startsWith('data:')) ? src : await loadImageDataURL(src)
+        if (dataUrl) html += `<img src="${dataUrl}" width="130" style="margin:3px;border:1px solid #ddd;" />`
+      } catch (e) { /* ignore */ }
+    }
+    return html
+  }
+
+  const rowsHtml = []
+  for (const l of lignesNormales) {
+    const t = (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * (1 - (Number(l.remise_pct) || 0) / 100)
+    const ttc = t * (1 + (Number(l.tva_pct) || 0) / 100)
+    const titre = esc(l.titre || l.description || '')
+    const desc = esc(l.descriptif || '').replace(/\n/g, '<br/>')
+    const photos = await photoTag(l.photos)
+    rowsHtml.push(`<tr>
+      <td style="border:1px solid #ccc;padding:6px;vertical-align:top;">
+        <b>${titre}</b>${desc ? `<br/><span style="font-size:9pt;color:#555;">${desc}</span>` : ''}
+        ${photos ? `<br/>${photos}` : ''}
+      </td>
+      <td style="border:1px solid #ccc;padding:6px;text-align:right;white-space:nowrap;">${eurW(l.prix_unitaire)}</td>
+      <td style="border:1px solid #ccc;padding:6px;text-align:center;">${l.tva_pct}%</td>
+      ${hasRem ? `<td style="border:1px solid #ccc;padding:6px;text-align:center;">${l.remise_pct || 0}%</td>` : ''}
+      <td style="border:1px solid #ccc;padding:6px;text-align:center;">${l.quantite}</td>
+      <td style="border:1px solid #ccc;padding:6px;text-align:right;white-space:nowrap;">${eurW(t)}</td>
+      <td style="border:1px solid #ccc;padding:6px;text-align:right;white-space:nowrap;">${eurW(ttc)}</td>
+    </tr>`)
+  }
+
+  let optionsHtml = ''
+  if (lignesOptions.length) {
+    const optRows = []
+    for (const l of lignesOptions) {
+      const t = (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * (1 - (Number(l.remise_pct) || 0) / 100)
+      const ttc = t * (1 + (Number(l.tva_pct) || 0) / 100)
+      optRows.push(`<tr><td style="border:1px solid #f0c674;padding:6px;"><b>${esc(l.titre || l.description)}</b>${l.descriptif ? `<br/><span style="font-size:9pt;color:#555;">${esc(l.descriptif)}</span>` : ''}</td><td style="border:1px solid #f0c674;padding:6px;text-align:right;white-space:nowrap;">${eurW(t)} HT / ${eurW(ttc)} TTC</td></tr>`)
+    }
+    optionsHtml = `<h3 style="color:#b45309;">Options au choix (non comprises dans le total)</h3>
+      <table style="border-collapse:collapse;width:100%;">${optRows.join('')}</table>`
+  }
+
+  const tvaRows = Object.entries(tot.parTaux).filter(([, v]) => v > 0)
+    .map(([tx, v]) => `<tr><td style="text-align:right;padding:2px 8px;">TVA ${tx}%</td><td style="text-align:right;padding:2px 8px;">${eurW(v)}</td></tr>`).join('')
+
+  const html = `<!DOCTYPE html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>${esc(doc.numero)}</title></head>
+  <body style="font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#1e293b;">
+    <table style="width:100%;"><tr>
+      <td style="vertical-align:top;"><b style="color:#ea580c;font-size:14pt;">${esc(LODE.raison_sociale)}</b><br/>${esc(LODE.adresse)}<br/>${esc(LODE.cp)} ${esc(LODE.ville)}<br/>TVA ${esc(LODE.tva)}</td>
+      <td style="vertical-align:top;text-align:right;"><b style="color:#ea580c;font-size:18pt;">${isDevis ? L.devis : L.facture} ${esc(doc.numero)}</b><br/>${L.date} ${fmtDate(isDevis ? doc.date_devis : doc.date_facture)}<br/>${isDevis ? L.validite : L.echeance} ${fmtDate(isDevis ? doc.date_validite : doc.date_echeance)}</td>
+    </tr></table>
+    <hr/>
+    <table style="width:100%;"><tr>
+      <td><b>À :</b> ${esc(doc.client_nom)}<br/>${esc(doc.client_adresse || '')}<br/>${esc(doc.client_cp || '')} ${esc(doc.client_ville || '')}${doc.client_tva ? `<br/>TVA ${esc(doc.client_tva)}` : ''}</td>
+    </tr></table>
+    ${doc.objet ? `<p><b>${L.objet} :</b> ${esc(doc.objet)}</p>` : ''}
+    <table style="border-collapse:collapse;width:100%;margin-top:10px;">
+      <thead><tr style="background:#ea580c;color:#fff;">
+        <th style="padding:6px;text-align:left;">${L.description}</th>
+        <th style="padding:6px;">P.U.</th><th style="padding:6px;">TVA</th>
+        ${hasRem ? '<th style="padding:6px;">%</th>' : ''}
+        <th style="padding:6px;">${L.qte}</th><th style="padding:6px;">${L.totalHT}</th><th style="padding:6px;">TTC</th>
+      </tr></thead>
+      <tbody>${rowsHtml.join('')}</tbody>
+    </table>
+    <table style="width:100%;margin-top:8px;"><tr><td></td><td style="width:200px;">
+      <table style="width:100%;"><tr><td style="text-align:right;padding:2px 8px;"><b>${L.totalHT}</b></td><td style="text-align:right;padding:2px 8px;">${eurW(tot.ht)}</td></tr>
+      ${tvaRows}
+      <tr><td style="text-align:right;padding:4px 8px;border-top:2px solid #ea580c;"><b style="color:#ea580c;font-size:13pt;">${isDevis ? L.totalTTC : L.montantDu}</b></td><td style="text-align:right;padding:4px 8px;border-top:2px solid #ea580c;"><b style="font-size:13pt;">${eurW(tot.ttc)}</b></td></tr>
+      </table>
+    </td></tr></table>
+    ${optionsHtml}
+    <p style="font-size:9pt;">${L.paiement} : ${esc(LODE.iban)} (${esc(LODE.bic)})</p>
+    <div style="page-break-before:always;"></div>
+    <h3 style="color:#ea580c;">${L.cgvTitre}</h3>
+    <div style="font-size:8.5pt;color:#444;">${cgv.map(c => `<p>${esc(c)}</p>`).join('')}</div>
+  </body></html>`
+
+  const blob = new Blob(['\ufeff', html], { type: 'application/msword' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = `${isDevis ? L.devis : L.facture}_${doc.numero}.doc`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 // ════════════════════════════════════════════════════════════════
 //  PAGE PRINCIPALE
 // ════════════════════════════════════════════════════════════════
@@ -1078,7 +1182,7 @@ export default function LodeDevisFactures() {
     try {
       const lignes = await getLignes(type, doc.id)
       if (fmt === 'pdf') await exportPDF(type, doc, lignes)
-      else await exportExcel(type, doc, lignes)
+      else await exportWord(type, doc, lignes)
     } catch (e) { alert('Erreur export : ' + e.message) }
     finally { setBusy(null) }
   }
@@ -1203,7 +1307,7 @@ export default function LodeDevisFactures() {
                       <ActionButton tone="grey" onClick={() => setEditing({ type: t, doc })}>Modifier</ActionButton>
                       {tab === 'devis' && <ActionButton tone="accent" color={C} onClick={() => setSuivi(doc)}>📊 Suivi</ActionButton>}
                       <ActionButton tone="pdf" disabled={busy === doc.id + 'pdf'} onClick={() => doExport('pdf', t, doc)}>{busy === doc.id + 'pdf' ? '…' : 'PDF'}</ActionButton>
-                      <ActionButton tone="excel" disabled={busy === doc.id + 'excel'} onClick={() => doExport('excel', t, doc)}>{busy === doc.id + 'excel' ? '…' : 'Excel'}</ActionButton>
+                      <ActionButton tone="excel" disabled={busy === doc.id + 'word'} onClick={() => doExport('word', t, doc)}>{busy === doc.id + 'word' ? '…' : 'Word'}</ActionButton>
                       {tab === 'factures' && doc.client_tva && doc.statut !== 'payée' && doc.statut !== 'annulée' && (
                         <ActionButton tone="peppol" disabled={busy === doc.id + 'peppol'} onClick={() => envoyerPeppol(doc)}>{busy === doc.id + 'peppol' ? '…' : '📨 Peppol'}</ActionButton>
                       )}
@@ -1241,7 +1345,7 @@ export default function LodeDevisFactures() {
                             <ActionButton tone="grey" onClick={() => setEditing({ type: tab === 'devis' ? 'devis' : 'facture', doc })}>Modifier</ActionButton>
                             {tab === 'devis' && <ActionButton tone="accent" color={C} onClick={() => setSuivi(doc)}>📊 Suivi</ActionButton>}
                             <ActionButton tone="pdf" disabled={busy === doc.id + 'pdf'} onClick={() => doExport('pdf', tab === 'devis' ? 'devis' : 'facture', doc)}>{busy === doc.id + 'pdf' ? '…' : 'PDF'}</ActionButton>
-                            <ActionButton tone="excel" disabled={busy === doc.id + 'excel'} onClick={() => doExport('excel', tab === 'devis' ? 'devis' : 'facture', doc)}>{busy === doc.id + 'excel' ? '…' : 'Excel'}</ActionButton>
+                            <ActionButton tone="excel" disabled={busy === doc.id + 'word'} onClick={() => doExport('word', tab === 'devis' ? 'devis' : 'facture', doc)}>{busy === doc.id + 'word' ? '…' : 'Word'}</ActionButton>
                             {tab === 'factures' && doc.client_tva && doc.statut !== 'payée' && doc.statut !== 'annulée' && (
                               <ActionButton tone="peppol" disabled={busy === doc.id + 'peppol'} onClick={() => envoyerPeppol(doc)}>{busy === doc.id + 'peppol' ? '…' : '📨 Peppol'}</ActionButton>
                             )}
