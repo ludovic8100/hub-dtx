@@ -104,6 +104,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
     statut: 'brouillon', langue: 'fr', ...(doc || {}),
   })
   const [lignes, setLignes] = useState([{ description: '', quantite: 1, prix_unitaire: 0, remise_pct: 0, tva_pct: 21 }])
+  const [afficherTVAC, setAfficherTVAC] = useState(false)
   const [saving, setSaving] = useState(false)
   const CLIENT_TABLE = 'dtx_clients'
   // colonnes texte candidates pour la recherche multi-champs (intersectees avec les colonnes reellement presentes dans la base de CETTE societe)
@@ -285,7 +286,10 @@ function Editeur({ type, doc, onClose, onSaved }) {
         </div>
 
         {/* Lignes */}
-        <div style={{ fontSize: 13, fontWeight: 800, color: ORANGE, marginBottom: 8 }}>Lignes</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 10 }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: ORANGE }}>Lignes</div>
+          <button type="button" onClick={() => setAfficherTVAC(v => !v)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: afficherTVAC ? ORANGE : '#f1f5f9', color: afficherTVAC ? '#fff' : '#64748b', border: 'none', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>💶 {afficherTVAC ? 'Prix TVAC affichés' : 'Afficher prix TVA comprise'}</button>
+        </div>
         <div style={{ border: '1px solid #f1f5f9', borderRadius: 9, overflowX: 'auto', marginBottom: 10 }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: mobE ? 520 : 'auto' }}>
             <thead style={{ background: '#f8fafc' }}>
@@ -300,14 +304,20 @@ function Editeur({ type, doc, onClose, onSaved }) {
                   <tr key={i} style={{ borderTop: '1px solid #f1f5f9' }}>
                     <td style={{ padding: 4 }}><input style={{ ...inp, padding: '6px 8px' }} value={l.description} onChange={e => setLigne(i, 'description', e.target.value)} /></td>
                     <td style={{ padding: 4, width: 60 }}><input type="number" style={{ ...inp, padding: '6px', textAlign: 'center' }} value={l.quantite} onChange={e => setLigne(i, 'quantite', e.target.value)} /></td>
-                    <td style={{ padding: 4, width: 90 }}><input type="number" step="0.01" style={{ ...inp, padding: '6px', textAlign: 'right' }} value={l.prix_unitaire} onChange={e => setLigne(i, 'prix_unitaire', e.target.value)} /></td>
+                    <td style={{ padding: 4, width: 90 }}>
+                      <input type="number" step="0.01" style={{ ...inp, padding: '6px', textAlign: 'right' }} value={l.prix_unitaire} onChange={e => setLigne(i, 'prix_unitaire', e.target.value)} />
+                      {afficherTVAC && <div style={{ fontSize: 10, color: ORANGE, textAlign: 'right', marginTop: 2, fontWeight: 700 }}>{eur((Number(l.prix_unitaire) || 0) * (1 + (Number(l.tva_pct) || 0) / 100))} TVAC</div>}
+                    </td>
                     <td style={{ padding: 4, width: 60 }}><input type="number" style={{ ...inp, padding: '6px', textAlign: 'center' }} value={l.remise_pct} onChange={e => setLigne(i, 'remise_pct', e.target.value)} /></td>
                     <td style={{ padding: 4, width: 70 }}>
                       <select style={{ ...inp, padding: '6px' }} value={l.tva_pct} onChange={e => setLigne(i, 'tva_pct', e.target.value)}>
                         {TVA_TAUX.map(t => <option key={t.val} value={t.val}>{t.val}%</option>)}
                       </select>
                     </td>
-                    <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 600, color: NAVY, whiteSpace: 'nowrap' }}>{eur(totLigne)}</td>
+                    <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 600, color: NAVY, whiteSpace: 'nowrap' }}>
+                      {eur(totLigne)}
+                      {afficherTVAC && <div style={{ fontSize: 10, color: ORANGE, marginTop: 2, fontWeight: 700 }}>{eur(totLigne * (1 + (Number(l.tva_pct) || 0) / 100))} TVAC</div>}
+                    </td>
                     <td style={{ padding: 4, width: 30 }}><button onClick={() => delLigne(i)} style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 16 }}>×</button></td>
                   </tr>
                 )
