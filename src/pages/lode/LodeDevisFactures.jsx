@@ -812,108 +812,155 @@ async function exportExcel(type, doc, lignes) {
 }
 
 // Export Word (.doc) éditable — via HTML que Word ouvre nativement
+// Export Word (.docx natif) — reproduit la structure du PDF, éditable dans Word
 async function exportWord(type, doc, lignes) {
+  const docx = await import('docx')
+  const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType, ImageRun, HeadingLevel, ShadingType } = docx
   const isDevis = type === 'devis'
   const L = I18N[doc.langue] || I18N.fr
   const cgv = CGV_I18N[doc.langue] || CGV_I18N.fr
   const tot = calcTotaux(lignes, doc.remise_pct)
-  const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   const eurW = n => (Number(n) || 0).toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
+  const O = 'EA580C', DARK = '1E293B', GREY = '64748B'
 
   const lignesNormales = lignes.filter(l => !l.optionnelle)
   const lignesOptions = lignes.filter(l => l.optionnelle)
   const hasRem = lignes.some(x => Number(x.remise_pct) > 0)
 
-  // Récupère les photos en dataURL (Word les embarque)
-  const photoTag = async (photos) => {
-    if (!photos || !photos.length) return ''
-    let html = ''
-    for (const p of photos) {
-      const src = p.url || p
-      try {
-        const dataUrl = (typeof src === 'string' && src.startsWith('data:')) ? src : await loadImageDataURL(src)
-        if (dataUrl) html += `<img src="${dataUrl}" width="130" style="margin:3px;border:1px solid #ddd;" />`
-      } catch (e) { /* ignore */ }
-    }
-    return html
+  // Charge une image en Uint8Array (docx exige des bytes)
+  const imgBytes = async (src) => {
+    try {
+      const res = await fetch(src)
+      const buf = await res.arrayBuffer()
+      return new Uint8Array(buf)
+    } catch { return null }
   }
 
-  const rowsHtml = []
+  const noBorder = { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } }
+  const cellBorder = { top: { style: BorderStyle.SINGLE, size: 2, color: 'DDDDDD' }, bottom: { style: BorderStyle.SINGLE, size: 2, color: 'DDDDDD' }, left: { style: BorderStyle.SINGLE, size: 2, color: 'DDDDDD' }, right: { style: BorderStyle.SINGLE, size: 2, color: 'DDDDDD' } }
+
+  // En-tête : LODE à gauche, titre à droite
+  const entete = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE }, borders: noBorder,
+    rows: [new TableRow({ children: [
+      new TableCell({ borders: noBorder, width: { size: 50, type: WidthType.PERCENTAGE }, children: [
+        new Paragraph({ children: [new TextRun({ text: LODE.raison_sociale, bold: true, color: O, size: 28 })] }),
+        new Paragraph({ children: [new TextRun({ text: LODE.adresse, size: 18 })] }),
+        new Paragraph({ children: [new TextRun({ text: `${LODE.cp} ${LODE.ville}`, size: 18 })] }),
+        new Paragraph({ children: [new TextRun({ text: `TVA ${LODE.tva}`, size: 18 })] }),
+      ] }),
+      new TableCell({ borders: noBorder, width: { size: 50, type: WidthType.PERCENTAGE }, children: [
+        new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${isDevis ? L.devis : L.facture} ${doc.numero || ''}`, bold: true, color: O, size: 36 })] }),
+        new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${L.date} ${fmtDate(isDevis ? doc.date_devis : doc.date_facture)}`, size: 18, color: GREY })] }),
+        new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${isDevis ? L.validite : L.echeance} ${fmtDate(isDevis ? doc.date_validite : doc.date_echeance)}`, size: 18, color: GREY })] }),
+      ] }),
+    ] })],
+  })
+
+  // Client
+  const clientPara = [
+    new Paragraph({ spacing: { before: 200 }, children: [new TextRun({ text: 'À : ', bold: true, size: 18, color: GREY }), new TextRun({ text: doc.client_nom || '', bold: true, size: 22 })] }),
+  ]
+  if (doc.client_adresse) clientPara.push(new Paragraph({ children: [new TextRun({ text: doc.client_adresse, size: 18 })] }))
+  if (doc.client_cp || doc.client_ville) clientPara.push(new Paragraph({ children: [new TextRun({ text: `${doc.client_cp || ''} ${doc.client_ville || ''}`, size: 18 })] }))
+  if (doc.client_tva) clientPara.push(new Paragraph({ children: [new TextRun({ text: `TVA ${doc.client_tva}`, size: 18 })] }))
+  if (doc.objet) clientPara.push(new Paragraph({ spacing: { before: 200 }, children: [new TextRun({ text: `${L.objet} : `, bold: true, size: 20 }), new TextRun({ text: doc.objet, size: 20 })] }))
+
+  // En-tête tableau
+  const th = (txt, align) => new TableCell({
+    shading: { type: ShadingType.SOLID, color: O, fill: O },
+    children: [new Paragraph({ alignment: align || AlignmentType.LEFT, children: [new TextRun({ text: txt, bold: true, color: 'FFFFFF', size: 16 })] })],
+  })
+  const headRow = new TableRow({ tableHeader: true, children: [
+    th(L.description), th('P.U.', AlignmentType.RIGHT), th('TVA', AlignmentType.CENTER),
+    ...(hasRem ? [th('%', AlignmentType.CENTER)] : []),
+    th(L.qte, AlignmentType.CENTER), th(L.totalHT, AlignmentType.RIGHT), th('TTC', AlignmentType.RIGHT),
+  ] })
+
+  // Lignes
+  const bodyRows = []
   for (const l of lignesNormales) {
     const t = (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * (1 - (Number(l.remise_pct) || 0) / 100)
     const ttc = t * (1 + (Number(l.tva_pct) || 0) / 100)
-    const titre = esc(l.titre || l.description || '')
-    const desc = esc(l.descriptif || '').replace(/\n/g, '<br/>')
-    const photos = await photoTag(l.photos)
-    rowsHtml.push(`<tr>
-      <td style="border:1px solid #ccc;padding:6px;vertical-align:top;">
-        <b>${titre}</b>${desc ? `<br/><span style="font-size:9pt;color:#555;">${desc}</span>` : ''}
-        ${photos ? `<br/>${photos}` : ''}
-      </td>
-      <td style="border:1px solid #ccc;padding:6px;text-align:right;white-space:nowrap;">${eurW(l.prix_unitaire)}</td>
-      <td style="border:1px solid #ccc;padding:6px;text-align:center;">${l.tva_pct}%</td>
-      ${hasRem ? `<td style="border:1px solid #ccc;padding:6px;text-align:center;">${l.remise_pct || 0}%</td>` : ''}
-      <td style="border:1px solid #ccc;padding:6px;text-align:center;">${l.quantite}</td>
-      <td style="border:1px solid #ccc;padding:6px;text-align:right;white-space:nowrap;">${eurW(t)}</td>
-      <td style="border:1px solid #ccc;padding:6px;text-align:right;white-space:nowrap;">${eurW(ttc)}</td>
-    </tr>`)
+    const descChildren = [new Paragraph({ children: [new TextRun({ text: l.titre || l.description || '', bold: true, size: 19, color: DARK })] })]
+    if (l.descriptif) descChildren.push(new Paragraph({ children: [new TextRun({ text: l.descriptif, size: 16, color: GREY })] }))
+    // photos
+    if (l.photos && l.photos.length) {
+      const imgRuns = []
+      for (const p of l.photos) {
+        const bytes = await imgBytes(p.url || p)
+        if (bytes) imgRuns.push(new ImageRun({ data: bytes, transformation: { width: 120, height: 120 } }))
+      }
+      if (imgRuns.length) descChildren.push(new Paragraph({ spacing: { before: 100 }, children: imgRuns }))
+    }
+    const cell = (children) => new TableCell({ borders: cellBorder, children })
+    const txtCell = (txt, align, bold) => cell([new Paragraph({ alignment: align, children: [new TextRun({ text: txt, size: 18, bold })] })])
+    bodyRows.push(new TableRow({ children: [
+      cell(descChildren),
+      txtCell(eurW(l.prix_unitaire), AlignmentType.RIGHT),
+      txtCell(`${l.tva_pct}%`, AlignmentType.CENTER),
+      ...(hasRem ? [txtCell(`${l.remise_pct || 0}%`, AlignmentType.CENTER)] : []),
+      txtCell(String(l.quantite), AlignmentType.CENTER),
+      txtCell(eurW(t), AlignmentType.RIGHT, true),
+      txtCell(eurW(ttc), AlignmentType.RIGHT, true),
+    ] }))
   }
 
-  let optionsHtml = ''
+  const tableLignes = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [headRow, ...bodyRows],
+  })
+
+  // Totaux
+  const totauxPara = [
+    new Paragraph({ spacing: { before: 200 }, alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${L.totalHT} : ${eurW(tot.ht)}`, size: 20 })] }),
+    ...Object.entries(tot.parTaux).filter(([, v]) => v > 0).map(([tx, v]) =>
+      new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `TVA ${tx}% : ${eurW(v)}`, size: 18, color: GREY })] })),
+    new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${isDevis ? L.totalTTC : L.montantDu} : ${eurW(tot.ttc)}`, bold: true, size: 26, color: O })] }),
+  ]
+
+  // Options
+  const optionsPara = []
   if (lignesOptions.length) {
-    const optRows = []
+    optionsPara.push(new Paragraph({ spacing: { before: 300 }, children: [new TextRun({ text: 'Options au choix (non comprises dans le total)', bold: true, size: 22, color: 'B45309' })] }))
     for (const l of lignesOptions) {
       const t = (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * (1 - (Number(l.remise_pct) || 0) / 100)
       const ttc = t * (1 + (Number(l.tva_pct) || 0) / 100)
-      optRows.push(`<tr><td style="border:1px solid #f0c674;padding:6px;"><b>${esc(l.titre || l.description)}</b>${l.descriptif ? `<br/><span style="font-size:9pt;color:#555;">${esc(l.descriptif)}</span>` : ''}</td><td style="border:1px solid #f0c674;padding:6px;text-align:right;white-space:nowrap;">${eurW(t)} HT / ${eurW(ttc)} TTC</td></tr>`)
+      optionsPara.push(new Paragraph({ children: [new TextRun({ text: `${l.titre || l.description} — ${eurW(t)} HT / ${eurW(ttc)} TTC`, size: 18 })] }))
+      if (l.descriptif) optionsPara.push(new Paragraph({ children: [new TextRun({ text: l.descriptif, size: 16, color: GREY })] }))
     }
-    optionsHtml = `<h3 style="color:#b45309;">Options au choix (non comprises dans le total)</h3>
-      <table style="border-collapse:collapse;width:100%;">${optRows.join('')}</table>`
   }
 
-  const tvaRows = Object.entries(tot.parTaux).filter(([, v]) => v > 0)
-    .map(([tx, v]) => `<tr><td style="text-align:right;padding:2px 8px;">TVA ${tx}%</td><td style="text-align:right;padding:2px 8px;">${eurW(v)}</td></tr>`).join('')
+  // CGV (nouvelle page)
+  const cgvPara = [
+    new Paragraph({ pageBreakBefore: true, children: [new TextRun({ text: L.cgvTitre, bold: true, size: 26, color: O })] }),
+    ...cgv.map(c => new Paragraph({ spacing: { after: 80 }, children: [new TextRun({ text: c, size: 15, color: '444444' })] })),
+  ]
 
-  const html = `<!DOCTYPE html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>${esc(doc.numero)}</title></head>
-  <body style="font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#1e293b;">
-    <table style="width:100%;"><tr>
-      <td style="vertical-align:top;"><b style="color:#ea580c;font-size:14pt;">${esc(LODE.raison_sociale)}</b><br/>${esc(LODE.adresse)}<br/>${esc(LODE.cp)} ${esc(LODE.ville)}<br/>TVA ${esc(LODE.tva)}</td>
-      <td style="vertical-align:top;text-align:right;"><b style="color:#ea580c;font-size:18pt;">${isDevis ? L.devis : L.facture} ${esc(doc.numero)}</b><br/>${L.date} ${fmtDate(isDevis ? doc.date_devis : doc.date_facture)}<br/>${isDevis ? L.validite : L.echeance} ${fmtDate(isDevis ? doc.date_validite : doc.date_echeance)}</td>
-    </tr></table>
-    <hr/>
-    <table style="width:100%;"><tr>
-      <td><b>À :</b> ${esc(doc.client_nom)}<br/>${esc(doc.client_adresse || '')}<br/>${esc(doc.client_cp || '')} ${esc(doc.client_ville || '')}${doc.client_tva ? `<br/>TVA ${esc(doc.client_tva)}` : ''}</td>
-    </tr></table>
-    ${doc.objet ? `<p><b>${L.objet} :</b> ${esc(doc.objet)}</p>` : ''}
-    <table style="border-collapse:collapse;width:100%;margin-top:10px;">
-      <thead><tr style="background:#ea580c;color:#fff;">
-        <th style="padding:6px;text-align:left;">${L.description}</th>
-        <th style="padding:6px;">P.U.</th><th style="padding:6px;">TVA</th>
-        ${hasRem ? '<th style="padding:6px;">%</th>' : ''}
-        <th style="padding:6px;">${L.qte}</th><th style="padding:6px;">${L.totalHT}</th><th style="padding:6px;">TTC</th>
-      </tr></thead>
-      <tbody>${rowsHtml.join('')}</tbody>
-    </table>
-    <table style="width:100%;margin-top:8px;"><tr><td></td><td style="width:200px;">
-      <table style="width:100%;"><tr><td style="text-align:right;padding:2px 8px;"><b>${L.totalHT}</b></td><td style="text-align:right;padding:2px 8px;">${eurW(tot.ht)}</td></tr>
-      ${tvaRows}
-      <tr><td style="text-align:right;padding:4px 8px;border-top:2px solid #ea580c;"><b style="color:#ea580c;font-size:13pt;">${isDevis ? L.totalTTC : L.montantDu}</b></td><td style="text-align:right;padding:4px 8px;border-top:2px solid #ea580c;"><b style="font-size:13pt;">${eurW(tot.ttc)}</b></td></tr>
-      </table>
-    </td></tr></table>
-    ${optionsHtml}
-    <p style="font-size:9pt;">${L.paiement} : ${esc(LODE.iban)} (${esc(LODE.bic)})</p>
-    <div style="page-break-before:always;"></div>
-    <h3 style="color:#ea580c;">${L.cgvTitre}</h3>
-    <div style="font-size:8.5pt;color:#444;">${cgv.map(c => `<p>${esc(c)}</p>`).join('')}</div>
-  </body></html>`
+  const docObj = new Document({
+    sections: [{
+      properties: { page: { margin: { top: 720, bottom: 720, left: 720, right: 720 } } },
+      children: [
+        entete,
+        ...clientPara,
+        new Paragraph({ text: '', spacing: { after: 100 } }),
+        tableLignes,
+        ...totauxPara,
+        ...optionsPara,
+        new Paragraph({ spacing: { before: 200 }, children: [new TextRun({ text: `${L.paiement} : ${LODE.iban} (${LODE.bic})`, size: 16, color: GREY })] }),
+        ...cgvPara,
+      ],
+    }],
+  })
 
-  const blob = new Blob(['\ufeff', html], { type: 'application/msword' })
+  const blob = await Packer.toBlob(docObj)
   const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url; a.download = `${isDevis ? L.devis : L.facture}_${doc.numero}.doc`
-  a.click()
+  const link = document.createElement('a')
+  link.href = url; link.download = `${isDevis ? L.devis : L.facture}_${doc.numero}.docx`
+  link.click()
   URL.revokeObjectURL(url)
 }
+
 
 // ════════════════════════════════════════════════════════════════
 //  PAGE PRINCIPALE
