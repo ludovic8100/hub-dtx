@@ -27,7 +27,6 @@ const MODULES = {
     { key: 'dyn_comptabilite', label: 'Comptabilité',      icon: 'ti-calculator',       path: '/dynassur/comptabilite' },
     { key: 'dyn_rentabilite',  label: 'Rentabilité',       icon: 'ti-coin',             path: '/dynassur/rentabilite' },
     { key: 'dyn_devis',        label: 'Devis & Factures',  icon: 'ti-file-invoice',     path: '/dynassur/devis-factures' },
-    { key: 'dyn_devis',        label: 'Devis produits',    icon: 'ti-photo',            path: '/dynassur/devis-produits' },
   ],
   dtx: [
     { key: 'dtx_dashboard',    label: 'Tableau de bord', icon: 'ti-layout-dashboard', path: '/dtx' },
@@ -38,7 +37,6 @@ const MODULES = {
     { key: 'dtx_trading',      label: 'Trading',          icon: 'ti-trending-up',      path: '/dtx/trading' },
     { key: 'dtx_comptabilite', label: 'Comptabilité',     icon: 'ti-calculator',       path: '/dtx/comptabilite' },
     { key: 'dtx_devis',        label: 'Devis & Factures', icon: 'ti-file-invoice',     path: '/dtx/devis-factures' },
-    { key: 'dtx_devis',        label: 'Devis produits',   icon: 'ti-photo',            path: '/dtx/devis-produits' },
   ],
   lode: [
     { key: 'lode_dashboard',    label: 'Tableau de bord', icon: 'ti-layout-dashboard', path: '/lode' },
@@ -46,7 +44,6 @@ const MODULES = {
     { key: 'lode_notesfrais', label: 'Notes de frais', icon: 'ti-receipt', path: '/lode/notes-frais' },
     { key: 'lode_clients',      label: 'Clients',          icon: 'ti-users',            path: '/lode/clients' },
     { key: 'lode_devis',        label: 'Devis & Factures', icon: 'ti-file-invoice',     path: '/lode/devis-factures' },
-    { key: 'lode_devis',        label: 'Devis produits',   icon: 'ti-photo',            path: '/lode/devis-produits' },
     { key: 'lode_comptabilite', label: 'Comptabilité',     icon: 'ti-calculator',       path: '/lode/comptabilite' },
   ],
   hexagroup: [

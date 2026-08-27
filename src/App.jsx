@@ -45,9 +45,6 @@ import LodeClients        from './pages/lode/LodeClients'
 import LodeBanque         from './pages/lode/LodeBanque'
 import LodeComptabilite   from './pages/lode/LodeComptabilite'
 import LodeDevisFactures  from './pages/lode/LodeDevisFactures'
-import LODEDevisProduits  from './pages/lode/LODEDevisProduits'
-import DTXDevisProduits   from './pages/dtx/DTXDevisProduits'
-import DynassurDevisProduits from './pages/dyn/DynassurDevisProduits'
 import DtxDevisFactures   from './pages/dtx/DtxDevisFactures'
 import DynDevisFactures   from './pages/dyn/DynDevisFactures'
 import ConfigModule       from './pages/config/ConfigModule'
@@ -152,9 +149,6 @@ export default function App() {
           <Route path="/lode/devis-factures" element={<P need="lode_devis"><LodeDevisFactures /></P>} />
           <Route path="/dtx/devis-factures"  element={<P need="dtx_devis"><DtxDevisFactures /></P>} />
           <Route path="/dynassur/devis-factures" element={<P need="dyn_devis"><DynDevisFactures /></P>} />
-          <Route path="/lode/devis-produits" element={<P need="lode_devis"><LODEDevisProduits /></P>} />
-          <Route path="/dtx/devis-produits" element={<P need="dtx_devis"><DTXDevisProduits /></P>} />
-          <Route path="/dynassur/devis-produits" element={<P need="dyn_devis"><DynassurDevisProduits /></P>} />
           <Route path="/config" element={<A><ConfigModule /></A>} />
           <Route path="/lode/banque"        element={<A><LodeBanque /></A>} />
           <Route path="/lode/comptabilite"  element={<P need="lode_comptabilite"><LodeComptabilite /></P>} />
