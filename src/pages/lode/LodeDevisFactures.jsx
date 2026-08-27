@@ -590,20 +590,20 @@ async function exportPDF(type, doc, lignes) {
   const tableW = PW - M_L - M_R
   const BOTTOM = 280
 
-  // Zone chiffres à droite
-  const wPU = 22, wTVA = 12, wRem = hasRemiseLigne ? 12 : 0, wQte = 11, wHT = 23, wTTC = 25
+  // Zone chiffres à droite — colonnes élargies pour que "30.203,04 €" tienne sur une ligne
+  const wPU = 28, wTVA = 11, wRem = hasRemiseLigne ? 11 : 0, wQte = 10, wHT = 27, wTTC = 29
   const wChiffres = wPU + wTVA + wRem + wQte + wHT + wTTC
   const xChiffresStart = PW - M_R - wChiffres
 
-  // Zone de gauche (avant les chiffres) scindée 2/3 descriptif - 1/3 photos
+  // Zone de gauche (avant les chiffres) scindée 2/5 descriptif - 3/5 photos
   const wGauche = xChiffresStart - M_L - 3
-  const wDesc = wGauche * 2 / 3 - 2
-  const wPhotoZone = wGauche / 3
-  const xPhotoZone = M_L + wGauche * 2 / 3 + 2
+  const wDesc = wGauche * 2 / 5 - 2
+  const wPhotoZone = wGauche * 3 / 5
+  const xPhotoZone = M_L + wGauche * 2 / 5 + 2
 
   // taille photo = largeur de la zone photo (2 par rangée si ça rentre, sinon 1)
-  const photoParRangee = wPhotoZone >= 44 ? 2 : 1
-  const PHOTO_SIZE = Math.min(34, (wPhotoZone - (photoParRangee - 1) * 2) / photoParRangee)
+  const photoParRangee = wPhotoZone >= 60 ? 2 : 1
+  const PHOTO_SIZE = Math.min(38, (wPhotoZone - (photoParRangee - 1) * 2) / photoParRangee)
 
   const numeroterPages = () => {
     const n = d.internal.getNumberOfPages()
@@ -616,7 +616,7 @@ async function exportPDF(type, doc, lignes) {
 
   const dessinerEnteteColonnes = (yy) => {
     d.setFillColor(...O); d.rect(M_L, yy, tableW, 8, 'F')
-    d.setFontSize(8.5); d.setTextColor(255, 255, 255); d.setFont(undefined, 'bold')
+    d.setFontSize(8); d.setTextColor(255, 255, 255); d.setFont(undefined, 'bold')
     d.text(L.description, M_L + 2, yy + 5.5)
     let cx = xChiffresStart
     d.text(L.pu, cx + wPU - 1, yy + 5.5, { align: 'right' }); cx += wPU
@@ -684,7 +684,7 @@ async function exportPDF(type, doc, lignes) {
     }
 
     // ── Colonne 3 : chiffres (droite) ──
-    d.setFontSize(9); d.setTextColor(...DARK); d.setFont(undefined, 'normal')
+    d.setFontSize(8.5); d.setTextColor(...DARK); d.setFont(undefined, 'normal')
     const yc = y + 5
     let cx = xChiffresStart
     d.text(eurPDF(l.prix_unitaire), cx + wPU - 1, yc, { align: 'right' }); cx += wPU
