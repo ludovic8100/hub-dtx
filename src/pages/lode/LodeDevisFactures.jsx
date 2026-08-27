@@ -104,7 +104,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
     date_facture: todayISO(), date_echeance: addDays(todayISO(), DELAI_PAIEMENT_JOURS),
     statut: 'brouillon', langue: 'fr', ...(doc || {}),
   })
-  const [lignes, setLignes] = useState([{ description: '', quantite: 1, prix_unitaire: 0, remise_pct: 0, tva_pct: 21 }])
+  const [lignes, setLignes] = useState([{ titre: '', descriptif: '', description: '', quantite: 1, prix_unitaire: 0, remise_pct: 0, tva_pct: 21, photos: [] }])
   const [afficherTVAC, setAfficherTVAC] = useState(false)
   const [saving, setSaving] = useState(false)
   const [importPDF, setImportPDF] = useState({ loading: false, msg: '', drag: false })
@@ -120,23 +120,23 @@ function Editeur({ type, doc, onClose, onSaved }) {
         if (ext.fournisseur === 'Inconnu') { setImportPDF({ loading: false, msg: `⚠ ${file.name} : fournisseur non reconnu`, drag: false }); continue }
         if (!objetAuto && ext.lignes[0]) objetAuto = ext.lignes[0].designation
         for (const l of ext.lignes) {
-          // convertit vers le format du module : description = objet + détail, prix_unitaire = prix public
-          const desc = l.description ? `${l.designation} — ${l.description}` : l.designation
+          // titre = objet (désignation), descriptif = détail
           nouvelles.push({
-            description: desc.slice(0, 500),
+            titre: (l.designation || '').slice(0, 200),
+            descriptif: (l.description || '').slice(0, 1000),
+            description: (l.designation || '').slice(0, 200),
             quantite: l.quantite || 1,
             prix_unitaire: l.prix_public || 0,
             remise_pct: l.remise_pct || 0,
             tva_pct: l.taux_tva || 21,
-            photos: [],
+            photos: [], optionnelle: false,
           })
         }
       } catch (e) { setImportPDF({ loading: false, msg: `Erreur ${file.name}: ${e.message}`, drag: false }) }
     }
     if (nouvelles.length) {
       setLignes(prev => {
-        const vides = prev.filter(l => !l.description.trim())
-        const pleines = prev.filter(l => l.description.trim())
+        const pleines = prev.filter(l => (l.titre || '').trim() || (l.description || '').trim() || (l.descriptif || '').trim())
         return [...pleines, ...nouvelles]
       })
       if (objetAuto && !f.objet) set('objet', objetAuto)
@@ -215,14 +215,24 @@ function Editeur({ type, doc, onClose, onSaved }) {
   useEffect(() => {
     if (doc?.id) {
       supabase.from(tableLignes).select('*').eq(fk, doc.id).order('position')
-        .then(({ data }) => { if (data?.length) setLignes(data) })
+        .then(({ data }) => { if (data?.length) setLignes(data.map(l => ({ ...l, photos: Array.isArray(l.photos) ? l.photos : [], titre: l.titre || l.description || '', descriptif: l.descriptif || '' }))) })
     }
   }, [doc])
 
   const tot = calcTotaux(lignes, f.remise_pct)
   const set = (k, v) => setF(p => ({ ...p, [k]: v }))
   const setLigne = (i, k, v) => setLignes(p => p.map((l, j) => j === i ? { ...l, [k]: v } : l))
-  const addLigne = () => setLignes(p => [...p, { description: '', quantite: 1, prix_unitaire: 0, remise_pct: 0, tva_pct: 21 }])
+  // Ajout de photos à une ligne (converties en DataURL — stockage Supabase au bloc suivant)
+  const ajouterPhotos = async (i, files) => {
+    const imgs = []
+    for (const file of files) {
+      if (!file.type.startsWith('image/')) continue
+      const dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(file) })
+      imgs.push({ url: dataUrl, nom: file.name })
+    }
+    if (imgs.length) setLignes(p => p.map((l, j) => j === i ? { ...l, photos: [...(l.photos || []), ...imgs] } : l))
+  }
+  const addLigne = () => setLignes(p => [...p, { titre: '', descriptif: '', description: '', quantite: 1, prix_unitaire: 0, remise_pct: 0, tva_pct: 21, photos: [] }])
   const delLigne = i => setLignes(p => p.filter((_, j) => j !== i))
 
   const save = async () => {
@@ -250,8 +260,11 @@ function Editeur({ type, doc, onClose, onSaved }) {
         if (error) throw error
         docId = data.id
       }
-      const lignesPayload = lignes.filter(l => l.description.trim()).map((l, i) => ({
-        [fk]: docId, position: i, description: l.description,
+      const lignesPayload = lignes.filter(l => (l.titre || '').trim() || (l.description || '').trim() || (l.descriptif || '').trim()).map((l, i) => ({
+        [fk]: docId, position: i,
+        titre: l.titre || '', descriptif: l.descriptif || '',
+        description: l.description || l.titre || '',
+        photos: l.photos || [], optionnelle: !!l.optionnelle,
         quantite: Number(l.quantite) || 0, prix_unitaire: Number(l.prix_unitaire) || 0,
         remise_pct: Number(l.remise_pct) || 0, tva_pct: Number(l.tva_pct) || 0,
         total_ht: (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * (1 - (Number(l.remise_pct) || 0) / 100),
@@ -345,40 +358,57 @@ function Editeur({ type, doc, onClose, onSaved }) {
           <div style={{ fontSize: 13, fontWeight: 800, color: ORANGE }}>Lignes</div>
           <button type="button" onClick={() => setAfficherTVAC(v => !v)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: afficherTVAC ? ORANGE : '#f1f5f9', color: afficherTVAC ? '#fff' : '#64748b', border: 'none', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>💶 {afficherTVAC ? 'Prix TVAC affichés' : 'Afficher prix TVA comprise'}</button>
         </div>
-        <div style={{ border: '1px solid #f1f5f9', borderRadius: 9, overflowX: 'auto', marginBottom: 10 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: mobE ? 520 : 'auto' }}>
-            <thead style={{ background: '#f8fafc' }}>
-              <tr>{['Description', 'Qté', 'P.U. €', 'Rem.%', 'TVA', 'Total HT', ''].map(h => (
-                <th key={h} style={{ padding: '7px 8px', textAlign: h === 'Description' ? 'left' : 'center', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>{h}</th>
-              ))}</tr>
-            </thead>
-            <tbody>
-              {lignes.map((l, i) => {
-                const totLigne = (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * (1 - (Number(l.remise_pct) || 0) / 100)
-                return (
-                  <tr key={i} style={{ borderTop: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: 4 }}><input style={{ ...inp, padding: '6px 8px' }} value={l.description} onChange={e => setLigne(i, 'description', e.target.value)} /></td>
-                    <td style={{ padding: 4, width: 60 }}><input type="number" style={{ ...inp, padding: '6px', textAlign: 'center' }} value={l.quantite} onChange={e => setLigne(i, 'quantite', e.target.value)} /></td>
-                    <td style={{ padding: 4, width: 90 }}>
-                      <input type="number" step="0.01" style={{ ...inp, padding: '6px', textAlign: 'right' }} value={l.prix_unitaire} onChange={e => setLigne(i, 'prix_unitaire', e.target.value)} />
-                      {afficherTVAC && <div style={{ fontSize: 10, color: ORANGE, textAlign: 'right', marginTop: 2, fontWeight: 700 }}>{eur((Number(l.prix_unitaire) || 0) * (1 + (Number(l.tva_pct) || 0) / 100))} TVAC</div>}
-                    </td>
-                    <td style={{ padding: 4, width: 60 }}><input type="number" style={{ ...inp, padding: '6px', textAlign: 'center' }} value={l.remise_pct} onChange={e => setLigne(i, 'remise_pct', e.target.value)} /></td>
-                    <td style={{ padding: 4, width: 70 }}>
-                      <select style={{ ...inp, padding: '6px' }} value={l.tva_pct} onChange={e => setLigne(i, 'tva_pct', e.target.value)}>
+        <div style={{ marginBottom: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {lignes.map((l, i) => {
+            const totLigne = (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * (1 - (Number(l.remise_pct) || 0) / 100)
+            const totTTC = totLigne * (1 + (Number(l.tva_pct) || 0) / 100)
+            return (
+              <div key={i} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 10, background: l.optionnelle ? '#FFFBEB' : '#fff' }}>
+                {/* Rangée 1 : titre + chiffres */}
+                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', flexWrap: mobE ? 'wrap' : 'nowrap' }}>
+                  <div style={{ flex: 1, minWidth: mobE ? '100%' : 180 }}>
+                    <input style={{ ...inp, fontWeight: 700, padding: '7px 9px' }} placeholder="Titre / objet (ex: Porte sectionnelle)" value={l.titre || ''} onChange={e => setLigne(i, 'titre', e.target.value)} />
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                    <ChampL label="Qté"><input type="number" style={{ ...inp, width: 52, padding: '6px', textAlign: 'center' }} value={l.quantite} onChange={e => setLigne(i, 'quantite', e.target.value)} /></ChampL>
+                    <ChampL label="P.U. €"><input type="number" step="0.01" style={{ ...inp, width: 82, padding: '6px', textAlign: 'right' }} value={l.prix_unitaire} onChange={e => setLigne(i, 'prix_unitaire', e.target.value)} /></ChampL>
+                    <ChampL label="Rem.%"><input type="number" style={{ ...inp, width: 50, padding: '6px', textAlign: 'center' }} value={l.remise_pct} onChange={e => setLigne(i, 'remise_pct', e.target.value)} /></ChampL>
+                    <ChampL label="TVA">
+                      <select style={{ ...inp, width: 64, padding: '6px' }} value={l.tva_pct} onChange={e => setLigne(i, 'tva_pct', e.target.value)}>
                         {TVA_TAUX.map(t => <option key={t.val} value={t.val}>{t.val}%</option>)}
                       </select>
-                    </td>
-                    <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 600, color: NAVY, whiteSpace: 'nowrap' }}>
-                      {eur(totLigne)}
-                      {afficherTVAC && <div style={{ fontSize: 10, color: ORANGE, marginTop: 2, fontWeight: 700 }}>{eur(totLigne * (1 + (Number(l.tva_pct) || 0) / 100))} TVAC</div>}
-                    </td>
-                    <td style={{ padding: 4, width: 30 }}><button onClick={() => delLigne(i)} style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 16 }}>×</button></td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                    </ChampL>
+                    <ChampL label="HT"><div style={{ minWidth: 78, textAlign: 'right', fontWeight: 700, color: NAVY, padding: '7px 0' }}>{eur(totLigne)}</div></ChampL>
+                    <ChampL label="TTC"><div style={{ minWidth: 82, textAlign: 'right', fontWeight: 700, color: ORANGE, padding: '7px 0' }}>{eur(totTTC)}</div></ChampL>
+                    <button onClick={() => delLigne(i)} title="Supprimer la ligne" style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 18, alignSelf: 'center', marginTop: 12 }}>×</button>
+                  </div>
+                </div>
+                {/* Rangée 2 : descriptif + photos à côté */}
+                <div style={{ display: 'flex', gap: 10, marginTop: 8, flexWrap: mobE ? 'wrap' : 'nowrap' }}>
+                  <textarea style={{ ...inp, flex: 1, minHeight: 54, fontSize: 12, color: '#475569', resize: 'vertical', minWidth: mobE ? '100%' : 200 }} placeholder="Descriptif détaillé (dimensions, coloris, options…)" value={l.descriptif || ''} onChange={e => setLigne(i, 'descriptif', e.target.value)} />
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                    {(l.photos || []).map((ph, pi) => (
+                      <div key={pi} style={{ width: 76, height: 76, borderRadius: 8, overflow: 'hidden', position: 'relative', border: '1px solid #e2e8f0', background: '#f1f5f9' }}>
+                        <img src={ph.url || ph} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <span onClick={() => setLigne(i, 'photos', (l.photos || []).filter((_, j) => j !== pi))} style={{ position: 'absolute', top: 2, right: 3, background: 'rgba(0,0,0,.5)', color: '#fff', borderRadius: '50%', width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 12 }}>×</span>
+                      </div>
+                    ))}
+                    <label style={{ width: 76, height: 76, borderRadius: 8, border: `1px dashed ${ORANGE}`, background: '#FFF7ED', color: ORANGE, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 11 }}>
+                      <span style={{ fontSize: 18 }}>＋</span>photo
+                      <input type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={e => ajouterPhotos(i, [...e.target.files])} />
+                    </label>
+                  </div>
+                </div>
+                {/* Option : ligne optionnelle (non additionnée) */}
+                <div style={{ marginTop: 6 }}>
+                  <label style={{ fontSize: 11, color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={!!l.optionnelle} onChange={e => setLigne(i, 'optionnelle', e.target.checked)} />
+                    Option au choix (non comptée dans le total)
+                  </label>
+                </div>
+              </div>
+            )
+          })}
         </div>
         <button onClick={addLigne} style={{ background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 16 }}>+ Ajouter une ligne</button>
 
@@ -824,6 +854,15 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+function ChampL({ label, children }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+      <span style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>{label}</span>
+      {children}
     </div>
   )
 }
