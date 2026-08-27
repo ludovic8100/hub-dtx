@@ -562,19 +562,34 @@ async function exportPDF(type, doc, lignes) {
   const lignesOptions = lignes.filter(l => l.optionnelle)
   const hasRemiseLigne = lignes.some(x => Number(x.remise_pct) > 0)
 
-  // Construit le libellé d'une ligne : titre en gras + descriptif en dessous
+  // Pré-charge toutes les photos en dataURL (indexées par ligne)
+  const photosData = {}  // index de ligne -> [dataUrl, ...]
+  for (let idx = 0; idx < lignesNormales.length; idx++) {
+    const l = lignesNormales[idx]
+    if (l.photos && l.photos.length) {
+      photosData[idx] = []
+      for (const photo of l.photos) {
+        const src = photo.url || photo
+        try {
+          const dataUrl = (typeof src === 'string' && src.startsWith('data:')) ? src : await loadImageDataURL(src)
+          if (dataUrl) photosData[idx].push(dataUrl)
+        } catch (e) { /* ignore */ }
+      }
+    }
+  }
+
+  // Construit le libellé d'une ligne : titre + descriptif en dessous
   const libelleLigne = (l) => {
     const titre = l.titre || l.description || ''
     const desc = l.descriptif || ''
     return desc ? `${titre}\n${desc}` : titre
   }
-  // Repère les photos par ligne pour les dessiner après le tableau
-  const photosParLigne = []
 
-  const mkBody = (arr) => arr.map((l, idx) => {
+  const PHOTO_H = 26  // hauteur d'une photo dans la cellule (mm)
+  const PHOTO_W = 34
+  const mkBody = (arr) => arr.map((l) => {
     const t = (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * (1 - (Number(l.remise_pct) || 0) / 100)
     const ttc = t * (1 + (Number(l.tva_pct) || 0) / 100)
-    if (l.photos && l.photos.length) photosParLigne.push({ idx, photos: l.photos })
     const cols = [libelleLigne(l), eurPDF(l.prix_unitaire), `${l.tva_pct}%`]
     if (hasRemiseLigne) cols.push(`${l.remise_pct || 0}%`)
     cols.push(String(l.quantite), eurPDF(t), eurPDF(ttc))
@@ -585,8 +600,6 @@ async function exportPDF(type, doc, lignes) {
   if (hasRemiseLigne) head.push(L.remise)
   head.push(L.qte, L.totalHT, 'TTC')
 
-  // Style : titre en gras (1ère ligne de la cellule). autoTable ne gère pas le multi-style dans une cellule,
-  // on met tout en 9pt ; le titre reste lisible grâce au saut de ligne.
   const colStyles = hasRemiseLigne
     ? { 0: { cellWidth: 'auto' }, 1: { halign: 'right', cellWidth: 22 }, 2: { halign: 'center', cellWidth: 14 }, 3: { halign: 'center', cellWidth: 14 }, 4: { halign: 'center', cellWidth: 12 }, 5: { halign: 'right', cellWidth: 24 }, 6: { halign: 'right', cellWidth: 26 } }
     : { 0: { cellWidth: 'auto' }, 1: { halign: 'right', cellWidth: 24 }, 2: { halign: 'center', cellWidth: 16 }, 3: { halign: 'center', cellWidth: 14 }, 4: { halign: 'right', cellWidth: 26 }, 5: { halign: 'right', cellWidth: 28 } }
@@ -595,15 +608,43 @@ async function exportPDF(type, doc, lignes) {
     startY, head: [head], body: mkBody(lignesNormales),
     theme: 'plain',
     headStyles: { fillColor: O, textColor: [255, 255, 255], fontSize: 9, fontStyle: 'bold', cellPadding: { top: 3, bottom: 3, left: 4, right: 4 } },
-    bodyStyles: { fontSize: 9, textColor: DARK, cellPadding: { top: 3, bottom: 3, left: 4, right: 4 } },
+    bodyStyles: { fontSize: 9, textColor: DARK, cellPadding: { top: 3, bottom: 3, left: 4, right: 4 }, valign: 'top' },
     alternateRowStyles: { fillColor: [252, 247, 243] },
     margin: { left: 16, right: 16 },
     columnStyles: colStyles,
     didParseCell: (data) => {
-      // mettre le titre (1ère ligne) en gras : on ne peut pas styliser par sous-ligne,
-      // donc on met la cellule descriptif en gris plus petit si elle contient un saut de ligne
+      // réserver de la hauteur sous le descriptif pour les photos
       if (data.section === 'body' && data.column.index === 0) {
-        data.cell.styles.fontStyle = 'normal'
+        const photos = photosData[data.row.index]
+        if (photos && photos.length) {
+          const nbParLigne = 2
+          const nbRangees = Math.ceil(photos.length / nbParLigne)
+          data.cell.styles.minCellHeight = (data.cell.styles.minCellHeight || 0) + nbRangees * (PHOTO_H + 2) + 2
+        }
+      }
+    },
+    didDrawCell: (data) => {
+      // dessiner les photos sous le texte de la cellule descriptif
+      if (data.section === 'body' && data.column.index === 0) {
+        const photos = photosData[data.row.index]
+        if (photos && photos.length) {
+          // position sous le texte : on estime la hauteur du texte
+          const texte = data.cell.text.join('\n')
+          const nbLignesTexte = data.cell.text.length
+          const yTexte = data.cell.y + 3 + nbLignesTexte * 3.4 + 2
+          let px = data.cell.x + 2
+          let py = yTexte
+          let count = 0
+          for (const dataUrl of photos) {
+            if (count > 0 && count % 2 === 0) { px = data.cell.x + 2; py += PHOTO_H + 2 }
+            try {
+              const fmt = dataUrl.includes('image/png') ? 'PNG' : 'JPEG'
+              d.addImage(dataUrl, fmt, px, py, PHOTO_W, PHOTO_H, undefined, 'FAST')
+            } catch (e) { /* ignore */ }
+            px += PHOTO_W + 2
+            count++
+          }
+        }
       }
     },
   })
@@ -662,37 +703,6 @@ async function exportPDF(type, doc, lignes) {
   if (doc.notes) {
     y += 8; d.setFontSize(8.5); d.setTextColor(...GREY); d.setFont(undefined, 'normal')
     d.text(d.splitTextToSize(doc.notes, PW - 32), 16, y)
-  }
-
-  // ---- Photos des produits ----
-  const lignesAvecPhotos = lignes.filter(l => l.photos && l.photos.length)
-  if (lignesAvecPhotos.length) {
-    y += 12
-    if (y > 240) { d.addPage(); y = 20 }
-    d.setFontSize(11); d.setTextColor(...O); d.setFont(undefined, 'bold')
-    d.text('Illustrations', 16, y); y += 7
-    for (const l of lignesAvecPhotos) {
-      if (y > 245) { d.addPage(); y = 20 }
-      d.setFontSize(9.5); d.setTextColor(...DARK); d.setFont(undefined, 'bold')
-      d.text(l.titre || l.description || '', 16, y); y += 5
-      let x = 16
-      const ph = 40, pw = 52  // hauteur/largeur photo
-      for (const photo of l.photos) {
-        const src = photo.url || photo
-        if (x + pw > PW - 16) { x = 16; y += ph + 4 }
-        if (y + ph > 285) { d.addPage(); y = 20; x = 16 }
-        try {
-          // charge l'image depuis son URL et la convertit pour jsPDF
-          const dataUrl = (typeof src === 'string' && src.startsWith('data:')) ? src : await loadImageDataURL(src)
-          if (dataUrl) {
-            const fmt = dataUrl.includes('image/png') ? 'PNG' : 'JPEG'
-            d.addImage(dataUrl, fmt, x, y, pw, ph, undefined, 'FAST')
-          }
-        } catch (e) { /* image illisible ignorée */ }
-        x += pw + 4
-      }
-      y += ph + 8
-    }
   }
 
   // ---- CGV (page 2) ----
