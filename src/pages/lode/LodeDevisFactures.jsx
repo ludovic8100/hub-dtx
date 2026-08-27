@@ -39,14 +39,17 @@ const eurPDF = n => {
   const v = (Number(n) || 0).toFixed(2)
   const [ent, dec] = v.split('.')
   const entSep = ent.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
-  return `${entSep},${dec} €`
+  // espace insécable avant € pour éviter que le sigle passe à la ligne dans une cellule étroite
+  return `${entSep},${dec}\u00A0€`
 }
 const todayISO = () => new Date().toISOString().slice(0, 10)
 const addDays = (iso, d) => { const t = new Date(iso); t.setDate(t.getDate() + d); return t.toISOString().slice(0, 10) }
 const fmtDate = iso => iso ? new Date(iso).toLocaleDateString('fr-BE') : '—'
 
 // ── Calcul des totaux d'un document ─────────────────────────────
-function calcTotaux(lignes, remiseGlobalePct) {
+function calcTotaux(lignesToutes, remiseGlobalePct) {
+  // les lignes marquées "optionnelle" (option au choix) ne sont pas additionnées au total
+  const lignes = (lignesToutes || []).filter(l => !l.optionnelle)
   let ht = 0, tva = 0
   const parTaux = {}
   lignes.forEach(l => {
@@ -522,28 +525,55 @@ async function exportPDF(type, doc, lignes) {
   }
 
   // ---- Tableau lignes (en-tête orange plein) ----
-  const body = lignes.map(l => {
+  // Lignes normales (non optionnelles) dans le total ; les optionnelles iront dans un encadré séparé
+  const lignesNormales = lignes.filter(l => !l.optionnelle)
+  const lignesOptions = lignes.filter(l => l.optionnelle)
+  const hasRemiseLigne = lignes.some(x => Number(x.remise_pct) > 0)
+
+  // Construit le libellé d'une ligne : titre en gras + descriptif en dessous
+  const libelleLigne = (l) => {
+    const titre = l.titre || l.description || ''
+    const desc = l.descriptif || ''
+    return desc ? `${titre}\n${desc}` : titre
+  }
+  // Repère les photos par ligne pour les dessiner après le tableau
+  const photosParLigne = []
+
+  const mkBody = (arr) => arr.map((l, idx) => {
     const t = (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * (1 - (Number(l.remise_pct) || 0) / 100)
-    const cols = [l.description, eurPDF(l.prix_unitaire), `${l.tva_pct}%`]
-    if (lignes.some(x => Number(x.remise_pct) > 0)) cols.push(`${l.remise_pct || 0}%`)
-    cols.push(String(l.quantite), eurPDF(t))
+    const ttc = t * (1 + (Number(l.tva_pct) || 0) / 100)
+    if (l.photos && l.photos.length) photosParLigne.push({ idx, photos: l.photos })
+    const cols = [libelleLigne(l), eurPDF(l.prix_unitaire), `${l.tva_pct}%`]
+    if (hasRemiseLigne) cols.push(`${l.remise_pct || 0}%`)
+    cols.push(String(l.quantite), eurPDF(t), eurPDF(ttc))
     return cols
   })
-  const hasRemiseLigne = lignes.some(x => Number(x.remise_pct) > 0)
+
   const head = [L.description, L.pu, L.tva]
   if (hasRemiseLigne) head.push(L.remise)
-  head.push(L.qte, L.totalHT)
+  head.push(L.qte, L.totalHT, 'TTC')
+
+  // Style : titre en gras (1ère ligne de la cellule). autoTable ne gère pas le multi-style dans une cellule,
+  // on met tout en 9pt ; le titre reste lisible grâce au saut de ligne.
+  const colStyles = hasRemiseLigne
+    ? { 0: { cellWidth: 'auto' }, 1: { halign: 'right', cellWidth: 22 }, 2: { halign: 'center', cellWidth: 14 }, 3: { halign: 'center', cellWidth: 14 }, 4: { halign: 'center', cellWidth: 12 }, 5: { halign: 'right', cellWidth: 24 }, 6: { halign: 'right', cellWidth: 26 } }
+    : { 0: { cellWidth: 'auto' }, 1: { halign: 'right', cellWidth: 24 }, 2: { halign: 'center', cellWidth: 16 }, 3: { halign: 'center', cellWidth: 14 }, 4: { halign: 'right', cellWidth: 26 }, 5: { halign: 'right', cellWidth: 28 } }
 
   d.autoTable({
-    startY, head: [head], body,
+    startY, head: [head], body: mkBody(lignesNormales),
     theme: 'plain',
-    headStyles: { fillColor: O, textColor: [255, 255, 255], fontSize: 9.5, fontStyle: 'bold', cellPadding: { top: 3.5, bottom: 3.5, left: 4, right: 4 } },
-    bodyStyles: { fontSize: 9.5, textColor: DARK, cellPadding: { top: 3.5, bottom: 3.5, left: 4, right: 4 } },
+    headStyles: { fillColor: O, textColor: [255, 255, 255], fontSize: 9, fontStyle: 'bold', cellPadding: { top: 3, bottom: 3, left: 4, right: 4 } },
+    bodyStyles: { fontSize: 9, textColor: DARK, cellPadding: { top: 3, bottom: 3, left: 4, right: 4 } },
     alternateRowStyles: { fillColor: [252, 247, 243] },
     margin: { left: 16, right: 16 },
-    columnStyles: hasRemiseLigne
-      ? { 0: { cellWidth: 'auto' }, 1: { halign: 'right' }, 2: { halign: 'center' }, 3: { halign: 'center' }, 4: { halign: 'center' }, 5: { halign: 'right' } }
-      : { 0: { cellWidth: 'auto' }, 1: { halign: 'right' }, 2: { halign: 'center' }, 3: { halign: 'center' }, 4: { halign: 'right' } },
+    columnStyles: colStyles,
+    didParseCell: (data) => {
+      // mettre le titre (1ère ligne) en gras : on ne peut pas styliser par sous-ligne,
+      // donc on met la cellule descriptif en gris plus petit si elle contient un saut de ligne
+      if (data.section === 'body' && data.column.index === 0) {
+        data.cell.styles.fontStyle = 'normal'
+      }
+    },
   })
 
   // ---- Totaux (alignés à droite, libellés orange) ----
@@ -569,6 +599,26 @@ async function exportPDF(type, doc, lignes) {
   d.text(isDevis ? L.totalTTC : (L.montantDu || L.totalTTC), labelX, y)
   d.setTextColor(...DARK); d.text(eurPDF(tot.ttc), valX, y, { align: 'right' })
 
+  // ---- Options au choix (non comptées dans le total) ----
+  if (lignesOptions.length) {
+    y += 14
+    d.setFillColor(255, 251, 235); d.setDrawColor(245, 158, 11); d.setLineWidth(0.3)
+    const optH = 8 + lignesOptions.length * 11 + 4
+    d.roundedRect(16, y - 5, PW - 32, optH, 2, 2, 'FD')
+    d.setFontSize(10); d.setTextColor(180, 83, 9); d.setFont(undefined, 'bold')
+    d.text(isDevis ? 'Options au choix (à sélectionner — non comprises dans le total)' : 'Options', 20, y); y += 8
+    d.setFont(undefined, 'normal'); d.setFontSize(9); d.setTextColor(...DARK)
+    lignesOptions.forEach(l => {
+      const t = (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * (1 - (Number(l.remise_pct) || 0) / 100)
+      const ttc = t * (1 + (Number(l.tva_pct) || 0) / 100)
+      const titre = l.titre || l.description || ''
+      d.setFont(undefined, 'bold'); d.text(titre, 20, y)
+      d.setFont(undefined, 'normal'); d.text(`${eurPDF(t)} HT  /  ${eurPDF(ttc)} TTC`, valX, y, { align: 'right' })
+      if (l.descriptif) { y += 4.5; d.setFontSize(8); d.setTextColor(...GREY); d.text(d.splitTextToSize(l.descriptif, PW - 80), 20, y); d.setFontSize(9); d.setTextColor(...DARK) }
+      y += 7
+    })
+  }
+
   // ---- Paiement ----
   y += 16; d.setFontSize(9); d.setTextColor(...GREY); d.setFont(undefined, 'normal')
   d.text(`${L.paiement} : ${LODE.iban}  (${LODE.bic} – ${LODE.banque})`, 16, y)
@@ -580,6 +630,33 @@ async function exportPDF(type, doc, lignes) {
   if (doc.notes) {
     y += 8; d.setFontSize(8.5); d.setTextColor(...GREY); d.setFont(undefined, 'normal')
     d.text(d.splitTextToSize(doc.notes, PW - 32), 16, y)
+  }
+
+  // ---- Photos des produits ----
+  const lignesAvecPhotos = lignes.filter(l => l.photos && l.photos.length)
+  if (lignesAvecPhotos.length) {
+    y += 12
+    if (y > 240) { d.addPage(); y = 20 }
+    d.setFontSize(11); d.setTextColor(...O); d.setFont(undefined, 'bold')
+    d.text('Illustrations', 16, y); y += 7
+    for (const l of lignesAvecPhotos) {
+      if (y > 245) { d.addPage(); y = 20 }
+      d.setFontSize(9.5); d.setTextColor(...DARK); d.setFont(undefined, 'bold')
+      d.text(l.titre || l.description || '', 16, y); y += 5
+      let x = 16
+      const ph = 40, pw = 52  // hauteur/largeur photo
+      for (const photo of l.photos) {
+        const src = photo.url || photo
+        if (x + pw > PW - 16) { x = 16; y += ph + 4 }
+        if (y + ph > 285) { d.addPage(); y = 20; x = 16 }
+        try {
+          const fmt = (typeof src === 'string' && src.includes('image/png')) ? 'PNG' : 'JPEG'
+          d.addImage(src, fmt, x, y, pw, ph, undefined, 'FAST')
+        } catch (e) { /* image illisible ignorée */ }
+        x += pw + 4
+      }
+      y += ph + 8
+    }
   }
 
   // ---- CGV (page 2) ----
