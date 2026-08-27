@@ -585,20 +585,26 @@ async function exportPDF(type, doc, lignes) {
     return desc ? `${titre}\n${desc}` : titre
   }
 
-  // ═══ Dessin manuel des lignes (pour maîtriser texte + photos + sauts de page) ═══
-  const PHOTO_SIZE = 30   // photos carrées uniformes (mm)
-  const PHOTO_GAP = 3
-  const M_L = 16, M_R = 16
+  // ═══ Dessin manuel des lignes : descriptif | photos | chiffres ═══
+  const M_L = 10, M_R = 10          // marges latérales réduites
   const tableW = PW - M_L - M_R
-  const BOTTOM = 280      // limite basse avant saut de page
+  const BOTTOM = 280
 
-  // largeurs colonnes chiffres (à droite)
-  const wPU = 24, wTVA = 13, wRem = hasRemiseLigne ? 13 : 0, wQte = 12, wHT = 24, wTTC = 26
+  // Zone chiffres à droite
+  const wPU = 22, wTVA = 12, wRem = hasRemiseLigne ? 12 : 0, wQte = 11, wHT = 23, wTTC = 25
   const wChiffres = wPU + wTVA + wRem + wQte + wHT + wTTC
   const xChiffresStart = PW - M_R - wChiffres
-  const wTexte = xChiffresStart - M_L - 3
 
-  // Numérotation de page (appelée en fin)
+  // Zone de gauche (avant les chiffres) scindée 2/3 descriptif - 1/3 photos
+  const wGauche = xChiffresStart - M_L - 3
+  const wDesc = wGauche * 2 / 3 - 2
+  const wPhotoZone = wGauche / 3
+  const xPhotoZone = M_L + wGauche * 2 / 3 + 2
+
+  // taille photo = largeur de la zone photo (2 par rangée si ça rentre, sinon 1)
+  const photoParRangee = wPhotoZone >= 44 ? 2 : 1
+  const PHOTO_SIZE = Math.min(34, (wPhotoZone - (photoParRangee - 1) * 2) / photoParRangee)
+
   const numeroterPages = () => {
     const n = d.internal.getNumberOfPages()
     for (let i = 1; i <= n; i++) {
@@ -608,7 +614,6 @@ async function exportPDF(type, doc, lignes) {
     }
   }
 
-  // En-tête de colonnes (bandeau orange) — redessiné en haut de chaque page de lignes
   const dessinerEnteteColonnes = (yy) => {
     d.setFillColor(...O); d.rect(M_L, yy, tableW, 8, 'F')
     d.setFontSize(8.5); d.setTextColor(255, 255, 255); d.setFont(undefined, 'bold')
@@ -634,41 +639,51 @@ async function exportPDF(type, doc, lignes) {
     const desc = l.descriptif || ''
     const photos = photosData[idx] || []
 
-    // calcul hauteur du texte
+    // hauteur du texte (colonne descriptif, largeur wDesc)
     d.setFontSize(9.5); d.setFont(undefined, 'bold')
-    const titreLignes = d.splitTextToSize(titre, wTexte)
-    d.setFontSize(8.5); d.setFont(undefined, 'normal')
-    const descLignes = desc ? d.splitTextToSize(desc, wTexte) : []
-    const hTexte = titreLignes.length * 4.2 + descLignes.length * 3.6 + 3
+    const titreLignes = d.splitTextToSize(titre, wDesc)
+    d.setFontSize(8); d.setFont(undefined, 'normal')
+    const descLignes = desc ? d.splitTextToSize(desc, wDesc) : []
+    const hTexte = titreLignes.length * 4.2 + descLignes.length * 3.4 + 4
 
-    // hauteur photos (à droite, sous les chiffres) : alignées en grille
-    const photosParRangee = Math.max(1, Math.floor((wChiffres + wTexte) / (PHOTO_SIZE + PHOTO_GAP)))
-    const nbRangeesPhotos = photos.length ? Math.ceil(photos.length / Math.max(1, Math.floor(tableW / (PHOTO_SIZE + PHOTO_GAP)))) : 0
-    const hPhotos = photos.length ? nbRangeesPhotos * (PHOTO_SIZE + PHOTO_GAP) + 1 : 0
+    // hauteur photos (colonne photos, empilées par rangées)
+    const nbRangees = photos.length ? Math.ceil(photos.length / photoParRangee) : 0
+    const hPhotos = nbRangees * (PHOTO_SIZE + 2) + 2
 
-    const hLigne = Math.max(hTexte, 8) + hPhotos + 3
+    const hLigne = Math.max(hTexte, hPhotos, 9)
 
-    // ── Saut de page : l'article entier passe à la page suivante ──
-    if (y + hLigne > BOTTOM) {
-      d.addPage()
-      y = dessinerEnteteColonnes(20)
-    }
+    // saut de page : article entier
+    if (y + hLigne > BOTTOM) { d.addPage(); y = dessinerEnteteColonnes(20) }
 
     const yDebut = y
-    // fond alterné
     if (rowAlt) { d.setFillColor(252, 247, 243); d.rect(M_L, y, tableW, hLigne, 'F') }
     rowAlt = !rowAlt
 
-    // texte à gauche
+    // ── Colonne 1 : descriptif (gauche) ──
     let ty = y + 4.5
     d.setFontSize(9.5); d.setTextColor(...DARK); d.setFont(undefined, 'bold')
     titreLignes.forEach(ln => { d.text(ln, M_L + 2, ty); ty += 4.2 })
     if (descLignes.length) {
-      d.setFontSize(8.5); d.setTextColor(...GREY); d.setFont(undefined, 'normal')
-      descLignes.forEach(ln => { d.text(ln, M_L + 2, ty); ty += 3.6 })
+      d.setFontSize(8); d.setTextColor(...GREY); d.setFont(undefined, 'normal')
+      descLignes.forEach(ln => { d.text(ln, M_L + 2, ty); ty += 3.4 })
     }
 
-    // chiffres à droite (alignés en haut)
+    // ── Colonne 2 : photos (milieu) ──
+    if (photos.length) {
+      let py = y + 3
+      let count = 0, col = 0
+      for (const dataUrl of photos) {
+        const px = xPhotoZone + col * (PHOTO_SIZE + 2)
+        try {
+          const fmt = dataUrl.includes('image/png') ? 'PNG' : 'JPEG'
+          d.addImage(dataUrl, fmt, px, py, PHOTO_SIZE, PHOTO_SIZE, undefined, 'FAST')
+        } catch (e) { /* ignore */ }
+        col++
+        if (col >= photoParRangee) { col = 0; py += PHOTO_SIZE + 2 }
+      }
+    }
+
+    // ── Colonne 3 : chiffres (droite) ──
     d.setFontSize(9); d.setTextColor(...DARK); d.setFont(undefined, 'normal')
     const yc = y + 5
     let cx = xChiffresStart
@@ -680,23 +695,6 @@ async function exportPDF(type, doc, lignes) {
     d.text(eurPDF(t), cx + wHT - 1, yc, { align: 'right' }); cx += wHT
     d.setTextColor(...O); d.text(eurPDF(ttc), cx + wTTC - 1, yc, { align: 'right' })
     d.setTextColor(...DARK); d.setFont(undefined, 'normal')
-
-    // photos : sous le texte/chiffres, alignées à gauche, taille uniforme
-    if (photos.length) {
-      let py = Math.max(ty, yc) + 3
-      let px = M_L + 2
-      const maxPar = Math.max(1, Math.floor(tableW / (PHOTO_SIZE + PHOTO_GAP)))
-      let count = 0
-      for (const dataUrl of photos) {
-        if (count > 0 && count % maxPar === 0) { px = M_L + 2; py += PHOTO_SIZE + PHOTO_GAP }
-        try {
-          const fmt = dataUrl.includes('image/png') ? 'PNG' : 'JPEG'
-          d.addImage(dataUrl, fmt, px, py, PHOTO_SIZE, PHOTO_SIZE, undefined, 'FAST')
-        } catch (e) { /* ignore */ }
-        px += PHOTO_SIZE + PHOTO_GAP
-        count++
-      }
-    }
 
     // ligne séparatrice fine
     y = yDebut + hLigne
