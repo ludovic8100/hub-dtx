@@ -585,25 +585,26 @@ async function exportPDF(type, doc, lignes) {
     return desc ? `${titre}\n${desc}` : titre
   }
 
-  // ═══ Dessin manuel des lignes : descriptif | photos | chiffres ═══
-  const M_L = 10, M_R = 10          // marges latérales réduites
+  // ═══ Dessin manuel : GAUCHE = titre+descriptif | DROITE = chiffres puis photos dessous ═══
+  const M_L = 10, M_R = 10
   const tableW = PW - M_L - M_R
   const BOTTOM = 280
 
-  // Zone chiffres à droite — colonnes élargies pour que "30.203,04 €" tienne sur une ligne
+  // La page est scindée en 2 : descriptif à gauche (~42%), zone droite (~58%)
+  const wDescCol = tableW * 0.42
+  const xDroite = M_L + wDescCol + 4        // début de la zone droite
+  const wDroite = PW - M_R - xDroite        // largeur de la zone droite
+
+  // Colonnes chiffres, calées à droite dans la zone droite
   const wPU = 28, wTVA = 11, wRem = hasRemiseLigne ? 11 : 0, wQte = 10, wHT = 27, wTTC = 29
   const wChiffres = wPU + wTVA + wRem + wQte + wHT + wTTC
   const xChiffresStart = PW - M_R - wChiffres
 
-  // Zone de gauche (avant les chiffres) scindée 2/5 descriptif - 3/5 photos
-  const wGauche = xChiffresStart - M_L - 3
-  const wDesc = wGauche * 2 / 5 - 2
-  const wPhotoZone = wGauche * 3 / 5
-  const xPhotoZone = M_L + wGauche * 2 / 5 + 2
+  const wDesc = wDescCol - 4                 // largeur texte descriptif
 
-  // taille photo = largeur de la zone photo (2 par rangée si ça rentre, sinon 1)
-  const photoParRangee = wPhotoZone >= 60 ? 2 : 1
-  const PHOTO_SIZE = Math.min(38, (wPhotoZone - (photoParRangee - 1) * 2) / photoParRangee)
+  // Photos : dans la zone droite, sous les chiffres, taille uniforme
+  const PHOTO_SIZE = 42
+  const photoParRangee = Math.max(1, Math.floor((wDroite + 2) / (PHOTO_SIZE + 3)))
 
   const numeroterPages = () => {
     const n = d.internal.getNumberOfPages()
@@ -646,11 +647,12 @@ async function exportPDF(type, doc, lignes) {
     const descLignes = desc ? d.splitTextToSize(desc, wDesc) : []
     const hTexte = titreLignes.length * 4.2 + descLignes.length * 3.4 + 4
 
-    // hauteur photos (colonne photos, empilées par rangées)
+    // hauteur zone droite = ligne de chiffres (~9mm) + photos dessous
     const nbRangees = photos.length ? Math.ceil(photos.length / photoParRangee) : 0
-    const hPhotos = nbRangees * (PHOTO_SIZE + 2) + 2
+    const hPhotos = photos.length ? nbRangees * (PHOTO_SIZE + 3) + 2 : 0
+    const hDroite = 9 + hPhotos
 
-    const hLigne = Math.max(hTexte, hPhotos, 9)
+    const hLigne = Math.max(hTexte, hDroite, 9)
 
     // saut de page : article entier
     if (y + hLigne > BOTTOM) { d.addPage(); y = dessinerEnteteColonnes(20) }
@@ -668,22 +670,7 @@ async function exportPDF(type, doc, lignes) {
       descLignes.forEach(ln => { d.text(ln, M_L + 2, ty); ty += 3.4 })
     }
 
-    // ── Colonne 2 : photos (milieu) ──
-    if (photos.length) {
-      let py = y + 3
-      let count = 0, col = 0
-      for (const dataUrl of photos) {
-        const px = xPhotoZone + col * (PHOTO_SIZE + 2)
-        try {
-          const fmt = dataUrl.includes('image/png') ? 'PNG' : 'JPEG'
-          d.addImage(dataUrl, fmt, px, py, PHOTO_SIZE, PHOTO_SIZE, undefined, 'FAST')
-        } catch (e) { /* ignore */ }
-        col++
-        if (col >= photoParRangee) { col = 0; py += PHOTO_SIZE + 2 }
-      }
-    }
-
-    // ── Colonne 3 : chiffres (droite) ──
+    // ── Zone droite : chiffres en haut ──
     d.setFontSize(8.5); d.setTextColor(...DARK); d.setFont(undefined, 'normal')
     const yc = y + 5
     let cx = xChiffresStart
@@ -695,6 +682,21 @@ async function exportPDF(type, doc, lignes) {
     d.text(eurPDF(t), cx + wHT - 1, yc, { align: 'right' }); cx += wHT
     d.setTextColor(...O); d.text(eurPDF(ttc), cx + wTTC - 1, yc, { align: 'right' })
     d.setTextColor(...DARK); d.setFont(undefined, 'normal')
+
+    // ── Zone droite : photos SOUS les chiffres, taille uniforme ──
+    if (photos.length) {
+      let py = y + 11
+      let col = 0
+      for (const dataUrl of photos) {
+        const px = xDroite + col * (PHOTO_SIZE + 3)
+        try {
+          const fmt = dataUrl.includes('image/png') ? 'PNG' : 'JPEG'
+          d.addImage(dataUrl, fmt, px, py, PHOTO_SIZE, PHOTO_SIZE, undefined, 'FAST')
+        } catch (e) { /* ignore */ }
+        col++
+        if (col >= photoParRangee) { col = 0; py += PHOTO_SIZE + 3 }
+      }
+    }
 
     // ligne séparatrice fine
     y = yDebut + hLigne
