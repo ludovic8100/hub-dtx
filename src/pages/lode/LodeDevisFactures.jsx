@@ -225,13 +225,19 @@ function Editeur({ type, doc, onClose, onSaved }) {
   const tot = calcTotaux(lignes, f.remise_pct)
   const set = (k, v) => setF(p => ({ ...p, [k]: v }))
   const setLigne = (i, k, v) => setLignes(p => p.map((l, j) => j === i ? { ...l, [k]: v } : l))
-  // Ajout de photos à une ligne (converties en DataURL — stockage Supabase au bloc suivant)
+  // Ajout de photos à une ligne : upload vers Supabase Storage, on garde l'URL publique
   const ajouterPhotos = async (i, files) => {
     const imgs = []
     for (const file of files) {
       if (!file.type.startsWith('image/')) continue
-      const dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(file) })
-      imgs.push({ url: dataUrl, nom: file.name })
+      try {
+        const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
+        const chemin = `${type}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`
+        const { error } = await supabase.storage.from('devis-photos').upload(chemin, file, { upsert: true, contentType: file.type })
+        if (error) { alert('Upload photo : ' + error.message); continue }
+        const { data } = supabase.storage.from('devis-photos').getPublicUrl(chemin)
+        imgs.push({ url: data.publicUrl, nom: file.name, chemin })
+      } catch (e) { alert('Erreur photo : ' + e.message) }
     }
     if (imgs.length) setLignes(p => p.map((l, j) => j === i ? { ...l, photos: [...(l.photos || []), ...imgs] } : l))
   }
@@ -272,7 +278,10 @@ function Editeur({ type, doc, onClose, onSaved }) {
         remise_pct: Number(l.remise_pct) || 0, tva_pct: Number(l.tva_pct) || 0,
         total_ht: (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * (1 - (Number(l.remise_pct) || 0) / 100),
       }))
-      if (lignesPayload.length) await supabase.from(tableLignes).insert(lignesPayload)
+      if (lignesPayload.length) {
+        const { error: errLignes } = await supabase.from(tableLignes).insert(lignesPayload)
+        if (errLignes) throw new Error('Enregistrement des lignes : ' + errLignes.message)
+      }
       onSaved()
     } catch (e) {
       alert('Erreur : ' + e.message)
@@ -482,43 +491,42 @@ async function exportPDF(type, doc, lignes) {
   // ---- Logo LODE (en-tête, à gauche) ----
   if (LODE.logo_url) {
     const logo = await loadImageDataURL(LODE.logo_url)
-    if (logo) { try { d.addImage(logo, 'PNG', 16, 14, 26, 26) } catch (e) { /* */ } }
+    if (logo) { try { d.addImage(logo, 'PNG', 16, 12, 20, 20) } catch (e) { /* */ } }
   }
 
   // ---- Titre document (haut droite) ----
-  d.setFontSize(24); d.setTextColor(...O); d.setFont(undefined, 'bold')
+  d.setFontSize(20); d.setTextColor(...O); d.setFont(undefined, 'bold')
   const titre = isDevis ? L.devis : L.facture
-  d.text(`${titre}  ${doc.numero || ''}`, PW - 16, 22, { align: 'right' })
-  d.setFontSize(9.5); d.setTextColor(...GREY); d.setFont(undefined, 'normal')
-  let yh = 30
-  d.text(`${(L.date || 'Date').toUpperCase()}  ${fmtDate(isDevis ? doc.date_devis : doc.date_facture)}`, PW - 16, yh, { align: 'right' }); yh += 6
+  d.text(`${titre}  ${doc.numero || ''}`, PW - 16, 18, { align: 'right' })
+  d.setFontSize(8.5); d.setTextColor(...GREY); d.setFont(undefined, 'normal')
+  let yh = 25
+  d.text(`${(L.date || 'Date').toUpperCase()}  ${fmtDate(isDevis ? doc.date_devis : doc.date_facture)}`, PW - 16, yh, { align: 'right' }); yh += 5
   if (isDevis) d.text(`${(L.validite || 'Validité').toUpperCase()}  ${fmtDate(doc.date_validite)}`, PW - 16, yh, { align: 'right' })
   else d.text(`${(L.echeance || 'Échéance').toUpperCase()}  ${fmtDate(doc.date_echeance)}`, PW - 16, yh, { align: 'right' })
 
-  // ---- Blocs De / À ----
-  const yDeA = 56
+  // ---- Blocs De / À (compacts) ----
+  const yDeA = 40
   // De (LODE)
-  d.setFontSize(8); d.setTextColor(...GREY); d.setFont(undefined, 'normal')
+  d.setFontSize(7.5); d.setTextColor(...GREY); d.setFont(undefined, 'normal')
   d.text('De', 16, yDeA)
-  d.setFontSize(13); d.setTextColor(...O); d.setFont(undefined, 'bold')
-  d.text(LODE.raison_sociale, 16, yDeA + 7)
-  d.setFontSize(9); d.setTextColor(...DARK); d.setFont(undefined, 'normal')
-  d.text([LODE.adresse, `${LODE.cp} ${LODE.ville}`, LODE.pays || 'Belgique', `TVA ${LODE.tva}`], 16, yDeA + 13)
+  d.setFontSize(11); d.setTextColor(...O); d.setFont(undefined, 'bold')
+  d.text(LODE.raison_sociale, 16, yDeA + 5)
+  d.setFontSize(8); d.setTextColor(...DARK); d.setFont(undefined, 'normal')
+  d.text([LODE.adresse, `${LODE.cp} ${LODE.ville}`, `TVA ${LODE.tva}`], 16, yDeA + 10, { lineHeightFactor: 1.15 })
 
   // À (client) - aligné à droite
-  d.setFontSize(8); d.setTextColor(...GREY)
+  d.setFontSize(7.5); d.setTextColor(...GREY)
   d.text('À', PW - 16, yDeA, { align: 'right' })
-  d.setFontSize(12); d.setTextColor(...DARK); d.setFont(undefined, 'bold')
-  d.text(doc.client_nom || '', PW - 16, yDeA + 7, { align: 'right' })
-  d.setFont(undefined, 'normal'); d.setFontSize(9); d.setTextColor(...GREY)
+  d.setFontSize(10.5); d.setTextColor(...DARK); d.setFont(undefined, 'bold')
+  d.text(doc.client_nom || '', PW - 16, yDeA + 5, { align: 'right' })
+  d.setFont(undefined, 'normal'); d.setFontSize(8); d.setTextColor(...GREY)
   const cl = []
   if (doc.client_adresse) cl.push(doc.client_adresse)
   if (doc.client_cp || doc.client_ville) cl.push(`${doc.client_cp || ''} ${doc.client_ville || ''}`.trim())
-  cl.push(doc.client_pays || 'Belgique')
   if (doc.client_tva) cl.push(`TVA ${doc.client_tva}`)
-  d.text(cl, PW - 16, yDeA + 13, { align: 'right' })
+  d.text(cl, PW - 16, yDeA + 10, { align: 'right', lineHeightFactor: 1.15 })
 
-  let startY = yDeA + 13 + cl.length * 4.5 + 8
+  let startY = yDeA + 10 + cl.length * 3.8 + 6
   if (doc.objet) {
     d.setFontSize(10); d.setTextColor(...DARK); d.setFont(undefined, 'bold')
     d.text(`${L.objet} : ${doc.objet}`, 16, startY); startY += 8
@@ -650,8 +658,12 @@ async function exportPDF(type, doc, lignes) {
         if (x + pw > PW - 16) { x = 16; y += ph + 4 }
         if (y + ph > 285) { d.addPage(); y = 20; x = 16 }
         try {
-          const fmt = (typeof src === 'string' && src.includes('image/png')) ? 'PNG' : 'JPEG'
-          d.addImage(src, fmt, x, y, pw, ph, undefined, 'FAST')
+          // charge l'image depuis son URL et la convertit pour jsPDF
+          const dataUrl = (typeof src === 'string' && src.startsWith('data:')) ? src : await loadImageDataURL(src)
+          if (dataUrl) {
+            const fmt = dataUrl.includes('image/png') ? 'PNG' : 'JPEG'
+            d.addImage(dataUrl, fmt, x, y, pw, ph, undefined, 'FAST')
+          }
         } catch (e) { /* image illisible ignorée */ }
         x += pw + 4
       }
