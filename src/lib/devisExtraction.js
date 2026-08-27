@@ -80,7 +80,7 @@ function extraireMarquise(texte) {
   return d
 }
 
-// ── Extraction SDA ──
+// ── Extraction SDA (par sections : titre = objet, détail = description) ──
 function extraireSDA(texte) {
   const d = { fournisseur: 'SDA', lignes: [], meta: {} }
   let m = texte.match(/Devis N°(\d+)/)
@@ -90,21 +90,33 @@ function extraireSDA(texte) {
   m = texte.match(/Date du devis\s+(\d{2}\/\d{2}\/\d{4})/)
   if (m) d.meta.date = m[1]
 
-  // Lignes : "désignation ... PRIX€ QTE PRIX€"
-  const reLigne = /([A-Za-zÀ-ÿ][^\n]*?)\s+([\d.,]+)€\s+(\d+)\s+([\d.,]+)€/g
-  let ml
-  while ((ml = reLigne.exec(texte)) !== null) {
-    const desc = ml[1].trim()
-    // ignorer les lignes de total
-    if (/total|prix public|remise/i.test(desc)) continue
-    const prixUnit = num(ml[2]), qte = num(ml[3]) || 1, total = num(ml[4])
-    d.lignes.push({
-      fournisseur: 'SDA', designation: desc, description: '',
-      prix_public: prixUnit, remise_pct: 0, quantite: qte,
-      prix_achat: total, taux_tva: 21,
-    })
+  const lignes = texte.split('\n')
+  let cur = null
+  const ignore = /Images non contractuelles|Page \d|SAS au capital|Devis valable|Prix total HT|CRT n°|Boulevard|Référence:|Client:|Date du devis|Quantité|Prix Public total|Hausse|Remise|Eco |Livraison/i
+  for (const ln of lignes) {
+    // Titre de section : "XXX Prix UHT Qté Prix public HT"
+    if (/Prix UHT.*Prix public HT/i.test(ln)) {
+      const titre = ln.replace(/\s*Prix UHT.*$/i, '').trim()
+      cur = { fournisseur: 'SDA', designation: titre, description: '', prix_public: 0, remise_pct: 0, quantite: 1, prix_achat: 0, taux_tva: 21, _desc: [] }
+      d.lignes.push(cur)
+      continue
+    }
+    if (!cur) continue
+    // Ligne avec prix : "desc ... 1,704.00€ 1 1,704.00€"
+    const mp = ln.match(/^(.*?)\s+([\d.,]+)€\s+(\d+)\s+([\d.,]+)€\s*$/)
+    if (mp) {
+      if (mp[1].trim()) cur._desc.push(mp[1].trim())
+      // premier prix de la section = prix principal
+      if (!cur.prix_public) { cur.prix_public = num(mp[2]); cur.quantite = num(mp[3]) || 1; cur.prix_achat = num(mp[4]) }
+    } else if (!ignore.test(ln) && ln.trim()) {
+      cur._desc.push(ln.trim())
+    }
   }
-  // remise globale SDA (en bas)
+  // finaliser description
+  for (const l of d.lignes) { l.description = (l._desc || []).join(' '); delete l._desc }
+  // retirer les sections sans prix (ex: en-têtes parasites)
+  d.lignes = d.lignes.filter(l => l.prix_public > 0)
+
   m = texte.match(/Remise\s+([\d.,]+)\s*%/); if (m) d.meta.remise_globale = num(m[1])
   m = texte.match(/Prix Public total HT\s+([\d.,]+)/); if (m) d.meta.prix_public_total = num(m[1])
   m = texte.match(/Prix total HT\s+([\d.,]+)/); if (m) d.meta.prix_net_total = num(m[1])

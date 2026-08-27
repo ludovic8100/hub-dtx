@@ -4,6 +4,7 @@ import Layout from '../../components/Layout'
 import { LODE, TVA_TAUX, CGV, DELAI_PAIEMENT_JOURS } from '../../lib/lodeConfig'
 import { I18N, CGV_I18N, LANGUES } from '../../lib/lodeI18n'
 import { StatBanner, TabsBar, StatusBadge, ActionButton, DataCard, PrimaryButton, useMobile } from '../../components/ui/AccountableUI'
+import { extraireDevis } from '../../lib/devisExtraction'
 
 const ORANGE = LODE.couleur
 const NAVY = '#1e293b'
@@ -106,6 +107,44 @@ function Editeur({ type, doc, onClose, onSaved }) {
   const [lignes, setLignes] = useState([{ description: '', quantite: 1, prix_unitaire: 0, remise_pct: 0, tva_pct: 21 }])
   const [afficherTVAC, setAfficherTVAC] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [importPDF, setImportPDF] = useState({ loading: false, msg: '', drag: false })
+
+  // Import de devis fournisseur (SDA / Marquise) -> pré-remplit les lignes
+  const importerPDFs = async (files) => {
+    setImportPDF({ loading: true, msg: '', drag: false })
+    const nouvelles = []
+    let objetAuto = ''
+    for (const file of files) {
+      try {
+        const ext = await extraireDevis(file)
+        if (ext.fournisseur === 'Inconnu') { setImportPDF({ loading: false, msg: `⚠ ${file.name} : fournisseur non reconnu`, drag: false }); continue }
+        if (!objetAuto && ext.lignes[0]) objetAuto = ext.lignes[0].designation
+        for (const l of ext.lignes) {
+          // convertit vers le format du module : description = objet + détail, prix_unitaire = prix public
+          const desc = l.description ? `${l.designation} — ${l.description}` : l.designation
+          nouvelles.push({
+            description: desc.slice(0, 500),
+            quantite: l.quantite || 1,
+            prix_unitaire: l.prix_public || 0,
+            remise_pct: l.remise_pct || 0,
+            tva_pct: l.taux_tva || 21,
+            photos: [],
+          })
+        }
+      } catch (e) { setImportPDF({ loading: false, msg: `Erreur ${file.name}: ${e.message}`, drag: false }) }
+    }
+    if (nouvelles.length) {
+      setLignes(prev => {
+        const vides = prev.filter(l => !l.description.trim())
+        const pleines = prev.filter(l => l.description.trim())
+        return [...pleines, ...nouvelles]
+      })
+      if (objetAuto && !f.objet) set('objet', objetAuto)
+      setImportPDF({ loading: false, msg: `✓ ${nouvelles.length} ligne(s) importée(s) — vérifiez et ajustez`, drag: false })
+    } else {
+      setImportPDF(p => ({ ...p, loading: false }))
+    }
+  }
   const CLIENT_TABLE = 'lode_clients'
   // colonnes texte candidates pour la recherche multi-champs (intersectees avec les colonnes reellement presentes dans la base de CETTE societe)
   const SEARCH_CANDIDATES = ['denomination','nom','prenom','dossier','ville','localite','email','telephone','tel_fixe','gsm','tva','bce','adresse','cp','code_postal','pays']
@@ -283,6 +322,22 @@ function Editeur({ type, doc, onClose, onSaved }) {
             <div><label style={lbl}>Date facture</label><input type="date" style={inp} value={f.date_facture} onChange={e => set('date_facture', e.target.value)} /></div>
             <div><label style={lbl}>Échéance</label><input type="date" style={inp} value={f.date_echeance} onChange={e => set('date_echeance', e.target.value)} /></div>
           </>}
+        </div>
+
+        {/* Import PDF fournisseur (glisser-déposer) */}
+        <div
+          onDragOver={e => { e.preventDefault(); setImportPDF(p => ({ ...p, drag: true })) }}
+          onDragLeave={e => { e.preventDefault(); setImportPDF(p => ({ ...p, drag: false })) }}
+          onDrop={e => { e.preventDefault(); const fs = [...e.dataTransfer.files].filter(x => x.type === 'application/pdf'); if (fs.length) importerPDFs(fs) }}
+          style={{ border: `2px dashed ${importPDF.drag ? ORANGE : '#cbd5e1'}`, background: importPDF.drag ? '#FFF7ED' : '#fafafa', borderRadius: 10, padding: '14px 16px', marginBottom: 14, textAlign: 'center', transition: 'all .15s' }}
+        >
+          <div style={{ fontSize: 13, fontWeight: 700, color: NAVY, marginBottom: 4 }}>📄 Importer un devis fournisseur (SDA / Marquise)</div>
+          <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 8 }}>Glissez vos PDF ici, ou cliquez pour parcourir — les lignes seront pré-remplies</div>
+          <label style={{ display: 'inline-block', background: '#fff', border: `1px solid ${ORANGE}`, color: ORANGE, borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+            {importPDF.loading ? 'Lecture en cours…' : 'Parcourir…'}
+            <input type="file" accept="application/pdf" multiple style={{ display: 'none' }} onChange={e => { const fs = [...e.target.files]; if (fs.length) importerPDFs(fs); e.target.value = '' }} />
+          </label>
+          {importPDF.msg && <div style={{ marginTop: 8, fontSize: 12, fontWeight: 600, color: importPDF.msg.startsWith('✓') ? '#16a34a' : importPDF.msg.startsWith('⚠') ? '#b45309' : '#dc2626' }}>{importPDF.msg}</div>}
         </div>
 
         {/* Lignes */}
