@@ -585,72 +585,128 @@ async function exportPDF(type, doc, lignes) {
     return desc ? `${titre}\n${desc}` : titre
   }
 
-  const PHOTO_H = 26  // hauteur d'une photo dans la cellule (mm)
-  const PHOTO_W = 34
-  const mkBody = (arr) => arr.map((l) => {
+  // ═══ Dessin manuel des lignes (pour maîtriser texte + photos + sauts de page) ═══
+  const PHOTO_SIZE = 30   // photos carrées uniformes (mm)
+  const PHOTO_GAP = 3
+  const M_L = 16, M_R = 16
+  const tableW = PW - M_L - M_R
+  const BOTTOM = 280      // limite basse avant saut de page
+
+  // largeurs colonnes chiffres (à droite)
+  const wPU = 24, wTVA = 13, wRem = hasRemiseLigne ? 13 : 0, wQte = 12, wHT = 24, wTTC = 26
+  const wChiffres = wPU + wTVA + wRem + wQte + wHT + wTTC
+  const xChiffresStart = PW - M_R - wChiffres
+  const wTexte = xChiffresStart - M_L - 3
+
+  // Numérotation de page (appelée en fin)
+  const numeroterPages = () => {
+    const n = d.internal.getNumberOfPages()
+    for (let i = 1; i <= n; i++) {
+      d.setPage(i)
+      d.setFontSize(8); d.setTextColor(...GREY); d.setFont(undefined, 'normal')
+      d.text(`Page ${i}/${n}`, PW - M_R, 292, { align: 'right' })
+    }
+  }
+
+  // En-tête de colonnes (bandeau orange) — redessiné en haut de chaque page de lignes
+  const dessinerEnteteColonnes = (yy) => {
+    d.setFillColor(...O); d.rect(M_L, yy, tableW, 8, 'F')
+    d.setFontSize(8.5); d.setTextColor(255, 255, 255); d.setFont(undefined, 'bold')
+    d.text(L.description, M_L + 2, yy + 5.5)
+    let cx = xChiffresStart
+    d.text(L.pu, cx + wPU - 1, yy + 5.5, { align: 'right' }); cx += wPU
+    d.text(L.tva, cx + wTVA / 2, yy + 5.5, { align: 'center' }); cx += wTVA
+    if (hasRemiseLigne) { d.text('%', cx + wRem / 2, yy + 5.5, { align: 'center' }); cx += wRem }
+    d.text(L.qte, cx + wQte / 2, yy + 5.5, { align: 'center' }); cx += wQte
+    d.text(L.totalHT, cx + wHT - 1, yy + 5.5, { align: 'right' }); cx += wHT
+    d.text('TTC', cx + wTTC - 1, yy + 5.5, { align: 'right' })
+    return yy + 8
+  }
+
+  let y = dessinerEnteteColonnes(startY)
+  let rowAlt = false
+
+  for (let idx = 0; idx < lignesNormales.length; idx++) {
+    const l = lignesNormales[idx]
     const t = (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * (1 - (Number(l.remise_pct) || 0) / 100)
     const ttc = t * (1 + (Number(l.tva_pct) || 0) / 100)
-    const cols = [libelleLigne(l), eurPDF(l.prix_unitaire), `${l.tva_pct}%`]
-    if (hasRemiseLigne) cols.push(`${l.remise_pct || 0}%`)
-    cols.push(String(l.quantite), eurPDF(t), eurPDF(ttc))
-    return cols
-  })
+    const titre = l.titre || l.description || ''
+    const desc = l.descriptif || ''
+    const photos = photosData[idx] || []
 
-  const head = [L.description, L.pu, L.tva]
-  if (hasRemiseLigne) head.push(L.remise)
-  head.push(L.qte, L.totalHT, 'TTC')
+    // calcul hauteur du texte
+    d.setFontSize(9.5); d.setFont(undefined, 'bold')
+    const titreLignes = d.splitTextToSize(titre, wTexte)
+    d.setFontSize(8.5); d.setFont(undefined, 'normal')
+    const descLignes = desc ? d.splitTextToSize(desc, wTexte) : []
+    const hTexte = titreLignes.length * 4.2 + descLignes.length * 3.6 + 3
 
-  const colStyles = hasRemiseLigne
-    ? { 0: { cellWidth: 'auto' }, 1: { halign: 'right', cellWidth: 22 }, 2: { halign: 'center', cellWidth: 14 }, 3: { halign: 'center', cellWidth: 14 }, 4: { halign: 'center', cellWidth: 12 }, 5: { halign: 'right', cellWidth: 24 }, 6: { halign: 'right', cellWidth: 26 } }
-    : { 0: { cellWidth: 'auto' }, 1: { halign: 'right', cellWidth: 24 }, 2: { halign: 'center', cellWidth: 16 }, 3: { halign: 'center', cellWidth: 14 }, 4: { halign: 'right', cellWidth: 26 }, 5: { halign: 'right', cellWidth: 28 } }
+    // hauteur photos (à droite, sous les chiffres) : alignées en grille
+    const photosParRangee = Math.max(1, Math.floor((wChiffres + wTexte) / (PHOTO_SIZE + PHOTO_GAP)))
+    const nbRangeesPhotos = photos.length ? Math.ceil(photos.length / Math.max(1, Math.floor(tableW / (PHOTO_SIZE + PHOTO_GAP)))) : 0
+    const hPhotos = photos.length ? nbRangeesPhotos * (PHOTO_SIZE + PHOTO_GAP) + 1 : 0
 
-  d.autoTable({
-    startY, head: [head], body: mkBody(lignesNormales),
-    theme: 'plain',
-    headStyles: { fillColor: O, textColor: [255, 255, 255], fontSize: 9, fontStyle: 'bold', cellPadding: { top: 3, bottom: 3, left: 4, right: 4 } },
-    bodyStyles: { fontSize: 9, textColor: DARK, cellPadding: { top: 3, bottom: 3, left: 4, right: 4 }, valign: 'top' },
-    alternateRowStyles: { fillColor: [252, 247, 243] },
-    margin: { left: 16, right: 16 },
-    columnStyles: colStyles,
-    didParseCell: (data) => {
-      // réserver de la hauteur sous le descriptif pour les photos
-      if (data.section === 'body' && data.column.index === 0) {
-        const photos = photosData[data.row.index]
-        if (photos && photos.length) {
-          const nbParLigne = 2
-          const nbRangees = Math.ceil(photos.length / nbParLigne)
-          data.cell.styles.minCellHeight = (data.cell.styles.minCellHeight || 0) + nbRangees * (PHOTO_H + 2) + 2
-        }
+    const hLigne = Math.max(hTexte, 8) + hPhotos + 3
+
+    // ── Saut de page : l'article entier passe à la page suivante ──
+    if (y + hLigne > BOTTOM) {
+      d.addPage()
+      y = dessinerEnteteColonnes(20)
+    }
+
+    const yDebut = y
+    // fond alterné
+    if (rowAlt) { d.setFillColor(252, 247, 243); d.rect(M_L, y, tableW, hLigne, 'F') }
+    rowAlt = !rowAlt
+
+    // texte à gauche
+    let ty = y + 4.5
+    d.setFontSize(9.5); d.setTextColor(...DARK); d.setFont(undefined, 'bold')
+    titreLignes.forEach(ln => { d.text(ln, M_L + 2, ty); ty += 4.2 })
+    if (descLignes.length) {
+      d.setFontSize(8.5); d.setTextColor(...GREY); d.setFont(undefined, 'normal')
+      descLignes.forEach(ln => { d.text(ln, M_L + 2, ty); ty += 3.6 })
+    }
+
+    // chiffres à droite (alignés en haut)
+    d.setFontSize(9); d.setTextColor(...DARK); d.setFont(undefined, 'normal')
+    const yc = y + 5
+    let cx = xChiffresStart
+    d.text(eurPDF(l.prix_unitaire), cx + wPU - 1, yc, { align: 'right' }); cx += wPU
+    d.text(`${l.tva_pct}%`, cx + wTVA / 2, yc, { align: 'center' }); cx += wTVA
+    if (hasRemiseLigne) { d.text(`${l.remise_pct || 0}%`, cx + wRem / 2, yc, { align: 'center' }); cx += wRem }
+    d.text(String(l.quantite), cx + wQte / 2, yc, { align: 'center' }); cx += wQte
+    d.setFont(undefined, 'bold')
+    d.text(eurPDF(t), cx + wHT - 1, yc, { align: 'right' }); cx += wHT
+    d.setTextColor(...O); d.text(eurPDF(ttc), cx + wTTC - 1, yc, { align: 'right' })
+    d.setTextColor(...DARK); d.setFont(undefined, 'normal')
+
+    // photos : sous le texte/chiffres, alignées à gauche, taille uniforme
+    if (photos.length) {
+      let py = Math.max(ty, yc) + 3
+      let px = M_L + 2
+      const maxPar = Math.max(1, Math.floor(tableW / (PHOTO_SIZE + PHOTO_GAP)))
+      let count = 0
+      for (const dataUrl of photos) {
+        if (count > 0 && count % maxPar === 0) { px = M_L + 2; py += PHOTO_SIZE + PHOTO_GAP }
+        try {
+          const fmt = dataUrl.includes('image/png') ? 'PNG' : 'JPEG'
+          d.addImage(dataUrl, fmt, px, py, PHOTO_SIZE, PHOTO_SIZE, undefined, 'FAST')
+        } catch (e) { /* ignore */ }
+        px += PHOTO_SIZE + PHOTO_GAP
+        count++
       }
-    },
-    didDrawCell: (data) => {
-      // dessiner les photos sous le texte de la cellule descriptif
-      if (data.section === 'body' && data.column.index === 0) {
-        const photos = photosData[data.row.index]
-        if (photos && photos.length) {
-          // position sous le texte : on estime la hauteur du texte
-          const texte = data.cell.text.join('\n')
-          const nbLignesTexte = data.cell.text.length
-          const yTexte = data.cell.y + 3 + nbLignesTexte * 3.4 + 2
-          let px = data.cell.x + 2
-          let py = yTexte
-          let count = 0
-          for (const dataUrl of photos) {
-            if (count > 0 && count % 2 === 0) { px = data.cell.x + 2; py += PHOTO_H + 2 }
-            try {
-              const fmt = dataUrl.includes('image/png') ? 'PNG' : 'JPEG'
-              d.addImage(dataUrl, fmt, px, py, PHOTO_W, PHOTO_H, undefined, 'FAST')
-            } catch (e) { /* ignore */ }
-            px += PHOTO_W + 2
-            count++
-          }
-        }
-      }
-    },
-  })
+    }
+
+    // ligne séparatrice fine
+    y = yDebut + hLigne
+    d.setDrawColor(235, 235, 235); d.setLineWidth(0.2); d.line(M_L, y, PW - M_R, y)
+  }
+
+  y += 4
 
   // ---- Totaux (alignés à droite, libellés orange) ----
-  let y = d.lastAutoTable.finalY + 10
+  if (y > 250) { d.addPage(); y = 20 }
   const labelX = PW - 70, valX = PW - 16
   d.setFontSize(10); d.setFont(undefined, 'normal')
   if (doc.remise_pct > 0) {
@@ -718,6 +774,7 @@ async function exportPDF(type, doc, lignes) {
     d.text(lines, 16, cy); cy += lines.length * 4 + 3.5
   })
 
+  numeroterPages()
   d.save(`${titre}_${doc.numero}.pdf`)
 }
 
