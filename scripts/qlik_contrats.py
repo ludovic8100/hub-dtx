@@ -105,7 +105,18 @@ def fetch_clients_index():
 
 def reload_all(rows):
     h = {"apikey": SUPA_KEY, "Authorization": f"Bearer {SUPA_KEY}", "Content-Type": "application/json", "Prefer": "return=minimal"}
-    urllib.request.urlopen(urllib.request.Request(f"{SUPA_URL}/rest/v1/contrats?id=not.is.null", method="DELETE", headers=h))
+    # DELETE de tous les contrats — on capture le message exact en cas d'échec (FK, etc.)
+    try:
+        urllib.request.urlopen(urllib.request.Request(f"{SUPA_URL}/rest/v1/contrats?id=not.is.null", method="DELETE", headers=h))
+    except urllib.error.HTTPError as e:
+        body = ""
+        try:
+            body = e.read().decode()
+        except Exception:
+            pass
+        print(f"  ⚠ DELETE contrats a échoué : HTTP {e.code}")
+        print(f"  Détail PostgREST : {body}")
+        raise
     B = 500
     for i in range(0, len(rows), B):
         urllib.request.urlopen(urllib.request.Request(f"{SUPA_URL}/rest/v1/contrats",
