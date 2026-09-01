@@ -19,14 +19,32 @@ const D = {
   btn:(v="primary")=>({ padding:"8px 16px", borderRadius:7, cursor:"pointer", fontSize:12, fontWeight:600, transition:"all 0.15s", border:"none", ...(v==="primary"?{ background:`linear-gradient(135deg,${C.cyan},${C.navyMid})`, color:"#fff" }:v==="ghost"?{ background:"transparent", color:C.navy, border:`1px solid ${C.border}` }:{ background:C.bg, color:C.textM, border:`1px solid ${C.border}` }) }),
   alertBox:(t="warn")=>({ background:t==="warn"?"#FEF3CD":t==="ok"?"#EAF7EC":"#FDECEA", border:`1px solid ${t==="warn"?"#F6D55C":t==="ok"?"#B2DFDB":"#F5C6CB"}`, borderRadius:8, padding:"10px 14px", marginBottom:8, fontSize:13, color:t==="warn"?"#856404":t==="ok"?"#155724":"#721C24" }),
 }
-const EMPTY_CIE = { code:"", nom:"", nom_court:"", logo_url:"", couleur:"#1A3A6B", site_web:"", email_contact:"", telephone:"", actif:true, notes:"" }
+const EMPTY_CIE = { code:"", nom:"", nom_court:"", numero:"", logo_url:"", couleur:"#1A3A6B", site_web:"", email_contact:"", telephone:"", actif:true, attend_bqt:true, attend_rcp:true, notes:"" }
 
-function CieFormModal({ cie, comptes = [], logos = [], onClose, onSave }) {
+const STATUT_PROD = {
+  actif:   { label:"Actif",    couleur:"#27AE60" },
+  runoff:  { label:"Run-off",  couleur:"#F39C12" },
+  cloture: { label:"Clôturé",  couleur:"#8A9BBE" },
+}
+
+function CieFormModal({ cie, comptes = [], logos = [], onClose, onSave, onDelete, onAddProd, onSetStatut, onDelProd }) {
   const isNew = !cie.id
   const [form, setForm] = useState({ ...cie })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
+  const [newProd, setNewProd] = useState({ numero:"", fsma:"" })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  const ajouterProd = async () => {
+    if (!newProd.numero.trim()) return
+    await onAddProd({ id: form.id, nom: form.nom }, newProd.numero.trim(), newProd.fsma.trim())
+    setNewProd({ numero:"", fsma:"" })
+  }
+  const supprimerCie = async () => {
+    if (comptes.length > 0) { setError("Cette compagnie a des numéros de producteur : désactive-la plutôt que la supprimer."); return }
+    if (!window.confirm(`Supprimer définitivement « ${form.nom} » ?`)) return
+    await onDelete(form.id); onClose()
+  }
 
   const handleSave = async () => {
     if (!form.code || !form.nom) { setError("Code et nom obligatoires"); return }
@@ -80,16 +98,37 @@ function CieFormModal({ cie, comptes = [], logos = [], onClose, onSave }) {
           {/* Comptes producteurs */}
           <div style={{ marginBottom:16, padding:"14px 16px", background:C.bg, borderRadius:10 }}>
             <div style={{ fontSize:11, fontWeight:700, color:C.textL, textTransform:"uppercase", letterSpacing:.5, marginBottom:8 }}>
-              {comptes.length} compte{comptes.length>1?"s":""} producteur{comptes.length>1?"s":""}
+              {comptes.length} numéro{comptes.length>1?"s":""} de producteur
             </div>
-            {comptes.length === 0 ? (
-              <div style={{ fontSize:12, color:C.danger, fontWeight:600 }}>⚠ Aucun numéro de producteur — non ouvert chez cette compagnie</div>
+            {isNew ? (
+              <div style={{ fontSize:12, color:C.textM }}>Enregistre d'abord la compagnie pour lui ajouter des numéros de producteur.</div>
             ) : (
-              <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
-                {comptes.map((p,j) => (
-                  <span key={j} style={{ fontSize:12, fontWeight:600, padding:"4px 10px", borderRadius:6, background:"#fff", border:`1px solid ${C.border}`, color:C.navy }} title={p.fsma?`FSMA ${p.fsma}`:""}>{p.numero_producteur}</span>
-                ))}
-              </div>
+              <>
+                {comptes.length === 0 && <div style={{ fontSize:12, color:C.danger, fontWeight:600, marginBottom:8 }}>⚠ Aucun numéro de producteur</div>}
+                <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                  {comptes.map(p => {
+                    const st = STATUT_PROD[p.statut] || STATUT_PROD.actif
+                    return (
+                    <div key={p.id} style={{ display:"flex", alignItems:"center", gap:8, background:"#fff", border:`1px solid ${C.border}`, borderRadius:6, padding:"6px 8px" }}>
+                      <span style={{ fontSize:12, fontWeight:700, color:C.navy, fontFamily:"monospace" }}>{p.numero_producteur}</span>
+                      {p.fsma && <span style={{ fontSize:10, color:C.textL }}>FSMA {p.fsma}</span>}
+                      <select value={p.statut||"actif"} onChange={e => onSetStatut(p.id, e.target.value)}
+                        style={{ marginLeft:"auto", border:"none", borderRadius:5, padding:"2px 6px", fontSize:11, fontWeight:600, cursor:"pointer", color:"#fff", background:st.couleur }}>
+                        <option value="actif" style={{ color:"#000", background:"#fff" }}>Actif</option>
+                        <option value="runoff" style={{ color:"#000", background:"#fff" }}>Run-off</option>
+                        <option value="cloture" style={{ color:"#000", background:"#fff" }}>Clôturé</option>
+                      </select>
+                      <button onClick={() => window.confirm(`Supprimer le n° ${p.numero_producteur} ?`) && onDelProd(p.id)}
+                        style={{ border:"none", background:"none", color:C.danger, cursor:"pointer", fontSize:14, padding:0 }} title="Supprimer">🗑</button>
+                    </div>
+                  )})}
+                </div>
+                <div style={{ display:"flex", gap:6, marginTop:8 }}>
+                  <input style={{ ...D.input, flex:1 }} placeholder="Nouveau n° producteur" value={newProd.numero} onChange={e => setNewProd(n => ({ ...n, numero:e.target.value }))} />
+                  <input style={{ ...D.input, width:90 }} placeholder="FSMA" value={newProd.fsma} onChange={e => setNewProd(n => ({ ...n, fsma:e.target.value }))} />
+                  <button style={D.btn("ghost")} onClick={ajouterProd}>➕ Ajouter</button>
+                </div>
+              </>
             )}
           </div>
 
@@ -101,6 +140,20 @@ function CieFormModal({ cie, comptes = [], logos = [], onClose, onSave }) {
             <div>
               <label style={{ fontSize:11, color:C.textL, display:"block", marginBottom:4 }}>Nom complet *</label>
               <input style={{ ...D.input, width:"100%" }} placeholder="AG Insurance" value={form.nom||""} onChange={e => set("nom", e.target.value)} />
+            </div>
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 2fr", gap:10, marginBottom:12, alignItems:"end" }}>
+            <div>
+              <label style={{ fontSize:11, color:C.textL, display:"block", marginBottom:4 }}>N° compagnie (FSMA)</label>
+              <input style={{ ...D.input, width:"100%" }} placeholder="79" value={form.numero||""} onChange={e => set("numero", e.target.value)} />
+            </div>
+            <div style={{ display:"flex", gap:16, paddingBottom:8 }}>
+              <label style={{ fontSize:12, color:C.textD, display:"flex", alignItems:"center", gap:6, cursor:"pointer" }}>
+                <input type="checkbox" checked={!!form.attend_bqt} onChange={e => set("attend_bqt", e.target.checked)} /> Attend un BQT (bordereau à terme)
+              </label>
+              <label style={{ fontSize:12, color:C.textD, display:"flex", alignItems:"center", gap:6, cursor:"pointer" }}>
+                <input type="checkbox" checked={!!form.attend_rcp} onChange={e => set("attend_rcp", e.target.checked)} /> Attend un RCP (commissions)
+              </label>
             </div>
           </div>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:12 }}>
@@ -143,8 +196,9 @@ function CieFormModal({ cie, comptes = [], logos = [], onClose, onSave }) {
           </div>
 
           {error && <div style={{ ...D.alertBox("danger"), marginTop:12 }}>{error}</div>}
-          <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:20, paddingTop:16, borderTop:`1px solid ${C.border}` }}>
-            <button onClick={onClose} style={D.btn("ghost")}>Annuler</button>
+          <div style={{ display:"flex", gap:10, alignItems:"center", marginTop:20, paddingTop:16, borderTop:`1px solid ${C.border}` }}>
+            {!isNew && <button onClick={supprimerCie} style={{ ...D.btn("ghost"), color:C.danger, borderColor:"#F5C6CB" }}>🗑 Supprimer</button>}
+            <button onClick={onClose} style={{ ...D.btn("ghost"), marginLeft:"auto" }}>Annuler</button>
             <button onClick={handleSave} disabled={saving} style={D.btn("primary")}>{saving ? "Sauvegarde…" : isNew ? "✅ Créer" : "✅ Enregistrer"}</button>
           </div>
         </div>
@@ -189,14 +243,33 @@ export default function CompagniesView() {
     return f ? STORAGE_BASE + encodeURIComponent(f) : null
   }
 
-  // Normalise pour matcher compagnies.nom <-> producteurs.compagnie_nom
-  const norm = (s) => (s || "").toString().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9]/g, "")
-  const comptesDe = (cie) => {
-    const cibles = [norm(cie.nom), norm(cie.nom_court), norm(cie.code)].filter(Boolean)
-    return producteurs.filter(p => {
-      const pn = norm(p.compagnie_nom)
-      return cibles.some(c => c && (pn === c || pn.startsWith(c) || c.startsWith(pn)))
-    })
+  // Rattachement fiable par compagnie_id
+  const comptesDe = (cie) => producteurs.filter(p => p.compagnie_id === cie.id)
+  const nonRattaches = producteurs.filter(p => !p.compagnie_id)
+
+  const reloadProd = async () => {
+    const { data } = await supabase.from("producteurs").select("*").order("compagnie_nom")
+    setProducteurs(Array.isArray(data) ? data : [])
+  }
+  const addProd = async (cie, numero, fsma) => {
+    await supabase.from("producteurs").insert({ numero_producteur:numero, fsma:fsma||null, compagnie_id:cie.id, compagnie_nom:cie.nom, statut:"actif" })
+    await reloadProd()
+  }
+  const setProdStatut = async (id, statut) => {
+    await supabase.from("producteurs").update({ statut, updated_at:new Date().toISOString() }).eq("id", id)
+    await reloadProd()
+  }
+  const delProd = async (id) => {
+    await supabase.from("producteurs").delete().eq("id", id)
+    await reloadProd()
+  }
+  const rattacherProd = async (id, cie) => {
+    await supabase.from("producteurs").update({ compagnie_id: cie ? cie.id : null, compagnie_nom: cie ? cie.nom : null, updated_at:new Date().toISOString() }).eq("id", id)
+    await reloadProd()
+  }
+  const delCie = async (id) => {
+    await supabase.from("compagnies").delete().eq("id", id)
+    setCies(prev => prev.filter(c => c.id !== id))
   }
 
   const handleSave = (saved) => {
@@ -228,6 +301,28 @@ export default function CompagniesView() {
           <button style={{ ...D.btn("primary"), marginLeft:"auto" }} onClick={() => setModal({ ...EMPTY_CIE })}>➕ Nouvelle compagnie</button>
         </div>
       </div>
+
+      {nonRattaches.length > 0 && (
+        <div style={{ ...D.card, borderColor:"#F6D55C", background:"#FEFBF0" }}>
+          <div style={{ fontSize:13, fontWeight:700, color:"#856404", marginBottom:10 }}>⚠ {nonRattaches.length} numéro{nonRattaches.length>1?"s":""} de producteur non rattaché{nonRattaches.length>1?"s":""}</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+            {nonRattaches.map(p => (
+              <div key={p.id} style={{ display:"flex", alignItems:"center", gap:8, background:"#fff", border:`1px solid ${C.border}`, borderRadius:6, padding:"6px 8px", flexWrap:"wrap" }}>
+                <span style={{ fontSize:12, fontWeight:700, color:C.navy, fontFamily:"monospace" }}>{p.numero_producteur}</span>
+                <span style={{ fontSize:11, color:C.textM }}>{p.compagnie_nom}</span>
+                {p.fsma && <span style={{ fontSize:10, color:C.textL }}>FSMA {p.fsma}</span>}
+                <select defaultValue="" onChange={e => { const c = cies.find(x => x.id === e.target.value); if (c) rattacherProd(p.id, c) }}
+                  style={{ ...D.input, marginLeft:"auto", width:"auto", fontSize:12 }}>
+                  <option value="">Rattacher à…</option>
+                  {cies.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
+                </select>
+                <button onClick={() => window.confirm(`Supprimer le n° ${p.numero_producteur} ?`) && delProd(p.id)}
+                  style={{ border:"none", background:"none", color:C.danger, cursor:"pointer", fontSize:14, padding:0 }} title="Supprimer">🗑</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(220px, 1fr))", gap:12 }}>
         {filtered.map(c => {
@@ -272,7 +367,7 @@ export default function CompagniesView() {
         )})}
       </div>
 
-      {modal && <CieFormModal cie={modal} comptes={comptesDe(modal)} logos={logos} onClose={() => setModal(null)} onSave={handleSave} />}
+      {modal && <CieFormModal cie={modal} comptes={comptesDe(modal)} logos={logos} onClose={() => setModal(null)} onSave={handleSave} onDelete={delCie} onAddProd={addProd} onSetStatut={setProdStatut} onDelProd={delProd} />}
     </div>
   )
 }
