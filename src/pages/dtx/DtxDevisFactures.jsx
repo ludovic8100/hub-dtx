@@ -114,6 +114,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
   const [clientQuery, setClientQuery] = useState('')
   const [clientResults, setClientResults] = useState([])
   const [searching, setSearching] = useState(false)
+  const [creatingClient, setCreatingClient] = useState(false)
 
   // decouverte des colonnes reelles de la base client de cette societe (1 ligne echantillon) -> aucune hypothese de schema codee en dur
   useEffect(() => {
@@ -173,6 +174,34 @@ function Editeur({ type, doc, onClose, onSaved }) {
     setClientResults([])
   }
 
+  // Crée le client saisi manuellement dans la base clients de la société, puis lie le devis/facture au nouveau client_id
+  const creerClient = async () => {
+    const nom = (f.client_nom || '').trim()
+    if (!nom) { alert('Renseigne au moins le nom / la société avant de créer le client.'); return }
+    setCreatingClient(true)
+    const estEntreprise = !!(f.client_tva || '').trim()
+    const payload = {
+      type: estEntreprise ? 'entreprise' : 'particulier',
+      denomination: estEntreprise ? nom : null,
+      nom: estEntreprise ? null : nom,
+      adresse: f.client_adresse || null,
+      cp: f.client_cp || null,
+      ville: f.client_ville || null,
+      pays: f.client_pays || 'Belgique',
+      tva: f.client_tva || null,
+      numero_bce: estEntreprise ? (f.client_tva || null) : null,
+      email: f.client_email || null,
+      telephone: f.client_telephone || null,
+      langue: f.langue || 'fr',
+      actif: true,
+    }
+    const { data, error } = await supabase.from(CLIENT_TABLE).insert(payload).select('id').single()
+    setCreatingClient(false)
+    if (error) { alert('Création client impossible : ' + error.message); return }
+    setF(p => ({ ...p, client_id: data.id }))
+    alert('Client créé et lié au ' + (isDevis ? 'devis' : 'facture') + '.')
+  }
+
   useEffect(() => {
     if (doc?.id) {
       supabase.from(tableLignes).select('*').eq(fk, doc.id).order('position')
@@ -194,6 +223,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
       const payload = {
         client_nom: f.client_nom, client_adresse: f.client_adresse, client_cp: f.client_cp,
         client_ville: f.client_ville, client_email: f.client_email, client_telephone: f.client_telephone,
+        client_id: f.client_id || null,
         client_tva: f.client_tva, objet: f.objet, notes: f.notes,
         remise_pct: Number(f.remise_pct) || 0, statut: f.statut, langue: f.langue || 'fr',
         total_ht: tot.ht, total_tva: tot.tva, total_ttc: tot.ttc,
@@ -271,6 +301,26 @@ function Editeur({ type, doc, onClose, onSaved }) {
           <div><label style={lbl}>Email</label><input style={inp} value={f.client_email} onChange={e => set('client_email', e.target.value)} /></div>
           <div><label style={lbl}>Téléphone</label><input style={inp} value={f.client_telephone} onChange={e => set('client_telephone', e.target.value)} /></div>
           <div><label style={lbl}>Pays</label><input style={inp} value={f.client_pays || ''} onChange={e => set('client_pays', e.target.value)} /></div>
+        </div>
+
+        {/* Création / liaison du client en base */}
+        <div style={{ marginBottom: 16 }}>
+          {f.client_id ? (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', borderRadius: 8, padding: '6px 12px', fontSize: 13, fontWeight: 700 }}>
+              ✓ Client encodé — lié à la base
+              <button onClick={() => set('client_id', null)} title="Détacher pour ressaisir un autre client" style={{ background: 'none', border: 'none', color: '#047857', cursor: 'pointer', fontSize: 12, textDecoration: 'underline', padding: 0 }}>détacher</button>
+            </div>
+          ) : (
+            <button onClick={creerClient} disabled={creatingClient || !f.client_nom.trim()}
+              style={{ background: f.client_nom.trim() ? ORANGE : '#cbd5e1', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 700, cursor: (f.client_nom.trim() && !creatingClient) ? 'pointer' : 'not-allowed' }}>
+              {creatingClient ? 'Création…' : '➕ Créer ce client dans la base'}
+            </button>
+          )}
+          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 5 }}>
+            {f.client_id
+              ? 'Ce client est enregistré dans ta base — réutilisable pour tes prochains devis et factures.'
+              : 'Client pas encore encodé. Crée-le pour le retrouver ensuite via la recherche.'}
+          </div>
         </div>
 
         {/* Objet + dates */}
