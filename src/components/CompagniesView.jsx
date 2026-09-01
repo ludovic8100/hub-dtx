@@ -301,29 +301,6 @@ export default function CompagniesView() {
           <button style={{ ...D.btn("primary"), marginLeft:"auto" }} onClick={() => setModal({ ...EMPTY_CIE })}>➕ Nouvelle compagnie</button>
         </div>
       </div>
-
-      {nonRattaches.length > 0 && (
-        <div style={{ ...D.card, borderColor:"#F6D55C", background:"#FEFBF0" }}>
-          <div style={{ fontSize:13, fontWeight:700, color:"#856404", marginBottom:10 }}>⚠ {nonRattaches.length} numéro{nonRattaches.length>1?"s":""} de producteur non rattaché{nonRattaches.length>1?"s":""}</div>
-          <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-            {nonRattaches.map(p => (
-              <div key={p.id} style={{ display:"flex", alignItems:"center", gap:8, background:"#fff", border:`1px solid ${C.border}`, borderRadius:6, padding:"6px 8px", flexWrap:"wrap" }}>
-                <span style={{ fontSize:12, fontWeight:700, color:C.navy, fontFamily:"monospace" }}>{p.numero_producteur}</span>
-                <span style={{ fontSize:11, color:C.textM }}>{p.compagnie_nom}</span>
-                {p.fsma && <span style={{ fontSize:10, color:C.textL }}>FSMA {p.fsma}</span>}
-                <select defaultValue="" onChange={e => { const c = cies.find(x => x.id === e.target.value); if (c) rattacherProd(p.id, c) }}
-                  style={{ ...D.input, marginLeft:"auto", width:"auto", fontSize:12 }}>
-                  <option value="">Rattacher à…</option>
-                  {cies.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
-                </select>
-                <button onClick={() => window.confirm(`Supprimer le n° ${p.numero_producteur} ?`) && delProd(p.id)}
-                  style={{ border:"none", background:"none", color:C.danger, cursor:"pointer", fontSize:14, padding:0 }} title="Supprimer">🗑</button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(220px, 1fr))", gap:12 }}>
         {filtered.map(c => {
           const comptes = comptesDe(c)
@@ -366,6 +343,29 @@ export default function CompagniesView() {
           </div>
         )})}
       </div>
+
+
+      {nonRattaches.length > 0 && (
+        <div style={{ ...D.card, borderColor:"#F6D55C", background:"#FEFBF0" }}>
+          <div style={{ fontSize:13, fontWeight:700, color:"#856404", marginBottom:10 }}>⚠ {nonRattaches.length} numéro{nonRattaches.length>1?"s":""} de producteur non rattaché{nonRattaches.length>1?"s":""}</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+            {nonRattaches.map(p => (
+              <div key={p.id} style={{ display:"flex", alignItems:"center", gap:8, background:"#fff", border:`1px solid ${C.border}`, borderRadius:6, padding:"6px 8px", flexWrap:"wrap" }}>
+                <span style={{ fontSize:12, fontWeight:700, color:C.navy, fontFamily:"monospace" }}>{p.numero_producteur}</span>
+                <span style={{ fontSize:11, color:C.textM }}>{p.compagnie_nom}</span>
+                {p.fsma && <span style={{ fontSize:10, color:C.textL }}>FSMA {p.fsma}</span>}
+                <select defaultValue="" onChange={e => { const c = cies.find(x => x.id === e.target.value); if (c) rattacherProd(p.id, c) }}
+                  style={{ ...D.input, marginLeft:"auto", width:"auto", fontSize:12 }}>
+                  <option value="">Rattacher à…</option>
+                  {cies.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
+                </select>
+                <button onClick={() => window.confirm(`Supprimer le n° ${p.numero_producteur} ?`) && delProd(p.id)}
+                  style={{ border:"none", background:"none", color:C.danger, cursor:"pointer", fontSize:14, padding:0 }} title="Supprimer">🗑</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {modal && <CieFormModal cie={modal} comptes={comptesDe(modal)} logos={logos} onClose={() => setModal(null)} onSave={handleSave} onDelete={delCie} onAddProd={addProd} onSetStatut={setProdStatut} onDelProd={delProd} />}
     </div>
