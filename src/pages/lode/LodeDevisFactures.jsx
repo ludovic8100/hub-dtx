@@ -612,21 +612,26 @@ async function exportPDF(type, doc, lignes) {
   const lignesOptions = lignes.filter(l => l.optionnelle)
   const hasRemiseLigne = lignes.some(x => Number(x.remise_pct) > 0)
 
-  // Pré-charge toutes les photos en dataURL (indexées par ligne)
-  const photosData = {}  // index de ligne -> [dataUrl, ...]
-  for (let idx = 0; idx < lignesNormales.length; idx++) {
-    const l = lignesNormales[idx]
-    if (l.photos && l.photos.length) {
-      photosData[idx] = []
-      for (const photo of l.photos) {
-        const src = photo.url || photo
-        try {
-          const dataUrl = (typeof src === 'string' && src.startsWith('data:')) ? src : await loadImageDataURL(src)
-          if (dataUrl) photosData[idx].push(dataUrl)
-        } catch (e) { /* ignore */ }
+  // Pré-charge les photos en dataURL (indexées par position dans la liste fournie)
+  const prechargerPhotos = async (liste) => {
+    const out = {}
+    for (let idx = 0; idx < liste.length; idx++) {
+      const l = liste[idx]
+      if (l.photos && l.photos.length) {
+        out[idx] = []
+        for (const photo of l.photos) {
+          const src = photo.url || photo
+          try {
+            const dataUrl = (typeof src === 'string' && src.startsWith('data:')) ? src : await loadImageDataURL(src)
+            if (dataUrl) out[idx].push(dataUrl)
+          } catch (e) { /* ignore */ }
+        }
       }
     }
+    return out
   }
+  const photosData = await prechargerPhotos(lignesNormales)
+  const photosDataOptions = await prechargerPhotos(lignesOptions)
 
   // Construit le libellé d'une ligne : titre + descriptif en dessous
   const libelleLigne = (l) => {
@@ -781,20 +786,45 @@ async function exportPDF(type, doc, lignes) {
   // ---- Options au choix (non comptées dans le total) ----
   if (lignesOptions.length) {
     y += 14
+    // Pré-calcul des hauteurs (titre + descriptif + photos) pour dimensionner l'encadré
+    d.setFontSize(9)
+    const optMetrics = lignesOptions.map((l, idx) => {
+      const titre = l.titre || l.description || ''
+      const descLn = l.descriptif ? d.splitTextToSize(l.descriptif, PW - 80) : []
+      const ph = photosDataOptions[idx] || []
+      const nbRangees = ph.length ? Math.ceil(ph.length / photoParRangee) : 0
+      const hPhotos = ph.length ? nbRangees * (PHOTO_SIZE + 3) + 3 : 0
+      const h = 6 + (descLn.length ? descLn.length * 3.6 + 1 : 0) + hPhotos + 3
+      return { titre, descLn, ph, h }
+    })
+    const optH = 8 + optMetrics.reduce((s, m) => s + m.h, 0) + 4
+    if (y - 5 + optH > 285) { d.addPage(); y = 20 }
     d.setFillColor(255, 251, 235); d.setDrawColor(245, 158, 11); d.setLineWidth(0.3)
-    const optH = 8 + lignesOptions.length * 11 + 4
     d.roundedRect(16, y - 5, PW - 32, optH, 2, 2, 'FD')
     d.setFontSize(10); d.setTextColor(180, 83, 9); d.setFont(undefined, 'bold')
     d.text(isDevis ? 'Options au choix (à sélectionner — non comprises dans le total)' : 'Options', 20, y); y += 8
-    d.setFont(undefined, 'normal'); d.setFontSize(9); d.setTextColor(...DARK)
-    lignesOptions.forEach(l => {
+    optMetrics.forEach((m, idx) => {
+      const l = lignesOptions[idx]
       const t = (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * (1 - (Number(l.remise_pct) || 0) / 100)
       const ttc = t * (1 + (Number(l.tva_pct) || 0) / 100)
-      const titre = l.titre || l.description || ''
-      d.setFont(undefined, 'bold'); d.text(titre, 20, y)
+      d.setFont(undefined, 'bold'); d.setFontSize(9); d.setTextColor(...DARK)
+      d.text(m.titre, 20, y)
       d.setFont(undefined, 'normal'); d.text(`${eurPDF(t)} HT  /  ${eurPDF(ttc)} TTC`, valX, y, { align: 'right' })
-      if (l.descriptif) { y += 4.5; d.setFontSize(8); d.setTextColor(...GREY); d.text(d.splitTextToSize(l.descriptif, PW - 80), 20, y); d.setFontSize(9); d.setTextColor(...DARK) }
-      y += 7
+      let yy = y
+      if (m.descLn.length) {
+        yy += 4.5; d.setFontSize(8); d.setTextColor(...GREY); d.setFont(undefined, 'normal')
+        d.text(m.descLn, 20, yy); yy += m.descLn.length * 3.6
+        d.setFontSize(9); d.setTextColor(...DARK)
+      }
+      if (m.ph.length) {
+        let py = yy + 3, col = 0
+        for (const dataUrl of m.ph) {
+          const px = 20 + col * (PHOTO_SIZE + 3)
+          try { d.addImage(dataUrl, dataUrl.includes('image/png') ? 'PNG' : 'JPEG', px, py, PHOTO_SIZE, PHOTO_SIZE, undefined, 'FAST') } catch (e) { /* ignore */ }
+          col++; if (col >= photoParRangee) { col = 0; py += PHOTO_SIZE + 3 }
+        }
+      }
+      y += m.h
     })
   }
 
