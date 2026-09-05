@@ -7,8 +7,10 @@ Le dossier est reconstruit depuis "Numéro" (même règle que les clients).
 Les infos client (nom/prénom/naissance/cp/localité) sont complétées depuis la
 table clients (jointure par dossier).
 
-Rechargement complet (delete + insert) — la table contrats n'a pas de clé
-métier unique et son id n'est référencé par aucune autre table.
+UPSERT sur police_unique (dimension Qlik PoliceUnique) — plus de delete+insert.
+La table contrats est désormais référencée par credits.contrat_id (FK) : le
+DELETE global était bloqué par cette FK. L'upsert n'efface rien et préserve les
+id, donc le lien credits->contrats reste stable d'une synchro à l'autre.
 
 Env : QLIK_API_KEY, SUPABASE_SERVICE_KEY (+ DRY_RUN=1).
 """
@@ -79,8 +81,10 @@ def extract():
             for i, (_, col, kind) in enumerate(MEAS):
                 v = (row[i + 1].get("qText") or "").strip()
                 rec[col] = parse_date(v) if kind == "date" else (v or None)
+            # Dimension PoliceUnique (row[0]) = clé stable d'upsert (auparavant ignorée)
+            rec["police_unique"] = (row[0].get("qText") or "").strip() or None
             rec["dossier"] = dossier_from_numero(rec.pop("_numero"))
-            if not rec["dossier"] or not rec.get("police"):
+            if not rec["dossier"] or not rec.get("police") or not rec.get("police_unique"):
                 continue
             out.append(rec)
         top += len(matrix)
@@ -103,25 +107,30 @@ def fetch_clients_index():
     return idx
 
 
-def reload_all(rows):
-    h = {"apikey": SUPA_KEY, "Authorization": f"Bearer {SUPA_KEY}", "Content-Type": "application/json", "Prefer": "return=minimal"}
-    # DELETE de tous les contrats — on capture le message exact en cas d'échec (FK, etc.)
-    try:
-        urllib.request.urlopen(urllib.request.Request(f"{SUPA_URL}/rest/v1/contrats?id=not.is.null", method="DELETE", headers=h))
-    except urllib.error.HTTPError as e:
-        body = ""
-        try:
-            body = e.read().decode()
-        except Exception:
-            pass
-        print(f"  ⚠ DELETE contrats a échoué : HTTP {e.code}")
-        print(f"  Détail PostgREST : {body}")
-        raise
+def upsert(rows):
+    """UPSERT sur police_unique — aucun DELETE.
+    La FK credits.contrat_id interdit le wipe global ; l'upsert garde les id
+    stables, donc le lien credits->contrats reste valide entre deux synchros."""
+    h = {"apikey": SUPA_KEY, "Authorization": f"Bearer {SUPA_KEY}",
+         "Content-Type": "application/json",
+         "Prefer": "resolution=merge-duplicates,return=minimal"}
     B = 500
     for i in range(0, len(rows), B):
-        urllib.request.urlopen(urllib.request.Request(f"{SUPA_URL}/rest/v1/contrats",
-            data=json.dumps(rows[i:i + B]).encode(), method="POST", headers=h))
-        print(f"  insert {i + len(rows[i:i+B])}/{len(rows)}")
+        chunk = rows[i:i + B]
+        req = urllib.request.Request(f"{SUPA_URL}/rest/v1/contrats?on_conflict=police_unique",
+            data=json.dumps(chunk).encode(), method="POST", headers=h)
+        try:
+            urllib.request.urlopen(req)
+        except urllib.error.HTTPError as e:
+            body = ""
+            try:
+                body = e.read().decode()
+            except Exception:
+                pass
+            print(f"  ⚠ UPSERT contrats a échoué : HTTP {e.code}")
+            print(f"  Détail PostgREST : {body}")
+            raise
+        print(f"  upsert {i + len(chunk)}/{len(rows)}")
 
 
 def main():
@@ -151,8 +160,8 @@ def main():
         return
     if not SUPA_KEY:
         sys.exit("SUPABASE_SERVICE_KEY manquant")
-    print("Rechargement complet contrats…")
-    reload_all(rows)
+    print("Upsert contrats (on_conflict=police_unique)…")
+    upsert(rows)
     print("OK.")
 
 
