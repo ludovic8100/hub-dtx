@@ -329,7 +329,7 @@ export default function BordereauxView() {
                   const hasBQT=type==="BQT+RCP"||type==="BQT"; const hasRCP=type==="BQT+RCP"||type==="RCP"
                   const ok=(!hasBQT||!!bqt)&&(!hasRCP||!!rcp)
                   const lien = b => b && (b.url_sharepoint || b.source)
-                  return <td key={m} style={{ ...D.td, textAlign:"center", background:ok?"#EAF7EC":"#FDECEA", padding:"3px 4px" }}>
+                  return <td key={m} style={{ ...D.td, textAlign:"center", background:"transparent", padding:"3px 4px" }}>
                     <span style={{ fontSize:13, fontWeight:800, display:"inline-flex", gap:7, justifyContent:"center" }}>
                       {hasBQT && (bqt
                         ? <a href={lien(bqt)||"#"} target="_blank" rel="noreferrer" title={`BQT — ${bqt.nom_fichier||""}${bqt.montant!=null?` · ${Number(bqt.montant).toLocaleString("fr-BE")} €`:""}`} style={{ color:C.ok, textDecoration:"none", cursor:"pointer" }}>B</a>
@@ -354,10 +354,10 @@ export default function BordereauxView() {
                     const enc = brioSet.has(brioKey(name, prod, mi))
                     return <td key={m} onClick={hasRCP ? (e) => { e.stopPropagation(); toggleBrio(name, prod, mi) } : undefined}
                       title={hasRCP ? ((cell ? ("payé: "+(paye?"oui":"non")+" · PDF: "+(rdoc?"oui":"non")+(cell.montant_paye?" · "+fmt(cell.montant_paye):"")) : "rien")+" — clic = encodé Brio") : undefined}
-                      style={{ ...D.td, textAlign:"center", padding:"2px 4px", cursor:hasRCP?"pointer":"default", background: enc ? C.ok : "transparent" }}>
+                      style={{ ...D.td, textAlign:"center", padding:"2px 4px", cursor:hasRCP?"pointer":"default", background: enc ? "#EAF7EC" : "transparent" }}>
                       <span style={{ fontSize:12, fontWeight:800, display:"inline-flex", gap:7, justifyContent:"center" }}>
-                        {hasBQT && <span title={bdoc?"BQT reçu":"BQT manquant"} style={{ color: enc ? "#fff" : (bdoc?C.ok:"#cbd5e1") }}>B</span>}
-                        {hasRCP && <span style={{ color: enc ? "#fff" : rcol }}>R</span>}
+                        {hasBQT && <span title={bdoc?"BQT reçu":"BQT manquant"} style={{ color: bdoc?C.ok:"#cbd5e1" }}>B</span>}
+                        {hasRCP && <span style={{ color: rcol }}>R</span>}
                       </span>
                     </td>
                   })}
