@@ -37,6 +37,20 @@ export default function BordereauxView() {
     }
     return m
   }, [matRows])
+  const [brioSet, setBrioSet] = useState(new Set())
+  const brioKey = (code, prod, mois) => `${code}|${prod}|${mois}`
+  const toggleBrio = async (code, prod, mois) => {
+    const key = brioKey(code, prod, mois)
+    const next = new Set(brioSet)
+    if (next.has(key)) {
+      next.delete(key)
+      await supabase.from("bordereaux_brio").delete().match({ code_comp:code, producteur:prod, mois, annee:2026 })
+    } else {
+      next.add(key)
+      await supabase.from("bordereaux_brio").insert({ code_comp:code, producteur:prod, mois, annee:2026 })
+    }
+    setBrioSet(next)
+  }
 
   useEffect(() => {
     const load = async () => {
@@ -62,6 +76,8 @@ export default function BordereauxView() {
         setQRows(qq)
         const mat = await fetchAll(() => supabase.from("v_matrice_rcp_2026").select("*"))
         setMatRows(mat)
+        const brio = await fetchAll(() => supabase.from("bordereaux_brio").select("*"))
+        setBrioSet(new Set((brio||[]).map(b => `${b.code_comp}|${b.producteur}|${b.mois}`)))
         // Défaut : dernier mois de l'année sélectionnée ayant des quittances (évite l'onglet vide)
         const moisDispo = {}
         qq.forEach(r => { if (r.date_comptable) { const d = new Date(r.date_comptable); if (String(d.getFullYear()) === filterAnnee) moisDispo[d.getMonth()+1] = true } })
@@ -271,7 +287,12 @@ export default function BordereauxView() {
             <div style={{ fontSize:12, color:C.textL }}>{Object.keys(idx).length} bordereau(x) en {filterAnnee}</div>
           </div>
           <div style={{ fontSize:11, color:C.textL }}>
-            <strong style={{ color:C.ok }}>B</strong> / <strong style={{ color:C.ok }}>R</strong> en vert = bordereau reçu (cliquer pour ouvrir le PDF) · <span style={{ color:"#cbd5e1", fontWeight:700 }}>B</span> / <span style={{ color:"#cbd5e1", fontWeight:700 }}>R</span> en gris = manquant
+            <span style={{ fontWeight:700, color:C.navy }}>Sous-lignes = producteurs. Lettre R : </span>
+            <span style={{ color:"#cbd5e1", fontWeight:800 }}>R</span> ni doc ni paiement&nbsp;·&nbsp;
+            <span style={{ color:"#111", fontWeight:800 }}>R</span> paiement, pas de PDF&nbsp;·&nbsp;
+            <span style={{ color:C.warn, fontWeight:800 }}>R</span> PDF, pas de paiement&nbsp;·&nbsp;
+            <span style={{ color:C.ok, fontWeight:800 }}>R</span> paiement + PDF&nbsp;·&nbsp;
+            <span style={{ background:C.ok, color:"#fff", fontWeight:700, padding:"1px 7px", borderRadius:4 }}>case verte = encodé dans Brio</span> (clique une case pour basculer)
           </div>
           {bordSearch.trim().length >= 2 && (
             <div style={{ marginTop:10, border:`1px solid ${C.border}`, borderRadius:8, maxHeight:280, overflowY:"auto" }}>
@@ -308,7 +329,7 @@ export default function BordereauxView() {
                   const hasBQT=type==="BQT+RCP"||type==="BQT"; const hasRCP=type==="BQT+RCP"||type==="RCP"
                   const ok=(!hasBQT||!!bqt)&&(!hasRCP||!!rcp)
                   const lien = b => b && (b.url_sharepoint || b.source)
-                  return <td key={m} style={{ ...D.td, textAlign:"center", background:ok?"#EAF7EC":"#FDECEA", padding:"6px 4px" }}>
+                  return <td key={m} style={{ ...D.td, textAlign:"center", background:ok?"#EAF7EC":"#FDECEA", padding:"3px 4px" }}>
                     <span style={{ fontSize:13, fontWeight:800, display:"inline-flex", gap:7, justifyContent:"center" }}>
                       {hasBQT && (bqt
                         ? <a href={lien(bqt)||"#"} target="_blank" rel="noreferrer" title={`BQT — ${bqt.nom_fichier||""}${bqt.montant!=null?` · ${Number(bqt.montant).toLocaleString("fr-BE")} €`:""}`} style={{ color:C.ok, textDecoration:"none", cursor:"pointer" }}>B</a>
@@ -325,14 +346,18 @@ export default function BordereauxView() {
                   <td style={{ ...D.td, paddingLeft:28, fontFamily:"monospace", fontSize:12, color:C.textM }}>{prod}</td>
                   <td style={D.td}></td>
                   {MOIS.map(m => {
-                    const cell = prods[prod][parseInt(m,10)]
+                    const mi = parseInt(m,10)
+                    const cell = prods[prod][mi]
                     const paye = !!(cell && cell.paye), rdoc = !!(cell && cell.rcp_doc), bdoc = !!(cell && cell.bqt_doc)
-                    const rcol = paye && rdoc ? C.ok : (paye && !rdoc ? C.warn : (!paye && rdoc ? C.danger : null))
+                    const rcol = paye && rdoc ? C.ok : (paye && !rdoc ? "#111" : (!paye && rdoc ? C.warn : "#cbd5e1"))
                     const hasRCP = type==="BQT+RCP"||type==="RCP"; const hasBQT = type==="BQT+RCP"||type==="BQT"
-                    return <td key={m} style={{ ...D.td, textAlign:"center", padding:"5px 4px", background: rcol ? rcol+"14" : "transparent" }}>
+                    const enc = brioSet.has(brioKey(name, prod, mi))
+                    return <td key={m} onClick={hasRCP ? (e) => { e.stopPropagation(); toggleBrio(name, prod, mi) } : undefined}
+                      title={hasRCP ? ((cell ? ("payé: "+(paye?"oui":"non")+" · PDF: "+(rdoc?"oui":"non")+(cell.montant_paye?" · "+fmt(cell.montant_paye):"")) : "rien")+" — clic = encodé Brio") : undefined}
+                      style={{ ...D.td, textAlign:"center", padding:"2px 4px", cursor:hasRCP?"pointer":"default", background: enc ? C.ok : "transparent" }}>
                       <span style={{ fontSize:12, fontWeight:800, display:"inline-flex", gap:7, justifyContent:"center" }}>
-                        {hasBQT && <span title={bdoc?"BQT reçu":"BQT manquant"} style={{ color: bdoc?C.ok:"#cbd5e1" }}>B</span>}
-                        {hasRCP && <span title={cell ? ("payé: "+(paye?"oui":"non")+" · bordereau: "+(rdoc?"oui":"non")+(cell.montant_paye?" · "+fmt(cell.montant_paye):"")) : "aucun"} style={{ color: rcol||"#cbd5e1" }}>R</span>}
+                        {hasBQT && <span title={bdoc?"BQT reçu":"BQT manquant"} style={{ color: enc ? "#fff" : (bdoc?C.ok:"#cbd5e1") }}>B</span>}
+                        {hasRCP && <span style={{ color: enc ? "#fff" : rcol }}>R</span>}
                       </span>
                     </td>
                   })}
