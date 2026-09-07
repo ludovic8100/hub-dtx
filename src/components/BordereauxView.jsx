@@ -51,6 +51,34 @@ export default function BordereauxView() {
     }
     setBrioSet(next)
   }
+  const [cies, setCies] = useState([])
+  const [prodRef, setProdRef] = useState([])
+  const normProd = (s) => { s = String(s||"").trim(); if (s === "3145235") return "145235"; return /^0*\d+$/.test(s) ? s.replace(/^0+/, "") : s }
+  const compAff = useMemo(() => {
+    const byId = {}; cies.forEach(c => byId[c.id] = c)
+    const prodsByCode = {}
+    prodRef.forEach(p => {
+      const c = byId[p.compagnie_id]; if (!c) return
+      const num = normProd(p.numero_producteur); if (!num) return
+      ;(prodsByCode[c.code] = prodsByCode[c.code] || new Set()).add(num)
+    })
+    Object.keys(matByComp).forEach(code => Object.keys(matByComp[code]).forEach(pr => (prodsByCode[code] = prodsByCode[code] || new Set()).add(pr)))
+    return cies.filter(c => c.attend_bqt || c.attend_rcp)
+      .map(c => ({ code:c.code, nom:c.nom, bqt:!!c.attend_bqt, rcp:!!c.attend_rcp, prods:[...(prodsByCode[c.code] || [])].sort() }))
+      .sort((a,b) => (a.nom||a.code||"").localeCompare(b.nom||b.code||""))
+  }, [cies, prodRef, matByComp])
+  const compStatus = (comp, mi, kind) => {
+    const cells = comp.prods.map(pr => (matByComp[comp.code]||{})[pr]?.[mi]).filter(Boolean)
+    if (kind === "rcp") {
+      const sig = cells.filter(c => c.paye || c.rcp_doc)
+      if (!sig.length) return null
+      return sig.filter(c => c.rcp_doc).length === sig.length ? C.ok : C.warn
+    }
+    const doc = cells.filter(c => c.bqt_doc).length
+    if (!doc) return null
+    const concern = comp.prods.filter(pr => Object.values((matByComp[comp.code]||{})[pr] || {}).some(x => x.bqt_doc)).length
+    return doc >= concern ? C.ok : C.warn
+  }
 
   useEffect(() => {
     const load = async () => {
@@ -78,6 +106,11 @@ export default function BordereauxView() {
         setMatRows(mat)
         const brio = await fetchAll(() => supabase.from("bordereaux_brio").select("*"))
         setBrioSet(new Set((brio||[]).map(b => `${b.code_comp}|${b.producteur}|${b.mois}`)))
+        const [cc, pp] = await Promise.all([
+          fetchAll(() => supabase.from("compagnies").select("id,code,nom,attend_bqt,attend_rcp,actif")),
+          fetchAll(() => supabase.from("producteurs").select("compagnie_id,numero_producteur,statut"))
+        ])
+        setCies(cc); setProdRef(pp)
         // Défaut : dernier mois de l'année sélectionnée ayant des quittances (évite l'onglet vide)
         const moisDispo = {}
         qq.forEach(r => { if (r.date_comptable) { const d = new Date(r.date_comptable); if (String(d.getFullYear()) === filterAnnee) moisDispo[d.getMonth()+1] = true } })
@@ -320,44 +353,40 @@ export default function BordereauxView() {
             <th style={D.th}>Compagnie</th><th style={D.th}>Type attendu</th>
             {MOIS.map(m => <th key={m} style={{ ...D.th, textAlign:"center" }}>{MOIS_L[m]}</th>)}
           </tr></thead><tbody>
-            {Object.entries(CIE_TYPES).map(([name, type]) => { const prods = matByComp[name]; const hasP = prods && Object.keys(prods).length; return [(
-              <tr key={name} style={hasP ? { cursor:"pointer" } : undefined} onClick={hasP ? () => setMatOpen(o => ({ ...o, [name]:!o[name] })) : undefined}>
-                <td style={{ ...D.td, fontWeight:700, color:C.navy }}>{hasP ? (matOpen[name] ? "▾ " : "▸ ") : ""}{name}</td>
-                <td style={D.td}><span style={D.badge(type==="RCP"?C.navyMid:C.cyanB)}>{type}</span></td>
+            {compAff.map(comp => {
+              const open = matOpen[comp.code] !== false
+              return [(
+              <tr key={comp.code} style={{ cursor:"pointer" }} onClick={() => setMatOpen(o => ({ ...o, [comp.code]: o[comp.code] === false }))}>
+                <td style={{ ...D.td, fontWeight:700, color:C.navy }}>{open ? "▾ " : "▸ "}{comp.nom || comp.code}</td>
+                <td style={D.td}><span style={D.badge(C.navyMid)}>{[comp.bqt?"BQT":null, comp.rcp?"RCP":null].filter(Boolean).join("+") || "—"}</span></td>
                 {MOIS.map(m => {
-                  const bqt=idx[`${norm(name)}-${m}-BQT`]; const rcp=idx[`${norm(name)}-${m}-RCP`]
-                  const hasBQT=type==="BQT+RCP"||type==="BQT"; const hasRCP=type==="BQT+RCP"||type==="RCP"
-                  const ok=(!hasBQT||!!bqt)&&(!hasRCP||!!rcp)
-                  const lien = b => b && (b.url_sharepoint || b.source)
-                  return <td key={m} style={{ ...D.td, textAlign:"center", background:"transparent", padding:"3px 4px" }}>
+                  const mi = parseInt(m,10)
+                  const rst = comp.rcp ? compStatus(comp, mi, "rcp") : undefined
+                  const bst = comp.bqt ? compStatus(comp, mi, "bqt") : undefined
+                  return <td key={m} style={{ ...D.td, textAlign:"center", padding:"3px 4px" }}>
                     <span style={{ fontSize:13, fontWeight:800, display:"inline-flex", gap:7, justifyContent:"center" }}>
-                      {hasBQT && (bqt
-                        ? <a href={lien(bqt)||"#"} target="_blank" rel="noreferrer" title={`BQT — ${bqt.nom_fichier||""}${bqt.montant!=null?` · ${Number(bqt.montant).toLocaleString("fr-BE")} €`:""}`} style={{ color:C.ok, textDecoration:"none", cursor:"pointer" }}>B</a>
-                        : <span title="BQT manquant" style={{ color:"#cbd5e1" }}>B</span>)}
-                      {hasRCP && (rcp
-                        ? <a href={lien(rcp)||"#"} target="_blank" rel="noreferrer" title={`RCP — ${rcp.nom_fichier||""}${rcp.montant!=null?` · ${Number(rcp.montant).toLocaleString("fr-BE")} €`:""}`} style={{ color:C.ok, textDecoration:"none", cursor:"pointer" }}>R</a>
-                        : <span title="RCP manquant" style={{ color:"#cbd5e1" }}>R</span>)}
+                      {comp.bqt && <span title="BQT — complétude" style={{ color: bst || "#cbd5e1" }}>B</span>}
+                      {comp.rcp && <span title="RCP — complétude" style={{ color: rst || "#cbd5e1" }}>R</span>}
                     </span>
                   </td>
                 })}
               </tr>),
-              ...(hasP && matOpen[name] ? Object.keys(prods).sort().map(prod => (
-                <tr key={name+"-"+prod} style={{ background:C.bg }}>
+              ...(open ? comp.prods.map(prod => (
+                <tr key={comp.code+"-"+prod} style={{ background:C.bg }}>
                   <td style={{ ...D.td, paddingLeft:28, fontFamily:"monospace", fontSize:12, color:C.textM }}>{prod}</td>
                   <td style={D.td}></td>
                   {MOIS.map(m => {
                     const mi = parseInt(m,10)
-                    const cell = prods[prod][mi]
+                    const cell = (matByComp[comp.code]||{})[prod]?.[mi]
                     const paye = !!(cell && cell.paye), rdoc = !!(cell && cell.rcp_doc), bdoc = !!(cell && cell.bqt_doc)
                     const rcol = paye && rdoc ? C.ok : (paye && !rdoc ? "#111" : (!paye && rdoc ? C.warn : "#cbd5e1"))
-                    const hasRCP = type==="BQT+RCP"||type==="RCP"; const hasBQT = type==="BQT+RCP"||type==="BQT"
-                    const enc = brioSet.has(brioKey(name, prod, mi))
-                    return <td key={m} onClick={hasRCP ? (e) => { e.stopPropagation(); toggleBrio(name, prod, mi) } : undefined}
-                      title={hasRCP ? ((cell ? ("payé: "+(paye?"oui":"non")+" · PDF: "+(rdoc?"oui":"non")+(cell.montant_paye?" · "+fmt(cell.montant_paye):"")) : "rien")+" — clic = encodé Brio") : undefined}
-                      style={{ ...D.td, textAlign:"center", padding:"2px 4px", cursor:hasRCP?"pointer":"default", background: enc ? "#EAF7EC" : "transparent" }}>
+                    const enc = brioSet.has(brioKey(comp.code, prod, mi))
+                    return <td key={m} onClick={comp.rcp ? (e) => { e.stopPropagation(); toggleBrio(comp.code, prod, mi) } : undefined}
+                      title={comp.rcp ? ((cell ? ("payé: "+(paye?"oui":"non")+" · PDF: "+(rdoc?"oui":"non")+(cell.montant_paye?" · "+fmt(cell.montant_paye):"")) : "rien")+" — clic = encodé Brio") : undefined}
+                      style={{ ...D.td, textAlign:"center", padding:"2px 4px", cursor:comp.rcp?"pointer":"default", background: enc ? "#EAF7EC" : "transparent" }}>
                       <span style={{ fontSize:12, fontWeight:800, display:"inline-flex", gap:7, justifyContent:"center" }}>
-                        {hasBQT && <span title={bdoc?"BQT reçu":"BQT manquant"} style={{ color: bdoc?C.ok:"#cbd5e1" }}>B</span>}
-                        {hasRCP && <span style={{ color: rcol }}>R</span>}
+                        {comp.bqt && <span title={bdoc?"BQT reçu":"BQT manquant"} style={{ color: bdoc?C.ok:"#cbd5e1" }}>B</span>}
+                        {comp.rcp && <span style={{ color: rcol }}>R</span>}
                       </span>
                     </td>
                   })}
