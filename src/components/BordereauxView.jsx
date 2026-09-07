@@ -26,19 +26,17 @@ export default function BordereauxView() {
   const [filterMois, setFilterMois] = useState(String(new Date().getMonth()+1))
   const [filterAnnee, setFilterAnnee] = useState("2026")
   const [bordSearch, setBordSearch] = useState("")
-  const [rccRows, setRccRows] = useState([])
-  const [rccOpen, setRccOpen] = useState({})
-  const rccAgg = useMemo(() => {
+  const [matRows, setMatRows] = useState([])
+  const [matOpen, setMatOpen] = useState({})
+  const matByComp = useMemo(() => {
     const m = {}
-    for (const r of rccRows) {
-      const k = r.code_comp || "?"
-      if (!m[k]) m[k] = { code:k, vert:0, orange:0, rouge:0, total:0, lignes:[] }
-      m[k][r.statut] = (m[k][r.statut] || 0) + 1
-      m[k].total++
-      m[k].lignes.push(r)
+    for (const r of matRows) {
+      if (!m[r.code_comp]) m[r.code_comp] = {}
+      if (!m[r.code_comp][r.producteur]) m[r.code_comp][r.producteur] = {}
+      m[r.code_comp][r.producteur][r.mois] = { paye:r.paye, rcp_doc:r.rcp_doc, bqt_doc:r.bqt_doc, montant_paye:r.montant_paye }
     }
-    return Object.values(m).sort((a,b) => b.total - a.total)
-  }, [rccRows])
+    return m
+  }, [matRows])
 
   useEffect(() => {
     const load = async () => {
@@ -62,8 +60,8 @@ export default function BordereauxView() {
         setBRows(b)
         const qq = await fetchAll(() => supabase.from("quittances").select("compagnie,date_comptable,prime_totale,commission,commission_sa,sous_agent,compte_producteur"))
         setQRows(qq)
-        const rcc = await fetchAll(() => supabase.from("v_rapprochement_rcp_2026").select("*"))
-        setRccRows(rcc)
+        const mat = await fetchAll(() => supabase.from("v_matrice_rcp_2026").select("*"))
+        setMatRows(mat)
         // Défaut : dernier mois de l'année sélectionnée ayant des quittances (évite l'onglet vide)
         const moisDispo = {}
         qq.forEach(r => { if (r.date_comptable) { const d = new Date(r.date_comptable); if (String(d.getFullYear()) === filterAnnee) moisDispo[d.getMonth()+1] = true } })
@@ -196,68 +194,9 @@ export default function BordereauxView() {
     <div style={{ fontFamily:"'Source Sans Pro', sans-serif" }}>
       {/* Onglets */}
       <div style={{ display:"flex", gap:8, marginBottom:16, alignItems:"center", flexWrap:"wrap" }}>
-        {[["quittances","💰 Quittances réelles"],["matrice","📊 Matrice BQT/RCP"],["reconciliation","🔗 Réconciliation"],["commissions","💶 Commissions RCP 2026"],["alertes",`⚠ Alertes (${alertes.length})`]].map(([k,l]) =>
+        {[["quittances","💰 Quittances réelles"],["matrice","📊 Matrice BQT/RCP"],["reconciliation","🔗 Réconciliation"],["alertes",`⚠ Alertes (${alertes.length})`]].map(([k,l]) =>
           <button key={k} style={D.btn(view===k?"primary":"ghost")} onClick={() => setView(k)}>{l}</button>)}
       </div>
-
-      {/* Commissions RCP 2026 — rapprochement paiements banque ↔ bordereaux */}
-      {view === "commissions" && <div>
-        <div style={D.alertBox("warn")}>
-          ⚠ Aperçu 2026. Pour les compagnies qui ne mettent pas le mois dans la communication (P&V, AXA, Baloise, DKV, Allianz…), la période est <b>déduite</b> du versement — certains oranges/rouges peuvent être un décalage d'un mois, pas un vrai manque.
-        </div>
-        {(() => {
-          const tot = rccRows.reduce((a,r) => { a[r.statut] = (a[r.statut]||0)+1; return a }, {})
-          const kpis = [["VERT · payé + bordereau", tot.vert||0, C.ok],["ORANGE · payé, sans bordereau", tot.orange||0, C.warn],["ROUGE · bordereau, sans paiement", tot.rouge||0, C.danger]]
-          return <div style={{ display:"flex", gap:10, margin:"12px 0 16px", flexWrap:"wrap" }}>
-            {kpis.map(([t,v,c]) => <div key={t} style={{ ...D.kpi, minWidth:200 }}>
-              <div style={{ fontSize:11, color:C.textL, fontWeight:700 }}>{t}</div>
-              <div style={{ fontSize:26, fontWeight:800, color:c }}>{v}</div>
-            </div>)}
-          </div>
-        })()}
-        <div style={D.card}>
-          <div style={D.cardTitle}>Rapprochement commissions RCP — 2026 (clique une compagnie pour le détail)</div>
-          {rccAgg.length === 0 ? <div style={{ fontSize:13, color:C.textL }}>Aucune donnée.</div> :
-          <table style={D.table}>
-            <thead><tr style={{ background:C.bg }}>
-              <th style={D.th}>Compagnie</th>
-              <th style={{ ...D.th, textAlign:"center" }}>Vert</th>
-              <th style={{ ...D.th, textAlign:"center" }}>Orange</th>
-              <th style={{ ...D.th, textAlign:"center" }}>Rouge</th>
-              <th style={{ ...D.th, textAlign:"center" }}>Total</th>
-            </tr></thead>
-            <tbody>
-              {rccAgg.map(c => [
-                <tr key={c.code} style={{ cursor:"pointer" }} onClick={() => setRccOpen(o => ({ ...o, [c.code]: !o[c.code] }))}>
-                  <td style={{ ...D.td, fontWeight:600, color:C.navy }}>{rccOpen[c.code] ? "▾" : "▸"} {c.code}</td>
-                  <td style={{ ...D.td, textAlign:"center", color:C.ok, fontWeight:700 }}>{c.vert}</td>
-                  <td style={{ ...D.td, textAlign:"center", color:C.warn, fontWeight:700 }}>{c.orange}</td>
-                  <td style={{ ...D.td, textAlign:"center", color:C.danger, fontWeight:700 }}>{c.rouge}</td>
-                  <td style={{ ...D.td, textAlign:"center", fontWeight:600 }}>{c.total}</td>
-                </tr>,
-                rccOpen[c.code] && <tr key={c.code+"-d"}><td colSpan={5} style={{ padding:0, background:C.bg }}>
-                  <table style={{ ...D.table, margin:0 }}>
-                    <thead><tr>
-                      <th style={D.th}>Producteur</th><th style={D.th}>Période</th><th style={D.th}>Statut</th><th style={{ ...D.th, textAlign:"right" }}>Montant payé</th>
-                    </tr></thead>
-                    <tbody>
-                      {c.lignes.slice().sort((a,b) => (a.periode||"").localeCompare(b.periode||"") || (a.producteur||"").localeCompare(b.producteur||"")).map((r,i) => (
-                        <tr key={i}>
-                          <td style={{ ...D.td, fontFamily:"monospace" }}>{r.producteur || "—"}</td>
-                          <td style={D.td}>{r.periode || "—"}</td>
-                          <td style={D.td}><span style={D.badge(r.statut==="vert"?C.ok:r.statut==="orange"?C.warn:C.danger)}>{r.statut}</span></td>
-                          <td style={{ ...D.td, textAlign:"right", fontVariantNumeric:"tabular-nums" }}>{r.montant_paye ? fmt(r.montant_paye) : "—"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </td></tr>
-              ])}
-            </tbody>
-          </table>}
-        </div>
-      </div>}
-
       {/* Quittances réelles */}
       {view === "quittances" && <div>
         <div style={{ ...D.card, padding:"12px 18px", marginBottom:12 }}>
@@ -360,9 +299,9 @@ export default function BordereauxView() {
             <th style={D.th}>Compagnie</th><th style={D.th}>Type attendu</th>
             {MOIS.map(m => <th key={m} style={{ ...D.th, textAlign:"center" }}>{MOIS_L[m]}</th>)}
           </tr></thead><tbody>
-            {Object.entries(CIE_TYPES).map(([name, type]) => (
-              <tr key={name}>
-                <td style={{ ...D.td, fontWeight:700, color:C.navy }}>{name}</td>
+            {Object.entries(CIE_TYPES).map(([name, type]) => { const prods = matByComp[name]; const hasP = prods && Object.keys(prods).length; return [(
+              <tr key={name} style={hasP ? { cursor:"pointer" } : undefined} onClick={hasP ? () => setMatOpen(o => ({ ...o, [name]:!o[name] })) : undefined}>
+                <td style={{ ...D.td, fontWeight:700, color:C.navy }}>{hasP ? (matOpen[name] ? "▾ " : "▸ ") : ""}{name}</td>
                 <td style={D.td}><span style={D.badge(type==="RCP"?C.navyMid:C.cyanB)}>{type}</span></td>
                 {MOIS.map(m => {
                   const bqt=idx[`${norm(name)}-${m}-BQT`]; const rcp=idx[`${norm(name)}-${m}-RCP`]
@@ -380,8 +319,26 @@ export default function BordereauxView() {
                     </span>
                   </td>
                 })}
-              </tr>
-            ))}
+              </tr>),
+              ...(hasP && matOpen[name] ? Object.keys(prods).sort().map(prod => (
+                <tr key={name+"-"+prod} style={{ background:C.bg }}>
+                  <td style={{ ...D.td, paddingLeft:28, fontFamily:"monospace", fontSize:12, color:C.textM }}>{prod}</td>
+                  <td style={D.td}></td>
+                  {MOIS.map(m => {
+                    const cell = prods[prod][parseInt(m,10)]
+                    const paye = !!(cell && cell.paye), rdoc = !!(cell && cell.rcp_doc), bdoc = !!(cell && cell.bqt_doc)
+                    const rcol = paye && rdoc ? C.ok : (paye && !rdoc ? C.warn : (!paye && rdoc ? C.danger : null))
+                    const hasRCP = type==="BQT+RCP"||type==="RCP"; const hasBQT = type==="BQT+RCP"||type==="BQT"
+                    return <td key={m} style={{ ...D.td, textAlign:"center", padding:"5px 4px", background: rcol ? rcol+"14" : "transparent" }}>
+                      <span style={{ fontSize:12, fontWeight:800, display:"inline-flex", gap:7, justifyContent:"center" }}>
+                        {hasBQT && <span title={bdoc?"BQT reçu":"BQT manquant"} style={{ color: bdoc?C.ok:"#cbd5e1" }}>B</span>}
+                        {hasRCP && <span title={cell ? ("payé: "+(paye?"oui":"non")+" · bordereau: "+(rdoc?"oui":"non")+(cell.montant_paye?" · "+fmt(cell.montant_paye):"")) : "aucun"} style={{ color: rcol||"#cbd5e1" }}>R</span>}
+                      </span>
+                    </td>
+                  })}
+                </tr>
+              )) : [])
+            ]})}
           </tbody></table>
         </div></div>
       </div>}
