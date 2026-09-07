@@ -6,6 +6,7 @@ import { useAuth } from '../../lib/auth'
 import { bootstrapConfigs } from '../../lib/bootstrapConfigs'
 import GestionCategories from './GestionCategories'
 import { RdvCategoriesPanel } from '../admin/RdvCategories'
+import ActeursMetierPanel from './ActeursMetierPanel'
 
 // ─── Définition des accès par société (colonnes réelles de user_permissions) ───
 const ACCES = [
@@ -216,7 +217,7 @@ export default function ConfigModule() {
     return true
   }).sort((a, b) => (a.nom || a.user_email || '').localeCompare(b.nom || b.user_email || '', 'fr', { sensitivity: 'base' }))
 
-  const TABS = [['societes', '🏢 Sociétés'], ['documents', '📄 Documents'], ['users', '👥 Utilisateurs & accès'], ['categories', '🏷️ Catégories compta'], ['categoriesrdv', '📅 Catégories RDV']]
+  const TABS = [['societes', '🏢 Sociétés'], ['documents', '📄 Documents'], ['users', '👥 Utilisateurs & accès'], ['acteurs', '🧑‍💼 Acteurs métier'], ['categories', '🏷️ Catégories compta'], ['categoriesrdv', '📅 Catégories RDV']]
 
   return (
     <Layout currentPage="Configuration">
@@ -236,6 +237,8 @@ export default function ConfigModule() {
         {tab === 'categories' && <GestionCategories />}
 
         {tab === 'categoriesrdv' && <RdvCategoriesPanel />}
+
+        {tab === 'acteurs' && <ActeursMetierPanel />}
 
         {/* ─────────── SOCIÉTÉS & DOCUMENTS ─────────── */}
         {(tab === 'societes' || tab === 'documents') && !loading && (
