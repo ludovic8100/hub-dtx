@@ -26,6 +26,19 @@ export default function BordereauxView() {
   const [filterMois, setFilterMois] = useState(String(new Date().getMonth()+1))
   const [filterAnnee, setFilterAnnee] = useState("2026")
   const [bordSearch, setBordSearch] = useState("")
+  const [rccRows, setRccRows] = useState([])
+  const [rccOpen, setRccOpen] = useState({})
+  const rccAgg = useMemo(() => {
+    const m = {}
+    for (const r of rccRows) {
+      const k = r.code_comp || "?"
+      if (!m[k]) m[k] = { code:k, vert:0, orange:0, rouge:0, total:0, lignes:[] }
+      m[k][r.statut] = (m[k][r.statut] || 0) + 1
+      m[k].total++
+      m[k].lignes.push(r)
+    }
+    return Object.values(m).sort((a,b) => b.total - a.total)
+  }, [rccRows])
 
   useEffect(() => {
     const load = async () => {
@@ -49,6 +62,8 @@ export default function BordereauxView() {
         setBRows(b)
         const qq = await fetchAll(() => supabase.from("quittances").select("compagnie,date_comptable,prime_totale,commission,commission_sa,sous_agent,compte_producteur"))
         setQRows(qq)
+        const rcc = await fetchAll(() => supabase.from("v_rapprochement_rcp_2026").select("*"))
+        setRccRows(rcc)
         // Défaut : dernier mois de l'année sélectionnée ayant des quittances (évite l'onglet vide)
         const moisDispo = {}
         qq.forEach(r => { if (r.date_comptable) { const d = new Date(r.date_comptable); if (String(d.getFullYear()) === filterAnnee) moisDispo[d.getMonth()+1] = true } })
@@ -181,9 +196,67 @@ export default function BordereauxView() {
     <div style={{ fontFamily:"'Source Sans Pro', sans-serif" }}>
       {/* Onglets */}
       <div style={{ display:"flex", gap:8, marginBottom:16, alignItems:"center", flexWrap:"wrap" }}>
-        {[["quittances","💰 Quittances réelles"],["matrice","📊 Matrice BQT/RCP"],["reconciliation","🔗 Réconciliation"],["alertes",`⚠ Alertes (${alertes.length})`]].map(([k,l]) =>
+        {[["quittances","💰 Quittances réelles"],["matrice","📊 Matrice BQT/RCP"],["reconciliation","🔗 Réconciliation"],["commissions","💶 Commissions RCP 2026"],["alertes",`⚠ Alertes (${alertes.length})`]].map(([k,l]) =>
           <button key={k} style={D.btn(view===k?"primary":"ghost")} onClick={() => setView(k)}>{l}</button>)}
       </div>
+
+      {/* Commissions RCP 2026 — rapprochement paiements banque ↔ bordereaux */}
+      {view === "commissions" && <div>
+        <div style={D.alertBox("warn")}>
+          ⚠ Aperçu 2026. Pour les compagnies qui ne mettent pas le mois dans la communication (P&V, AXA, Baloise, DKV, Allianz…), la période est <b>déduite</b> du versement — certains oranges/rouges peuvent être un décalage d'un mois, pas un vrai manque.
+        </div>
+        {(() => {
+          const tot = rccRows.reduce((a,r) => { a[r.statut] = (a[r.statut]||0)+1; return a }, {})
+          const kpis = [["VERT · payé + bordereau", tot.vert||0, C.ok],["ORANGE · payé, sans bordereau", tot.orange||0, C.warn],["ROUGE · bordereau, sans paiement", tot.rouge||0, C.danger]]
+          return <div style={{ display:"flex", gap:10, margin:"12px 0 16px", flexWrap:"wrap" }}>
+            {kpis.map(([t,v,c]) => <div key={t} style={{ ...D.kpi, minWidth:200 }}>
+              <div style={{ fontSize:11, color:C.textL, fontWeight:700 }}>{t}</div>
+              <div style={{ fontSize:26, fontWeight:800, color:c }}>{v}</div>
+            </div>)}
+          </div>
+        })()}
+        <div style={D.card}>
+          <div style={D.cardTitle}>Rapprochement commissions RCP — 2026 (clique une compagnie pour le détail)</div>
+          {rccAgg.length === 0 ? <div style={{ fontSize:13, color:C.textL }}>Aucune donnée.</div> :
+          <table style={D.table}>
+            <thead><tr style={{ background:C.bg }}>
+              <th style={D.th}>Compagnie</th>
+              <th style={{ ...D.th, textAlign:"center" }}>Vert</th>
+              <th style={{ ...D.th, textAlign:"center" }}>Orange</th>
+              <th style={{ ...D.th, textAlign:"center" }}>Rouge</th>
+              <th style={{ ...D.th, textAlign:"center" }}>Total</th>
+            </tr></thead>
+            <tbody>
+              {rccAgg.map(c => [
+                <tr key={c.code} style={{ cursor:"pointer" }} onClick={() => setRccOpen(o => ({ ...o, [c.code]: !o[c.code] }))}>
+                  <td style={{ ...D.td, fontWeight:600, color:C.navy }}>{rccOpen[c.code] ? "▾" : "▸"} {c.code}</td>
+                  <td style={{ ...D.td, textAlign:"center", color:C.ok, fontWeight:700 }}>{c.vert}</td>
+                  <td style={{ ...D.td, textAlign:"center", color:C.warn, fontWeight:700 }}>{c.orange}</td>
+                  <td style={{ ...D.td, textAlign:"center", color:C.danger, fontWeight:700 }}>{c.rouge}</td>
+                  <td style={{ ...D.td, textAlign:"center", fontWeight:600 }}>{c.total}</td>
+                </tr>,
+                rccOpen[c.code] && <tr key={c.code+"-d"}><td colSpan={5} style={{ padding:0, background:C.bg }}>
+                  <table style={{ ...D.table, margin:0 }}>
+                    <thead><tr>
+                      <th style={D.th}>Producteur</th><th style={D.th}>Période</th><th style={D.th}>Statut</th><th style={{ ...D.th, textAlign:"right" }}>Montant payé</th>
+                    </tr></thead>
+                    <tbody>
+                      {c.lignes.slice().sort((a,b) => (a.periode||"").localeCompare(b.periode||"") || (a.producteur||"").localeCompare(b.producteur||"")).map((r,i) => (
+                        <tr key={i}>
+                          <td style={{ ...D.td, fontFamily:"monospace" }}>{r.producteur || "—"}</td>
+                          <td style={D.td}>{r.periode || "—"}</td>
+                          <td style={D.td}><span style={D.badge(r.statut==="vert"?C.ok:r.statut==="orange"?C.warn:C.danger)}>{r.statut}</span></td>
+                          <td style={{ ...D.td, textAlign:"right", fontVariantNumeric:"tabular-nums" }}>{r.montant_paye ? fmt(r.montant_paye) : "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </td></tr>
+              ])}
+            </tbody>
+          </table>}
+        </div>
+      </div>}
 
       {/* Quittances réelles */}
       {view === "quittances" && <div>
