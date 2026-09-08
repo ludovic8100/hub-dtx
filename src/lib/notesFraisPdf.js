@@ -1,12 +1,11 @@
 // Génération de la pièce PDF d'une note de frais validée (client, jsPDF).
 // Design aligné sur la maquette validée : en-tête coloré + logo, tableau,
 // totaux, encart remboursement avec QR de paiement SEPA (EPC), annexe justificatifs.
-import { jsPDF } from 'jspdf'
-import QRCode from 'qrcode'
 import { fmtIban, ibanEspace, epcPayload } from './epc'
 import { ENTITES } from './entites'
 import { supabase } from './supabase'
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
+// Libs lourdes (jspdf, pdf-lib, qrcode ≈ 800 kB) chargées dynamiquement au moment
+// de la génération, pour ne pas alourdir le chunk de la page qui importe ce module.
 
 const W = 595.28, H = 841.89, MX = 44, RX = W - 44, CW = RX - MX
 const GREY = [100, 116, 139], DGREY = [30, 41, 59], MGREY = [71, 85, 105]
@@ -53,6 +52,9 @@ function truncate(doc, txt, maxw) {
  * @returns {Promise<Blob>}
  */
 export async function genererPdfNote({ entiteKey = 'dynassur', note = {}, lignes = [], benefNom = '', benefIban = '', sigImage = '', sigNom = '', sigAt = null, valideParNom = '', valideAt = null }) {
+  const { jsPDF } = await import('jspdf')
+  const QRCode = (await import('qrcode')).default
+  const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib')
   const ent = ENTITES[entiteKey] || ENTITES.dynassur
   const showTVA = entiteKey === 'lode'  // Seul LODE affiche TVA/HT
   const COL = hx(ent.color), DARK = hx(ent.colorDark || ent.color)
