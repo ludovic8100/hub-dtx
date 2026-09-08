@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 
 // Types de travail pour les taux de commission/rétrocession
-const TYPES_TRAVAIL = ['Non-Vie', 'Vie', 'Santé', 'Crédit', 'PJ']
+const TYPES_TRAVAIL = ['Non-Vie', 'Vie', 'Santé', 'Crédit', 'SRDU', 'PJ']
 
 const CATS = [
   { key: 'employe',   label: 'Employés',    color: '#0080BD', test: c => c.est_commercial || c.est_gestionnaire },
