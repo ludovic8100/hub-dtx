@@ -1,5 +1,6 @@
 import { useState, useEffect, Component } from 'react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../lib/auth'
 
 const C = {
   blue: '#0080BD', blueDark: '#005f8e', bluePale: '#e8f4fb',
@@ -434,6 +435,7 @@ export default function ObjectifsView() {
   const [detail, setDetail] = useState(null)   // { titre, kind, rows }
   const [loading, setLoading] = useState(true)
   const onDetail = (titre, kind, rows) => setDetail({ titre, kind, rows })
+  const { isAdmin } = useAuth()
 
   const ONGLETS = [
     { key: 'commerciaux', label: 'Commerciaux', icon: 'ti-target' },
@@ -572,6 +574,14 @@ export default function ObjectifsView() {
     }
     load()
   }, [])
+
+  if (!isAdmin) return (
+    <div style={{ padding: 40, textAlign: 'center', color: C.textM, fontFamily: "'Source Sans Pro', sans-serif" }}>
+      <i className="ti ti-lock" style={{ fontSize: 32, color: C.textL, display: 'block', marginBottom: 12 }} />
+      <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Accès réservé aux administrateurs</div>
+      <div style={{ fontSize: 13, marginTop: 4 }}>Les objectifs et les commissions par producteur ne sont visibles que par un administrateur.</div>
+    </div>
+  )
 
   return (
     <div style={{ fontFamily: "'Source Sans Pro', sans-serif", padding: 0 }}>
