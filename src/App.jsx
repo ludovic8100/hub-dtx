@@ -1,67 +1,71 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/auth'
 
+// Chargées immédiatement (chemin non-authentifié, très légères)
 import Login              from './pages/Login'
 import AuthCallback       from './pages/AuthCallback'
 import AccessDenied       from './pages/AccessDenied'
-import SyncCenter         from './pages/admin/SyncCenter'
-import RdvCategories      from './pages/admin/RdvCategories'
-import LiensCasses       from './pages/admin/LiensCasses'
-import AdminNotesFrais    from './pages/admin/AdminNotesFrais'
 
-import DashboardGroupe    from './pages/groupe/DashboardGroupe'
+// Tout le reste : code-splitting — chaque page devient un chunk chargé à la demande
+const SyncCenter          = lazy(() => import('./pages/admin/SyncCenter'))
+const RdvCategories       = lazy(() => import('./pages/admin/RdvCategories'))
+const LiensCasses         = lazy(() => import('./pages/admin/LiensCasses'))
+const AdminNotesFrais     = lazy(() => import('./pages/admin/AdminNotesFrais'))
 
-import DashboardDynassur   from './pages/dynassur/DashboardDynassur'
-import Tickets             from './pages/Tickets'
-import DynassurTaches      from './pages/dynassur/DynassurTaches'
-import DtxTaches           from './pages/dtx/DtxTaches'
-import LodeTaches          from './pages/lode/LodeTaches'
-import HexagroupTaches     from './pages/hexagroup/HexagroupTaches'
-import PriveTaches         from './pages/prive/PriveTaches'
-import GroupeTaches        from './pages/groupe/GroupeTaches'
-import DynassurClients     from './pages/dynassur/DynassurClients'
-import DynassurProduction  from './pages/dynassur/DynassurProduction'
-import DynassurBordereaux  from './pages/dynassur/DynassurBordereaux'
-import DynassurChiffres    from './pages/dynassur/DynassurChiffres'
-import DynassurObjectifs   from './pages/dynassur/DynassurObjectifs'
-import DynassurCompagnies  from './pages/dynassur/DynassurCompagnies'
-import DynassurSinistres   from './pages/dynassur/DynassurSinistres'
-import DynassurBanque      from './pages/dynassur/DynassurBanque'
-import DynassurComptabilite from './pages/dynassur/DynassurComptabilite'
-import DynassurRentabilite from './pages/dynassur/DynassurRentabilite'
-import DynassurCredits     from './pages/dynassur/DynassurCredits'
-import DynassurRdv         from './pages/dynassur/DynassurRdv'
-import DynassurAppels      from './pages/dynassur/DynassurAppels'
+const DashboardGroupe     = lazy(() => import('./pages/groupe/DashboardGroupe'))
 
-import DashboardDtx       from './pages/dtx/DashboardDtx'
-import DtxImmobilier      from './pages/dtx/DtxImmobilier'
-import DtxVehicules       from './pages/dtx/DtxVehicules'
-import DtxTrading         from './pages/dtx/DtxTrading'
-import DtxComptabilite    from './pages/dtx/DtxComptabilite'
+const DashboardDynassur   = lazy(() => import('./pages/dynassur/DashboardDynassur'))
+const Tickets             = lazy(() => import('./pages/Tickets'))
+const DynassurTaches      = lazy(() => import('./pages/dynassur/DynassurTaches'))
+const DtxTaches           = lazy(() => import('./pages/dtx/DtxTaches'))
+const LodeTaches          = lazy(() => import('./pages/lode/LodeTaches'))
+const HexagroupTaches     = lazy(() => import('./pages/hexagroup/HexagroupTaches'))
+const PriveTaches         = lazy(() => import('./pages/prive/PriveTaches'))
+const GroupeTaches        = lazy(() => import('./pages/groupe/GroupeTaches'))
+const DynassurClients     = lazy(() => import('./pages/dynassur/DynassurClients'))
+const DynassurProduction  = lazy(() => import('./pages/dynassur/DynassurProduction'))
+const DynassurBordereaux  = lazy(() => import('./pages/dynassur/DynassurBordereaux'))
+const DynassurChiffres    = lazy(() => import('./pages/dynassur/DynassurChiffres'))
+const DynassurObjectifs   = lazy(() => import('./pages/dynassur/DynassurObjectifs'))
+const DynassurCompagnies  = lazy(() => import('./pages/dynassur/DynassurCompagnies'))
+const DynassurSinistres   = lazy(() => import('./pages/dynassur/DynassurSinistres'))
+const DynassurBanque      = lazy(() => import('./pages/dynassur/DynassurBanque'))
+const DynassurComptabilite= lazy(() => import('./pages/dynassur/DynassurComptabilite'))
+const DynassurRentabilite = lazy(() => import('./pages/dynassur/DynassurRentabilite'))
+const DynassurCredits     = lazy(() => import('./pages/dynassur/DynassurCredits'))
+const DynassurRdv         = lazy(() => import('./pages/dynassur/DynassurRdv'))
+const DynassurAppels      = lazy(() => import('./pages/dynassur/DynassurAppels'))
 
-import DashboardLode      from './pages/lode/DashboardLode'
-import LodeClients        from './pages/lode/LodeClients'
-import LodeBanque         from './pages/lode/LodeBanque'
-import LodeComptabilite   from './pages/lode/LodeComptabilite'
-import LodeDevisFactures  from './pages/lode/LodeDevisFactures'
-import DtxDevisFactures   from './pages/dtx/DtxDevisFactures'
-import DynDevisFactures   from './pages/dyn/DynDevisFactures'
-import ConfigModule       from './pages/config/ConfigModule'
-import LodeDevisAccept    from './pages/lode/LodeDevisAccept'
+const DashboardDtx        = lazy(() => import('./pages/dtx/DashboardDtx'))
+const DtxImmobilier       = lazy(() => import('./pages/dtx/DtxImmobilier'))
+const DtxVehicules        = lazy(() => import('./pages/dtx/DtxVehicules'))
+const DtxTrading          = lazy(() => import('./pages/dtx/DtxTrading'))
+const DtxComptabilite     = lazy(() => import('./pages/dtx/DtxComptabilite'))
 
-import DashboardHexagroup  from './pages/hexagroup/DashboardHexagroup'
-import HexagroupBanque     from './pages/hexagroup/HexagroupBanque'
-import HexagroupComptabilite from './pages/hexagroup/HexagroupComptabilite'
+const DashboardLode       = lazy(() => import('./pages/lode/DashboardLode'))
+const LodeClients         = lazy(() => import('./pages/lode/LodeClients'))
+const LodeBanque          = lazy(() => import('./pages/lode/LodeBanque'))
+const LodeComptabilite    = lazy(() => import('./pages/lode/LodeComptabilite'))
+const LodeDevisFactures   = lazy(() => import('./pages/lode/LodeDevisFactures'))
+const DtxDevisFactures    = lazy(() => import('./pages/dtx/DtxDevisFactures'))
+const DynDevisFactures    = lazy(() => import('./pages/dyn/DynDevisFactures'))
+const ConfigModule        = lazy(() => import('./pages/config/ConfigModule'))
+const LodeDevisAccept     = lazy(() => import('./pages/lode/LodeDevisAccept'))
 
-import DashboardPrive     from './pages/prive/DashboardPrive'
-import PriveBanque        from './pages/prive/PriveBanque'
-import PriveComptabilite  from './pages/prive/PriveComptabilite'
-import DynassurNotesFrais  from './pages/dynassur/DynassurNotesFrais'
-import DtxNotesFrais        from './pages/dtx/DtxNotesFrais'
-import LodeNotesFrais       from './pages/lode/LodeNotesFrais'
-import HexagroupNotesFrais  from './pages/hexagroup/HexagroupNotesFrais'
-import PriveNotesFrais      from './pages/prive/PriveNotesFrais'
-import GroupeNotesFrais     from './pages/groupe/GroupeNotesFrais'
+const DashboardHexagroup  = lazy(() => import('./pages/hexagroup/DashboardHexagroup'))
+const HexagroupBanque     = lazy(() => import('./pages/hexagroup/HexagroupBanque'))
+const HexagroupComptabilite = lazy(() => import('./pages/hexagroup/HexagroupComptabilite'))
+
+const DashboardPrive      = lazy(() => import('./pages/prive/DashboardPrive'))
+const PriveBanque         = lazy(() => import('./pages/prive/PriveBanque'))
+const PriveComptabilite   = lazy(() => import('./pages/prive/PriveComptabilite'))
+const DynassurNotesFrais  = lazy(() => import('./pages/dynassur/DynassurNotesFrais'))
+const DtxNotesFrais       = lazy(() => import('./pages/dtx/DtxNotesFrais'))
+const LodeNotesFrais      = lazy(() => import('./pages/lode/LodeNotesFrais'))
+const HexagroupNotesFrais = lazy(() => import('./pages/hexagroup/HexagroupNotesFrais'))
+const PriveNotesFrais     = lazy(() => import('./pages/prive/PriveNotesFrais'))
+const GroupeNotesFrais    = lazy(() => import('./pages/groupe/GroupeNotesFrais'))
 
 function ProtectedRoute({ children, requireAdmin = false, need = null }) {
   const { user, perms, loading } = useAuth()
@@ -89,6 +93,16 @@ function RootRedirect() {
   return <Navigate to={routes[activeSociete] || '/dynassur'} replace />
 }
 
+// Fallback affiché pendant le chargement d'un chunk de page
+function PageLoader() {
+  return (
+    <div style={{ minHeight:'60vh', display:'flex', alignItems:'center', justifyContent:'center' }}>
+      <div style={{ width:'34px', height:'34px', border:'3px solid rgba(13,47,94,0.15)', borderTopColor:'#0D2F5E', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  )
+}
+
 const P = ({ children, need }) => <ProtectedRoute need={need}>{children}</ProtectedRoute>
 const A = ({ children }) => <ProtectedRoute requireAdmin>{children}</ProtectedRoute>
 
@@ -97,6 +111,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/login"         element={<Login />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
@@ -172,6 +187,7 @@ export default function App() {
           <Route path="/" element={<P><RootRedirect /></P>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </Suspense>
       </AuthProvider>
     </BrowserRouter>
   )
