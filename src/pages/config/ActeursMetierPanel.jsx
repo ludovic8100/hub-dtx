@@ -26,6 +26,7 @@ export default function ActeursMetierPanel() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [flash, setFlash] = useState(null)
+  const [showFrais, setShowFrais] = useState(false)
 
   useEffect(() => { load() }, [])
 
@@ -43,6 +44,7 @@ export default function ActeursMetierPanel() {
   function pick(c) {
     setSel({ ...c, noms_repris_str: (c.noms_repris || []).join(', ') })
     setSelTaux({ ...(taux[c.id] || {}) })
+    setShowFrais(false)
   }
   function nouveau() {
     setSel({
@@ -51,6 +53,7 @@ export default function ActeursMetierPanel() {
       noms_repris_str: '',
     })
     setSelTaux({})
+    setShowFrais(false)
   }
 
   async function save() {
@@ -61,6 +64,7 @@ export default function ActeursMetierPanel() {
     const payload = {
       ...rest,
       numero: (rest.numero === '' || rest.numero == null) ? null : Number(rest.numero),
+      frais_annuels: (rest.frais_annuels === '' || rest.frais_annuels == null) ? null : Number(rest.frais_annuels),
       noms_repris: noms_repris_str ? noms_repris_str.split(',').map(s => s.trim()).filter(Boolean) : null,
     }
     let cid = id
@@ -179,6 +183,23 @@ export default function ActeursMetierPanel() {
               <F label="IBAN" value={sel.iban} onChange={v => setSel(s => ({ ...s, iban: v }))} />
               <F label="BIC" value={sel.bic} onChange={v => setSel(s => ({ ...s, bic: v }))} />
             </Grid>
+          </Section>
+
+          <Section titre="Coûts internes (confidentiel)">
+            {showFrais ? (
+              <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                <div style={{ maxWidth: 240 }}>
+                  <Lbl>Frais annuels (logiciel, cotisations…)</Lbl>
+                  <div style={{ position: 'relative' }}>
+                    <input type="number" step="0.01" value={sel.frais_annuels ?? ''} onChange={e => setSel(s => ({ ...s, frais_annuels: e.target.value }))} style={{ ...inp, paddingRight: 26 }} />
+                    <span style={{ position: 'absolute', right: 10, top: 9, color: '#94a3b8', fontSize: 13 }}>€</span>
+                  </div>
+                </div>
+                <button onClick={() => setShowFrais(false)} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', color: '#475569', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>🙈 Masquer</button>
+              </div>
+            ) : (
+              <button onClick={() => setShowFrais(true)} style={{ padding: '8px 14px', borderRadius: 8, border: '1px dashed #cbd5e1', background: '#f8fafc', color: '#64748b', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>👁 Afficher les frais (admin)</button>
+            )}
           </Section>
 
           <Section titre="Taux de commission / rétrocession par type de travail (%)">
