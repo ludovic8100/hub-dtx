@@ -16,11 +16,10 @@ const MODULES = {
     { key: 'dyn_notesfrais', label: 'Notes de frais', icon: 'ti-receipt', path: '/dynassur/notes-frais' },
     { key: 'dyn_clients',      label: 'Clients',           icon: 'ti-users',            path: '/dynassur/clients' },
     { key: 'dyn_production',   label: 'Production',        icon: 'ti-chart-line',       path: '/dynassur/production' },
-    { key: 'dyn_bordereaux',   label: 'Bordereaux',        icon: 'ti-file-invoice',     path: '/dynassur/bordereaux' },
+    { key: 'dyn_compagnies',   label: 'Compagnies & Bordereaux', icon: 'ti-building',    path: '/dynassur/compagnies', anyKeys: ['dyn_compagnies','dyn_bordereaux'] },
     { key: 'dyn_credits',      label: 'Crédits',           icon: 'ti-cash-banknote',    path: '/dynassur/credits' },
     { key: 'dyn_chiffres',     label: 'Chiffres',          icon: 'ti-report-analytics', path: '/dynassur/chiffres' },
     { key: 'dyn_objectifs',    label: 'Objectifs',         icon: 'ti-target',           path: '/dynassur/objectifs' },
-    { key: 'dyn_compagnies',   label: 'Compagnies',        icon: 'ti-building',         path: '/dynassur/compagnies' },
     { key: 'dyn_sinistres',    label: 'Sinistres',         icon: 'ti-alert-triangle',   path: '/dynassur/sinistres' },
     { key: 'dyn_rdv',          label: 'RDV / Agenda',      icon: 'ti-calendar',         path: '/dynassur/rdv' },
     { key: 'dyn_appels',       label: 'Appels',            icon: 'ti-phone',            path: '/dynassur/appels' },
@@ -141,7 +140,7 @@ export default function Sidebar() {
   const accentLight = cfg.colorAccent
 
   const currentModules = activeSociete && MODULES[activeSociete]
-    ? orderModules(MODULES[activeSociete].filter(m => isAdmin || perms[m.key]))
+    ? orderModules(MODULES[activeSociete].filter(m => isAdmin || (m.anyKeys ? m.anyKeys.some(k => perms[k]) : perms[m.key])))
     : []
 
   const NavItem = ({ item }) => {

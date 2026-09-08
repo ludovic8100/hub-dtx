@@ -18,8 +18,10 @@ const MOIS_L = { "1":"Jan","2":"Fév","3":"Mar","4":"Avr","5":"Mai","6":"Jun","7
 const MOIS = ["01","02","03","04","05","06","07","08","09","10","11","12"]
 const MOIS_FULL = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"]
 
-export default function BordereauxView() {
-  const [view, setView] = useState("quittances")
+export default function BordereauxView({ view: viewProp, embedded } = {}) {
+  const [viewInt, setViewInt] = useState("quittances")
+  const view = viewProp || viewInt
+  const setView = setViewInt
   const [qRows, setQRows] = useState([])
   const [bRows, setBRows] = useState([])
   const [loading, setLoading] = useState(true)
@@ -242,10 +244,10 @@ export default function BordereauxView() {
   return (
     <div style={{ fontFamily:"'Source Sans Pro', sans-serif" }}>
       {/* Onglets */}
-      <div style={{ display:"flex", gap:8, marginBottom:16, alignItems:"center", flexWrap:"wrap" }}>
+      {!embedded && <div style={{ display:"flex", gap:8, marginBottom:16, alignItems:"center", flexWrap:"wrap" }}>
         {[["quittances","💰 Quittances réelles"],["matrice","📊 Matrice BQT/RCP"],["reconciliation","🔗 Réconciliation"],["alertes",`⚠ Alertes (${alertes.length})`]].map(([k,l]) =>
           <button key={k} style={D.btn(view===k?"primary":"ghost")} onClick={() => setView(k)}>{l}</button>)}
-      </div>
+      </div>}
       {/* Quittances réelles */}
       {view === "quittances" && <div>
         <div style={{ ...D.card, padding:"12px 18px", marginBottom:12 }}>

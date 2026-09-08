@@ -80,8 +80,12 @@ function ProtectedRoute({ children, requireAdmin = false, need = null }) {
   if (requireAdmin && perms.role !== 'admin') return <Navigate to="/" replace />
   if (need && perms.role !== 'admin') {
     const ACC = { dyn:'acc_dynassur', dtx:'acc_dtx', lode:'acc_lode', hex:'acc_hexagroup', prive:'acc_prive', grp:'acc_holding' }
-    const accCol = need.startsWith('acc_') ? need : ACC[need.split('_')[0]]
-    if ((accCol && !perms[accCol]) || !perms[need]) return <Navigate to="/access-denied" replace />
+    const needs = Array.isArray(need) ? need : [need]
+    const ok = needs.some(n => {
+      const accCol = n.startsWith('acc_') ? n : ACC[n.split('_')[0]]
+      return (!accCol || perms[accCol]) && perms[n]
+    })
+    if (!ok) return <Navigate to="/access-denied" replace />
   }
   return children
 }
@@ -138,11 +142,11 @@ export default function App() {
           <Route path="/groupe/notes-frais"    element={<P need="grp_notesfrais"><GroupeNotesFrais /></P>} />
           <Route path="/dynassur/clients"      element={<P need="dyn_clients"><DynassurClients /></P>} />
           <Route path="/dynassur/production"   element={<P need="dyn_production"><DynassurProduction /></P>} />
-          <Route path="/dynassur/bordereaux"   element={<P need="dyn_bordereaux"><DynassurBordereaux /></P>} />
+          <Route path="/dynassur/bordereaux"   element={<Navigate to="/dynassur/compagnies" replace />} />
           <Route path="/dynassur/credits"      element={<P need="dyn_credits"><DynassurCredits /></P>} />
           <Route path="/dynassur/chiffres"     element={<P need="dyn_chiffres"><DynassurChiffres /></P>} />
           <Route path="/dynassur/objectifs"    element={<P need="dyn_objectifs"><DynassurObjectifs /></P>} />
-          <Route path="/dynassur/compagnies"   element={<P need="dyn_compagnies"><DynassurCompagnies /></P>} />
+          <Route path="/dynassur/compagnies"   element={<P need={["dyn_compagnies","dyn_bordereaux"]}><DynassurCompagnies /></P>} />
           <Route path="/dynassur/sinistres"    element={<P need="dyn_sinistres"><DynassurSinistres /></P>} />
           <Route path="/dynassur/rdv"          element={<P need="dyn_rdv"><DynassurRdv /></P>} />
           <Route path="/dynassur/appels"       element={<P need="dyn_appels"><DynassurAppels /></P>} />
