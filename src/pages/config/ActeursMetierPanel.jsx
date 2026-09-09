@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import BceSearch from '../../components/BceSearch'
 
 // Types de travail pour les taux de commission/rétrocession
 const TYPES_TRAVAIL = ['Non-Vie', 'Vie', 'Santé', 'Crédit', 'SRDU', 'PJ']
@@ -141,6 +142,18 @@ export default function ActeursMetierPanel() {
       {sel ? (
         <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 20, display: 'flex', flexDirection: 'column', gap: 18 }}>
           <Section titre="Coordonnées">
+            <BceSearch onSelect={c => {
+              const a = c.address || {}
+              setSel(s => ({
+                ...s,
+                type: 'morale',
+                nom_complet: c.denomination_with_legal_form || c.denomination || s.nom_complet,
+                bce: c.cbe_number_formatted || c.cbe_number || s.bce,
+                adresse: a.street ? `${a.street} ${a.street_number || ''}`.trim() : s.adresse,
+                code_postal: a.post_code || s.code_postal,
+                ville: a.city || s.ville,
+              }))
+            }} />
             <Grid>
               <F label="Nom complet" value={sel.nom_complet} onChange={v => setSel(s => ({ ...s, nom_complet: v }))} />
               <F label="Code" value={sel.code} onChange={v => setSel(s => ({ ...s, code: (v || '').toUpperCase() }))} />
