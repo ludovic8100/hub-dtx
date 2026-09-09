@@ -4,6 +4,7 @@ import Layout from '../../components/Layout'
 import { LODE } from '../../lib/lodeConfig'
 import { LANGUES } from '../../lib/lodeI18n'
 import { StatBanner, DataCard, ActionButton, PrimaryButton, useMobile } from '../../components/ui/AccountableUI'
+import InternalClientSearch from '../../components/InternalClientSearch'
 
 const ORANGE = LODE.couleur
 const NAVY = '#1e293b'
@@ -161,6 +162,18 @@ function EditeurClient({ client, onClose, onSaved }) {
               background: f.type === v ? '#fff7ed' : '#fff', color: f.type === v ? ORANGE : '#64748b',
             }}>{l}</button>
           ))}
+        </div>
+
+        {/* Reprise d'un client déjà encodé dans une autre entité (anti multi-encodage) */}
+        <div style={{ background: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: 10, padding: 14, marginBottom: 16 }}>
+          <label style={{ ...lbl, color: '#7c3aed' }}>♻️ Reprendre un client déjà encodé (Dynassur / DTX)</label>
+          <InternalClientSearch
+            sources={[{ table: 'dyn_clients', label: 'Dynassur', color: '#0080BD' }, { table: 'dtx_clients', label: 'DTX', color: '#94a3b8' }]}
+            onSelect={(rec) => {
+              const KEYS = ['type', 'denomination', 'nom', 'prenom', 'adresse', 'cp', 'ville', 'pays', 'tva', 'numero_bce', 'email', 'telephone', 'gsm', 'langue']
+              setF(p => { const n = { ...p }; KEYS.forEach(k => { if (rec[k] != null && rec[k] !== '') n[k] = rec[k] }); return n })
+            }}
+          />
         </div>
 
         {/* Recherche BCE (entreprise uniquement) — autocomplétion temps réel */}
