@@ -51,6 +51,7 @@ export default function ConfigModule() {
   const [collabBureau, setCollabBureau] = useState({})  // code collaborateur -> bureau_id
   const [sel, setSel] = useState(() => new Set())       // ids user cochés (attribution groupée)
   const [bulkBureau, setBulkBureau] = useState('')      // bureau cible de l'attribution groupée
+  const [bulkAcces, setBulkAcces] = useState('')        // page cible de l'attribution groupée d'accès
 
   useEffect(() => {
     if (!isAdmin) { setLoading(false); return }
@@ -150,6 +151,25 @@ export default function ConfigModule() {
     if (error) { notify('❌ ' + error.message); return }
     setUsers(prev => prev.map(u => u.id === id ? { ...selUser, user_email: email, nom } : u))
     notify('✓ Utilisateur enregistré')
+  }
+
+  async function bulkAccesApply(grant) {
+    if (!bulkAcces) { notify('❌ Choisis d\'abord une page'); return }
+    const grp = ACCES.find(g => bulkAcces.startsWith(g.pfx + '_'))
+    if (!grp) return
+    const pageLabel = grp.pages.find(([pg]) => `${grp.pfx}_${pg}` === bulkAcces)?.[1] || bulkAcces
+    // Admins exclus : ils ont déjà l'accès total, un flag par page n'a aucun effet pour eux
+    const ids = usersFiltres.filter(u => sel.has(u.id) && u.role !== 'admin').map(u => u.id)
+    if (!ids.length) { notify('❌ Aucun utilisateur coché (hors admins)'); return }
+    if (!window.confirm(`${grant ? 'Donner' : 'Retirer'} l'accès « ${grp.label} · ${pageLabel} » à ${ids.length} utilisateur(s) ?`)) return
+    setSaving(true)
+    // Donner : on active aussi la société parente, sinon la page reste inaccessible
+    const patch = grant ? { [bulkAcces]: true, [grp.acc]: true } : { [bulkAcces]: false }
+    const { error } = await supabase.from('user_permissions').update(patch).in('id', ids)
+    setSaving(false)
+    if (error) { notify('❌ ' + error.message); return }
+    setUsers(prev => prev.map(u => ids.includes(u.id) ? { ...u, ...patch } : u))
+    notify(`✓ Accès ${grant ? 'donné' : 'retiré'} à ${ids.length} utilisateur(s)`)
   }
 
   async function deleteUser() {
@@ -339,6 +359,21 @@ export default function ConfigModule() {
               )}
               <button onClick={() => setSelUser({ _nouveau: true, nom: '', user_email: '', role: 'user', actif: true })} style={{ ...btn('#16a34a'), padding: '8px 14px', fontSize: 13 }}>➕ Nouvel utilisateur</button>
               <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 'auto' }}>{usersFiltres.length} / {users.length}</span>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 14, alignItems: 'center', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 10, padding: '8px 12px' }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#0369a1' }}>Attribution groupée d'un accès page</span>
+              <select value={bulkAcces} onChange={e => setBulkAcces(e.target.value)} style={{ ...inp, width: 'auto' }}>
+                <option value="">— Choisir une page —</option>
+                {ACCES.flatMap(g => g.pages.map(([pg, pl]) => <option key={`${g.pfx}_${pg}`} value={`${g.pfx}_${pg}`}>{g.label} · {pl}</option>))}
+              </select>
+              {bulkAcces && (() => {
+                const holders = usersFiltres.filter(u => u[bulkAcces]).length
+                const admins = usersFiltres.filter(u => u.role === 'admin').length
+                return <span style={{ fontSize: 12, color: '#0369a1' }}>{holders} ont l'accès{admins ? ` · ${admins} admin(s) accès total` : ''}</span>
+              })()}
+              <button onClick={() => { if (!bulkAcces) { notify('❌ Choisis d\'abord une page'); return } setSel(new Set(usersFiltres.filter(u => u[bulkAcces]).map(u => u.id))) }} style={{ ...btnGhost }}>Pré-cocher les détenteurs</button>
+              <button onClick={() => bulkAccesApply(true)} disabled={saving || !sel.size} style={{ ...btn('#0284c7'), opacity: (saving || !sel.size) ? .5 : 1 }}>✓ Donner aux cochés ({sel.size})</button>
+              <button onClick={() => bulkAccesApply(false)} disabled={saving || !sel.size} style={{ ...btnGhost, color: '#dc2626', borderColor: '#fecaca', opacity: (saving || !sel.size) ? .5 : 1 }}>✕ Retirer aux cochés</button>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 14, alignItems: 'center', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '8px 12px' }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: '#475569' }}>Attribution groupée d'un bureau</span>
