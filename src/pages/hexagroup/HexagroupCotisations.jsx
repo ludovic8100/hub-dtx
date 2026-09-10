@@ -44,8 +44,10 @@ function epcSepa(r) {
   return ['BCD', '002', '1', 'SCT', HEX.bic, HEX.nom, iban, mt, '', '', String(r.numero || '').slice(0, 140), ''].join('\n')
 }
 async function qrDataURL(text) {
-  await loadScript('https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js')
-  try { return await window.QRCode.toDataURL(text, { margin: 1, width: 300, color: { dark: '#20202A', light: '#FFFFFF' } }) } catch (e) { return null }
+  try {
+    const QRCode = (await import('qrcode')).default
+    return await QRCode.toDataURL(text, { margin: 1, width: 300, color: { dark: '#20202A', light: '#FFFFFF' } })
+  } catch (e) { return null }
 }
 
 const BADGES = {
