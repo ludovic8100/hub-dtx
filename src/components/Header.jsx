@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useAuth, SOCIETES_CONFIG } from '../lib/auth'
 import { useNavigate } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
 
 const LOGOS = {
   dynassur: '/logo_dynassur.png',
@@ -40,7 +41,7 @@ function EntityLogo({ societeKey, size = 26 }) {
 }
 
 // ── Dropdown sélecteur d'entité ──
-function EntityDropdown({ activeSociete, societesDispo, onSelect, accentColor }) {
+function EntityDropdown({ activeSociete, societesDispo, onSelect, accentColor, logos = {} }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
 
@@ -72,13 +73,13 @@ function EntityDropdown({ activeSociete, societesDispo, onSelect, accentColor })
       >
         {/* Logo entité active */}
         <div style={{ width: 26, height: 26, flexShrink: 0, display:'flex', alignItems:'center', justifyContent:'center' }}>
-          {activeSociete && activeSociete !== 'groupe'
-            ? (LOGOS[activeSociete]
-                ? <EntityLogo societeKey={activeSociete} size={26} />
-                : <div style={{ width:26, height:26, borderRadius:5, background:cfg.color, display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:800, color:'#fff' }}>{cfg.short}</div>
-              )
-            : <GroupeLogo size={24} />
-          }
+          {(() => {
+            if (!activeSociete || activeSociete === 'groupe') return <GroupeLogo size={24} />
+            const src = logos[activeSociete] || LOGOS[activeSociete]
+            return src
+              ? <img src={src} alt={activeSociete} style={{ width:26, height:26, objectFit:'contain' }} />
+              : <div style={{ width:26, height:26, borderRadius:5, background:cfg.color, display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:800, color:'#fff' }}>{cfg.short}</div>
+          })()}
         </div>
         <div style={{ flex:1, textAlign:'left', overflow:'hidden', minWidth:0 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', lineHeight: 1.1, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{cfg.label}</div>
@@ -120,8 +121,8 @@ function EntityDropdown({ activeSociete, societesDispo, onSelect, accentColor })
                   <div style={{ width:28, height:28, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
                     {s.key === 'groupe'
                       ? <GroupeLogo size={26} />
-                      : LOGOS[s.key]
-                        ? <img src={LOGOS[s.key]} alt={s.key} style={{ width:'100%', height:'100%', objectFit:'contain' }} />
+                      : (logos[s.key] || LOGOS[s.key])
+                        ? <img src={logos[s.key] || LOGOS[s.key]} alt={s.key} style={{ width:'100%', height:'100%', objectFit:'contain' }} />
                         : <div style={{ width:28, height:28, borderRadius:6, background:s.color, display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:800, color:'#fff' }}>{s.short}</div>
                     }
                   </div>
@@ -146,6 +147,20 @@ function EntityDropdown({ activeSociete, societesDispo, onSelect, accentColor })
 export default function Header({ currentPage, onToggleMenu, menuOuvert }) {
   const { user, perms, isAdmin, switchUser, signOut, societeActive, activeSociete, societesDispo, setActiveSociete } = useAuth()
   const navigate = useNavigate()
+
+  // Logos des sociétés depuis la DB (Paramètres > Sociétés) — fallback sur les fichiers /public
+  const [dbLogos, setDbLogos] = useState({})
+  useEffect(() => {
+    let alive = true
+    supabase.from('societes').select('code, logo_url').then(({ data }) => {
+      if (!alive || !data) return
+      const M = { DYNASSUR: 'dynassur', DTX: 'dtx', LODE: 'lode', HEXAGROUP: 'hexagroup', PRIVE: 'prive', HOL: 'groupe' }
+      const map = {}
+      data.forEach(r => { const k = M[r.code]; if (k && r.logo_url) map[k] = r.logo_url })
+      setDbLogos(map)
+    })
+    return () => { alive = false }
+  }, [])
 
   // Taille du texte (accessibilité) — zoom global persistant. L'app utilise des px en dur,
   // donc on agit sur le zoom du document (agrandit tout proportionnellement).
@@ -202,6 +217,7 @@ export default function Header({ currentPage, onToggleMenu, menuOuvert }) {
             societesDispo={societesDispo}
             onSelect={handleSelectEntity}
             accentColor={accentColor}
+            logos={dbLogos}
           />
         )}
 
