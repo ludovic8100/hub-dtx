@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 
@@ -21,6 +21,7 @@ const PRIOS = [
 ]
 const st = k => STATUTS.find(s => s.k === k) || STATUTS[0]
 const pr = k => PRIOS.find(p => p.k === k) || PRIOS[1]
+const URGENT_STYLE = { display: 'inline-block', background: '#E74C3C', color: '#fff', fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 6, marginRight: 8, letterSpacing: '.5px', verticalAlign: 'middle' }
 
 const fmtDT = d => d ? new Date(d).toLocaleString('fr-BE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''
 const rel = d => {
@@ -89,7 +90,7 @@ function mailTicket(t, intro) {
     <p>${intro}</p>
     <p style="margin:14px 0"><b>Ticket #${t.id}</b> — ${t.titre || ''}<br>
     <span style="color:#8A9BBE;font-size:13px">${t.ticket_categorie || ''}</span></p>
-    <p><a href="${HUB_URL}/tickets" style="background:#1E5799;color:#fff;text-decoration:none;padding:9px 16px;border-radius:8px;display:inline-block">Ouvrir le ticket</a></p>
+    <p><a href="${HUB_URL}/tickets?ticket=${t.id}" style="background:#1E5799;color:#fff;text-decoration:none;padding:9px 16px;border-radius:8px;display:inline-block">Ouvrir le ticket</a></p>
     <p style="color:#8A9BBE;font-size:12px;margin-top:16px">Hub DTX — notification automatique</p>
   </div>`
 }
@@ -124,11 +125,31 @@ export default function TicketsView() {
       if (data.length < 1000) break
     }
     setTickets(all)
-    let c = []; try { const r = await supabase.from('collaborateurs').select('code,nom_complet,nom_sa_data,email,actif').eq('actif', true); c = r.data || [] } catch (e) { c = [] }
+    let c = []
+    try {
+      const r = await supabase.from('user_permissions').select('collab_code,nom,o365_display_name,user_email,actif,est_employe').eq('actif', true)
+      const EXCLUS = new Set(['INF', 'SIN', 'SEC', 'CON', 'GH', 'TES'])   // boîtes partagées / génériques / test
+      const vus = new Set()
+      c = (r.data || [])
+        .filter(u => u.collab_code && u.user_email && !EXCLUS.has((u.collab_code || '').toUpperCase()))
+        .filter(u => { const k = u.collab_code.toUpperCase(); if (vus.has(k)) return false; vus.add(k); return true })
+        .map(u => ({ code: u.collab_code.toUpperCase(), nom_complet: u.nom || u.o365_display_name || u.collab_code, email: u.user_email, actif: u.actif }))
+        .sort((a, b) => (a.nom_complet || '').localeCompare(b.nom_complet || ''))
+    } catch (e) { c = [] }
     setCollabs(c)
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
+
+  // Ouverture directe d'un ticket via le lien e-mail (?ticket=ID)
+  const ouvertParUrl = useRef(false)
+  useEffect(() => {
+    if (ouvertParUrl.current || !tickets.length) return
+    const tid = new URLSearchParams(window.location.search).get('ticket')
+    if (!tid) return
+    const found = tickets.find(x => String(x.id) === String(tid))
+    if (found) { ouvertParUrl.current = true; setSel(found) }
+  }, [tickets])
 
   const codeLabel = code => { if (!code) return '—'; const c = collabs.find(x => (x.code || '').toUpperCase() === (code || '').toUpperCase()); return c ? (c.nom_complet || c.nom_sa_data || c.code) : code }
 
@@ -180,7 +201,7 @@ export default function TicketsView() {
         </select>
         <select style={{ ...S.input, width: 'auto' }} value={fCollab} onChange={e => setFCollab(e.target.value)}>
           <option value="tous">Tous collaborateurs</option>
-          {collabs.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
+          {collabs.map(c => <option key={c.code} value={c.code}>{c.nom_complet}</option>)}
         </select>
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: 12, color: C.textL, alignSelf: 'center' }}>{visibles.length} ticket(s)</span>
@@ -222,12 +243,12 @@ export default function TicketsView() {
                 return (
                   <tr key={t.id} onClick={() => setSel(t)} style={{ borderTop: `1px solid #EEF1F6`, cursor: 'pointer', opacity: t.ticket_statut === 'cloture' ? 0.6 : 1 }}>
                     <td style={{ padding: '11px 14px', fontFamily: 'monospace', color: C.textL, fontWeight: 700 }}>#{t.id}</td>
-                    <td style={{ padding: '11px 14px', fontWeight: 600, color: NAVY }}><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: p.col, marginRight: 8 }} />{t.titre}</td>
+                    <td style={{ padding: '11px 14px', fontWeight: 600, color: NAVY }}>{t.priorite === 'urgente' && <span style={URGENT_STYLE}>URGENT</span>}<span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: p.col, marginRight: 8 }} />{t.titre}</td>
                     <td style={{ padding: '11px 14px', color: C.textL, fontSize: 12 }}>{t.ticket_categorie || '—'}</td>
                     <td style={{ padding: '11px 14px' }}><span style={S.badge(s.bg, s.fg)}>{s.label}</span></td>
                     <td style={{ padding: '11px 14px', fontSize: 12 }}>{t.cree_par || '—'}</td>
                     <td style={{ padding: '11px 14px' }}>{t.gestionnaire ? <span style={S.avatar}>{(t.gestionnaire || '').slice(0, 3)}</span> : <span style={{ color: C.danger, fontWeight: 600, fontSize: 12 }}>⚠ À attribuer</span>}</td>
-                    <td style={{ padding: '11px 14px' }}>{(Array.isArray(t.participants) && t.participants.length) ? <span style={{ fontSize: 11, color: C.textM }}>{t.participants.join(', ')}</span> : <span style={{ color: C.textL, fontSize: 12 }}>—</span>}</td>
+                    <td style={{ padding: '11px 14px' }}>{(Array.isArray(t.participants) && t.participants.length) ? <span style={{ fontSize: 11, color: C.textM }}>{t.participants.map(codeLabel).join(', ')}</span> : <span style={{ color: C.textL, fontSize: 12 }}>—</span>}</td>
                     <td style={{ padding: '11px 14px', color: C.textL, fontSize: 12 }}>{rel(t.derniere_activite || t.created_at)}</td>
                   </tr>
                 )
@@ -252,7 +273,7 @@ function TicketCard({ t, codeLabel, onOpen }) {
         <span style={S.badge(s.bg, s.fg)}>{s.label}</span>
         <span style={{ marginLeft: 'auto', width: 9, height: 9, borderRadius: '50%', background: p.col }} />
       </div>
-      <div style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.3, marginBottom: 8, color: NAVY }}>{t.titre}</div>
+      <div style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.3, marginBottom: 8, color: NAVY }}>{t.priorite === 'urgente' && <span style={URGENT_STYLE}>URGENT</span>}{t.titre}</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 12, color: C.textL }}>
         <span>{t.ticket_categorie || '—'}</span>·<span>par {t.cree_par || '—'}</span>·
         {t.gestionnaire ? <span style={{ ...S.avatar, width: 20, height: 20 }}>{(t.gestionnaire || '').slice(0, 3)}</span> : <span style={{ color: C.danger, fontWeight: 600 }}>⚠ À attribuer</span>}
@@ -375,6 +396,14 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
     await supabase.from('taches').update({ ...patch, derniere_activite: now }).eq('id', t.id)
     if (sysMsg) await supabase.from('tickets_messages').insert({ tache_id: t.id, auteur_code: myCode, type: 'systeme', message: sysMsg })
     setT(x => ({ ...x, ...patch }))
+    // Alerte e-mail à CHAQUE modification : créateur + assigné + participants, sauf l'auteur du changement
+    if (sysMsg) {
+      const merged = { ...t, ...patch }
+      const p2 = Array.isArray(merged.participants) ? merged.participants.map(x => (x || '').toUpperCase()) : []
+      const dest = [...new Set([(merged.gestionnaire || '').toUpperCase(), (merged.cree_par || '').toUpperCase(), ...p2].filter(cc => cc && cc !== myCode))]
+      const emails = emailsOf(dest)
+      if (emails.length) envoyerAlerte(emails, `Ticket #${t.id} — mise à jour`, mailTicket(merged, `Une adaptation a été apportée à ce ticket par <b>${myCode}</b>.<br><i>${sysMsg}</i><br>Merci de cliquer sur le lien ci-dessous pour la consulter et réagir si besoin.`))
+    }
     await loadMsgs(); onChanged()
   }
 
@@ -394,22 +423,14 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
   const changeStatut = async (nk) => {
     const ancien = st(t.ticket_statut).label
     await touch({ ticket_statut: nk }, `Statut : ${ancien} → ${st(nk).label} (${myCode})`)
-    // Prévenir les concernés de l'avancement (sauf celui qui change)
-    const emails = emailsOf(concernesSauf(myCode))
-    if (emails.length) envoyerAlerte(emails, `Ticket #${t.id} — ${st(nk).label}`, mailTicket(t, `Bonjour,<br>Le ticket a changé de statut : <b>${ancien} → ${st(nk).label}</b> (par ${myCode}).`))
   }
   const assigner = async (code) => {
     const c = code ? code.toUpperCase() : null
     await touch({ gestionnaire: c }, c ? `Assigné à ${c} (par ${myCode})` : `Attribution retirée (par ${myCode})`)
-    if (c && c !== myCode) {
-      const em = emailOf(c)
-      if (em) envoyerAlerte([em], `Ticket #${t.id} vous a été attribué`, mailTicket(t, `Bonjour,<br>Le ticket suivant vous a été attribué par ${myCode}.`))
-    }
   }
   const parts = Array.isArray(t.participants) ? t.participants.map(x => (x || '').toUpperCase()) : []
   const emailOf = code => { const c = collabs.find(x => (x.code || '').toUpperCase() === (code || '').toUpperCase()); return c?.email || null }
   const emailsOf = codes => codes.map(emailOf).filter(Boolean)
-  const concernesSauf = (exclu) => [...new Set([(t.gestionnaire||'').toUpperCase(), (t.cree_par||'').toUpperCase(), ...parts].filter(c => c && c !== (exclu||'').toUpperCase()))]
   const addParticipant = async (code) => {
     if (!code) return
     const c = code.toUpperCase()
@@ -424,9 +445,6 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
   }
   const cloturer = async () => {
     await touch({ ticket_statut: 'cloture', cloture_par: myCode, statut: 'terminee', date_cloture: new Date().toISOString() }, `Ticket clôturé par ${myCode}`)
-    // Prévenir tous les concernés (créateur, assigné, participants) sauf celui qui clôture
-    const emails = emailsOf(concernesSauf(myCode))
-    if (emails.length) envoyerAlerte(emails, `Ticket #${t.id} clôturé`, mailTicket(t, `Bonjour,<br>Le ticket a été clôturé par ${myCode}.`))
   }
 
   const s = st(t.ticket_statut), p = pr(t.priorite)
@@ -442,7 +460,7 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
           <span style={{ width: 9, height: 9, borderRadius: '50%', background: p.col }} /><span style={{ fontSize: 11, color: p.col, fontWeight: 700 }}>{p.label}</span>
           <button onClick={onClose} style={{ marginLeft: 'auto', border: 'none', background: C.bg, borderRadius: 8, padding: '6px 10px', cursor: 'pointer' }}>✕</button>
         </div>
-        <div style={{ fontSize: 17, fontWeight: 800, color: NAVY }}>{t.titre}</div>
+        <div style={{ fontSize: 17, fontWeight: 800, color: NAVY }}>{t.priorite === 'urgente' && <span style={URGENT_STYLE}>URGENT</span>}{t.titre}</div>
         <div style={{ fontSize: 12, color: C.textL, marginTop: 4 }}>{t.ticket_categorie} · ouvert par {t.cree_par} · {fmtDT(t.date_creation || t.created_at)}</div>
       </div>
 
@@ -452,7 +470,7 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
         {canManage && (
           <select style={{ ...S.input, width: 'auto', padding: '5px 8px', fontSize: 12 }} value={t.gestionnaire || ''} onChange={e => assigner(e.target.value)}>
             <option value="">— À attribuer —</option>
-            {collabs.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
+            {collabs.map(c => <option key={c.code} value={c.code}>{c.nom_complet}</option>)}
           </select>
         )}
         {canManage && t.ticket_statut !== 'cloture' && (
@@ -468,14 +486,14 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
         {parts.length === 0 && <span style={{ fontSize: 12, color: C.textL }}>aucun</span>}
         {parts.map(pc => (
           <span key={pc} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#E3F2FD', color: '#1565C0', borderRadius: 14, padding: '3px 10px', fontSize: 12, fontWeight: 600 }}>
-            {pc}
+            {codeLabel(pc)}
             {t.ticket_statut !== 'cloture' && <span onClick={() => removeParticipant(pc)} style={{ cursor: 'pointer', color: '#1565C0', fontWeight: 700 }}>×</span>}
           </span>
         ))}
         {t.ticket_statut !== 'cloture' && (
           <select style={{ ...S.input, width: 'auto', padding: '4px 8px', fontSize: 12 }} value="" onChange={e => { addParticipant(e.target.value); e.target.value = '' }}>
             <option value="">+ Ajouter…</option>
-            {collabs.filter(c => !parts.includes((c.code || '').toUpperCase()) && (c.code || '').toUpperCase() !== (t.gestionnaire || '').toUpperCase()).map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
+            {collabs.filter(c => !parts.includes((c.code || '').toUpperCase()) && (c.code || '').toUpperCase() !== (t.gestionnaire || '').toUpperCase()).map(c => <option key={c.code} value={c.code}>{c.nom_complet}</option>)}
           </select>
         )}
       </div>
