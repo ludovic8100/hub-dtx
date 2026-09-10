@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
 import { ENTITES } from '../../lib/entites'
-import { StatBanner } from '../../components/ui/AccountableUI'
+import { StatBanner, useMobile } from '../../components/ui/AccountableUI'
 import HexMembreForm from '../../components/HexMembreForm'
 
 // ── Coordonnées émetteur Hexagroup (pied de facture) ──
@@ -272,6 +272,8 @@ export default function HexagroupCotisations() {
     </button>
   )
 
+  const mob = useMobile()
+
   return (
     <Layout currentPage="Cotisations">
       <div style={{ fontFamily: "'Source Sans Pro', sans-serif", width: '100%' }}>
@@ -298,6 +300,36 @@ export default function HexagroupCotisations() {
           {metric('Recouvrement', taux + ' %')}
         </div>
 
+        {mob ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {loading && <div style={{ padding: 24, textAlign: 'center', color: '#94a3b8' }}>Chargement…</div>}
+            {!loading && rows.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: '#94a3b8' }}>Aucune cotisation pour {annee}.</div>}
+            {rows.map(r => {
+              const b = BADGES[r.statut] || BADGES.a_envoyer
+              const nbR = (r.rappels || []).length
+              return (
+                <div key={r.id} style={{ ...card, padding: 14 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <span style={{ fontFamily: 'monospace', color: '#64748b', fontSize: 13 }}>{r.numero}</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: b.bg, color: b.fg, padding: '3px 9px', borderRadius: 20, fontSize: 12, fontWeight: 700 }}><i className={`ti ${b.ic}`} style={{ fontSize: 13 }} />{b.tx}</span>
+                  </div>
+                  <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 2 }}>{r.membre?.societe || r.membre?.contact || '—'}</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <span style={{ fontSize: 20, fontWeight: 700, color: cVIOLET }}>{eur(r.total)}</span>
+                    <span style={{ fontSize: 12, color: nbR >= 2 ? '#dc2626' : '#94a3b8' }}>{nbR > 0 ? <><i className="ti ti-bell" style={{ fontSize: 13, verticalAlign: -1 }} /> {nbR} rappel{nbR > 1 ? 's' : ''}</> : 'aucun rappel'}{r.statut === 'payee' && r.date_paiement ? ' · payé le ' + fmtD(r.date_paiement) : ''}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    {ibtn(r.statut === 'payee' ? 'ti-rotate' : 'ti-check', r.statut === 'payee' ? 'Annuler le paiement' : 'Marquer payé', () => basculerPaye(r), r.statut === 'payee' ? '#64748b' : '#15803d')}
+                    {ibtn('ti-bell-plus', 'Ajouter un rappel', () => ajouterRappel(r), '#b45309')}
+                    {ibtn('ti-pencil', 'Éditer', () => ouvrirEdition(r))}
+                    {ibtn('ti-file-type-pdf', 'Télécharger le PDF', () => genererPDF(r), cVIOLET)}
+                    {ibtn('ti-send', 'Envoyer par e-mail', () => envoyerMail(r), '#2563eb')}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        ) : (
         <div style={card}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
             <colgroup><col style={{ width: 66 }} /><col /><col style={{ width: 98 }} /><col style={{ width: 112 }} /><col style={{ width: 64 }} /><col style={{ width: 196 }} /></colgroup>
@@ -346,6 +378,7 @@ export default function HexagroupCotisations() {
             </tbody>
           </table>
         </div>
+        )}
 
         <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
           <i className="ti ti-info-circle" style={{ fontSize: 14 }} />
