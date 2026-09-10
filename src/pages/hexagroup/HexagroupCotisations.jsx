@@ -37,6 +37,17 @@ async function loadImageDataURL(url) {
   try { const r = await fetch(url); const b = await r.blob(); return await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(b) }) } catch { return null }
 }
 
+// Payload QR de virement SEPA (norme EPC) : scanné par l'app bancaire → virement pré-rempli
+function epcSepa(r) {
+  const iban = HEX.iban.replace(/\s/g, '')
+  const mt = 'EUR' + (Number(r.total) || 0).toFixed(2)
+  return ['BCD', '002', '1', 'SCT', HEX.bic, HEX.nom, iban, mt, '', '', String(r.numero || '').slice(0, 140), ''].join('\n')
+}
+async function qrDataURL(text) {
+  await loadScript('https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js')
+  try { return await window.QRCode.toDataURL(text, { margin: 1, width: 300, color: { dark: '#20202A', light: '#FFFFFF' } }) } catch (e) { return null }
+}
+
 const BADGES = {
   a_envoyer: { bg: '#eef1f5', fg: '#64748b', ic: 'ti-clock', tx: 'À envoyer' },
   envoyee:   { bg: '#fef3c7', fg: '#b45309', ic: 'ti-send', tx: 'Envoyée' },
@@ -205,6 +216,20 @@ export default function HexagroupCotisations() {
     d.setFontSize(13); d.text(eurPDF(r.total), RM - 3, yt + 18.5, { align: 'right' })
     d.setTextColor(110, 44, 145); d.setFont('helvetica', 'italic'); d.setFontSize(10); d.text('À payer comptant.', LM, yt + 18)
 
+    // QR de paiement SEPA (si montant > 0)
+    if (Number(r.total) > 0) {
+      const qr = await qrDataURL(epcSepa(r))
+      if (qr) {
+        const qy = yt + 26
+        try { d.addImage(qr, 'PNG', LM, qy, 26, 26) } catch (e) { /* */ }
+        d.setTextColor(110, 44, 145); d.setFont('helvetica', 'bold'); d.setFontSize(9.5); d.text('Payer en un scan', LM + 30, qy + 5)
+        d.setTextColor(105, 105, 115); d.setFont('helvetica', 'normal'); d.setFontSize(7.8)
+        d.text('Scannez ce QR avec votre app bancaire :', LM + 30, qy + 11)
+        d.text('le virement est pré-rempli (IBAN,', LM + 30, qy + 15)
+        d.text('montant, communication).', LM + 30, qy + 19)
+      }
+    }
+
     // Footer : lames multicolores + coordonnées
     const H = 297
     tri([[0, H], [0, H - 46], [78, H]], [22, 117, 189])
@@ -230,11 +255,13 @@ export default function HexagroupCotisations() {
     try {
       const d = await construirePDF(r)
       const b64 = d.output('datauristring').split(',')[1]
+      let qrB64 = null
+      if (Number(r.total) > 0) { const qr = await qrDataURL(epcSepa(r)); qrB64 = qr ? qr.split(',')[1] : null }
       const { data: { session } } = await supabase.auth.getSession()
       const resp = await fetch('/api/cotisation-send', {
         method: 'POST',
         headers: { Authorization: `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: r.membre.email, nom: r.membre.contact || r.membre.societe, numero: r.numero, total: Number(r.total || 0), pdf_base64: b64 }),
+        body: JSON.stringify({ email: r.membre.email, nom: r.membre.contact || r.membre.societe, numero: r.numero, total: Number(r.total || 0), pdf_base64: b64, qr_base64: qrB64 }),
       })
       const j = await resp.json()
       if (!j.ok) { alert('Envoi impossible : ' + (j.detail || j.error || 'erreur')) ; setBusy(false) ; return }

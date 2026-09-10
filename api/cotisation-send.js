@@ -22,7 +22,7 @@ export default async function handler(req, res) {
     if (!u.ok) return res.status(401).json({ ok: false, error: 'invalid session' })
   } catch (e) { return res.status(401).json({ ok: false, error: 'auth failed' }) }
 
-  const { email, nom, numero, total, pdf_base64 } = req.body || {}
+  const { email, nom, numero, total, pdf_base64, qr_base64 } = req.body || {}
   if (!email || !numero || !pdf_base64) return res.status(400).json({ ok: false, error: 'champs manquants (email, numero, pdf)' })
 
   const montant = typeof total === 'number'
@@ -43,6 +43,11 @@ export default async function handler(req, res) {
         <div style="font-size:14px">IBAN <strong>${HEX.iban}</strong> (${HEX.bic})</div>
         <div style="font-size:14px">Communication : <strong>${numero}</strong></div>
       </div>
+      ${qr_base64 ? `<div style="text-align:center;margin:18px 0">
+        <img src="cid:qrpay" width="150" height="150" alt="QR de paiement" style="border:1px solid #eee;border-radius:8px;padding:6px;background:#fff" />
+        <div style="font-size:13px;color:#6E2C91;font-weight:700;margin-top:6px">Payer en un scan</div>
+        <div style="font-size:11px;color:#94a3b8">Scannez avec votre app bancaire — le virement est pré-rempli</div>
+      </div>` : ''}
       <p>À payer comptant. Nous vous remercions de votre confiance.</p>
       <p style="margin-bottom:0">Bien à vous,<br><strong>${HEX.nom}</strong></p>
     </div>
@@ -66,12 +71,10 @@ export default async function handler(req, res) {
       subject: `Facture de cotisation ${HEX.nom} ${numero}`,
       body: { contentType: 'HTML', content: html },
       toRecipients: [{ emailAddress: { address: email } }],
-      attachments: [{
-        '@odata.type': '#microsoft.graph.fileAttachment',
-        name: `Cotisation_${HEX.nom}_${numero}.pdf`,
-        contentType: 'application/pdf',
-        contentBytes: pdf_base64,
-      }],
+      attachments: [
+        { '@odata.type': '#microsoft.graph.fileAttachment', name: `Cotisation_${HEX.nom}_${numero}.pdf`, contentType: 'application/pdf', contentBytes: pdf_base64 },
+        ...(qr_base64 ? [{ '@odata.type': '#microsoft.graph.fileAttachment', name: 'qr-paiement.png', contentType: 'image/png', contentBytes: qr_base64, isInline: true, contentId: 'qrpay' }] : []),
+      ],
     }
 
     const mr = await fetch(`https://graph.microsoft.com/v1.0/users/${HEX.from}/sendMail`, {
