@@ -300,7 +300,7 @@ export default function HexagroupCotisations() {
 
         <div style={card}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
-            <colgroup><col style={{ width: 66 }} /><col /><col style={{ width: 100 }} /><col style={{ width: 116 }} /><col style={{ width: 72 }} /><col style={{ width: 150 }} /></colgroup>
+            <colgroup><col style={{ width: 66 }} /><col /><col style={{ width: 98 }} /><col style={{ width: 112 }} /><col style={{ width: 64 }} /><col style={{ width: 196 }} /></colgroup>
             <thead>
               <tr style={{ background: '#f8fafc', color: '#64748b', textAlign: 'left' }}>
                 <th style={{ padding: '11px 12px', fontWeight: 700 }}>N°</th>
