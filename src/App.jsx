@@ -57,6 +57,7 @@ const DashboardHexagroup  = lazy(() => import('./pages/hexagroup/DashboardHexagr
 const HexagroupBanque     = lazy(() => import('./pages/hexagroup/HexagroupBanque'))
 const HexagroupComptabilite = lazy(() => import('./pages/hexagroup/HexagroupComptabilite'))
 const HexagroupCotisations = lazy(() => import('./pages/hexagroup/HexagroupCotisations'))
+const HexagroupMembres = lazy(() => import('./pages/hexagroup/HexagroupMembres'))
 
 const DashboardPrive      = lazy(() => import('./pages/prive/DashboardPrive'))
 const PriveBanque         = lazy(() => import('./pages/prive/PriveBanque'))
@@ -176,6 +177,7 @@ export default function App() {
           <Route path="/hexagroup"               element={<P need="hex_dashboard"><DashboardHexagroup /></P>} />
           <Route path="/hexagroup/banque"        element={<A><HexagroupBanque /></A>} />
           <Route path="/hexagroup/comptabilite"  element={<P need="hex_comptabilite"><HexagroupComptabilite /></P>} />
+          <Route path="/hexagroup/membres"       element={<P need="hex_membres"><HexagroupMembres /></P>} />
           <Route path="/hexagroup/cotisations"   element={<P need="hex_cotisations"><HexagroupCotisations /></P>} />
 
           {/* Privé */}

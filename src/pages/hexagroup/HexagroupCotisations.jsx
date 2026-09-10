@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
 import { ENTITES } from '../../lib/entites'
-import { StatBanner, TabsBar } from '../../components/ui/AccountableUI'
-import BceSearch from '../../components/BceSearch'
+import { StatBanner } from '../../components/ui/AccountableUI'
+import HexMembreForm from '../../components/HexMembreForm'
 
 // ── Coordonnées émetteur Hexagroup (pied de facture) ──
 const HEX = {
@@ -51,11 +51,9 @@ export default function HexagroupCotisations() {
   const [busy, setBusy] = useState(false)
   const [edit, setEdit] = useState(null)   // cotisation en cours d'édition
   const [form, setForm] = useState(null)
-  const [tab, setTab] = useState('cotisations')
   const [membres, setMembres] = useState([])
-  const [editM, setEditM] = useState(null)   // 'new' | objet membre
-  const [formM, setFormM] = useState(null)
-  const [pick, setPick] = useState(false)    // sélecteur de membre pour nouvelle cotisation
+  const [pick, setPick] = useState(false)          // sélecteur de membre pour nouvelle cotisation
+  const [newMembre, setNewMembre] = useState(false) // création d'un membre à la volée
 
   const charger = async () => {
     setLoading(true)
@@ -246,20 +244,6 @@ export default function HexagroupCotisations() {
     setBusy(false); charger()
   }
 
-  // ── Membres ──
-  const nouveauMembre = () => { setEditM('new'); setFormM({ contact: '', societe: '', numero_bce: '', adresse: '', cp: '', ville: '', email: '', actif: true }) }
-  const ouvrirMembre = (m) => { setEditM(m); setFormM({ contact: m.contact || '', societe: m.societe || '', numero_bce: m.numero_bce || '', adresse: m.adresse || '', cp: m.cp || '', ville: m.ville || '', email: m.email || '', actif: m.actif !== false }) }
-  const setM = (k, v) => setFormM(p => ({ ...p, [k]: v }))
-  const sauverMembre = async () => {
-    if (!(formM.societe || formM.contact)) { alert('Renseigne au moins le nom ou la société.'); return }
-    setBusy(true)
-    const payload = { contact: formM.contact || null, societe: formM.societe || null, numero_bce: formM.numero_bce || null, adresse: formM.adresse || null, cp: formM.cp || null, ville: formM.ville || null, email: formM.email || null, actif: !!formM.actif }
-    if (editM === 'new') await supabase.from('hex_membres').insert(payload)
-    else await supabase.from('hex_membres').update(payload).eq('id', editM.id)
-    setBusy(false); setEditM(null); setFormM(null); chargerMembres(); charger()
-  }
-  const toggleActifMembre = async (m) => { await supabase.from('hex_membres').update({ actif: !m.actif }).eq('id', m.id); chargerMembres() }
-
   // Crée une cotisation pour UN membre (année courante), puis ouvre l'éditeur de lignes
   const creerCotisation = async (membre) => {
     if (rows.some(r => r.membre_id === membre.id)) { alert(`${membre.societe || membre.contact} a déjà une cotisation ${annee}.`); return }
@@ -307,9 +291,6 @@ export default function HexagroupCotisations() {
             </div>
           } />
 
-        <TabsBar color={E.color} active={tab} onChange={setTab} tabs={[{ key: 'cotisations', label: 'Cotisations', count: rows.length }, { key: 'membres', label: 'Membres', count: membres.length }]} />
-
-        {tab === 'cotisations' && (<>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 12, margin: '18px 0' }}>
           {metric('Émis', eur(totalEmis))}
           {metric('Encaissé', eur(totalPaye), '#15803d')}
@@ -370,43 +351,6 @@ export default function HexagroupCotisations() {
           <i className="ti ti-info-circle" style={{ fontSize: 14 }} />
           Envoi par e-mail depuis Info@hexagroup.be avec le PDF joint. Export Word : bientôt.
         </div>
-        </>)}
-
-        {tab === 'membres' && (
-          <div style={card}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', borderBottom: '0.5px solid #eef2f7' }}>
-              <div style={{ fontWeight: 700, fontSize: 14 }}>Membres Hexagroup</div>
-              <button onClick={nouveauMembre} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: cVIOLET, color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
-                <i className="ti ti-plus" style={{ fontSize: 15, verticalAlign: -2, marginRight: 4 }} />Nouveau membre
-              </button>
-            </div>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-              <thead><tr style={{ background: '#f8fafc', color: '#64748b', textAlign: 'left' }}>
-                <th style={{ padding: '11px 12px', fontWeight: 700 }}>Membre</th>
-                <th style={{ padding: '11px 12px', fontWeight: 700 }}>N&deg; BCE</th>
-                <th style={{ padding: '11px 12px', fontWeight: 700 }}>E-mail</th>
-                <th style={{ padding: '11px 12px', fontWeight: 700, textAlign: 'center' }}>Actif</th>
-                <th style={{ padding: '11px 12px', fontWeight: 700, textAlign: 'right' }}>Actions</th>
-              </tr></thead>
-              <tbody>
-                {membres.length === 0 && <tr><td colSpan={5} style={{ padding: 24, textAlign: 'center', color: '#94a3b8' }}>Aucun membre.</td></tr>}
-                {membres.map(m => (
-                  <tr key={m.id} style={{ borderTop: '0.5px solid #eef2f7', opacity: m.actif ? 1 : 0.5 }}>
-                    <td style={{ padding: '11px 12px' }}><div style={{ fontWeight: 600 }}>{m.societe || m.contact || '—'}</div>{m.societe && m.contact && <div style={{ fontSize: 12, color: '#94a3b8' }}>{m.contact}</div>}</td>
-                    <td style={{ padding: '11px 12px', color: '#64748b' }}>{m.numero_bce || '—'}</td>
-                    <td style={{ padding: '11px 12px', color: m.email ? '#334155' : '#dc2626' }}>{m.email || 'à compléter'}</td>
-                    <td style={{ padding: '11px 12px', textAlign: 'center' }}>{m.actif ? <i className="ti ti-circle-check" style={{ color: '#16a34a', fontSize: 18 }} /> : <i className="ti ti-circle" style={{ color: '#cbd5e1', fontSize: 18 }} />}</td>
-                    <td style={{ padding: '9px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      {ibtn('ti-file-plus', 'Créer une cotisation ' + annee, () => creerCotisation(m), cVIOLET)}{' '}
-                      {ibtn('ti-pencil', 'Éditer', () => ouvrirMembre(m))}{' '}
-                      {ibtn(m.actif ? 'ti-user-off' : 'ti-user-check', m.actif ? 'Désactiver' : 'Réactiver', () => toggleActifMembre(m))}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
 
       {/* ── Panneau d'édition ── */}
@@ -454,37 +398,7 @@ export default function HexagroupCotisations() {
           </div>
         </div>
       )}
-      {/* ── Panneau membre (création / édition) ── */}
-      {editM && formM && (
-        <div style={modalBg}>
-          <div style={{ ...modalCard, width: 'min(620px,100%)' }}>
-            <div style={modalHead}>
-              <div style={{ fontSize: 18, fontWeight: 700 }}>{editM === 'new' ? 'Nouveau membre' : 'Membre — ' + (editM.societe || editM.contact)}</div>
-              <button onClick={() => { setEditM(null); setFormM(null) }} style={closeBtn}><i className="ti ti-x" /></button>
-            </div>
-            <div style={{ marginBottom: 12 }}>
-              <label style={lbl}>Rechercher via la BCE (entreprise belge)</label>
-              <BceSearch onSelect={c => { const a = c.address || {}; setFormM(p => ({ ...p, societe: c.denomination_with_legal_form || c.denomination || p.societe, numero_bce: c.cbe_number_formatted || c.cbe_number || p.numero_bce, adresse: a.street ? (a.street + ' ' + (a.street_number || '')).trim() : p.adresse, cp: a.post_code || p.cp, ville: a.city || p.ville })) }} />
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10 }}>
-              <div><label style={lbl}>Contact</label><input value={formM.contact} onChange={e => setM('contact', e.target.value)} style={inp} /></div>
-              <div><label style={lbl}>Société</label><input value={formM.societe} onChange={e => setM('societe', e.target.value)} style={inp} /></div>
-              <div><label style={lbl}>N° BCE / TVA</label><input value={formM.numero_bce} onChange={e => setM('numero_bce', e.target.value)} style={inp} /></div>
-              <div><label style={lbl}>E-mail</label><input value={formM.email} onChange={e => setM('email', e.target.value)} placeholder="nom@societe.be" style={inp} /></div>
-              <div style={{ gridColumn: '1 / -1' }}><label style={lbl}>Adresse</label><input value={formM.adresse} onChange={e => setM('adresse', e.target.value)} style={inp} /></div>
-              <div><label style={lbl}>Code postal</label><input value={formM.cp} onChange={e => setM('cp', e.target.value)} style={inp} /></div>
-              <div><label style={lbl}>Ville</label><input value={formM.ville} onChange={e => setM('ville', e.target.value)} style={inp} /></div>
-            </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, fontSize: 13, cursor: 'pointer' }}>
-              <input type="checkbox" checked={!!formM.actif} onChange={e => setM('actif', e.target.checked)} />Membre actif
-            </label>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 18, borderTop: '0.5px solid #eef2f7', paddingTop: 14 }}>
-              <button onClick={() => { setEditM(null); setFormM(null) }} style={btnGhost}>Annuler</button>
-              <button onClick={sauverMembre} disabled={busy} style={btnPrim}>{busy ? 'Enregistrement…' : 'Enregistrer'}</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {newMembre && <HexMembreForm initial={null} onSaved={() => chargerMembres()} onClose={() => setNewMembre(false)} />}
 
       {/* ── Sélecteur de membre pour une nouvelle cotisation ── */}
       {pick && (
@@ -508,7 +422,7 @@ export default function HexagroupCotisations() {
               })}
             </div>
             <div style={{ marginTop: 12, textAlign: 'center' }}>
-              <button onClick={() => { setPick(false); nouveauMembre() }} style={{ border: 'none', background: 'none', color: cVIOLET, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>+ Créer un nouveau membre</button>
+              <button onClick={() => setNewMembre(true)} style={{ border: 'none', background: 'none', color: cVIOLET, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>+ Créer un nouveau membre</button>
             </div>
           </div>
         </div>

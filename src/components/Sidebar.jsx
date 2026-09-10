@@ -50,6 +50,8 @@ const MODULES = {
     { key: 'hex_taches',         label: 'Tâches',          icon: 'ti-checkbox',         path: '/hexagroup/taches' },
     { key: 'hex_notesfrais', label: 'Notes de frais', icon: 'ti-receipt', path: '/hexagroup/notes-frais' },
     { key: 'hex_comptabilite',   label: 'Comptabilité',     icon: 'ti-calculator',       path: '/hexagroup/comptabilite' },
+    { key: 'hex_membres',        label: 'Membres',          icon: 'ti-users',            path: '/hexagroup/membres' },
+    { key: 'hex_membres',        label: 'Membres',          icon: 'ti-users-group',      path: '/hexagroup/membres' },
     { key: 'hex_cotisations',    label: 'Cotisations',      icon: 'ti-receipt-2',        path: '/hexagroup/cotisations' },
   ],
   prive: [

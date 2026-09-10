@@ -17,7 +17,7 @@ const ACCES = [
   { acc: 'acc_lode', label: 'LODE', pfx: 'lode', couleur: '#F97316',
     pages: [['dashboard', 'Tableau de bord'], ['taches', 'Tâches'], ['clients', 'Clients'], ['banque', 'Banque'], ['comptabilite', 'Comptabilité'], ['devis', 'Devis & Factures'], ['notesfrais', 'Notes de frais']] },
   { acc: 'acc_hexagroup', label: 'Hexagroup', pfx: 'hex', couleur: '#ec4899',
-    pages: [['dashboard', 'Tableau de bord'], ['taches', 'Tâches'], ['banque', 'Banque'], ['comptabilite', 'Comptabilité'], ['notesfrais', 'Notes de frais'], ['cotisations', 'Cotisations']] },
+    pages: [['dashboard', 'Tableau de bord'], ['taches', 'Tâches'], ['banque', 'Banque'], ['comptabilite', 'Comptabilité'], ['notesfrais', 'Notes de frais'], ['membres', 'Membres'], ['cotisations', 'Cotisations']] },
   { acc: 'acc_prive', label: 'Privé', pfx: 'prive', couleur: '#22c55e',
     pages: [['dashboard', 'Tableau de bord'], ['taches', 'Tâches'], ['banque', 'Banque'], ['comptabilite', 'Comptabilité'], ['notesfrais', 'Notes de frais']] },
   { acc: 'acc_holding', label: 'Groupe (consolidé)', pfx: 'grp', couleur: '#7c3aed', pages: [['taches', 'Tâches'], ['notesfrais', 'Notes de frais']] },
