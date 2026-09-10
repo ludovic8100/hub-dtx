@@ -128,8 +128,8 @@ export default function HexagroupCotisations() {
     setBusy(false); setEdit(null); setForm(null); charger()
   }
 
-  // ── Génération PDF (design validé) ──
-  const genererPDF = async (r) => {
+  // ── Construit le document PDF (design validé) et le retourne ──
+  const construirePDF = async (r) => {
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
     const { jsPDF } = window.jspdf
     const d = new jsPDF()            // mm, A4 portrait (210 x 297)
@@ -208,7 +208,30 @@ export default function HexagroupCotisations() {
     d.text(`Si\u00e8ge : ${HEX.siege}`, RM, H - 18, { align: 'right' })
     d.text(`N\u00b0 ${HEX.bce}   \u2022   ${HEX.email}`, RM, H - 14, { align: 'right' })
 
-    d.save(`Cotisation_${HEX.nom}_${r.numero}.pdf`)
+    return d
+  }
+
+  const genererPDF = async (r) => { const d = await construirePDF(r); d.save(`Cotisation_${HEX.nom}_${r.numero}.pdf`) }
+
+  const envoyerMail = async (r) => {
+    if (!r.membre?.email) { alert("Ajoute d'abord l'e-mail du membre (via le crayon).") ; return }
+    if (!confirm(`Envoyer la facture ${r.numero} à ${r.membre.email} ?`)) return
+    setBusy(true)
+    try {
+      const d = await construirePDF(r)
+      const b64 = d.output('datauristring').split(',')[1]
+      const { data: { session } } = await supabase.auth.getSession()
+      const resp = await fetch('/api/cotisation-send', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: r.membre.email, nom: r.membre.contact || r.membre.societe, numero: r.numero, total: Number(r.total || 0), pdf_base64: b64 }),
+      })
+      const j = await resp.json()
+      if (!j.ok) { alert('Envoi impossible : ' + (j.detail || j.error || 'erreur')) ; setBusy(false) ; return }
+      await supabase.from('hex_cotisations').update({ statut: 'envoyee', date_envoi: today() }).eq('id', r.id)
+      alert('Facture envoyée à ' + r.membre.email)
+    } catch (e) { alert('Erreur : ' + String(e)) }
+    setBusy(false); charger()
   }
 
   // ── UI ──
@@ -288,7 +311,8 @@ export default function HexagroupCotisations() {
                       {ibtn(r.statut === 'payee' ? 'ti-rotate' : 'ti-check', r.statut === 'payee' ? 'Annuler le paiement' : 'Marquer pay\u00e9', () => basculerPaye(r), r.statut === 'payee' ? '#64748b' : '#15803d')}{' '}
                       {ibtn('ti-bell-plus', 'Ajouter un rappel', () => ajouterRappel(r), '#b45309')}{' '}
                       {ibtn('ti-pencil', '\u00c9diter', () => ouvrirEdition(r))}{' '}
-                      {ibtn('ti-file-type-pdf', 'T\u00e9l\u00e9charger le PDF', () => genererPDF(r), cVIOLET)}
+                      {ibtn('ti-file-type-pdf', 'T\u00e9l\u00e9charger le PDF', () => genererPDF(r), cVIOLET)}{' '}
+                      {ibtn('ti-send', 'Envoyer par e-mail', () => envoyerMail(r), '#2563eb')}
                     </td>
                   </tr>
                 )
@@ -299,7 +323,7 @@ export default function HexagroupCotisations() {
 
         <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
           <i className="ti ti-info-circle" style={{ fontSize: 14 }} />
-          Envoi par e-mail (depuis Info@hexagroup.be) et export Word : arrivent prochainement.
+          Envoi par e-mail depuis Info@hexagroup.be avec le PDF joint. Export Word : bient\u00f4t.
         </div>
       </div>
 
