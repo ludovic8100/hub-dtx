@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
 import { ENTITES } from '../../lib/entites'
-import { StatBanner } from '../../components/ui/AccountableUI'
+import { StatBanner, useMobile } from '../../components/ui/AccountableUI'
 import HexMembreForm from '../../components/HexMembreForm'
 
 export default function HexagroupMembres() {
   const E = ENTITES.hexagroup
+  const mob = useMobile()
   const [membres, setMembres] = useState([])
   const [loading, setLoading] = useState(true)
   const [edit, setEdit] = useState(null)   // null | 'new' | membre
@@ -54,6 +55,32 @@ export default function HexagroupMembres() {
           <div style={{ fontSize: 13, color: '#64748b' }}>{actifs} actif{actifs > 1 ? 's' : ''} / {membres.length}</div>
         </div>
 
+        {mob ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {loading && <div style={{ padding: 24, textAlign: 'center', color: '#94a3b8' }}>Chargement…</div>}
+            {!loading && filtre.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: '#94a3b8' }}>Aucun membre.</div>}
+            {filtre.map(m => (
+              <div key={m.id} style={{ background: '#fff', border: '0.5px solid #e2e8f0', borderRadius: 12, padding: 14, opacity: m.actif ? 1 : 0.55 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>{m.societe || m.contact || '—'}</div>
+                    {m.societe && m.contact && <div style={{ fontSize: 12, color: '#94a3b8' }}>{m.contact}</div>}
+                  </div>
+                  {m.actif ? <i className="ti ti-circle-check" style={{ color: '#16a34a', fontSize: 20 }} /> : <i className="ti ti-circle" style={{ color: '#cbd5e1', fontSize: 20 }} />}
+                </div>
+                <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 8, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <div>BCE : {m.numero_bce || '—'}</div>
+                  <div>{[m.adresse, [m.cp, m.ville].filter(Boolean).join(' ')].filter(Boolean).join(' – ') || '—'}</div>
+                  <div style={{ color: m.email ? '#334155' : '#dc2626' }}>{m.email || 'e-mail à compléter'}</div>
+                </div>
+                <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+                  {ibtn('ti-pencil', 'Éditer', () => setEdit(m))}
+                  {ibtn(m.actif ? 'ti-user-off' : 'ti-user-check', m.actif ? 'Désactiver' : 'Réactiver', () => toggle(m))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
         <div style={{ background: '#fff', border: '0.5px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead><tr style={{ background: '#f8fafc', color: '#64748b', textAlign: 'left' }}>
@@ -83,6 +110,7 @@ export default function HexagroupMembres() {
             </tbody>
           </table>
         </div>
+        )}
       </div>
 
       {edit && <HexMembreForm initial={edit === 'new' ? null : edit} onSaved={charger} onClose={() => setEdit(null)} />}
