@@ -38,11 +38,12 @@ async function loadImageDataURL(url) {
 }
 
 // Payload QR de virement SEPA (norme EPC) : scanné par l'app bancaire → virement pré-rempli
-function epcSepa(r) {
+function epcSepaMontant(montant, communication) {
   const iban = HEX.iban.replace(/\s/g, '')
-  const mt = 'EUR' + (Number(r.total) || 0).toFixed(2)
-  return ['BCD', '002', '1', 'SCT', HEX.bic, HEX.nom, iban, mt, '', '', String(r.numero || '').slice(0, 140), ''].join('\n')
+  const mt = 'EUR' + (Number(montant) || 0).toFixed(2)
+  return ['BCD', '002', '1', 'SCT', HEX.bic, HEX.nom, iban, mt, '', '', String(communication || '').slice(0, 140), ''].join('\n')
 }
+function epcSepa(r) { return epcSepaMontant(r.total, r.numero) }
 async function qrDataURL(text) {
   try {
     const QRCode = (await import('qrcode')).default
@@ -67,6 +68,8 @@ export default function HexagroupCotisations() {
   const [membres, setMembres] = useState([])
   const [pick, setPick] = useState(false)          // sélecteur de membre pour nouvelle cotisation
   const [newMembre, setNewMembre] = useState(false) // création d'un membre à la volée
+  const [rappel, setRappel] = useState(null)         // cotisation dont on prépare un rappel
+  const [cfg, setCfg] = useState({ delai: 30, taux: 10.5, forfait: 40 }) // paramètres légaux de retard
 
   const charger = async () => {
     setLoading(true)
@@ -77,6 +80,11 @@ export default function HexagroupCotisations() {
     setRows(r); setLoading(false)
   }
   useEffect(() => { charger() }, [annee])
+  useEffect(() => {
+    supabase.from('hex_cotisations_config')
+      .select('delai_paiement_jours, taux_interet_annuel, indemnite_forfaitaire').maybeSingle()
+      .then(({ data }) => { if (data) setCfg({ delai: Number(data.delai_paiement_jours) || 30, taux: Number(data.taux_interet_annuel) || 10.5, forfait: Number(data.indemnite_forfaitaire) || 40 }) })
+  }, [])
 
   const chargerMembres = async () => {
     const { data } = await supabase.from('hex_membres').select('*').order('actif', { ascending: false }).order('societe', { nullsFirst: false })
@@ -94,12 +102,41 @@ export default function HexagroupCotisations() {
     await supabase.from('hex_cotisations').update({ statut: payee ? 'payee' : 'envoyee', date_paiement: payee ? today() : null }).eq('id', r.id)
     charger()
   }
-  const ajouterRappel = async (r) => {
-    const note = prompt('Note du rappel (facultatif) :', '')
-    if (note === null) return
-    await supabase.from('hex_cotisations_rappels').insert({ cotisation_id: r.id, date_rappel: today(), canal: 'email', note })
-    if (r.statut === 'a_envoyer') await supabase.from('hex_cotisations').update({ statut: 'envoyee' }).eq('id', r.id)
-    charger()
+  // Frais légaux (transactions commerciales) : forfait + intérêts au taux légal, prorata du retard depuis l'échéance
+  const calculerFrais = (r) => {
+    const dFact = r.date_facture ? new Date(r.date_facture) : new Date()
+    const echeance = new Date(dFact); echeance.setDate(echeance.getDate() + cfg.delai)
+    const joursRetard = Math.max(0, Math.floor((Date.now() - echeance.getTime()) / 86400000))
+    const total = Number(r.total) || 0
+    const interets = joursRetard > 0 ? Math.round(total * (cfg.taux / 100) * joursRetard / 365 * 100) / 100 : 0
+    const forfait = joursRetard > 0 ? cfg.forfait : 0
+    const frais = Math.round((interets + forfait) * 100) / 100
+    return { echeance, joursRetard, interets, forfait, frais, totalDu: Math.round((total + frais) * 100) / 100 }
+  }
+
+  const envoyerRappel = async (r, niveau) => {
+    if (!r.membre?.email) { alert("Ajoute d'abord l'e-mail du membre (bouton crayon).") ; return }
+    const f = calculerFrais(r)
+    const montantOriginal = Number(r.total) || 0
+    const totalDu = niveau === 'frais' ? f.totalDu : montantOriginal
+    if (!confirm(`Envoyer un rappel ${niveau === 'frais' ? 'AVEC FRAIS (' + eur(f.frais) + ' → total ' + eur(f.totalDu) + ')' : 'simple'} à ${r.membre.email} ?`)) return
+    setBusy(true)
+    try {
+      const qr = await qrDataURL(epcSepaMontant(totalDu, r.numero))
+      const qrB64 = qr ? qr.split(',')[1] : null
+      const { data: { session } } = await supabase.auth.getSession()
+      const resp = await fetch('/api/cotisation-rappel', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: r.membre.email, nom: r.membre.contact || r.membre.societe, numero: r.numero, niveau, montant_original: montantOriginal, forfait: f.forfait, interets: f.interets, total_du: totalDu, jours_retard: f.joursRetard, qr_base64: qrB64 }),
+      })
+      const j = await resp.json()
+      if (!j.ok) { alert('Envoi impossible : ' + (j.detail || j.error || 'erreur')) ; setBusy(false) ; return }
+      await supabase.from('hex_cotisations_rappels').insert({ cotisation_id: r.id, date_rappel: today(), canal: 'email', niveau, frais: niveau === 'frais' ? f.frais : 0, note: niveau === 'frais' ? `Forfait ${eur(f.forfait)} + intérêts ${eur(f.interets)} (${f.joursRetard} j de retard)` : 'Rappel simple' })
+      if (r.statut === 'a_envoyer') await supabase.from('hex_cotisations').update({ statut: 'envoyee' }).eq('id', r.id)
+      alert('Rappel envoyé à ' + r.membre.email)
+    } catch (e) { alert('Erreur : ' + String(e)) }
+    setBusy(false); setRappel(null); charger()
   }
 
   const nouvelleCampagne = async () => {
@@ -116,7 +153,7 @@ export default function HexagroupCotisations() {
       const numero = `${annee}${String(seq).padStart(2, '0')}`
       const src = prevBy[m.id] || []
       const total = src.reduce((s, l) => s + Number(l.total || 0), 0)
-      const { data: cot } = await supabase.from('hex_cotisations').insert({ membre_id: m.id, annee, numero, date_facture: `${annee}-09-01`, statut: 'a_envoyer', total }).select('id').single()
+      const { data: cot } = await supabase.from('hex_cotisations').insert({ membre_id: m.id, annee, numero, date_facture: `${annee}-07-01`, statut: 'a_envoyer', total }).select('id').single()
       if (cot && src.length) {
         await supabase.from('hex_cotisations_lignes').insert(src.map((l, i) => ({ cotisation_id: cot.id, position: i, libelle: (l.libelle || '').replaceAll(String(annee - 1), String(annee)), quantite: l.quantite, prix_unitaire: l.prix_unitaire })))
       }
@@ -279,7 +316,7 @@ export default function HexagroupCotisations() {
     const seq = rows.length ? Math.max(...rows.map(r => parseInt(String(r.numero).slice(4)) || 0)) : 0
     const numero = `${annee}${String(seq + 1).padStart(2, '0')}`
     const { data, error } = await supabase.from('hex_cotisations')
-      .insert({ membre_id: membre.id, annee, numero, date_facture: `${annee}-09-01`, statut: 'a_envoyer', total: 0 })
+      .insert({ membre_id: membre.id, annee, numero, date_facture: `${annee}-07-01`, statut: 'a_envoyer', total: 0 })
       .select('*, membre:hex_membres(*)').single()
     if (error) { alert('Création impossible : ' + error.message); return }
     setPick(false); setTab('cotisations'); await charger()
@@ -349,7 +386,7 @@ export default function HexagroupCotisations() {
                   </div>
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                     {ibtn(r.statut === 'payee' ? 'ti-rotate' : 'ti-check', r.statut === 'payee' ? 'Annuler le paiement' : 'Marquer payé', () => basculerPaye(r), r.statut === 'payee' ? '#64748b' : '#15803d')}
-                    {ibtn('ti-bell-plus', 'Ajouter un rappel', () => ajouterRappel(r), '#b45309')}
+                    {ibtn('ti-bell-plus', 'Rappel', () => setRappel(r), '#b45309')}
                     {ibtn('ti-pencil', 'Éditer', () => ouvrirEdition(r))}
                     {ibtn('ti-file-type-pdf', 'Télécharger le PDF', () => genererPDF(r), cVIOLET)}
                     {ibtn('ti-send', 'Envoyer par e-mail', () => envoyerMail(r), '#2563eb')}
@@ -396,7 +433,7 @@ export default function HexagroupCotisations() {
                     </td>
                     <td style={{ padding: '9px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
                       {ibtn(r.statut === 'payee' ? 'ti-rotate' : 'ti-check', r.statut === 'payee' ? 'Annuler le paiement' : 'Marquer payé', () => basculerPaye(r), r.statut === 'payee' ? '#64748b' : '#15803d')}{' '}
-                      {ibtn('ti-bell-plus', 'Ajouter un rappel', () => ajouterRappel(r), '#b45309')}{' '}
+                      {ibtn('ti-bell-plus', 'Rappel', () => setRappel(r), '#b45309')}{' '}
                       {ibtn('ti-pencil', 'Éditer', () => ouvrirEdition(r))}{' '}
                       {ibtn('ti-file-type-pdf', 'Télécharger le PDF', () => genererPDF(r), cVIOLET)}{' '}
                       {ibtn('ti-send', 'Envoyer par e-mail', () => envoyerMail(r), '#2563eb')}
@@ -489,6 +526,38 @@ export default function HexagroupCotisations() {
           </div>
         </div>
       )}
+      {rappel && (() => {
+        const f = calculerFrais(rappel)
+        const echu = f.joursRetard > 0
+        return (
+          <div style={modalBg} onClick={() => setRappel(null)}>
+            <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, width: 'min(520px,100%)', padding: 22, boxShadow: '0 20px 50px rgba(0,0,0,.25)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <div style={{ fontSize: 18, fontWeight: 800 }}>Rappel — {rappel.numero}</div>
+                <button onClick={() => setRappel(null)} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 20, color: '#94a3b8' }}><i className="ti ti-x" /></button>
+              </div>
+              <div style={{ fontSize: 13, color: '#64748b' }}>{rappel.membre?.societe || rappel.membre?.contact}{rappel.membre?.email ? ' · ' + rappel.membre.email : ' · pas d\u2019e-mail'}</div>
+              <div style={{ fontSize: 13, color: echu ? '#b45309' : '#64748b', margin: '6px 0 18px' }}>
+                Échéance {fmtD(f.echeance)} · {echu ? `${f.joursRetard} jours de retard` : 'pas encore échu'}
+              </div>
+              <button onClick={() => envoyerRappel(rappel, 'simple')} disabled={busy}
+                style={{ width: '100%', textAlign: 'left', padding: '12px 14px', border: '0.5px solid #e2e8f0', borderRadius: 10, background: '#fff', cursor: 'pointer', marginBottom: 10 }}>
+                <div style={{ fontWeight: 700, fontSize: 14 }}><i className="ti ti-bell" style={{ verticalAlign: -2, marginRight: 6 }} />Rappel simple</div>
+                <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>Mail courtois, montant inchangé ({eur(rappel.total)}).</div>
+              </button>
+              <button onClick={() => envoyerRappel(rappel, 'frais')} disabled={busy || !echu}
+                style={{ width: '100%', textAlign: 'left', padding: '12px 14px', border: '0.5px solid ' + (echu ? '#fca5a5' : '#e2e8f0'), borderRadius: 10, background: echu ? '#fef2f2' : '#f8fafc', cursor: echu ? 'pointer' : 'not-allowed', opacity: echu ? 1 : .55 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, color: '#b91c1c' }}><i className="ti ti-gavel" style={{ verticalAlign: -2, marginRight: 6 }} />Rappel avec frais + mention huissier</div>
+                {echu ? (
+                  <div style={{ fontSize: 12, color: '#7f1d1d', marginTop: 4 }}>
+                    Cotisation {eur(rappel.total)} + forfait {eur(f.forfait)} + intérêts {eur(f.interets)} (10,5 %) = <strong>{eur(f.totalDu)}</strong>
+                  </div>
+                ) : <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>Disponible une fois l'échéance dépassée.</div>}
+              </button>
+            </div>
+          </div>
+        )
+      })()}
     </Layout>
   )
 }
