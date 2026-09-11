@@ -457,7 +457,10 @@ function Editeur({ type, doc, onClose, onSaved }) {
                   </div>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start', flexWrap: 'wrap' }}>
                     <ChampL label="Qté"><input type="number" style={{ ...inp, width: 52, padding: '6px', textAlign: 'center' }} value={l.quantite} onChange={e => setLigne(i, 'quantite', e.target.value)} /></ChampL>
-                    <ChampL label="P.U. €"><input type="number" step="0.01" style={{ ...inp, width: 82, padding: '6px', textAlign: 'right' }} value={l.prix_unitaire} onChange={e => setLigne(i, 'prix_unitaire', e.target.value)} /></ChampL>
+                    <ChampL label="P.U. €">
+                      <input type="number" step="0.01" style={{ ...inp, width: 82, padding: '6px', textAlign: 'right' }} value={l.prix_unitaire} onChange={e => setLigne(i, 'prix_unitaire', e.target.value)} />
+                      {afficherTVAC && <div style={{ fontSize: 10, color: ORANGE, textAlign: 'right', marginTop: 2, fontWeight: 700 }}>{eur((Number(l.prix_unitaire) || 0) * (1 + (Number(l.tva_pct) || 0) / 100))} TVAC</div>}
+                    </ChampL>
                     <ChampL label="Rem.%"><input type="number" style={{ ...inp, width: 50, padding: '6px', textAlign: 'center' }} value={l.remise_pct} onChange={e => setLigne(i, 'remise_pct', e.target.value)} /></ChampL>
                     <ChampL label="TVA">
                       <select style={{ ...inp, width: 64, padding: '6px' }} value={l.tva_pct} onChange={e => setLigne(i, 'tva_pct', e.target.value)}>
