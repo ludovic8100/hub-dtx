@@ -839,7 +839,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       <div style={{ background:'#fff', borderRadius:'12px', border:'1px solid #e2e8f0', overflow:'hidden' }}>
         {/* En-tête (desktop) */}
         {!isMobile && (
-        <div style={{ display:'grid', gridTemplateColumns:'95px 100px 110px 1fr 170px 140px 110px', padding:'9px 16px', background:'#f8fafc', borderBottom:'1px solid #e2e8f0', fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.06em' }}>
+        <div style={{ display:'grid', gridTemplateColumns:'95px 100px 110px 220px 1fr 140px 110px', padding:'9px 16px', background:'#f8fafc', borderBottom:'1px solid #e2e8f0', fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.06em' }}>
           {(() => {
             const trier = (col) => setTri(t => ({ col, sens: t.col === col && t.sens === 'desc' ? 'asc' : 'desc' }))
             const fleche = (col) => tri.col === col ? (tri.sens === 'desc' ? ' ↓' : ' ↑') : ''
@@ -850,8 +850,8 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
               <div style={{ textAlign:'center' }}>Facture</div>
               <Th col="date">Date</Th>
               <div>Compte</div>
-              <div>Libellé</div>
               <Th col="contrepartie">Contrepartie</Th>
+              <div>Libellé</div>
               <Th col="categorie">Catégorie</Th>
               <Th col="montant" align="right">Montant</Th>
             </>
@@ -944,7 +944,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
               }
               return (
               <div key={t.id} onClick={() => setTxSelection(t)} style={{
-                display:'grid', gridTemplateColumns:'95px 100px 110px 1fr 170px 140px 110px',
+                display:'grid', gridTemplateColumns:'95px 100px 110px 220px 1fr 140px 110px',
                 padding:'9px 16px', alignItems:'center', cursor:'pointer',
                 borderBottom: i < txPage.length-1 ? '1px solid #f8fafc' : 'none',
                 background: t.facture_url ? '#f0fdf4' : (i%2===0 ? '#fff' : '#fafafa')
@@ -982,20 +982,20 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                     }}>✕</button>
                   )}
                 </div>
-                <div
-                  onMouseEnter={() => t.facture_url && setApercuFacture({ thumb: t.facture_thumb_url, lien: urlVisionneuse(t.facture_url), nom: cheminFacture(t.facture_url) })}
-                  onMouseLeave={() => setApercuFacture(null)}
-                  style={{ fontSize:'12px', color: t.facture_url ? '#16a34a' : '#64748b', fontWeight: t.facture_url ? '700' : '400', cursor: t.facture_url ? 'zoom-in' : 'default' }}>
-                  {fmtDate(t._date)}{t.facture_url ? ' 🔍' : ''}
+                <div style={{ fontSize:'12px', color:'#64748b' }}>
+                  {fmtDate(t._date)}
                 </div>
                 <div style={{ fontSize:'11px', color:'#94a3b8', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                   {t.comptes_bancaires?.banque || '—'}
                 </div>
+                <div
+                  onMouseEnter={() => t.facture_url && setApercuFacture({ thumb: t.facture_thumb_url, lien: urlVisionneuse(t.facture_url), nom: cheminFacture(t.facture_url) })}
+                  onMouseLeave={() => setApercuFacture(null)}
+                  style={{ fontSize:'12px', color: t.facture_url ? '#16a34a' : '#64748b', fontWeight: t.facture_url ? '600' : '400', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', cursor: t.facture_url ? 'zoom-in' : 'default' }}>
+                  {t.contrepartie_nom || '—'}{t.facture_url ? ' 🔍' : ''}
+                </div>
                 <div style={{ fontSize:'13px', color:'#1e293b', fontWeight:'500', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', paddingRight:'12px' }}>
                   {t.information_paiement || t.description || '—'}
-                </div>
-                <div style={{ fontSize:'12px', color:'#64748b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                  {t.contrepartie_nom || '—'}
                 </div>
                 <div style={{ overflow:'hidden' }}>
                   {cat ? (
@@ -1136,9 +1136,11 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
           </div>
           {apercuFacture.thumb ? (
             <img src={apercuFacture.thumb} alt="Aperçu facture" style={{ width:'100%', height:'auto', display:'block', objectFit:'contain' }} />
+          ) : apercuFacture.lien ? (
+            <iframe src={apercuFacture.lien} title="Aperçu facture" style={{ width:'100%', height:'70vh', border:'none', display:'block', background:'#fff' }} />
           ) : (
             <div style={{ padding:'30px 20px', textAlign:'center', color:'#94a3b8', fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif" }}>
-              Aperçu en cours de génération…<br/><span style={{ fontSize:'11px' }}>Cliquez sur le ✓ pour ouvrir la facture</span>
+              Aucun aperçu disponible<br/><span style={{ fontSize:'11px' }}>Cliquez sur le ✓ pour ouvrir la facture</span>
             </div>
           )}
         </div>
