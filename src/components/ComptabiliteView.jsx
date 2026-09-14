@@ -595,7 +595,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       {/* Onglets Mouvements / Factures */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:'8px', marginBottom:'10px', borderBottom:'2px solid #e2e8f0' }}>
         <div style={{ display:'flex', gap:'4px' }}>
-          {[['mouvements','Mouvements bancaires'],['achats','Achats'],['ventes','Ventes']].map(([k,lab]) => (
+          {[['mouvements','Mouvements bancaires'],['achats','Dépenses'],['ventes','Rentrées']].map(([k,lab]) => (
             <button key={k} onClick={()=>setOnglet(k)} style={{
               padding:'10px 20px', border:'none', background:'none', cursor:'pointer', fontSize:'14px', fontWeight:'700',
               fontFamily:"'Source Sans Pro', sans-serif", color: onglet===k ? color : '#94a3b8',
@@ -616,8 +616,8 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       <div style={{ display:'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap:'12px', marginBottom:'10px' }}>
         {[
           { label:'Trésorerie totale', value: fmt(soldeTotal), color, sub:`${comptes.length} comptes`, sensible:true },
-          { label:'Entrées', value: fmt(totalEntrees), color:'#16a34a', sensible:true },
-          { label:'Sorties', value: fmt(totalSorties), color:'#dc2626', sensible:true },
+          { label:'Rentrées', value: fmt(totalEntrees), color:'#16a34a', sensible:true },
+          { label:'Dépenses', value: fmt(totalSorties), color:'#dc2626', sensible:true },
           (filtre.facture === 'avec'
             ? { label:'Factures liées', value: nbAvecFacture, color:'#16a34a', clic:'toggle', sub:`${nbSansFacture} non liées • ${nbAvecFacture+nbSansFacture} au total`, badge:true }
             : filtre.facture === 'sans'
@@ -659,7 +659,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
         <div style={{ display:'flex', flexDirection:'column', gap:'3px', flexShrink:0 }}>
           <label style={{ fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em' }}>Type</label>
           <div style={{ display:'flex', gap:'4px' }}>
-            {[['tous','Tout'],['entrees','▲ Entrées'],['sorties','▼ Sorties']].map(([val,lab]) => (
+            {[['tous','Tout'],['entrees','▲ Rentrées'],['sorties','▼ Dépenses']].map(([val,lab]) => (
               <button key={val} onClick={()=>setFiltre(f=>({...f,type:val}))} style={{
                 padding:'7px 12px', borderRadius:'6px', fontSize:'12px', fontWeight:'600', cursor:'pointer', border:'none',
                 background: filtre.type===val ? (val==='entrees'?'#dcfce7':val==='sorties'?'#fee2e2':`${color}18`) : '#f1f5f9',
@@ -1278,7 +1278,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                   <div style={{ fontSize:'12px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'8px' }}>Catégorie</div>
                   <select value={parentIdDe(t.categorie_id)} onChange={e=>assignerCategorie(t.id, e.target.value || null)} style={{ width:'100%', padding:'10px 12px', border:'1px solid #e2e8f0', borderRadius:'8px', fontSize:'14px', fontFamily:"'Source Sans Pro', sans-serif", cursor:'pointer' }}>
                     <option value="">— Non catégorisé —</option>
-                    <optgroup label="Recettes">
+                    <optgroup label="Rentrées">
                       {parentsCat('recette').map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
                     </optgroup>
                     <optgroup label="Dépenses">
@@ -1318,7 +1318,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                       <div style={{ display:'flex', gap:'8px', alignItems:'center', marginBottom:'10px' }}>
                         <select value={nouvelleCat.type} onChange={e=>setNouvelleCat(s=>({...s, type:e.target.value}))} style={{ flex:1, padding:'8px 10px', border:'1px solid #e2e8f0', borderRadius:'6px', fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif", cursor:'pointer' }}>
                           <option value="depense">Dépense</option>
-                          <option value="recette">Recette</option>
+                          <option value="recette">Rentrée</option>
                         </select>
                         <input type="color" value={nouvelleCat.couleur} onChange={e=>setNouvelleCat(s=>({...s, couleur:e.target.value}))} title="Couleur" style={{ width:'40px', height:'36px', border:'1px solid #e2e8f0', borderRadius:'6px', padding:'2px', cursor:'pointer' }} />
                       </div>

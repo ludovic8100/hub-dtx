@@ -153,11 +153,11 @@ function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, s
   if (loading) return <div style={{ padding: '50px', textAlign: 'center', color: '#94a3b8' }}>Chargement…</div>
 
   const kpis = vente ? [
-    { label: 'Total ventes', value: total, c: color, sub: `${nbPayees} encaissées • ${nbNonPayees} à vérifier` },
+    { label: 'Total rentrées', value: total, c: color, sub: `${nbPayees} encaissées • ${nbNonPayees} à vérifier` },
     { label: 'Encaissées', value: nbPayees, c: '#16a34a', sub: 'liées à un mouvement', clic: 'payees' },
     { label: 'Factures à encaisser', value: nbNonPayees, c: '#dc2626', sub: 'aucun mouvement lié', clic: 'nonpayees' },
   ] : [
-    { label: 'Total achats', value: total, c: color, sub: `${nbPayees} payées • ${nbNonPayees} à vérifier` },
+    { label: 'Total dépenses', value: total, c: color, sub: `${nbPayees} payées • ${nbNonPayees} à vérifier` },
     { label: 'Payées', value: nbPayees, c: '#16a34a', sub: 'liées à un paiement', clic: 'payees' },
     { label: 'Factures à vérifier', value: nbNonPayees, c: '#dc2626', sub: 'aucun paiement lié', clic: 'nonpayees' },
     { label: 'Paiements à vérifier', value: nbPaiementsAVerifier, c: '#ea580c', sub: 'mouvement sans facture' },
@@ -181,7 +181,7 @@ function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, s
             <span style={{ fontSize: '12.5px', color: '#64748b', fontWeight: '600' }}>{fmtDate(f.date_facture)}</span>,
             <span style={{ fontSize: '13px', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '10px' }}>{(f.nom || '').replace(/\.pdf$/i, '')}</span>,
             ...(masquerMontant ? [] : [<span style={{ textAlign: 'right', display: 'block', fontSize: '13.5px', fontWeight: '700', color: f.montant == null ? '#cbd5e1' : '#0f172a' }}>{f.montant == null ? '—' : fmt(f.montant)}</span>]),
-            <button onClick={(e) => { e.stopPropagation(); basculerSens(f) }} title={vente ? 'Reclasser dans les Achats' : 'Reclasser dans les Ventes'} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '30px', height: '30px', margin: '0 auto', borderRadius: '7px', border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', cursor: 'pointer' }}><i className="ti ti-transfer" style={{ fontSize: '16px' }} /></button>,
+            <button onClick={(e) => { e.stopPropagation(); basculerSens(f) }} title={vente ? 'Reclasser dans les Dépenses' : 'Reclasser dans les Rentrées'} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '30px', height: '30px', margin: '0 auto', borderRadius: '7px', border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', cursor: 'pointer' }}><i className="ti ti-transfer" style={{ fontSize: '16px' }} /></button>,
           ]
           return <Ligne key={f.fichier_id} cols={cols} items={cells} onClick={() => ouvrir(f)} clickable={!!f.url} alt={i % 2 === 1} title={f.nom} />
         })}
@@ -233,11 +233,11 @@ function VueVentes({ tables, color }) {
   const totalPages = Math.ceil(filtrees.length / PAR_PAGE)
   const facturesPage = filtrees.slice((page - 1) * PAR_PAGE, page * PAR_PAGE)
 
-  if (loading) return <div style={{ padding: '50px', textAlign: 'center', color: '#94a3b8' }}>Chargement des ventes…</div>
+  if (loading) return <div style={{ padding: '50px', textAlign: 'center', color: '#94a3b8' }}>Chargement des rentrées…</div>
   if (tables.length === 0) return <div style={{ padding: '50px', textAlign: 'center', color: '#94a3b8', background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0' }}>Pas de module de facturation de vente pour cette entité.</div>
 
   const kpis = [
-    { label: 'Total ventes', value: factures.length, c: color, sub: `${nbPayees} encaissées • ${nbNonPayees} en attente` },
+    { label: 'Total rentrées', value: factures.length, c: color, sub: `${nbPayees} encaissées • ${nbNonPayees} en attente` },
     { label: 'Encaissées', value: nbPayees, c: '#16a34a', sub: 'payées par le client', clic: 'payees' },
     { label: 'En attente', value: nbNonPayees, c: '#dc2626', sub: 'non encore payées', clic: 'nonpayees' },
     { label: 'Montant à encaisser', value: fmt(montantAEncaisser), c: '#dc2626', sub: 'solde dû par les clients' },
@@ -249,7 +249,7 @@ function VueVentes({ tables, color }) {
       <FiltreBar filtre={filtre} setFiltre={setFiltre} anneesDispo={anneesDispo} placeholder="Client, n° ou objet…" reset={() => setFiltre({ statut: 'toutes', recherche: '', annee: '' })} />
       <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
         <Ligne header cols={['100px', '110px', '110px', '1fr', '130px']} items={['Statut', 'Date', 'N°', 'Client', 'Montant TTC']} />
-        {facturesPage.length === 0 && <div style={{ padding: '50px', textAlign: 'center', color: '#94a3b8' }}>Aucune facture de vente</div>}
+        {facturesPage.length === 0 && <div style={{ padding: '50px', textAlign: 'center', color: '#94a3b8' }}>Aucune rentrée</div>}
         {facturesPage.map((f, i) => {
           const payee = estPayee(f)
           const cells = [
