@@ -323,23 +323,28 @@ export default function HexagroupCotisations() {
     ouvrirEdition({ ...data, lignes: [] })
   }
 
-  // Cotisation exceptionnelle (formation payante, option ...) : membre + intitulé + montant → 1 ligne
+  // Cotisation exceptionnelle (formation payante, option ...) : 1..N membres, même intitulé + montant → 1 cotisation par membre
   const creerExceptionnelle = async () => {
-    if (!exc?.membre_id) { alert('Choisis un membre.'); return }
+    const ids = exc?.membre_ids || []
+    if (!ids.length) { alert('Coche au moins un membre.'); return }
     if (!exc.objet.trim()) { alert('Donne un intitulé (ex : « Formation ... »).'); return }
     const montant = Number(String(exc.montant).replace(',', '.')) || 0
+    const lib = exc.objet.trim()
     setBusy(true)
-    const seq = rows.length ? Math.max(...rows.map(r => parseInt(String(r.numero).slice(4)) || 0)) : 0
-    const numero = `${annee}${String(seq + 1).padStart(2, '0')}`
-    const { data, error } = await supabase.from('hex_cotisations')
-      .insert({ membre_id: exc.membre_id, annee, numero, date_facture: today(), statut: 'a_envoyer', total: montant, objet: exc.objet.trim() })
-      .select('*, membre:hex_membres(*)').single()
-    if (error) { setBusy(false); alert('Création impossible : ' + error.message); return }
-    if (montant > 0) {
-      await supabase.from('hex_cotisations_lignes').insert({ cotisation_id: data.id, position: 0, libelle: exc.objet.trim(), quantite: 1, prix_unitaire: montant })
+    let seq = rows.length ? Math.max(...rows.map(r => parseInt(String(r.numero).slice(4)) || 0)) : 0
+    let created = 0, errs = 0
+    for (const mid of ids) {
+      seq += 1
+      const numero = `${annee}${String(seq).padStart(2, '0')}`
+      const { data, error } = await supabase.from('hex_cotisations')
+        .insert({ membre_id: mid, annee, numero, date_facture: today(), statut: 'a_envoyer', total: montant, objet: lib })
+        .select('id').single()
+      if (error) { errs++; continue }
+      if (montant > 0) await supabase.from('hex_cotisations_lignes').insert({ cotisation_id: data.id, position: 0, libelle: lib, quantite: 1, prix_unitaire: montant })
+      created++
     }
     setBusy(false); setExc(null); setTab('cotisations'); await charger()
-    ouvrirEdition({ ...data, lignes: montant > 0 ? [{ libelle: exc.objet.trim(), quantite: 1, prix_unitaire: montant }] : [] })
+    alert(`${created} cotisation${created > 1 ? 's' : ''} exceptionnelle${created > 1 ? 's' : ''} créée${created > 1 ? 's' : ''}${errs ? ` — ${errs} en échec` : ''}.`)
   }
 
   // ── UI ──
@@ -375,7 +380,7 @@ export default function HexagroupCotisations() {
               <button onClick={() => setPick(true)} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: 'rgba(255,255,255,.18)', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
                 <i className="ti ti-file-plus" style={{ fontSize: 15, verticalAlign: -2, marginRight: 4 }} />Nouvelle cotisation
               </button>
-              <button onClick={() => setExc({ membre_id: '', objet: '', montant: '' })} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: 'rgba(255,255,255,.28)', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
+              <button onClick={() => setExc({ membre_ids: [], objet: '', montant: '' })} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: 'rgba(255,255,255,.28)', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
                 <i className="ti ti-school" style={{ fontSize: 15, verticalAlign: -2, marginRight: 4 }} />Cotisation exceptionnelle
               </button>
             </div>
@@ -540,11 +545,24 @@ export default function HexagroupCotisations() {
             </div>
             <div style={{ fontSize: 13, color: '#64748b', marginBottom: 14 }}>Formation payante, option ou prestation ponctuelle facturée à un membre (en plus de sa cotisation annuelle).</div>
             <div style={{ marginBottom: 12 }}>
-              <label style={lbl}>Membre</label>
-              <select value={exc.membre_id} onChange={e => setExc(p => ({ ...p, membre_id: e.target.value }))} style={inp}>
-                <option value="">— choisir —</option>
-                {membres.filter(m => m.actif).map(m => <option key={m.id} value={m.id}>{m.societe || m.contact}</option>)}
-              </select>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <label style={{ ...lbl, marginBottom: 0 }}>Membres — {exc.membre_ids.length} sélectionné{exc.membre_ids.length > 1 ? 's' : ''}</label>
+                <button onClick={() => setExc(p => { const a = membres.filter(m => m.actif).map(m => m.id); return { ...p, membre_ids: p.membre_ids.length === a.length ? [] : a } })}
+                  style={{ border: 'none', background: 'none', color: cVIOLET, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                  {exc.membre_ids.length === membres.filter(m => m.actif).length ? 'Tout désélectionner' : 'Tout sélectionner'}
+                </button>
+              </div>
+              <div style={{ maxHeight: 200, overflowY: 'auto', border: '0.5px solid #cbd5e1', borderRadius: 8, padding: 4 }}>
+                {membres.filter(m => m.actif).map(m => {
+                  const on = exc.membre_ids.includes(m.id)
+                  return (
+                    <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 6, cursor: 'pointer', background: on ? '#f4f0f9' : 'transparent' }}>
+                      <input type="checkbox" checked={on} onChange={() => setExc(p => ({ ...p, membre_ids: p.membre_ids.includes(m.id) ? p.membre_ids.filter(x => x !== m.id) : [...p.membre_ids, m.id] }))} />
+                      <span style={{ fontSize: 13 }}>{m.societe || m.contact}</span>
+                    </label>
+                  )
+                })}
+              </div>
             </div>
             <div style={{ marginBottom: 12 }}>
               <label style={lbl}>Intitulé</label>
@@ -557,7 +575,7 @@ export default function HexagroupCotisations() {
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <button onClick={() => setExc(null)} style={{ padding: '9px 16px', borderRadius: 8, border: '0.5px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontWeight: 600 }}>Annuler</button>
-              <button onClick={creerExceptionnelle} disabled={busy} style={{ padding: '9px 18px', borderRadius: 8, border: 'none', background: cVIOLET, color: '#fff', cursor: 'pointer', fontWeight: 700 }}>{busy ? 'Création…' : 'Créer'}</button>
+              <button onClick={creerExceptionnelle} disabled={busy || !exc.membre_ids.length} style={{ padding: '9px 18px', borderRadius: 8, border: 'none', background: cVIOLET, color: '#fff', cursor: 'pointer', fontWeight: 700, opacity: exc.membre_ids.length ? 1 : .5 }}>{busy ? 'Création…' : `Créer (${exc.membre_ids.length})`}</button>
             </div>
           </div>
         </div>
