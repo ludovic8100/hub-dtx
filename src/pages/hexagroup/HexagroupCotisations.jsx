@@ -347,6 +347,45 @@ export default function HexagroupCotisations() {
     alert(`${created} cotisation${created > 1 ? 's' : ''} exceptionnelle${created > 1 ? 's' : ''} créée${created > 1 ? 's' : ''}${errs ? ` — ${errs} en échec` : ''}.`)
   }
 
+  // Rapprochement auto : lie chaque cotisation impayée à un crédit bancaire Hexagroup -> statut payée
+  const rapprocherPaiements = async () => {
+    setBusy(true)
+    const { data: soc } = await supabase.from('societes').select('id').eq('code', 'HEXAGROUP').maybeSingle()
+    let compteIds = []
+    if (soc) { const { data: cbs } = await supabase.from('comptes_bancaires').select('id').eq('societe_id', soc.id); compteIds = (cbs || []).map(c => c.id) }
+    if (!compteIds.length) { setBusy(false); alert('Aucun compte bancaire Hexagroup connecté à Ponto.'); return }
+    const { data: txs } = await supabase.from('transactions')
+      .select('id, montant, information_paiement, contrepartie_nom, date_execution, date_valeur')
+      .in('compte_id', compteIds).gt('montant', 0)
+    const credits = txs || []
+    const { data: liees } = await supabase.from('hex_cotisations').select('transaction_id').not('transaction_id', 'is', null)
+    const used = new Set((liees || []).map(l => l.transaction_id))
+    const norm = s => (s || '').toString().toUpperCase().replace(/[^A-Z0-9]/g, '')
+    const nums = info => (String(info || '').match(/\d{6,7}/g) || [])
+    let matched = 0
+    const aPayer = rows.filter(r => r.statut !== 'payee' && !r.transaction_id)
+    for (const c of aPayer) {
+      const total = Number(c.total) || 0
+      const mnom = norm(c.membre?.societe) || norm(c.membre?.contact)
+      const cand = credits.filter(t => !used.has(t.id))
+      // 1) numéro de cotisation dans la communication (fiable)
+      let m = cand.find(t => nums(t.information_paiement).includes(String(c.numero)))
+      // 2) sinon membre + montant exact, uniquement si un seul candidat (évite les faux positifs)
+      if (!m && mnom && total > 0) {
+        const mm = cand.filter(t => Math.abs(Number(t.montant) - total) < 0.01 && (norm(t.contrepartie_nom).includes(mnom) || mnom.includes(norm(t.contrepartie_nom))))
+        if (mm.length === 1) m = mm[0]
+      }
+      if (m) {
+        used.add(m.id)
+        await supabase.from('hex_cotisations').update({ transaction_id: m.id, statut: 'payee', date_paiement: m.date_execution || m.date_valeur || today() }).eq('id', c.id)
+        matched++
+      }
+    }
+    setBusy(false); await charger()
+    const restant = aPayer.length - matched
+    alert(`${matched} paiement${matched > 1 ? 's' : ''} rapproché${matched > 1 ? 's' : ''} automatiquement.` + (restant > 0 ? `\n${restant} cotisation(s) sans correspondance sûre — à pointer à la main.` : ''))
+  }
+
   // ── UI ──
   const card = { background: '#fff', border: '0.5px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }
   const metric = (label, val, col) => (
@@ -382,6 +421,9 @@ export default function HexagroupCotisations() {
               </button>
               <button onClick={() => setExc({ membre_ids: [], objet: '', montant: '' })} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: 'rgba(255,255,255,.28)', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
                 <i className="ti ti-school" style={{ fontSize: 15, verticalAlign: -2, marginRight: 4 }} />Cotisation exceptionnelle
+              </button>
+              <button onClick={rapprocherPaiements} disabled={busy} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: 'rgba(255,255,255,.28)', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
+                <i className="ti ti-arrows-transfer-down" style={{ fontSize: 15, verticalAlign: -2, marginRight: 4 }} />Rapprocher les paiements
               </button>
             </div>
           } />
