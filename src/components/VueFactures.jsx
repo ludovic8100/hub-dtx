@@ -234,7 +234,7 @@ function VueVentes({ tables, color }) {
   const facturesPage = filtrees.slice((page - 1) * PAR_PAGE, page * PAR_PAGE)
 
   if (loading) return <div style={{ padding: '50px', textAlign: 'center', color: '#94a3b8' }}>Chargement des rentrées…</div>
-  if (tables.length === 0) return <div style={{ padding: '50px', textAlign: 'center', color: '#94a3b8', background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0' }}>Pas de module de facturation de vente pour cette entité.</div>
+  if (tables.length === 0) return <div style={{ padding: '50px', textAlign: 'center', color: '#94a3b8', background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0' }}>Pas de module de facturation pour cette entité.</div>
 
   const kpis = [
     { label: 'Total rentrées', value: factures.length, c: color, sub: `${nbPayees} encaissées • ${nbNonPayees} en attente` },
