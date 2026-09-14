@@ -166,7 +166,7 @@ export default function HexagroupCotisations() {
     setEdit(r)
     setForm({
       statut: r.statut, date_facture: r.date_facture || '', date_envoi: r.date_envoi || '', date_paiement: r.date_paiement || '',
-      notes: r.notes || '', email: r.membre?.email || '',
+      notes: r.notes || '', email: r.membre?.email || '', objet: r.objet || '',
       lignes: (r.lignes || []).map(l => ({ libelle: l.libelle || '', quantite: Number(l.quantite || 1), prix_unitaire: Number(l.prix_unitaire || 0) })),
     })
   }
@@ -182,7 +182,7 @@ export default function HexagroupCotisations() {
     await supabase.from('hex_cotisations_lignes').delete().eq('cotisation_id', edit.id)
     if (form.lignes.length) await supabase.from('hex_cotisations_lignes').insert(form.lignes.map((l, i) => ({ cotisation_id: edit.id, position: i, libelle: l.libelle, quantite: Number(l.quantite || 0), prix_unitaire: Number(l.prix_unitaire || 0) })))
     await supabase.from('hex_cotisations').update({
-      statut: form.statut, total,
+      statut: form.statut, total, objet: form.objet || null,
       date_facture: form.date_facture || null, date_envoi: form.date_envoi || null, date_paiement: form.date_paiement || null, notes: form.notes || null,
     }).eq('id', edit.id)
     setBusy(false); setEdit(null); setForm(null); charger()
@@ -312,11 +312,17 @@ export default function HexagroupCotisations() {
 
   // Crée une cotisation pour UN membre (année courante), puis ouvre l'éditeur de lignes
   const creerCotisation = async (membre) => {
-    if (rows.some(r => r.membre_id === membre.id)) { alert(`${membre.societe || membre.contact} a déjà une cotisation ${annee}.`); return }
+    const nb = rows.filter(r => r.membre_id === membre.id).length
+    let objet = null
+    if (nb > 0) {
+      objet = prompt(`Cotisation exceptionnelle pour ${membre.societe || membre.contact}\n(il a déjà ${nb} cotisation${nb > 1 ? 's' : ''} en ${annee})\n\nObjet — ex : « Option ... » :`, '')
+      if (objet === null) return
+      objet = objet.trim() || 'Cotisation exceptionnelle'
+    }
     const seq = rows.length ? Math.max(...rows.map(r => parseInt(String(r.numero).slice(4)) || 0)) : 0
     const numero = `${annee}${String(seq + 1).padStart(2, '0')}`
     const { data, error } = await supabase.from('hex_cotisations')
-      .insert({ membre_id: membre.id, annee, numero, date_facture: `${annee}-07-01`, statut: 'a_envoyer', total: 0 })
+      .insert({ membre_id: membre.id, annee, numero, date_facture: `${annee}-07-01`, statut: 'a_envoyer', total: 0, objet })
       .select('*, membre:hex_membres(*)').single()
     if (error) { alert('Création impossible : ' + error.message); return }
     setPick(false); setTab('cotisations'); await charger()
@@ -380,6 +386,7 @@ export default function HexagroupCotisations() {
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: b.bg, color: b.fg, padding: '3px 9px', borderRadius: 20, fontSize: 12, fontWeight: 700 }}><i className={`ti ${b.ic}`} style={{ fontSize: 13 }} />{b.tx}</span>
                   </div>
                   <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 2 }}>{r.membre?.societe || r.membre?.contact || '—'}</div>
+                  {r.objet && <div style={{ fontSize: 12, color: '#b45309', marginBottom: 4 }}>{r.objet}</div>}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                     <span style={{ fontSize: 20, fontWeight: 700, color: cVIOLET }}>{eur(r.total)}</span>
                     <span style={{ fontSize: 12, color: nbR >= 2 ? '#dc2626' : '#94a3b8' }}>{nbR > 0 ? <><i className="ti ti-bell" style={{ fontSize: 13, verticalAlign: -1 }} /> {nbR} rappel{nbR > 1 ? 's' : ''}</> : 'aucun rappel'}{r.statut === 'payee' && r.date_paiement ? ' · payé le ' + fmtD(r.date_paiement) : ''}</span>
@@ -418,7 +425,10 @@ export default function HexagroupCotisations() {
                 return (
                   <tr key={r.id} style={{ borderTop: '0.5px solid #eef2f7' }}>
                     <td style={{ padding: '11px 12px', fontFamily: 'monospace', color: '#64748b' }}>{r.numero}</td>
-                    <td style={{ padding: '11px 12px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.membre?.societe || r.membre?.contact || '—'}</td>
+                    <td style={{ padding: '11px 12px' }}>
+                      <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.membre?.societe || r.membre?.contact || '—'}</div>
+                      {r.objet && <div style={{ fontSize: 11, color: '#b45309', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.objet}</div>}
+                    </td>
                     <td style={{ padding: '11px 12px', textAlign: 'right', fontWeight: 700 }}>{eur(r.total)}</td>
                     <td style={{ padding: '11px 12px' }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: b.bg, color: b.fg, padding: '3px 9px', borderRadius: 20, fontSize: 12, fontWeight: 700 }}>
@@ -459,6 +469,11 @@ export default function HexagroupCotisations() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div style={{ fontSize: 18, fontWeight: 700 }}>Cotisation {edit.numero} — {edit.membre?.societe || edit.membre?.contact}</div>
               <button onClick={() => { setEdit(null); setForm(null) }} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 20, color: '#64748b' }}><i className="ti ti-x" /></button>
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={lbl}>Objet <span style={{ color: '#94a3b8', fontWeight: 400 }}>(facultatif — ex : « Option ... ». Vide = cotisation annuelle)</span></label>
+              <input value={form.objet || ''} onChange={e => setForm(p => ({ ...p, objet: e.target.value }))} placeholder="Cotisation annuelle" style={inp} />
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10, marginBottom: 16 }}>
@@ -510,12 +525,12 @@ export default function HexagroupCotisations() {
             <div style={{ fontSize: 13, color: '#64748b', marginBottom: 12 }}>Choisis le membre à facturer :</div>
             <div style={{ maxHeight: 360, overflowY: 'auto' }}>
               {membres.filter(m => m.actif).map(m => {
-                const deja = rows.some(r => r.membre_id === m.id)
+                const nb = rows.filter(r => r.membre_id === m.id).length
                 return (
-                  <button key={m.id} onClick={() => !deja && creerCotisation(m)} disabled={deja}
-                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', textAlign: 'left', padding: '10px 12px', border: '0.5px solid #eef2f7', borderRadius: 8, marginBottom: 6, background: deja ? '#f8fafc' : '#fff', cursor: deja ? 'not-allowed' : 'pointer', opacity: deja ? 0.6 : 1 }}>
-                    <span style={{ fontWeight: 600 }}>{m.societe || m.contact}</span>
-                    <span style={{ fontSize: 12, color: '#94a3b8' }}>{deja ? 'déjà facturé' : 'facturer →'}</span>
+                  <button key={m.id} onClick={() => creerCotisation(m)}
+                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', textAlign: 'left', padding: '10px 12px', border: '0.5px solid #eef2f7', borderRadius: 8, marginBottom: 6, background: '#fff', cursor: 'pointer' }}>
+                    <span style={{ fontWeight: 600 }}>{m.societe || m.contact}{nb > 0 && <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400, marginLeft: 6 }}>· déjà {nb}</span>}</span>
+                    <span style={{ fontSize: 12, color: nb > 0 ? '#b45309' : '#94a3b8' }}>{nb > 0 ? 'cotisation except. →' : 'facturer →'}</span>
                   </button>
                 )
               })}
