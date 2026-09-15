@@ -357,20 +357,36 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
   const [reply, setReply] = useState('')
   const [checklist, setChecklist] = useState(Array.isArray(t.checklist) ? t.checklist : [])
   const [newItem, setNewItem] = useState('')
-  const saveChecklist = async (next) => {
+  const [commentDrafts, setCommentDrafts] = useState({})
+  // Enregistre la checklist ET notifie les participants (via touch)
+  const saveChecklistNotify = async (next, sysMsg) => {
     setChecklist(next)
-    await supabase.from('taches').update({ checklist: next, derniere_activite: new Date().toISOString() }).eq('id', t.id)
-    onChanged()
+    await touch({ checklist: next }, sysMsg)
   }
   const addItem = () => {
     if (!newItem.trim()) return
-    saveChecklist([...checklist, { id: Date.now(), texte: newItem.trim(), fait: false, remarque: '' }])
+    const txt = newItem.trim()
+    saveChecklistNotify([...checklist, { id: Date.now(), texte: txt, fait: false, commentaires: [] }], `Point ajouté à la checklist : « ${txt} » (par ${myCode})`)
     setNewItem('')
   }
-  const toggleItem = (id) => saveChecklist(checklist.map(c => c.id === id ? { ...c, fait: !c.fait, fait_par: !c.fait ? myCode : null, fait_le: !c.fait ? new Date().toISOString() : null } : c))
-  const setRemarque = (id, v) => setChecklist(checklist.map(c => c.id === id ? { ...c, remarque: v } : c))
-  const saveRemarque = (id) => { const it = checklist.find(c => c.id === id); saveChecklist(checklist.map(c => c.id === id ? { ...c, remarque: it.remarque } : c)) }
-  const removeItem = (id) => saveChecklist(checklist.filter(c => c.id !== id))
+  const toggleItem = (id) => {
+    const it = checklist.find(c => c.id === id)
+    const next = checklist.map(c => c.id === id ? { ...c, fait: !c.fait, fait_par: !c.fait ? myCode : null, fait_le: !c.fait ? new Date().toISOString() : null } : c)
+    saveChecklistNotify(next, `Point « ${it?.texte || ''} » ${it?.fait ? 'décoché' : 'coché'} (par ${myCode})`)
+  }
+  const removeItem = (id) => {
+    const it = checklist.find(c => c.id === id)
+    saveChecklistNotify(checklist.filter(c => c.id !== id), `Point « ${it?.texte || ''} » retiré (par ${myCode})`)
+  }
+  const addComment = (id) => {
+    const txt = (commentDrafts[id] || '').trim()
+    if (!txt) return
+    const it = checklist.find(c => c.id === id)
+    const com = { id: Date.now(), code: myCode, nom: myNom, texte: txt, date: new Date().toISOString() }
+    const next = checklist.map(c => c.id === id ? { ...c, commentaires: [...(Array.isArray(c.commentaires) ? c.commentaires : []), com] } : c)
+    setCommentDrafts(d => ({ ...d, [id]: '' }))
+    saveChecklistNotify(next, `💬 ${myCode} a commenté « ${it?.texte || ''} » : ${txt.slice(0, 140)}`)
+  }
   const [sending, setSending] = useState(false)
   const [loadingMsgs, setLoadingMsgs] = useState(true)
 
@@ -519,8 +535,21 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
               {item.fait && item.fait_par && <span style={{ fontSize: 10, color: C.textL }}>✓ {item.fait_par}</span>}
               <span onClick={() => removeItem(item.id)} style={{ cursor: 'pointer', color: C.textL, fontSize: 14, padding: '0 4px' }}>×</span>
             </div>
-            <input value={item.remarque || ''} onChange={e => setRemarque(item.id, e.target.value)} onBlur={() => saveRemarque(item.id)}
-              placeholder="Remarque (optionnel)…" style={{ ...S.input, marginTop: 6, fontSize: 12, padding: '5px 8px', background: '#fff' }} />
+            {(Array.isArray(item.commentaires) ? item.commentaires : []).map(com => (
+              <div key={com.id} style={{ marginTop: 6, marginLeft: 25, fontSize: 12, color: '#2D3748', background: '#fff', border: `1px solid #EEF1F6`, borderRadius: 8, padding: '5px 9px' }}>
+                <span style={{ fontWeight: 700, color: NAVY }}>{codeLabel(com.code) || com.nom || com.code}</span>
+                <span style={{ fontSize: 10, color: C.textL, marginLeft: 6 }}>{fmtDT(com.date)}</span>
+                <div>{com.texte}</div>
+              </div>
+            ))}
+            {item.remarque && <div style={{ marginTop: 6, marginLeft: 25, fontSize: 12, color: C.textL, fontStyle: 'italic' }}>Note : {item.remarque}</div>}
+            {t.ticket_statut !== 'cloture' && (
+              <div style={{ display: 'flex', gap: 6, marginTop: 6, marginLeft: 25 }}>
+                <input value={commentDrafts[item.id] || ''} onChange={e => setCommentDrafts(d => ({ ...d, [item.id]: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addComment(item.id) } }}
+                  placeholder="Commenter ce point…" style={{ ...S.input, fontSize: 12, padding: '5px 8px', background: '#fff' }} />
+                <button onClick={() => addComment(item.id)} style={{ ...S.btn('ghost'), padding: '5px 10px', fontSize: 12 }}>💬</button>
+              </div>
+            )}
           </div>
         ))}
         {t.ticket_statut !== 'cloture' && (
