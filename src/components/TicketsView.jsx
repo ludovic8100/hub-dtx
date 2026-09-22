@@ -95,6 +95,51 @@ function mailTicket(t, intro) {
   </div>`
 }
 
+// ── Pièces jointes (Supabase Storage, bucket 'tickets') ──
+const sanitizeName = n => (n || 'fichier').replace(/[^a-zA-Z0-9.\-_]/g, '_').slice(0, 120)
+
+async function uploadPiece(tacheId, file, who) {
+  const path = `${tacheId}/${Date.now()}-${sanitizeName(file.name)}`
+  const { error } = await supabase.storage.from('tickets').upload(path, file, { upsert: false })
+  if (error) throw error
+  await supabase.from('tickets_messages').insert({
+    tache_id: tacheId, auteur_code: who.code, auteur_nom: who.nom, auteur_email: who.email,
+    type: 'piece_jointe', message: file.name, piece_jointe_path: path, piece_jointe_nom: file.name,
+  })
+}
+
+// Zone de dépôt réutilisable : glisser-déposer OU clic
+function DropZone({ onFiles, disabled, compact }) {
+  const [over, setOver] = useState(false)
+  const inputRef = useRef(null)
+  const handle = list => { const arr = Array.from(list || []).filter(Boolean); if (arr.length) onFiles(arr) }
+  return (
+    <div
+      onDragOver={e => { e.preventDefault(); if (!disabled) setOver(true) }}
+      onDragLeave={e => { e.preventDefault(); setOver(false) }}
+      onDrop={e => { e.preventDefault(); setOver(false); if (!disabled) handle(e.dataTransfer.files) }}
+      onClick={() => { if (!disabled) inputRef.current?.click() }}
+      style={{ border: `2px dashed ${over ? CYAN : C.border}`, borderRadius: 10, padding: compact ? '10px 12px' : '18px 14px', textAlign: 'center', cursor: disabled ? 'not-allowed' : 'pointer', background: over ? '#EAF6FD' : '#FAFBFD', color: over ? MID : C.textL, fontSize: 12.5, fontWeight: 600, transition: 'all .15s', opacity: disabled ? 0.5 : 1 }}>
+      <input ref={inputRef} type="file" multiple style={{ display: 'none' }} onChange={e => { handle(e.target.files); e.target.value = '' }} />
+      📎 Glisse un fichier ici ou clique pour choisir
+    </div>
+  )
+}
+
+// Affiche une pièce jointe (lien signé + aperçu image)
+function PieceJointe({ path, nom }) {
+  const [url, setUrl] = useState(null)
+  useEffect(() => { let ok = true; if (path) supabase.storage.from('tickets').createSignedUrl(path, 3600).then(({ data }) => { if (ok) setUrl(data?.signedUrl || null) }); return () => { ok = false } }, [path])
+  const isImg = /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(nom || path || '')
+  if (!url) return <span style={{ fontSize: 12, color: C.textL }}>📎 {nom || 'pièce jointe'}…</span>
+  return (
+    <a href={url} target="_blank" rel="noreferrer" style={{ color: MID, textDecoration: 'none', fontWeight: 600 }}>
+      {isImg && <img src={url} alt={nom} style={{ maxWidth: 220, maxHeight: 220, borderRadius: 8, display: 'block', marginBottom: 5 }} />}
+      📎 {nom || 'Télécharger'}
+    </a>
+  )
+}
+
 export default function TicketsView() {
   const { perms, isAdmin } = useAuth()
   const myCode = (perms?.collab_code || perms?.code || (perms?.user_email || '').split('@')[0] || '').toUpperCase()
@@ -109,6 +154,7 @@ export default function TicketsView() {
   const [fCat, setFCat] = useState('tous')
   const [fCollab, setFCollab] = useState('tous')
   const [showCreate, setShowCreate] = useState(false)
+  const [createPrefill, setCreatePrefill] = useState(null)
   const [sel, setSel] = useState(null)             // ticket ouvert (détail)
   const [mobile, setMobile] = useState(isMobile())
 
@@ -150,6 +196,20 @@ export default function TicketsView() {
     const found = tickets.find(x => String(x.id) === String(tid))
     if (found) { ouvertParUrl.current = true; setSel(found) }
   }, [tickets])
+
+  // Ouverture directe du formulaire de création via lien (?new=1&dossier=...&client_id=...&titre=...)
+  const ouvertNewUrl = useRef(false)
+  useEffect(() => {
+    if (ouvertNewUrl.current) return
+    const q = new URLSearchParams(window.location.search)
+    if (q.get('new') !== '1') return
+    ouvertNewUrl.current = true
+    const dossier = q.get('dossier') || ''
+    const client_id = q.get('client_id') || ''
+    const titre = q.get('titre') || (dossier ? `${dossier} - ` : '')
+    setCreatePrefill({ titre, dossier_client: dossier || null, client_id: client_id || null })
+    setShowCreate(true)
+  }, [])
 
   const codeLabel = code => { if (!code) return '—'; const c = collabs.find(x => (x.code || '').toUpperCase() === (code || '').toUpperCase()); return c ? (c.nom_complet || c.nom_sa_data || c.code) : code }
 
@@ -258,7 +318,7 @@ export default function TicketsView() {
         </div>
       )}
 
-      {showCreate && <CreateModal collabs={collabs} myCode={myCode} onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); load() }} />}
+      {showCreate && <CreateModal collabs={collabs} myCode={myCode} myNom={myNom} myEmail={myEmail} prefill={createPrefill} onClose={() => { setShowCreate(false); setCreatePrefill(null) }} onCreated={() => { setShowCreate(false); setCreatePrefill(null); load() }} />}
       {sel && <DetailModal ticket={sel} collabs={collabs} codeLabel={codeLabel} myCode={myCode} myNom={myNom} myEmail={myEmail} isAdmin={isAdmin} onClose={() => setSel(null)} onChanged={() => load()} />}
     </div>
   )
@@ -291,8 +351,9 @@ function Overlay({ children, onClose, wide }) {
   )
 }
 
-function CreateModal({ collabs, myCode, onClose, onCreated }) {
-  const [f, setF] = useState({ titre: '', description: '', ticket_categorie: 'Bug hub', priorite: 'moyenne', gestionnaire: '' })
+function CreateModal({ collabs, myCode, myNom, myEmail, prefill, onClose, onCreated }) {
+  const [f, setF] = useState({ titre: prefill?.titre || '', description: '', ticket_categorie: 'Bug hub', priorite: 'moyenne', gestionnaire: '' })
+  const [files, setFiles] = useState([])
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
   const set = (k, v) => setF(x => ({ ...x, [k]: v }))
@@ -306,6 +367,7 @@ function CreateModal({ collabs, myCode, onClose, onCreated }) {
         is_ticket: true, ticket_categorie: f.ticket_categorie, ticket_statut: 'nouveau', ticket_origine: 'interne',
         priorite: f.priorite, gestionnaire: f.gestionnaire ? f.gestionnaire.toUpperCase() : null,
         cree_par: myCode, statut: 'todo', source: 'ticket', derniere_activite: now,
+        dossier_client: prefill?.dossier_client || null, client_id: prefill?.client_id || null,
       }
       const { data, error } = await supabase.from('taches').insert(payload).select().single()
       if (error) throw error
@@ -314,6 +376,7 @@ function CreateModal({ collabs, myCode, onClose, onCreated }) {
         tache_id: data.id, auteur_code: myCode, type: 'systeme',
         message: f.gestionnaire ? `Ticket créé et assigné à ${f.gestionnaire.toUpperCase()}` : 'Ticket créé (non attribué)',
       })
+      for (const file of files) { try { await uploadPiece(data.id, file, { code: myCode, nom: myNom, email: myEmail }) } catch (e) { /* une PJ ne doit pas faire échouer la création */ } }
       // Alerte à l'assigné (si attribué à quelqu'un d'autre que le créateur)
       const asg = f.gestionnaire ? f.gestionnaire.toUpperCase() : null
       if (asg && asg !== myCode) {
@@ -329,6 +392,7 @@ function CreateModal({ collabs, myCode, onClose, onCreated }) {
       <div style={{ padding: '18px 22px', borderBottom: `1px solid ${C.border}`, fontSize: 16, fontWeight: 800, color: NAVY }}>Nouvelle demande</div>
       <div style={{ padding: 22, overflowY: 'auto' }}>
         {err && <div style={{ background: '#FDECEA', color: '#721C24', border: '1px solid #F5C6CB', borderRadius: 8, padding: '10px 12px', marginBottom: 14, fontSize: 13 }}>{err}</div>}
+        {prefill?.dossier_client && <div style={{ background: '#EAF6FD', color: MID, border: '1px solid #BFE3F5', borderRadius: 8, padding: '8px 12px', marginBottom: 14, fontSize: 12, fontWeight: 600 }}>🔗 Ticket lié au dossier client #{prefill.dossier_client}</div>}
         <div style={{ marginBottom: 14 }}><label style={S.label}>Titre *</label><input style={S.input} value={f.titre} onChange={e => set('titre', e.target.value)} placeholder="Résumé court de la demande" /></div>
         <div style={{ marginBottom: 14 }}><label style={S.label}>Description</label><textarea style={{ ...S.input, minHeight: 90, resize: 'vertical' }} value={f.description} onChange={e => set('description', e.target.value)} placeholder="Détaille ta demande ou le problème…" /></div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
@@ -341,6 +405,21 @@ function CreateModal({ collabs, myCode, onClose, onCreated }) {
             {collabs.map(c => <option key={c.code} value={c.code}>{c.nom_complet || c.nom_sa_data || c.code} ({c.code})</option>)}
           </select>
           <div style={{ fontSize: 11, color: C.textL, marginTop: 6 }}>Si tu laisses vide, le ticket ira dans « À attribuer ».</div>
+        </div>
+        <div style={{ marginTop: 16 }}>
+          <label style={S.label}>Pièces jointes</label>
+          <DropZone onFiles={fs => setFiles(prev => [...prev, ...fs])} />
+          {files.length > 0 && (
+            <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {files.map((file, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 7, padding: '5px 9px' }}>
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: NAVY }}>📎 {file.name}</span>
+                  <span style={{ color: C.textL }}>{Math.round(file.size / 1024)} Ko</span>
+                  <span onClick={() => setFiles(prev => prev.filter((_, j) => j !== i))} style={{ cursor: 'pointer', color: C.danger, fontWeight: 700 }}>×</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
       <div style={{ padding: '14px 22px', borderTop: `1px solid ${C.border}`, display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
@@ -388,6 +467,7 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
     saveChecklistNotify(next, `💬 ${myCode} a commenté « ${it?.texte || ''} » : ${txt.slice(0, 140)}`)
   }
   const [sending, setSending] = useState(false)
+  const [upBusy, setUpBusy] = useState(false)
   const [loadingMsgs, setLoadingMsgs] = useState(true)
 
   const loadMsgs = useCallback(async () => {
@@ -434,6 +514,20 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
     const emails = emailsOf(concernes)
     if (emails.length) envoyerAlerte(emails, `Nouveau message sur le ticket #${t.id}`, mailTicket(t, `Bonjour,<br>${myCode} a écrit un message sur ce ticket :<br><i>"${txt.slice(0,200)}"</i>`))
     setReply(''); setSending(false); await loadMsgs(); onChanged()
+  }
+
+  const attachFiles = async (fileList) => {
+    const arr = Array.from(fileList || [])
+    if (!arr.length) return
+    setUpBusy(true)
+    try {
+      for (const file of arr) await uploadPiece(t.id, file, { code: myCode, nom: myNom, email: myEmail })
+      await supabase.from('taches').update({ derniere_activite: new Date().toISOString() }).eq('id', t.id)
+      const concernes = [...new Set([(t.gestionnaire || '').toUpperCase(), (t.cree_par || '').toUpperCase(), ...parts].filter(c => c && c !== myCode))]
+      const emails = emailsOf(concernes)
+      if (emails.length) envoyerAlerte(emails, `Pièce jointe ajoutée au ticket #${t.id}`, mailTicket(t, `Bonjour,<br>${myCode} a ajouté ${arr.length > 1 ? arr.length + ' pièces jointes' : 'une pièce jointe'} au ticket.`))
+    } catch (e) { alert("Échec de l'envoi de la pièce jointe : " + (e.message || '')) }
+    setUpBusy(false); await loadMsgs(); onChanged()
   }
 
   const changeStatut = async (nk) => {
@@ -565,6 +659,20 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
       <div style={{ flex: 1, overflowY: 'auto', padding: 20, background: C.bg, minHeight: 200 }}>
         {loadingMsgs ? <div style={{ textAlign: 'center', color: C.textL }}>…</div> : msgs.map(m => {
           if (m.type === 'systeme') return <div key={m.id} style={{ textAlign: 'center', margin: '10px 0' }}><span style={{ fontSize: 11, color: C.textL, fontStyle: 'italic', border: `1px dashed ${C.border}`, borderRadius: 20, padding: '3px 12px' }}>{m.message}</span></div>
+          if (m.type === 'piece_jointe') {
+            const ownPj = (m.auteur_code || '').toUpperCase() === myCode
+            return (
+              <div key={m.id} style={{ marginBottom: 14, textAlign: ownPj ? 'right' : 'left' }}>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4, justifyContent: ownPj ? 'flex-end' : 'flex-start' }}>
+                  <span style={{ fontWeight: 700, fontSize: 12 }}>{m.auteur_nom || m.auteur_code}</span>
+                  <span style={{ fontSize: 10, color: C.textL }}>{fmtDT(m.created_at)}</span>
+                </div>
+                <div style={{ display: 'inline-block', textAlign: 'left', maxWidth: '80%', background: '#fff', border: `1px solid #EEF1F6`, borderRadius: 10, padding: '9px 12px' }}>
+                  <PieceJointe path={m.piece_jointe_path} nom={m.piece_jointe_nom} />
+                </div>
+              </div>
+            )
+          }
           const own = (m.auteur_code || '').toUpperCase() === myCode
           return (
             <div key={m.id} style={{ marginBottom: 14, textAlign: own ? 'right' : 'left' }}>
@@ -583,6 +691,10 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
       {/* Actions bas */}
       {t.ticket_statut !== 'cloture' ? (
         <>
+          <div style={{ padding: '10px 16px 0' }}>
+            <DropZone compact disabled={upBusy} onFiles={attachFiles} />
+            {upBusy && <div style={{ fontSize: 11, color: C.textL, marginTop: 4 }}>Envoi de la pièce jointe…</div>}
+          </div>
           <div style={{ display: 'flex', gap: 8, padding: '10px 16px', borderTop: `1px solid ${C.border}`, alignItems: 'center' }}>
             <input style={{ ...S.input, borderRadius: 20 }} value={reply} onChange={e => setReply(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply() } }} placeholder="Écrire une réponse…" />
             <button onClick={sendReply} disabled={sending} style={{ ...S.btn('primary'), borderRadius: '50%', width: 42, height: 42, padding: 0, fontSize: 16 }}>➤</button>

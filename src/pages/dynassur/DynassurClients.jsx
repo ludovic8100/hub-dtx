@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import Layout from '../../components/Layout'
@@ -1048,6 +1048,7 @@ function Fiche({ client, onClose, onOpenDossier }) {
   const [bureauClient,setBureauClient]=useState('')
   const [cies,setCies]=useState([])
   const ref=useRef(null)
+  const navigate = useNavigate()
   useEffect(()=>{ getCompagnies().then(setCies) },[])
 
   useEffect(()=>{
@@ -1317,6 +1318,9 @@ function Fiche({ client, onClose, onOpenDossier }) {
               </div>
             ))}
           </div>
+          <button onClick={()=>navigate(`/tickets?new=1&dossier=${encodeURIComponent(client.dossier)}${client.id?`&client_id=${client.id}`:''}`)} title="Ouvrir un ticket lié à ce dossier" style={{background:'rgba(255,255,255,0.15)',border:'1px solid rgba(255,255,255,0.3)',borderRadius:8,padding:'6px 12px',cursor:'pointer',color:'#fff',fontSize:13,fontWeight:600,display:'flex',alignItems:'center',gap:5}}>
+            <i className="ti ti-ticket"/>Ouvrir ticket
+          </button>
           <button onClick={onClose} style={{background:'rgba(255,255,255,0.15)',border:'1px solid rgba(255,255,255,0.3)',borderRadius:8,padding:'6px 12px',cursor:'pointer',color:'#fff',fontSize:13,fontWeight:600,display:'flex',alignItems:'center',gap:5}}>
             <i className="ti ti-x"/>Fermer
           </button>
