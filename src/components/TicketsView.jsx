@@ -165,6 +165,7 @@ export default function TicketsView() {
   const [fCollab, setFCollab] = useState('tous')
   const [sort, setSort] = useState({ col: 'created', dir: 'desc' })
   const [cats, setCats] = useState(CATEGORIES)
+  const [catType, setCatType] = useState({})
   const [showCreate, setShowCreate] = useState(false)
   const [createPrefill, setCreatePrefill] = useState(null)
   const [sel, setSel] = useState(null)             // ticket ouvert (détail)
@@ -198,7 +199,7 @@ export default function TicketsView() {
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
-  useEffect(() => { supabase.from('ticket_categories').select('label').eq('actif', true).order('ordre').then(({ data }) => { if (data && data.length) setCats(data.map(r => r.label)) }) }, [])
+  useEffect(() => { supabase.from('ticket_categories').select('label,type').eq('actif', true).order('ordre').then(({ data }) => { if (data && data.length) { setCats(data.map(r => r.label)); setCatType(Object.fromEntries(data.map(r => [r.label, r.type || 'gestion']))) } }) }, [])
 
   // Ouverture directe d'un ticket via le lien e-mail (?ticket=ID)
   const ouvertParUrl = useRef(false)
@@ -377,7 +378,7 @@ export default function TicketsView() {
         </div>
       )}
 
-      {showCreate && <CreateModal collabs={collabs} cats={cats} myCode={myCode} myNom={myNom} myEmail={myEmail} prefill={createPrefill} onClose={() => { setShowCreate(false); setCreatePrefill(null) }} onCreated={() => { setShowCreate(false); setCreatePrefill(null); load() }} />}
+      {showCreate && <CreateModal collabs={collabs} cats={cats} catType={catType} myCode={myCode} myNom={myNom} myEmail={myEmail} prefill={createPrefill} onClose={() => { setShowCreate(false); setCreatePrefill(null) }} onCreated={() => { setShowCreate(false); setCreatePrefill(null); load() }} />}
       {sel && <DetailModal ticket={sel} collabs={collabs} codeLabel={codeLabel} myCode={myCode} myNom={myNom} myEmail={myEmail} isAdmin={isAdmin} onClose={() => setSel(null)} onChanged={() => load()} />}
     </div>
   )
@@ -410,7 +411,7 @@ function Overlay({ children, onClose, wide }) {
   )
 }
 
-function CreateModal({ collabs, cats = CATEGORIES, myCode, myNom, myEmail, prefill, onClose, onCreated }) {
+function CreateModal({ collabs, cats = CATEGORIES, catType = {}, myCode, myNom, myEmail, prefill, onClose, onCreated }) {
   const [f, setF] = useState({ titre: prefill?.titre || '', description: '', entite: '', ticket_categorie: (cats && cats[0]) || 'Gestion client', priorite: 'moyenne', gestionnaire: '', dossier_client: prefill?.dossier_client || '', client_id: prefill?.client_id || null, participants: [] })
   const [files, setFiles] = useState([])
   const [saving, setSaving] = useState(false)
@@ -427,12 +428,31 @@ function CreateModal({ collabs, cats = CATEGORIES, myCode, myNom, myEmail, prefi
     setCbusy(true); let cancelled = false
     const timer = setTimeout(async () => {
       const safe = query.replace(/[,%()*]/g, ' ').trim()
-      try { const { data } = await supabase.from('clients').select('id,nom,prenom,dossier,cp,localite').or(`nom.ilike.%${safe}%,prenom.ilike.%${safe}%,dossier.ilike.%${safe}%`).limit(10); if (!cancelled) setCres(data || []) }
+      try { const { data } = await supabase.from('clients').select('id,nom,prenom,dossier,cp,localite,gestionnaire_code,gestionnaire_nom,sa_code,sa_nom').or(`nom.ilike.%${safe}%,prenom.ilike.%${safe}%,dossier.ilike.%${safe}%`).limit(10); if (!cancelled) setCres(data || []) }
       catch { if (!cancelled) setCres([]) } finally { if (!cancelled) setCbusy(false) }
     }, 300)
     return () => { cancelled = true; clearTimeout(timer) }
   }, [cq])
-  const pickClient = c => { setSelClient({ id: c.id, dossier: c.dossier, nom: `${c.nom || ''} ${c.prenom || ''}`.trim() }); setF(x => ({ ...x, client_id: c.id, dossier_client: c.dossier })); setCq(''); setCres(null) }
+  const routeFor = (client, categorie) => {
+    if (!client) return {}
+    const type = catType[categorie] || 'gestion'
+    if (type === 'neutre') return {}
+    const has = code => !!code && collabs.some(c => (c.code || '').toUpperCase() === code.toUpperCase())
+    const gest = (client.gestionnaire_code || '').toUpperCase()
+    const com = (client.sa_code || '').toUpperCase()
+    const assigne = type === 'commercial' ? com : gest
+    const suiveur = type === 'commercial' ? gest : com
+    const res = {}
+    if (has(assigne)) res.gestionnaire = assigne
+    if (has(suiveur) && suiveur !== (has(assigne) ? assigne : null)) res.participants = [suiveur]
+    return res
+  }
+  const pickClient = c => {
+    setSelClient({ id: c.id, dossier: c.dossier, nom: `${c.nom || ''} ${c.prenom || ''}`.trim(), gestionnaire_code: c.gestionnaire_code, sa_code: c.sa_code })
+    const r = routeFor(c, f.ticket_categorie)
+    setF(x => ({ ...x, client_id: c.id, dossier_client: c.dossier, ...('gestionnaire' in r ? { gestionnaire: r.gestionnaire } : {}), ...('participants' in r ? { participants: r.participants } : {}) }))
+    setCq(''); setCres(null)
+  }
   const clearClient = () => { setSelClient(null); setF(x => ({ ...x, client_id: null, dossier_client: '' })) }
   const save = async () => {
     if (!f.titre.trim()) { setErr('Le titre est obligatoire'); return }
@@ -498,7 +518,7 @@ function CreateModal({ collabs, cats = CATEGORIES, myCode, myNom, myEmail, prefi
           </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
-          <div><label style={S.label}>Catégorie</label><select style={S.input} value={f.ticket_categorie} onChange={e => set('ticket_categorie', e.target.value)}>{cats.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+          <div><label style={S.label}>Catégorie</label><select style={S.input} value={f.ticket_categorie} onChange={e => { const v = e.target.value; const r = routeFor(selClient, v); setF(x => ({ ...x, ticket_categorie: v, ...('gestionnaire' in r ? { gestionnaire: r.gestionnaire } : {}), ...('participants' in r ? { participants: r.participants } : {}) })) }}>{cats.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
           <div><label style={S.label}>Priorité</label><select style={S.input} value={f.priorite} onChange={e => set('priorite', e.target.value)}>{PRIOS.map(p => <option key={p.k} value={p.k}>{p.label}</option>)}</select></div>
         </div>
         <div><label style={S.label}>Assigner à (optionnel)</label>
@@ -510,6 +530,7 @@ function CreateModal({ collabs, cats = CATEGORIES, myCode, myNom, myEmail, prefi
         </div>
         <div style={{ marginTop: 16 }}>
           <label style={S.label}>En suivi (participants)</label>
+          {selClient && <div style={{ fontSize: 11, color: MID, marginBottom: 6 }}>Assigné et suivi pré-remplis depuis le dossier selon la catégorie — modifiables.</div>}
           {f.participants.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
               {f.participants.map(pc => (
