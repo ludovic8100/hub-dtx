@@ -164,6 +164,7 @@ export default function TicketsView() {
   const [fCat, setFCat] = useState('tous')
   const [fCollab, setFCollab] = useState('tous')
   const [sort, setSort] = useState({ col: 'created', dir: 'desc' })
+  const [cats, setCats] = useState(CATEGORIES)
   const [showCreate, setShowCreate] = useState(false)
   const [createPrefill, setCreatePrefill] = useState(null)
   const [sel, setSel] = useState(null)             // ticket ouvert (détail)
@@ -197,6 +198,7 @@ export default function TicketsView() {
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
+  useEffect(() => { supabase.from('ticket_categories').select('label').eq('actif', true).order('ordre').then(({ data }) => { if (data && data.length) setCats(data.map(r => r.label)) }) }, [])
 
   // Ouverture directe d'un ticket via le lien e-mail (?ticket=ID)
   const ouvertParUrl = useRef(false)
@@ -306,7 +308,7 @@ export default function TicketsView() {
         </select>
         <select style={{ ...S.input, width: 'auto' }} value={fCat} onChange={e => setFCat(e.target.value)}>
           <option value="tous">Toutes catégories</option>
-          {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+          {cats.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
         <select style={{ ...S.input, width: 'auto' }} value={fCollab} onChange={e => setFCollab(e.target.value)}>
           <option value="tous">Assigné à : tous</option>
@@ -375,7 +377,7 @@ export default function TicketsView() {
         </div>
       )}
 
-      {showCreate && <CreateModal collabs={collabs} myCode={myCode} myNom={myNom} myEmail={myEmail} prefill={createPrefill} onClose={() => { setShowCreate(false); setCreatePrefill(null) }} onCreated={() => { setShowCreate(false); setCreatePrefill(null); load() }} />}
+      {showCreate && <CreateModal collabs={collabs} cats={cats} myCode={myCode} myNom={myNom} myEmail={myEmail} prefill={createPrefill} onClose={() => { setShowCreate(false); setCreatePrefill(null) }} onCreated={() => { setShowCreate(false); setCreatePrefill(null); load() }} />}
       {sel && <DetailModal ticket={sel} collabs={collabs} codeLabel={codeLabel} myCode={myCode} myNom={myNom} myEmail={myEmail} isAdmin={isAdmin} onClose={() => setSel(null)} onChanged={() => load()} />}
     </div>
   )
@@ -408,8 +410,8 @@ function Overlay({ children, onClose, wide }) {
   )
 }
 
-function CreateModal({ collabs, myCode, myNom, myEmail, prefill, onClose, onCreated }) {
-  const [f, setF] = useState({ titre: prefill?.titre || '', description: '', entite: '', ticket_categorie: 'Gestion client', priorite: 'moyenne', gestionnaire: '', dossier_client: prefill?.dossier_client || '', participants: [] })
+function CreateModal({ collabs, cats = CATEGORIES, myCode, myNom, myEmail, prefill, onClose, onCreated }) {
+  const [f, setF] = useState({ titre: prefill?.titre || '', description: '', entite: '', ticket_categorie: (cats && cats[0]) || 'Gestion client', priorite: 'moyenne', gestionnaire: '', dossier_client: prefill?.dossier_client || '', client_id: prefill?.client_id || null, participants: [] })
   const [files, setFiles] = useState([])
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
@@ -417,8 +419,24 @@ function CreateModal({ collabs, myCode, myNom, myEmail, prefill, onClose, onCrea
   const nameOf = code => collabs.find(c => (c.code || '').toUpperCase() === (code || '').toUpperCase())?.nom_complet || code
   const addPart = code => { const c = (code || '').toUpperCase(); if (c && !f.participants.includes(c) && c !== (f.gestionnaire || '').toUpperCase()) set('participants', [...f.participants, c]) }
   const removePart = code => set('participants', f.participants.filter(x => x !== code))
+  const [selClient, setSelClient] = useState(prefill?.dossier_client ? { id: prefill.client_id || null, dossier: prefill.dossier_client, nom: '' } : null)
+  const [cq, setCq] = useState(''); const [cres, setCres] = useState(null); const [cbusy, setCbusy] = useState(false)
+  useEffect(() => {
+    const query = cq.trim()
+    if (query.length < 2) { setCres(null); setCbusy(false); return }
+    setCbusy(true); let cancelled = false
+    const timer = setTimeout(async () => {
+      const safe = query.replace(/[,%()*]/g, ' ').trim()
+      try { const { data } = await supabase.from('clients').select('id,nom,prenom,dossier,cp,localite').or(`nom.ilike.%${safe}%,prenom.ilike.%${safe}%,dossier.ilike.%${safe}%`).limit(10); if (!cancelled) setCres(data || []) }
+      catch { if (!cancelled) setCres([]) } finally { if (!cancelled) setCbusy(false) }
+    }, 300)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [cq])
+  const pickClient = c => { setSelClient({ id: c.id, dossier: c.dossier, nom: `${c.nom || ''} ${c.prenom || ''}`.trim() }); setF(x => ({ ...x, client_id: c.id, dossier_client: c.dossier })); setCq(''); setCres(null) }
+  const clearClient = () => { setSelClient(null); setF(x => ({ ...x, client_id: null, dossier_client: '' })) }
   const save = async () => {
     if (!f.titre.trim()) { setErr('Le titre est obligatoire'); return }
+    if (!f.entite) { setErr('La société est obligatoire'); return }
     setSaving(true); setErr('')
     try {
       const now = new Date().toISOString()
@@ -427,7 +445,7 @@ function CreateModal({ collabs, myCode, myNom, myEmail, prefill, onClose, onCrea
         is_ticket: true, entite: f.entite || null, ticket_categorie: f.ticket_categorie, ticket_statut: 'nouveau', ticket_origine: 'interne',
         priorite: f.priorite, gestionnaire: f.gestionnaire ? f.gestionnaire.toUpperCase() : null,
         participants: f.participants, cree_par: myCode, statut: 'todo', source: 'ticket', derniere_activite: now,
-        dossier_client: (f.dossier_client || '').trim() || prefill?.dossier_client || null, client_id: prefill?.client_id || null,
+        dossier_client: (f.dossier_client || '').trim() || prefill?.dossier_client || null, client_id: f.client_id || prefill?.client_id || null,
       }
       const { data, error } = await supabase.from('taches').insert(payload).select().single()
       if (error) throw error
@@ -455,11 +473,32 @@ function CreateModal({ collabs, myCode, myNom, myEmail, prefill, onClose, onCrea
         <div style={{ marginBottom: 14 }}><label style={S.label}>Titre *</label><input style={S.input} value={f.titre} onChange={e => set('titre', e.target.value)} placeholder="Résumé court de la demande" /></div>
         <div style={{ marginBottom: 14 }}><label style={S.label}>Description</label><textarea style={{ ...S.input, minHeight: 90, resize: 'vertical' }} value={f.description} onChange={e => set('description', e.target.value)} placeholder="Détaille ta demande ou le problème…" /></div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
-          <div><label style={S.label}>Société</label><select style={S.input} value={f.entite} onChange={e => set('entite', e.target.value)}><option value="">— Choisir —</option>{SOCIETES.map(s => <option key={s.k} value={s.k}>{s.label}</option>)}</select></div>
-          <div><label style={S.label}>Dossier client (n° — vide = néant)</label><input style={S.input} value={f.dossier_client} onChange={e => set('dossier_client', e.target.value)} placeholder="ex. 6060 — laisser vide si aucun" /></div>
+          <div><label style={S.label}>Société *</label><select style={S.input} value={f.entite} onChange={e => set('entite', e.target.value)}><option value="">— Choisir —</option>{SOCIETES.map(s => <option key={s.k} value={s.k}>{s.label}</option>)}</select></div>
+          <div style={{ position: 'relative' }}>
+            <label style={S.label}>Dossier client (nom ou n° — vide = néant)</label>
+            {selClient ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#EAF6FD', border: '1px solid #BFE3F5', borderRadius: 8, padding: '8px 11px', fontSize: 13 }}>
+                <span style={{ flex: 1, color: MID, fontWeight: 600 }}>🔗 {selClient.nom || 'Dossier'} #{selClient.dossier}</span>
+                <span onClick={clearClient} style={{ cursor: 'pointer', color: C.danger, fontWeight: 800 }}>×</span>
+              </div>
+            ) : (<>
+              <input style={S.input} value={cq} onChange={e => setCq(e.target.value)} placeholder="Nom du client ou n° de dossier…" autoComplete="off" />
+              {cbusy && <div style={{ fontSize: 11, color: C.textL, marginTop: 4 }}>Recherche…</div>}
+              {cres && cres.length === 0 && !cbusy && <div style={{ fontSize: 11, color: C.textL, marginTop: 4 }}>Aucun client trouvé.</div>}
+              {cres && cres.length > 0 && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 30, marginTop: 4, background: '#fff', border: `1px solid ${C.border}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.12)', maxHeight: 240, overflowY: 'auto' }}>
+                  {cres.map(c => (
+                    <div key={c.id} onClick={() => pickClient(c)} style={{ padding: '8px 11px', cursor: 'pointer', borderBottom: `1px solid #F1F4F8`, fontSize: 13 }}>
+                      <span style={{ fontWeight: 700, color: NAVY }}>{c.nom} {c.prenom}</span> <span style={{ color: C.textL }}>#{c.dossier} · {c.cp} {c.localite}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>)}
+          </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
-          <div><label style={S.label}>Catégorie</label><select style={S.input} value={f.ticket_categorie} onChange={e => set('ticket_categorie', e.target.value)}>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+          <div><label style={S.label}>Catégorie</label><select style={S.input} value={f.ticket_categorie} onChange={e => set('ticket_categorie', e.target.value)}>{cats.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
           <div><label style={S.label}>Priorité</label><select style={S.input} value={f.priorite} onChange={e => set('priorite', e.target.value)}>{PRIOS.map(p => <option key={p.k} value={p.k}>{p.label}</option>)}</select></div>
         </div>
         <div><label style={S.label}>Assigner à (optionnel)</label>
