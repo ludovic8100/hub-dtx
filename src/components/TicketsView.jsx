@@ -5,7 +5,16 @@ import { useAuth } from '../lib/auth'
 const NAVY = '#1A3A6B', CYAN = '#29ABE2', MID = '#1E5799'
 const C = { bg: '#F4F6F9', white: '#fff', border: '#DDE3ED', textM: '#4A5568', textL: '#8A9BBE', ok: '#27AE60', warn: '#F39C12', danger: '#E74C3C' }
 
-const CATEGORIES = ['Bug hub', 'Demande développement', 'Problème Outlook/M365', 'Demande administrative', 'Autre']
+const CATEGORIES = ['Gestion client', 'Sinistre', 'Commercial', 'Demande développement', 'Bug hub', 'Problème Outlook/M365', 'Demande administrative', 'Autre']
+const SOCIETES = [
+  { k: 'dynassur', label: 'Dynassur' },
+  { k: 'dtx', label: 'DTX' },
+  { k: 'lode', label: 'LODE' },
+  { k: 'hex', label: 'Hexagroup' },
+  { k: 'prive', label: 'Privé' },
+  { k: 'grp', label: 'Groupe' },
+]
+const socLabel = k => (SOCIETES.find(s => s.k === (k || '').toLowerCase())?.label) || (k ? k : '—')
 const STATUTS = [
   { k: 'nouveau', label: 'Nouveau', bg: '#E3F2FD', fg: '#1565C0' },
   { k: 'en_cours', label: 'En cours', bg: '#FFF3E0', fg: '#E65100' },
@@ -151,8 +160,10 @@ export default function TicketsView() {
   const [loading, setLoading] = useState(true)
   const [scope, setScope] = useState('mine')       // mine / unassigned / all
   const [fStatut, setFStatut] = useState('actifs') // actifs / tous / <statut>
+  const [fSoc, setFSoc] = useState('tous')
   const [fCat, setFCat] = useState('tous')
   const [fCollab, setFCollab] = useState('tous')
+  const [sort, setSort] = useState({ col: 'created', dir: 'desc' })
   const [showCreate, setShowCreate] = useState(false)
   const [createPrefill, setCreatePrefill] = useState(null)
   const [sel, setSel] = useState(null)             // ticket ouvert (détail)
@@ -221,16 +232,50 @@ export default function TicketsView() {
     if (scope === 'mine' && !(assigne === myCode || auteur === myCode || parts.includes(myCode))) return false
     if (scope === 'unassigned' && assigne) return false
     // scope 'all' : tout (réservé admin)
+    if (fSoc !== 'tous' && (t.entite || '').toLowerCase() !== fSoc) return false
     if (fCat !== 'tous' && t.ticket_categorie !== fCat) return false
-    if (fCollab !== 'tous') {
-      const fc = fCollab.toUpperCase()
-      const impliques = [(t.gestionnaire || '').toUpperCase(), ...parts]
-      if (!impliques.includes(fc)) return false
-    }
+    if (fCollab !== 'tous' && (t.gestionnaire || '').toUpperCase() !== fCollab.toUpperCase()) return false
     if (fStatut === 'actifs' && t.ticket_statut === 'cloture') return false
     else if (fStatut !== 'actifs' && fStatut !== 'tous' && t.ticket_statut !== fStatut) return false
     return true
   })
+  const COLS = [
+    { key: 'id', label: '#' },
+    { key: 'titre', label: 'Titre' },
+    { key: 'societe', label: 'Société' },
+    { key: 'categorie', label: 'Catégorie' },
+    { key: 'priorite', label: 'Priorité' },
+    { key: 'statut', label: 'Statut' },
+    { key: 'assigne', label: 'Assigné à' },
+    { key: 'cree', label: 'Créé par' },
+    { key: 'participants', label: 'Participants' },
+    { key: 'dossier', label: 'Dossier' },
+    { key: 'created', label: 'Créé le' },
+    { key: 'maj', label: 'Maj' },
+  ]
+  const sortVal = (t, key) => {
+    switch (key) {
+      case 'id': return t.id
+      case 'titre': return (t.titre || '').toLowerCase()
+      case 'societe': return socLabel(t.entite).toLowerCase()
+      case 'categorie': return (t.ticket_categorie || '').toLowerCase()
+      case 'priorite': return PRIOS.findIndex(p => p.k === t.priorite)
+      case 'statut': return STATUTS.findIndex(s => s.k === t.ticket_statut)
+      case 'assigne': return (codeLabel(t.gestionnaire) || '').toLowerCase()
+      case 'cree': return (codeLabel(t.cree_par) || '').toLowerCase()
+      case 'participants': return Array.isArray(t.participants) ? t.participants.length : 0
+      case 'dossier': return t.dossier_client || ''
+      case 'created': return new Date(t.created_at || t.date_creation || 0).getTime()
+      case 'maj': return new Date(t.derniere_activite || t.created_at || 0).getTime()
+      default: return ''
+    }
+  }
+  const rows = [...visibles].sort((a, b) => {
+    const va = sortVal(a, sort.col), vb = sortVal(b, sort.col)
+    const r = va < vb ? -1 : va > vb ? 1 : 0
+    return sort.dir === 'asc' ? r : -r
+  })
+  const toggleSort = key => setSort(s => s.col === key ? { col: key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { col: key, dir: 'asc' })
   const nbUnassigned = tickets.filter(t => !(t.gestionnaire || '')).length
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: C.textL }}>Chargement des tickets…</div>
@@ -255,12 +300,16 @@ export default function TicketsView() {
           <option value="tous">Tous statuts</option>
           {STATUTS.map(s => <option key={s.k} value={s.k}>{s.label}</option>)}
         </select>
+        <select style={{ ...S.input, width: 'auto' }} value={fSoc} onChange={e => setFSoc(e.target.value)}>
+          <option value="tous">Toutes sociétés</option>
+          {SOCIETES.map(s => <option key={s.k} value={s.k}>{s.label}</option>)}
+        </select>
         <select style={{ ...S.input, width: 'auto' }} value={fCat} onChange={e => setFCat(e.target.value)}>
           <option value="tous">Toutes catégories</option>
           {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
         <select style={{ ...S.input, width: 'auto' }} value={fCollab} onChange={e => setFCollab(e.target.value)}>
-          <option value="tous">Tous collaborateurs</option>
+          <option value="tous">Assigné à : tous</option>
           {collabs.map(c => <option key={c.code} value={c.code}>{c.nom_complet}</option>)}
         </select>
         <div style={{ flex: 1 }} />
@@ -292,24 +341,32 @@ export default function TicketsView() {
       ) : mobile ? (
         <div>{visibles.map(t => <TicketCard key={t.id} t={t} codeLabel={codeLabel} onOpen={() => setSel(t)} />)}</div>
       ) : (
-        <div style={{ background: '#fff', border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ background: '#fff', border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead><tr style={{ background: C.bg, color: C.textM }}>
-              {['#', 'Titre', 'Catégorie', 'Statut', 'Créé par', 'Assigné à', 'Participants', 'Maj'].map(h => <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, textTransform: 'uppercase', fontWeight: 700 }}>{h}</th>)}
+              {COLS.map(c => (
+                <th key={c.key} onClick={() => toggleSort(c.key)} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, textTransform: 'uppercase', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', userSelect: 'none' }}>
+                  {c.label}{sort.col === c.key ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                </th>
+              ))}
             </tr></thead>
             <tbody>
-              {visibles.map(t => {
+              {rows.map(t => {
                 const s = st(t.ticket_statut), p = pr(t.priorite)
                 return (
                   <tr key={t.id} onClick={() => setSel(t)} style={{ borderTop: `1px solid #EEF1F6`, cursor: 'pointer', opacity: t.ticket_statut === 'cloture' ? 0.6 : 1 }}>
                     <td style={{ padding: '11px 14px', fontFamily: 'monospace', color: C.textL, fontWeight: 700 }}>#{t.id}</td>
                     <td style={{ padding: '11px 14px', fontWeight: 600, color: NAVY }}>{t.priorite === 'urgente' && <span style={URGENT_STYLE}>URGENT</span>}<span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: p.col, marginRight: 8 }} />{t.titre}</td>
+                    <td style={{ padding: '11px 14px', fontSize: 12, color: C.textM }}>{socLabel(t.entite)}</td>
                     <td style={{ padding: '11px 14px', color: C.textL, fontSize: 12 }}>{t.ticket_categorie || '—'}</td>
+                    <td style={{ padding: '11px 14px' }}><span style={{ fontSize: 11, fontWeight: 700, color: p.col }}>{p.label}</span></td>
                     <td style={{ padding: '11px 14px' }}><span style={S.badge(s.bg, s.fg)}>{s.label}</span></td>
-                    <td style={{ padding: '11px 14px', fontSize: 12 }}>{t.cree_par || '—'}</td>
-                    <td style={{ padding: '11px 14px' }}>{t.gestionnaire ? <span style={S.avatar}>{(t.gestionnaire || '').slice(0, 3)}</span> : <span style={{ color: C.danger, fontWeight: 600, fontSize: 12 }}>⚠ À attribuer</span>}</td>
+                    <td style={{ padding: '11px 14px' }}>{t.gestionnaire ? <span style={S.avatar} title={codeLabel(t.gestionnaire)}>{(t.gestionnaire || '').slice(0, 3)}</span> : <span style={{ color: C.danger, fontWeight: 600, fontSize: 12 }}>⚠ À attribuer</span>}</td>
+                    <td style={{ padding: '11px 14px', fontSize: 12, color: C.textM }}>{codeLabel(t.cree_par) || t.cree_par || '—'}</td>
                     <td style={{ padding: '11px 14px' }}>{(Array.isArray(t.participants) && t.participants.length) ? <span style={{ fontSize: 11, color: C.textM }}>{t.participants.map(codeLabel).join(', ')}</span> : <span style={{ color: C.textL, fontSize: 12 }}>—</span>}</td>
-                    <td style={{ padding: '11px 14px', color: C.textL, fontSize: 12 }}>{rel(t.derniere_activite || t.created_at)}</td>
+                    <td style={{ padding: '11px 14px', fontSize: 12, color: MID, fontWeight: 600 }}>{t.dossier_client ? '#' + t.dossier_client : '—'}</td>
+                    <td style={{ padding: '11px 14px', color: C.textL, fontSize: 12, whiteSpace: 'nowrap' }}>{t.created_at ? new Date(t.created_at).toLocaleDateString('fr-BE') : '—'}</td>
+                    <td style={{ padding: '11px 14px', color: C.textL, fontSize: 12, whiteSpace: 'nowrap' }}>{rel(t.derniere_activite || t.created_at)}</td>
                   </tr>
                 )
               })}
@@ -352,11 +409,14 @@ function Overlay({ children, onClose, wide }) {
 }
 
 function CreateModal({ collabs, myCode, myNom, myEmail, prefill, onClose, onCreated }) {
-  const [f, setF] = useState({ titre: prefill?.titre || '', description: '', ticket_categorie: 'Bug hub', priorite: 'moyenne', gestionnaire: '' })
+  const [f, setF] = useState({ titre: prefill?.titre || '', description: '', entite: '', ticket_categorie: 'Gestion client', priorite: 'moyenne', gestionnaire: '', dossier_client: prefill?.dossier_client || '', participants: [] })
   const [files, setFiles] = useState([])
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
   const set = (k, v) => setF(x => ({ ...x, [k]: v }))
+  const nameOf = code => collabs.find(c => (c.code || '').toUpperCase() === (code || '').toUpperCase())?.nom_complet || code
+  const addPart = code => { const c = (code || '').toUpperCase(); if (c && !f.participants.includes(c) && c !== (f.gestionnaire || '').toUpperCase()) set('participants', [...f.participants, c]) }
+  const removePart = code => set('participants', f.participants.filter(x => x !== code))
   const save = async () => {
     if (!f.titre.trim()) { setErr('Le titre est obligatoire'); return }
     setSaving(true); setErr('')
@@ -364,10 +424,10 @@ function CreateModal({ collabs, myCode, myNom, myEmail, prefill, onClose, onCrea
       const now = new Date().toISOString()
       const payload = {
         titre: f.titre.trim(), description: f.description || null,
-        is_ticket: true, ticket_categorie: f.ticket_categorie, ticket_statut: 'nouveau', ticket_origine: 'interne',
+        is_ticket: true, entite: f.entite || null, ticket_categorie: f.ticket_categorie, ticket_statut: 'nouveau', ticket_origine: 'interne',
         priorite: f.priorite, gestionnaire: f.gestionnaire ? f.gestionnaire.toUpperCase() : null,
-        cree_par: myCode, statut: 'todo', source: 'ticket', derniere_activite: now,
-        dossier_client: prefill?.dossier_client || null, client_id: prefill?.client_id || null,
+        participants: f.participants, cree_par: myCode, statut: 'todo', source: 'ticket', derniere_activite: now,
+        dossier_client: (f.dossier_client || '').trim() || prefill?.dossier_client || null, client_id: prefill?.client_id || null,
       }
       const { data, error } = await supabase.from('taches').insert(payload).select().single()
       if (error) throw error
@@ -377,12 +437,11 @@ function CreateModal({ collabs, myCode, myNom, myEmail, prefill, onClose, onCrea
         message: f.gestionnaire ? `Ticket créé et assigné à ${f.gestionnaire.toUpperCase()}` : 'Ticket créé (non attribué)',
       })
       for (const file of files) { try { await uploadPiece(data.id, file, { code: myCode, nom: myNom, email: myEmail }) } catch (e) { /* une PJ ne doit pas faire échouer la création */ } }
-      // Alerte à l'assigné (si attribué à quelqu'un d'autre que le créateur)
+      // Alerte aux concernés (assigné + participants), sauf le créateur
       const asg = f.gestionnaire ? f.gestionnaire.toUpperCase() : null
-      if (asg && asg !== myCode) {
-        const c = collabs.find(x => (x.code||'').toUpperCase() === asg)
-        if (c?.email) envoyerAlerte([c.email], `Ticket #${data.id} vous a été attribué`, mailTicket({ ...data }, `Bonjour,<br>Un nouveau ticket vous a été attribué par ${myCode}.`))
-      }
+      const dest = [...new Set([asg, ...f.participants].filter(cc => cc && cc !== myCode))]
+      const emails = dest.map(code => collabs.find(x => (x.code || '').toUpperCase() === code)?.email).filter(Boolean)
+      if (emails.length) envoyerAlerte(emails, `Nouveau ticket #${data.id}`, mailTicket({ ...data }, `Un nouveau ticket a été créé par <b>${myCode}</b>${data.dossier_client ? ` (dossier #${data.dossier_client})` : ''}.<br>Vous y êtes associé. Cliquez ci-dessous pour le consulter.`))
       onCreated()
     } catch (e) { setErr('Erreur : ' + (e.message || '')) }
     setSaving(false)
@@ -396,6 +455,10 @@ function CreateModal({ collabs, myCode, myNom, myEmail, prefill, onClose, onCrea
         <div style={{ marginBottom: 14 }}><label style={S.label}>Titre *</label><input style={S.input} value={f.titre} onChange={e => set('titre', e.target.value)} placeholder="Résumé court de la demande" /></div>
         <div style={{ marginBottom: 14 }}><label style={S.label}>Description</label><textarea style={{ ...S.input, minHeight: 90, resize: 'vertical' }} value={f.description} onChange={e => set('description', e.target.value)} placeholder="Détaille ta demande ou le problème…" /></div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+          <div><label style={S.label}>Société</label><select style={S.input} value={f.entite} onChange={e => set('entite', e.target.value)}><option value="">— Choisir —</option>{SOCIETES.map(s => <option key={s.k} value={s.k}>{s.label}</option>)}</select></div>
+          <div><label style={S.label}>Dossier client (n° — vide = néant)</label><input style={S.input} value={f.dossier_client} onChange={e => set('dossier_client', e.target.value)} placeholder="ex. 6060 — laisser vide si aucun" /></div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
           <div><label style={S.label}>Catégorie</label><select style={S.input} value={f.ticket_categorie} onChange={e => set('ticket_categorie', e.target.value)}>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
           <div><label style={S.label}>Priorité</label><select style={S.input} value={f.priorite} onChange={e => set('priorite', e.target.value)}>{PRIOS.map(p => <option key={p.k} value={p.k}>{p.label}</option>)}</select></div>
         </div>
@@ -405,6 +468,23 @@ function CreateModal({ collabs, myCode, myNom, myEmail, prefill, onClose, onCrea
             {collabs.map(c => <option key={c.code} value={c.code}>{c.nom_complet || c.nom_sa_data || c.code} ({c.code})</option>)}
           </select>
           <div style={{ fontSize: 11, color: C.textL, marginTop: 6 }}>Si tu laisses vide, le ticket ira dans « À attribuer ».</div>
+        </div>
+        <div style={{ marginTop: 16 }}>
+          <label style={S.label}>En suivi (participants)</label>
+          {f.participants.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+              {f.participants.map(pc => (
+                <span key={pc} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#E3F2FD', color: '#1565C0', borderRadius: 14, padding: '3px 10px', fontSize: 12, fontWeight: 600 }}>
+                  {nameOf(pc)}<span onClick={() => removePart(pc)} style={{ cursor: 'pointer', fontWeight: 800 }}>×</span>
+                </span>
+              ))}
+            </div>
+          )}
+          <select style={S.input} value="" onChange={e => { addPart(e.target.value); e.target.value = '' }}>
+            <option value="">+ Mettre une personne en suivi…</option>
+            {collabs.filter(c => !f.participants.includes((c.code || '').toUpperCase()) && (c.code || '').toUpperCase() !== (f.gestionnaire || '').toUpperCase()).map(c => <option key={c.code} value={c.code}>{c.nom_complet}</option>)}
+          </select>
+          <div style={{ fontSize: 11, color: C.textL, marginTop: 6 }}>Ils reçoivent les mises à jour et la clôture, et peuvent commenter.</div>
         </div>
         <div style={{ marginTop: 16 }}>
           <label style={S.label}>Pièces jointes</label>
