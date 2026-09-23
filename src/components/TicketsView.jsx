@@ -10,9 +10,9 @@ const SOCIETES = [
   { k: 'dynassur', label: 'Dynassur' },
   { k: 'dtx', label: 'DTX' },
   { k: 'lode', label: 'LODE' },
-  { k: 'hex', label: 'Hexagroup' },
+  { k: 'hexagroup', label: 'Hexagroup' },
   { k: 'prive', label: 'Privé' },
-  { k: 'grp', label: 'Groupe' },
+  { k: 'groupe', label: 'Groupe' },
 ]
 const socLabel = k => (SOCIETES.find(s => s.k === (k || '').toLowerCase())?.label) || (k ? k : '—')
 const STATUTS = [
@@ -150,7 +150,8 @@ function PieceJointe({ path, nom }) {
 }
 
 export default function TicketsView() {
-  const { perms, isAdmin } = useAuth()
+  const { perms, isAdmin, activeSociete } = useAuth()
+  const entiteScope = (activeSociete && activeSociete !== 'groupe') ? activeSociete : null
   const myCode = (perms?.collab_code || perms?.code || (perms?.user_email || '').split('@')[0] || '').toUpperCase()
   const myEmail = (perms?.user_email || '').toLowerCase()
   const myNom = perms?.nom || myCode
@@ -235,6 +236,7 @@ export default function TicketsView() {
     if (scope === 'mine' && !(assigne === myCode || auteur === myCode || parts.includes(myCode))) return false
     if (scope === 'unassigned' && assigne) return false
     // scope 'all' : tout (réservé admin)
+    if (entiteScope && (t.entite || '').toLowerCase() !== entiteScope) return false
     if (fSoc !== 'tous' && (t.entite || '').toLowerCase() !== fSoc) return false
     if (fCat !== 'tous' && t.ticket_categorie !== fCat) return false
     if (fCollab !== 'tous' && (t.gestionnaire || '').toUpperCase() !== fCollab.toUpperCase()) return false
@@ -303,10 +305,12 @@ export default function TicketsView() {
           <option value="tous">Tous statuts</option>
           {STATUTS.map(s => <option key={s.k} value={s.k}>{s.label}</option>)}
         </select>
-        <select style={{ ...S.input, width: 'auto' }} value={fSoc} onChange={e => setFSoc(e.target.value)}>
-          <option value="tous">Toutes sociétés</option>
-          {SOCIETES.map(s => <option key={s.k} value={s.k}>{s.label}</option>)}
-        </select>
+        {entiteScope
+          ? <span style={{ ...S.input, width: 'auto', display: 'inline-flex', alignItems: 'center', background: '#EAF6FD', borderColor: '#BFE3F5', color: MID, fontWeight: 700 }}>Société : {socLabel(entiteScope)}</span>
+          : <select style={{ ...S.input, width: 'auto' }} value={fSoc} onChange={e => setFSoc(e.target.value)}>
+              <option value="tous">Toutes sociétés</option>
+              {SOCIETES.map(s => <option key={s.k} value={s.k}>{s.label}</option>)}
+            </select>}
         <select style={{ ...S.input, width: 'auto' }} value={fCat} onChange={e => setFCat(e.target.value)}>
           <option value="tous">Toutes catégories</option>
           {cats.map(c => <option key={c} value={c}>{c}</option>)}
@@ -378,7 +382,7 @@ export default function TicketsView() {
         </div>
       )}
 
-      {showCreate && <CreateModal collabs={collabs} cats={cats} catType={catType} myCode={myCode} myNom={myNom} myEmail={myEmail} prefill={createPrefill} onClose={() => { setShowCreate(false); setCreatePrefill(null) }} onCreated={() => { setShowCreate(false); setCreatePrefill(null); load() }} />}
+      {showCreate && <CreateModal collabs={collabs} cats={cats} catType={catType} lockedSociete={entiteScope} myCode={myCode} myNom={myNom} myEmail={myEmail} prefill={createPrefill} onClose={() => { setShowCreate(false); setCreatePrefill(null) }} onCreated={() => { setShowCreate(false); setCreatePrefill(null); load() }} />}
       {sel && <DetailModal ticket={sel} collabs={collabs} codeLabel={codeLabel} myCode={myCode} myNom={myNom} myEmail={myEmail} isAdmin={isAdmin} onClose={() => setSel(null)} onChanged={() => load()} />}
     </div>
   )
@@ -411,8 +415,8 @@ function Overlay({ children, onClose, wide }) {
   )
 }
 
-function CreateModal({ collabs, cats = CATEGORIES, catType = {}, myCode, myNom, myEmail, prefill, onClose, onCreated }) {
-  const [f, setF] = useState({ titre: prefill?.titre || '', description: '', entite: '', ticket_categorie: (cats && cats[0]) || 'Gestion client', priorite: 'moyenne', gestionnaire: '', dossier_client: prefill?.dossier_client || '', client_id: prefill?.client_id || null, participants: [] })
+function CreateModal({ collabs, cats = CATEGORIES, catType = {}, lockedSociete = null, myCode, myNom, myEmail, prefill, onClose, onCreated }) {
+  const [f, setF] = useState({ titre: prefill?.titre || '', description: '', entite: lockedSociete || '', ticket_categorie: (cats && cats[0]) || 'Gestion client', priorite: 'moyenne', gestionnaire: '', dossier_client: prefill?.dossier_client || '', client_id: prefill?.client_id || null, participants: [] })
   const [files, setFiles] = useState([])
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
@@ -493,7 +497,7 @@ function CreateModal({ collabs, cats = CATEGORIES, catType = {}, myCode, myNom, 
         <div style={{ marginBottom: 14 }}><label style={S.label}>Titre *</label><input style={S.input} value={f.titre} onChange={e => set('titre', e.target.value)} placeholder="Résumé court de la demande" /></div>
         <div style={{ marginBottom: 14 }}><label style={S.label}>Description</label><textarea style={{ ...S.input, minHeight: 90, resize: 'vertical' }} value={f.description} onChange={e => set('description', e.target.value)} placeholder="Détaille ta demande ou le problème…" /></div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
-          <div><label style={S.label}>Société *</label><select style={S.input} value={f.entite} onChange={e => set('entite', e.target.value)}><option value="">— Choisir —</option>{SOCIETES.map(s => <option key={s.k} value={s.k}>{s.label}</option>)}</select></div>
+          <div><label style={S.label}>Société *</label><select style={{ ...S.input, ...(lockedSociete ? { background: '#EEF1F6', color: MID, fontWeight: 700 } : {}) }} value={f.entite} disabled={!!lockedSociete} onChange={e => set('entite', e.target.value)}><option value="">— Choisir —</option>{SOCIETES.map(s => <option key={s.k} value={s.k}>{s.label}</option>)}</select></div>
           <div style={{ position: 'relative' }}>
             <label style={S.label}>Dossier client (nom ou n° — vide = néant)</label>
             {selClient ? (
