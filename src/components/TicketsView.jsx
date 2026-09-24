@@ -176,7 +176,7 @@ export default function TicketsView() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const sel = 'id,titre,description,ticket_categorie,ticket_statut,ticket_origine,priorite,gestionnaire,cree_par,cloture_par,user_email,derniere_activite,date_creation,created_at,dossier_client,client_id,participants,checklist'
+    const sel = 'id,titre,description,entite,ticket_categorie,ticket_statut,ticket_origine,priorite,gestionnaire,cree_par,cloture_par,user_email,derniere_activite,date_creation,created_at,dossier_client,client_id,participants,checklist'
     let all = []
     for (let from = 0; ; from += 1000) {
       const { data, error } = await supabase.from('taches').select(sel).eq('is_ticket', true).order('derniere_activite', { ascending: false }).range(from, from + 999)
@@ -682,6 +682,9 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
     const c = code ? code.toUpperCase() : null
     await touch({ gestionnaire: c }, c ? `Assigné à ${c} (par ${myCode})` : `Attribution retirée (par ${myCode})`)
   }
+  const changerSociete = async (v) => {
+    await touch({ entite: v || null }, v ? `Société → ${socLabel(v)} (par ${myCode})` : `Société retirée (par ${myCode})`)
+  }
   const parts = Array.isArray(t.participants) ? t.participants.map(x => (x || '').toUpperCase()) : []
   const emailOf = code => { const c = collabs.find(x => (x.code || '').toUpperCase() === (code || '').toUpperCase()); return c?.email || null }
   const emailsOf = codes => codes.map(emailOf).filter(Boolean)
@@ -725,6 +728,13 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
           <select style={{ ...S.input, width: 'auto', padding: '5px 8px', fontSize: 12 }} value={t.gestionnaire || ''} onChange={e => assigner(e.target.value)}>
             <option value="">— À attribuer —</option>
             {collabs.map(c => <option key={c.code} value={c.code}>{c.nom_complet}</option>)}
+          </select>
+        )}
+        <div style={{ fontSize: 12, marginLeft: 4 }}>Société : <b style={{ color: t.entite ? MID : C.danger }}>{t.entite ? socLabel(t.entite) : '⚠ aucune'}</b></div>
+        {canManage && (
+          <select style={{ ...S.input, width: 'auto', padding: '5px 8px', fontSize: 12 }} value={t.entite || ''} onChange={e => changerSociete(e.target.value)}>
+            <option value="">— Société —</option>
+            {SOCIETES.map(s => <option key={s.k} value={s.k}>{s.label}</option>)}
           </select>
         )}
         {canManage && t.ticket_statut !== 'cloture' && (
