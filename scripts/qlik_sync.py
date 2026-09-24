@@ -77,6 +77,20 @@ def parse_date(txt):
     return None
 
 
+def qnum_to_date(qnum, txt=None):
+    """Convertit un numero de serie Qlik/Excel (epoque 1899-12-30) en date ISO.
+    Insensible a la locale -> corrige l'inversion jour/mois du parsing texte
+    (Qlik sort ses dates en format americain M/J via =Date(...))."""
+    try:
+        if qnum is not None and str(qnum) not in ("NaN", ""):
+            n = float(qnum)
+            if n > 0:
+                return (datetime.date(1899, 12, 30) + datetime.timedelta(days=int(round(n)))).isoformat()
+    except (ValueError, TypeError):
+        pass
+    return parse_date(txt)
+
+
 def first(txt):
     if not txt:
         return None
@@ -128,7 +142,7 @@ def extract():
                     v = (cell.get("qText") or "").strip()
                     rec[col] = v or None
                 elif kind == "date":
-                    rec[col] = parse_date(cell.get("qText"))
+                    rec[col] = qnum_to_date(cell.get("qNum"), cell.get("qText"))
                 elif kind == "num":
                     n = cell.get("qNum")
                     rec[col] = round(float(n), 2) if isinstance(n, (int, float)) else 0
