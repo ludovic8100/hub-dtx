@@ -13,6 +13,7 @@ export default function GestionCategories() {
   const [edits, setEdits] = useState({})
   const [flash, setFlash] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [reaff, setReaff] = useState(null) // { cat, count, cible } : reaffectation avant suppression
 
   function notify(m) { setFlash(m); setTimeout(() => setFlash(null), 2800) }
 
@@ -78,12 +79,26 @@ export default function GestionCategories() {
   async function supprimer(cat) {
     if (aDesEnfants(cat.id)) { notify(`Impossible : « ${cat.nom} » a des sous-catégories. Supprime-les ou détache-les d'abord.`); return }
     const { count } = await supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('categorie_id', cat.id)
-    if (count && count > 0) { notify(`Impossible : ${count} transaction(s) utilisent « ${cat.nom} ». Réaffecte-les d'abord.`); return }
+    if (count && count > 0) { setReaff({ cat, count, cible: '' }); return }
     if (!window.confirm(`Supprimer la catégorie « ${cat.nom} » ?`)) return
     await supabase.from('categories_regles').delete().eq('categorie_id', cat.id)
     const { error } = await supabase.from('categories').delete().eq('id', cat.id)
     if (error) { notify('Erreur : ' + error.message); return }
     await charger(); notify('Catégorie supprimée.')
+  }
+
+  async function confirmerReaff() {
+    if (!reaff) return
+    if (!reaff.cible) { notify('Choisis une catégorie de remplacement.'); return }
+    const src = reaff.cat.id
+    const { error: e1 } = await supabase.from('transactions').update({ categorie_id: reaff.cible }).eq('categorie_id', src)
+    if (e1) { notify('Erreur réaffectation : ' + e1.message); return }
+    await supabase.from('categories_regles').delete().eq('categorie_id', src)
+    const { error: e2 } = await supabase.from('categories').delete().eq('id', src)
+    if (e2) { notify('Erreur suppression : ' + e2.message); return }
+    const n = reaff.count
+    setReaff(null)
+    await charger(); notify(`${n} transaction(s) réaffectées, catégorie supprimée.`)
   }
 
   const inp = { padding: '7px 9px', border: '1px solid #e2e8f0', borderRadius: 7, fontSize: 13, fontFamily: FONT, boxSizing: 'border-box' }
@@ -150,6 +165,25 @@ export default function GestionCategories() {
   return (
     <div style={{ fontFamily: FONT }}>
       {flash && <div style={{ position: 'fixed', top: 16, right: 16, background: '#1e293b', color: '#fff', padding: '10px 16px', borderRadius: 10, zIndex: 50, fontWeight: 600 }}>{flash}</div>}
+
+      {reaff && (
+        <div onClick={() => setReaff(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, padding: 22, width: 460, maxWidth: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.25)' }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', marginBottom: 8 }}>Réaffecter avant suppression</div>
+            <div style={{ fontSize: 13, color: '#475569', marginBottom: 16, lineHeight: 1.5 }}>
+              <b>{reaff.count}</b> transaction(s) utilisent « <b>{reaff.cat.nom}</b> ». Choisis la catégorie vers laquelle les déplacer&nbsp;; « {reaff.cat.nom} » sera ensuite supprimée.
+            </div>
+            <select value={reaff.cible} onChange={e => setReaff(r => ({ ...r, cible: e.target.value }))} style={{ ...inp, width: '100%', marginBottom: 18 }}>
+              <option value="">— Catégorie de remplacement —</option>
+              {cats.filter(c => c.type === reaff.cat.type && c.id !== reaff.cat.id).map(c => <option key={c.id} value={c.id}>{c.parent_id ? '↳ ' : ''}{c.nom}</option>)}
+            </select>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button onClick={() => setReaff(null)} style={{ padding: '9px 16px', border: '1px solid #e2e8f0', borderRadius: 8, background: '#fff', color: '#475569', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: FONT }}>Annuler</button>
+              <button onClick={confirmerReaff} disabled={!reaff.cible} style={{ padding: '9px 16px', border: 'none', borderRadius: 8, background: reaff.cible ? '#dc2626' : '#fca5a5', color: '#fff', fontWeight: 700, fontSize: 13, cursor: reaff.cible ? 'pointer' : 'not-allowed', fontFamily: FONT }}>Réaffecter et supprimer</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ marginBottom: 6, fontSize: 20, fontWeight: 800, color: '#0f172a' }}>Catégories comptables</div>
       <div style={{ fontSize: 13, color: '#64748b', marginBottom: 16, maxWidth: 780 }}>
