@@ -112,15 +112,18 @@ export default function RentabiliteView({ transactions = [], categories = [], ac
   }, [lignesAn])
 
   const parMois = useMemo(() => {
-    const arr = Array.from({ length: 12 }, (_, i) => ({ mois: i + 1, e: 0, s: 0 }))
+    const ans = Array.from(anSel).sort()
+    const buckets = ans.flatMap(an => Array.from({ length: 12 }, (_, i) => ({ an, mi: i, e: 0, s: 0 })))
+    const idx = {}
+    buckets.forEach((b, i) => { idx[`${b.an}-${String(b.mi + 1).padStart(2, '0')}`] = i })
     for (const t of lignesAn) {
-      const d = t._date || t.date_valeur
-      const mi = parseInt(String(d).slice(5, 7), 10) - 1
-      if (mi < 0 || mi > 11) continue
-      const m = num(t); if (m > 0) arr[mi].e += m; else arr[mi].s += -m
+      const ym = String(t._date || t.date_valeur || '').slice(0, 7)
+      const i = idx[ym]
+      if (i === undefined) continue
+      const m = num(t); if (m > 0) buckets[i].e += m; else buckets[i].s += -m
     }
-    return arr
-  }, [lignesAn])
+    return buckets
+  }, [lignesAn, anSel])
 
   const maxCat = Math.max(1, ...parCategorie.map(c => c.total))
   const maxMois = Math.max(1, ...parMois.map(m => Math.max(m.e, m.s)))
@@ -210,12 +213,12 @@ export default function RentabiliteView({ transactions = [], categories = [], ac
         </div>
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '160px' }}>
           {parMois.map(m => (
-            <div key={m.mois} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
+            <div key={m.an + '-' + m.mi} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
               <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end', gap: '2px', width: '100%', justifyContent: 'center' }}>
-                <div title={eur(m.e)} style={{ width: '42%', height: `${m.e / maxMois * 100}%`, background: '#1baf7a', borderRadius: '3px 3px 0 0', minHeight: m.e ? '2px' : '0' }} />
-                <div title={eur(m.s)} style={{ width: '42%', height: `${m.s / maxMois * 100}%`, background: '#eb6834', borderRadius: '3px 3px 0 0', minHeight: m.s ? '2px' : '0' }} />
+                <div title={`${MOIS[m.mi]} ${m.an} — Entrées ${eur(m.e)}`} style={{ width: '42%', height: `${m.e / maxMois * 100}%`, background: '#1baf7a', borderRadius: '3px 3px 0 0', minHeight: m.e ? '2px' : '0' }} />
+                <div title={`${MOIS[m.mi]} ${m.an} — Sorties ${eur(m.s)}`} style={{ width: '42%', height: `${m.s / maxMois * 100}%`, background: '#eb6834', borderRadius: '3px 3px 0 0', minHeight: m.s ? '2px' : '0' }} />
               </div>
-              <span style={{ fontSize: '10px', color: '#94a3b8' }}>{MOIS[m.mois - 1]}</span>
+              <span style={{ fontSize: anSel.size > 1 ? '9px' : '10px', color: '#94a3b8', whiteSpace: 'nowrap' }}>{MOIS[m.mi]}{anSel.size > 1 && m.mi === 0 ? " '" + String(m.an).slice(2) : ''}</span>
             </div>
           ))}
         </div>
