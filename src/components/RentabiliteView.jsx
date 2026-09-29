@@ -5,7 +5,7 @@ const FONT = "'Source Sans Pro', sans-serif"
 const eur = (v) => Math.round(v).toLocaleString('fr-BE') + ' €'
 const MOIS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc']
 
-export default function RentabiliteView({ transactions = [], categories = [], activitesSoc = [], color = '#0080BD' }) {
+export default function RentabiliteView({ transactions = [], categories = [], activitesSoc = [], color = '#0080BD', ventilations = {} }) {
   const [annee, setAnnee] = useState(null)
   const [deplie, setDeplie] = useState(null)
   const [ibanGroupe, setIbanGroupe] = useState(() => new Set())
@@ -48,11 +48,26 @@ export default function RentabiliteView({ transactions = [], categories = [], ac
     return true
   }), [transactions, anneeActive, transfertIds, ibanGroupe])
 
+  // Éclatement : une transaction ventilée est remplacée par ses lignes (montant signé/catégorie/activité)
+  const lignesAn = useMemo(() => {
+    const out = []
+    for (const t of txAn) {
+      const dt = t._date || t.date_valeur
+      const v = ventilations[t.id]
+      if (v && v.length) {
+        for (const l of v) out.push({ montant: l.montant, activite: l.activite, categorie_id: l.categorie_id, _date: dt })
+      } else {
+        out.push({ montant: t.montant, activite: t.activite, categorie_id: t.categorie_id, _date: dt })
+      }
+    }
+    return out
+  }, [txAn, ventilations])
+
   const glob = useMemo(() => {
     let e = 0, s = 0
-    for (const t of txAn) { const m = num(t); if (m > 0) e += m; else s += -m }
+    for (const t of lignesAn) { const m = num(t); if (m > 0) e += m; else s += -m }
     return { e, s, net: e - s }
-  }, [txAn])
+  }, [lignesAn])
 
   const parActivite = useMemo(() => {
     if (!activitesSoc.length) return []
@@ -60,16 +75,16 @@ export default function RentabiliteView({ transactions = [], categories = [], ac
     const acc = {}
     for (const a of activitesSoc) acc[a.code] = { ...a, e: 0, s: 0 }
     acc._none = { code: '_none', label: 'Non qualifié', couleur: '#94a3b8', e: 0, s: 0 }
-    for (const t of txAn) {
+    for (const t of lignesAn) {
       const k = (t.activite && codes.includes(t.activite)) ? t.activite : '_none'
       const m = num(t); if (m > 0) acc[k].e += m; else acc[k].s += -m
     }
     return Object.values(acc).map(x => ({ ...x, net: x.e - x.s }))
-  }, [txAn, activitesSoc])
+  }, [lignesAn, activitesSoc])
 
   const parCategorie = useMemo(() => {
     const acc = {}
-    for (const t of txAn) {
+    for (const t of lignesAn) {
       const m = num(t); if (m >= 0) continue
       const dep = -m
       const cid = t.categorie_id
@@ -84,18 +99,18 @@ export default function RentabiliteView({ transactions = [], categories = [], ac
       }
     }
     return Object.values(acc).sort((a, b) => b.total - a.total)
-  }, [txAn])
+  }, [lignesAn])
 
   const parMois = useMemo(() => {
     const arr = Array.from({ length: 12 }, (_, i) => ({ mois: i + 1, e: 0, s: 0 }))
-    for (const t of txAn) {
+    for (const t of lignesAn) {
       const d = t._date || t.date_valeur
       const mi = parseInt(String(d).slice(5, 7), 10) - 1
       if (mi < 0 || mi > 11) continue
       const m = num(t); if (m > 0) arr[mi].e += m; else arr[mi].s += -m
     }
     return arr
-  }, [txAn])
+  }, [lignesAn])
 
   const maxCat = Math.max(1, ...parCategorie.map(c => c.total))
   const maxMois = Math.max(1, ...parMois.map(m => Math.max(m.e, m.s)))

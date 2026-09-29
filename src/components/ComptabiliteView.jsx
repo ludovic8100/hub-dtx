@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import VueFactures from './VueFactures'
 import SelecteurFactureAchat from './SelecteurFactureAchat'
 import RentabiliteView from './RentabiliteView'
+import VentilationEditor from './VentilationEditor'
 
 const fmt = (v) => v === null || v === undefined ? '—'
   : new Intl.NumberFormat('fr-BE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 }).format(v)
@@ -617,7 +618,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       </div>
 
       {onglet === 'rentabilite' ? (
-        <RentabiliteView transactions={transactions} categories={categories} activitesSoc={activitesSoc} color={color} societeCodes={societeCodes} />
+        <RentabiliteView transactions={transactions} categories={categories} activitesSoc={activitesSoc} color={color} societeCodes={societeCodes} ventilations={ventilations} />
       ) : onglet !== 'mouvements' ? (
         <VueFactures societeCodes={societeCodes} color={color} sens={onglet === 'ventes' ? 'vente' : 'achat'} />
       ) : (<>
@@ -1303,6 +1304,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                     </div>
                   </div>
                 )}
+                <VentilationEditor tx={t} categories={categories} activitesSoc={activitesSoc} color={color} onSaved={chargerVentilations} />
                 {/* Sélecteur catégorie */}
                 <div style={{ marginBottom:'18px' }}>
                   <div style={{ fontSize:'12px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'8px' }}>Catégorie</div>
