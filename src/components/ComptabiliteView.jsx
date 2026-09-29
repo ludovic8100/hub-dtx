@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import VueFactures from './VueFactures'
 import SelecteurFactureAchat from './SelecteurFactureAchat'
+import RentabiliteView from './RentabiliteView'
 
 const fmt = (v) => v === null || v === undefined ? '—'
   : new Intl.NumberFormat('fr-BE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 }).format(v)
@@ -605,7 +606,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       {/* Onglets Mouvements / Factures */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:'8px', marginBottom:'10px', borderBottom:'2px solid #e2e8f0' }}>
         <div style={{ display:'flex', gap:'4px' }}>
-          {[['mouvements','Mouvements bancaires'],['achats','Dépenses'],['ventes','Rentrées']].map(([k,lab]) => (
+          {[['mouvements','Mouvements bancaires'],['achats','Dépenses'],['ventes','Rentrées'],['rentabilite','Rentabilité']].map(([k,lab]) => (
             <button key={k} onClick={()=>setOnglet(k)} style={{
               padding:'10px 20px', border:'none', background:'none', cursor:'pointer', fontSize:'14px', fontWeight:'700',
               fontFamily:"'Source Sans Pro', sans-serif", color: onglet===k ? color : '#94a3b8',
@@ -615,7 +616,9 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
         </div>
       </div>
 
-      {onglet !== 'mouvements' ? (
+      {onglet === 'rentabilite' ? (
+        <RentabiliteView transactions={transactions} categories={categories} activitesSoc={activitesSoc} color={color} societeCodes={societeCodes} />
+      ) : onglet !== 'mouvements' ? (
         <VueFactures societeCodes={societeCodes} color={color} sens={onglet === 'ventes' ? 'vente' : 'achat'} />
       ) : (<>
 
