@@ -102,6 +102,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const [tri, setTri] = useState({ col: 'date', sens: 'desc' })
   const [page, setPage] = useState(1)
   const [categories, setCategories] = useState([])
+  const [activitesSoc, setActivitesSoc] = useState([])
   const [employes, setEmployes] = useState([])
   const [ventilations, setVentilations] = useState({})
   const [ventilDraft, setVentilDraft] = useState(null)
@@ -211,6 +212,8 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
     const { data } = await supabase.from('categories').select('*').order('nom')
     const filtrees = (data || []).filter(c => !c.entites || c.entites.length === 0 || (societeCodes || []).some(code => c.entites.includes(code)))
     setCategories(filtrees)
+    const { data: acts } = await supabase.from('activites').select('*').in('societe_code', societeCodes || []).eq('actif', true).order('ordre')
+    setActivitesSoc(acts || [])
     return filtrees
   }
   useEffect(() => { chargerCategories() }, [societeCodes.join(',')])
@@ -280,6 +283,13 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
     await supabase.from('transactions').update({ categorie_id: categorieId }).eq('id', txId)
     setTransactions(prev => prev.map(t => t.id === txId ? { ...t, categorie_id: categorieId } : t))
     setTxSelection(prev => prev ? { ...prev, categorie_id: categorieId } : prev)
+  }
+
+  // Assigner une activité (ex: LODE Protect/Rental) a une transaction
+  async function assignerActivite(txId, code) {
+    await supabase.from('transactions').update({ activite: code }).eq('id', txId)
+    setTransactions(prev => prev.map(t => t.id === txId ? { ...t, activite: code } : t))
+    setTxSelection(prev => prev ? { ...prev, activite: code } : prev)
   }
 
   // Assigner un bénéficiaire (employé) à une transaction
@@ -1275,6 +1285,21 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                     </div>
                   )}
                 </div>
+                {activitesSoc.length > 0 && (
+                  <div style={{ marginBottom:'18px' }}>
+                    <div style={{ fontSize:'12px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'8px' }}>Activité</div>
+                    <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
+                      {activitesSoc.map(a => {
+                        const on = t.activite === a.code
+                        return (
+                          <button key={a.code} onClick={()=>assignerActivite(t.id, on ? null : a.code)} style={{ flex:'1 1 0', minWidth:'90px', padding:'9px 12px', borderRadius:'8px', fontSize:'13px', fontWeight:'700', cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif", border: on ? `2px solid ${a.couleur||'#1e293b'}` : '1px solid #e2e8f0', background: on ? (a.couleur||'#1e293b')+'22' : '#fff', color: on ? '#1e293b' : '#64748b' }}>
+                            {a.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
                 {/* Sélecteur catégorie */}
                 <div style={{ marginBottom:'18px' }}>
                   <div style={{ fontSize:'12px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'8px' }}>Catégorie</div>
