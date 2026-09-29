@@ -628,7 +628,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       </div>
 
       {onglet === 'rentabilite' ? (
-        <RentabiliteView transactions={transactions} categories={categories} activitesSoc={activitesSoc} color={color} societeCodes={societeCodes} ventilations={ventilations} />
+        <RentabiliteView transactions={transactions} categories={categories} activitesSoc={activitesSoc} color={color} societeCodes={societeCodes} ventilations={ventilations} facturesParTx={facturesParTx} />
       ) : onglet !== 'mouvements' ? (
         <VueFactures societeCodes={societeCodes} color={color} sens={onglet === 'ventes' ? 'vente' : 'achat'} />
       ) : (<>

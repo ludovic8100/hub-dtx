@@ -5,7 +5,7 @@ const FONT = "'Source Sans Pro', sans-serif"
 const eur = (v) => Math.round(v).toLocaleString('fr-BE') + ' €'
 const MOIS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc']
 
-export default function RentabiliteView({ transactions = [], categories = [], activitesSoc = [], color = '#0080BD', ventilations = {} }) {
+export default function RentabiliteView({ transactions = [], categories = [], activitesSoc = [], color = '#0080BD', ventilations = {}, facturesParTx = {} }) {
   const [anneesSel, setAnneesSel] = useState(null)
   const [scopeAct, setScopeAct] = useState('all')
   const [deplie, setDeplie] = useState(null)
@@ -53,9 +53,10 @@ export default function RentabiliteView({ transactions = [], categories = [], ac
     if (!d || !anSel.has(String(d).slice(0, 4))) return false
     if (t.categorie_id && transfertIds.has(t.categorie_id)) return false
     const cib = (t.contrepartie_iban || '').replace(/\s/g, '').toUpperCase()
-    if (cib && ibanGroupe.has(cib)) return false
+    const interne = cib && ibanGroupe.has(cib)
+    if (interne && !((facturesParTx[t.id] || 0) > 0)) return false
     return true
-  }), [transactions, anSel, transfertIds, ibanGroupe])
+  }), [transactions, anSel, transfertIds, ibanGroupe, facturesParTx])
 
   // Éclatement : une transaction ventilée est remplacée par ses lignes (montant signé/catégorie/activité)
   const lignesAn = useMemo(() => {
