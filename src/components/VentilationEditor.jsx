@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
 const FONT = "'Source Sans Pro', sans-serif"
-const eur = (v) => (Math.round((v + Number.EPSILON) * 100) / 100).toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
+const r2 = (v) => Math.round((v + Number.EPSILON) * 100) / 100
+const eur = (v) => r2(v).toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
 const inp = { padding: '7px 9px', border: '1px solid #e2e8f0', borderRadius: '7px', fontSize: '13px', fontFamily: FONT, boxSizing: 'border-box' }
 
 export default function VentilationEditor({ tx, categories = [], activitesSoc = [], color = '#0080BD', onSaved }) {
@@ -18,6 +19,8 @@ export default function VentilationEditor({ tx, categories = [], activitesSoc = 
   const absTx = Math.abs(montantTx)
   const typeTx = montantTx < 0 ? 'depense' : 'recette'
 
+  const pctDe = (m) => absTx > 0 ? String(r2((parseFloat(m) || 0) / absTx * 100)) : ''
+
   useEffect(() => { chargerResume() }, [tx?.id])
 
   async function chargerResume() {
@@ -31,12 +34,13 @@ export default function VentilationEditor({ tx, categories = [], activitesSoc = 
     const { data: v } = await supabase.from('transaction_ventilation').select('*').eq('transaction_id', tx.id)
     const { data: f } = await supabase.from('factures_achat').select('id, nom, montant').eq('transaction_id', tx.id)
     setFactures(f || [])
+    const mk = (m, cat, act, fac) => ({ montant: String(m), pct: pctDe(m), categorie_id: cat || '', activite: act || '', facture_id: fac || '' })
     if (v && v.length) {
-      setLignes(v.map(l => ({ montant: String(Math.abs(parseFloat(l.montant) || 0)), categorie_id: l.categorie_id || '', activite: l.activite || '', facture_id: l.facture_id || '' })))
+      setLignes(v.map(l => mk(Math.abs(parseFloat(l.montant) || 0), l.categorie_id, l.activite, l.facture_id)))
     } else if (f && f.length) {
-      setLignes(f.map(fa => ({ montant: String(Math.abs(parseFloat(fa.montant) || 0)), categorie_id: '', activite: '', facture_id: fa.id })))
+      setLignes(f.map(fa => mk(Math.abs(parseFloat(fa.montant) || 0), '', '', fa.id)))
     } else {
-      setLignes([{ montant: absTx.toFixed(2), categorie_id: tx.categorie_id || '', activite: tx.activite || '', facture_id: '' }])
+      setLignes([mk(absTx, tx.categorie_id, tx.activite, '')])
     }
   }
 
@@ -47,15 +51,27 @@ export default function VentilationEditor({ tx, categories = [], activitesSoc = 
   })
 
   const somme = lignes.reduce((s, l) => s + (parseFloat(l.montant) || 0), 0)
-  const ecart = absTx - somme
+  const ecart = r2(absTx - somme)
   const equilibre = Math.abs(ecart) < 0.01
+  const sommePct = lignes.reduce((s, l) => s + (parseFloat(l.pct) || 0), 0)
 
-  function setLigne(i, key, val) { setLignes(prev => prev.map((l, j) => j === i ? { ...l, [key]: val } : l)) }
-  function ajouter() { setLignes(prev => [...prev, { montant: ecart > 0 ? ecart.toFixed(2) : '', categorie_id: '', activite: '', facture_id: '' }]) }
+  function setField(i, key, val) { setLignes(prev => prev.map((l, j) => j === i ? { ...l, [key]: val } : l)) }
+  function setMontant(i, val) { setLignes(prev => prev.map((l, j) => j === i ? { ...l, montant: val, pct: val === '' ? '' : pctDe(val) } : l)) }
+  function setPct(i, val) { setLignes(prev => prev.map((l, j) => j === i ? { ...l, pct: val, montant: val === '' ? '' : String(r2((parseFloat(val) || 0) / 100 * absTx)) } : l)) }
+  function ajouter() { setLignes(prev => [...prev, { montant: ecart > 0 ? ecart.toFixed(2) : '', pct: ecart > 0 ? pctDe(ecart) : '', categorie_id: '', activite: '', facture_id: '' }]) }
   function retirer(i) { setLignes(prev => prev.filter((_, j) => j !== i)) }
   function repartirParFacture() {
     if (!factures.length) return
-    setLignes(factures.map(fa => ({ montant: String(Math.abs(parseFloat(fa.montant) || 0)), categorie_id: '', activite: '', facture_id: fa.id })))
+    setLignes(factures.map(fa => { const m = Math.abs(parseFloat(fa.montant) || 0); return { montant: String(m), pct: pctDe(m), categorie_id: '', activite: '', facture_id: fa.id } }))
+  }
+  function repartirEgal() {
+    const n = lignes.length
+    if (!n) return
+    const part = r2(absTx / n)
+    setLignes(prev => prev.map((l, j) => {
+      const m = j < n - 1 ? part : r2(absTx - part * (n - 1))
+      return { ...l, montant: m.toFixed(2), pct: pctDe(m) }
+    }))
   }
 
   async function enregistrer() {
@@ -104,23 +120,25 @@ export default function VentilationEditor({ tx, categories = [], activitesSoc = 
       {lignes.map((l, i) => (
         <div key={i} style={{ border: '1px solid #eef2f7', borderRadius: '8px', padding: '8px', marginBottom: '8px', background: '#fff' }}>
           <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '6px' }}>
-            <input type="number" step="0.01" value={l.montant} onChange={e => setLigne(i, 'montant', e.target.value)} placeholder="Montant" style={{ ...inp, width: '110px' }} />
+            <input type="number" step="0.01" value={l.pct} onChange={e => setPct(i, e.target.value)} placeholder="%" style={{ ...inp, width: '68px' }} />
+            <span style={{ fontSize: '12px', color: '#94a3b8' }}>%</span>
+            <input type="number" step="0.01" value={l.montant} onChange={e => setMontant(i, e.target.value)} placeholder="Montant" style={{ ...inp, width: '108px' }} />
             <span style={{ fontSize: '12px', color: '#94a3b8' }}>€</span>
             <button onClick={() => retirer(i)} title="Retirer" style={{ marginLeft: 'auto', width: '28px', height: '28px', border: '1px solid #fecaca', borderRadius: '7px', background: '#fff', color: '#dc2626', cursor: 'pointer' }}>×</button>
           </div>
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-            <select value={l.categorie_id} onChange={e => setLigne(i, 'categorie_id', e.target.value)} style={{ ...inp, flex: '1 1 150px' }}>
+            <select value={l.categorie_id} onChange={e => setField(i, 'categorie_id', e.target.value)} style={{ ...inp, flex: '1 1 150px' }}>
               <option value="">— Catégorie —</option>
               {catsOptions.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
             </select>
             {activitesSoc.length > 0 && (
-              <select value={l.activite} onChange={e => setLigne(i, 'activite', e.target.value)} style={{ ...inp, flex: '1 1 110px' }}>
+              <select value={l.activite} onChange={e => setField(i, 'activite', e.target.value)} style={{ ...inp, flex: '1 1 110px' }}>
                 <option value="">— Activité —</option>
                 {activitesSoc.map(a => <option key={a.code} value={a.code}>{a.label}</option>)}
               </select>
             )}
             {factures.length > 0 && (
-              <select value={l.facture_id} onChange={e => setLigne(i, 'facture_id', e.target.value)} style={{ ...inp, flex: '1 1 150px' }}>
+              <select value={l.facture_id} onChange={e => setField(i, 'facture_id', e.target.value)} style={{ ...inp, flex: '1 1 150px' }}>
                 <option value="">— Facture —</option>
                 {factures.map(f => <option key={f.id} value={f.id}>{(f.nom || 'facture').slice(0, 28)} · {eur(parseFloat(f.montant) || 0)}</option>)}
               </select>
@@ -131,11 +149,12 @@ export default function VentilationEditor({ tx, categories = [], activitesSoc = 
 
       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
         <button onClick={ajouter} style={{ padding: '7px 12px', borderRadius: '7px', fontSize: '12.5px', fontWeight: 600, border: '1px dashed #cbd5e1', background: '#fff', color: '#475569', cursor: 'pointer', fontFamily: FONT }}>+ Ligne</button>
+        {lignes.length > 1 && <button onClick={repartirEgal} style={{ padding: '7px 12px', borderRadius: '7px', fontSize: '12.5px', fontWeight: 600, border: '1px solid #e2e8f0', background: '#fff', color: '#475569', cursor: 'pointer', fontFamily: FONT }}>Répartir également ({lignes.length})</button>}
         {factures.length > 1 && <button onClick={repartirParFacture} style={{ padding: '7px 12px', borderRadius: '7px', fontSize: '12.5px', fontWeight: 600, border: '1px solid #e2e8f0', background: '#fff', color: '#475569', cursor: 'pointer', fontFamily: FONT }}>Répartir par facture ({factures.length})</button>}
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px', padding: '8px 4px', borderTop: '1px solid #eef2f7' }}>
-        <span style={{ color: '#64748b' }}>Total lignes</span>
+        <span style={{ color: '#64748b' }}>Total{sommePct ? ` · ${r2(sommePct)} %` : ''}</span>
         <span style={{ fontWeight: 700, color: equilibre ? '#16a34a' : '#dc2626' }}>{eur(somme)} / {eur(absTx)}{!equilibre && ` (écart ${eur(Math.abs(ecart))})`}</span>
       </div>
 
