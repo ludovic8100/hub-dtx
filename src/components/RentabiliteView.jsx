@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { supabase } from '../lib/supabase'
 
 const FONT = "'Source Sans Pro', sans-serif"
 const eur = (v) => Math.round(v).toLocaleString('fr-BE') + ' €'
@@ -7,6 +8,16 @@ const MOIS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep'
 export default function RentabiliteView({ transactions = [], categories = [], activitesSoc = [], color = '#0080BD' }) {
   const [annee, setAnnee] = useState(null)
   const [deplie, setDeplie] = useState(null)
+  const [ibanGroupe, setIbanGroupe] = useState(() => new Set())
+
+  useEffect(() => {
+    let annule = false
+    supabase.from('comptes_bancaires').select('iban').then(({ data }) => {
+      if (annule) return
+      setIbanGroupe(new Set((data || []).map(c => (c.iban || '').replace(/\s/g, '').toUpperCase()).filter(Boolean)))
+    })
+    return () => { annule = true }
+  }, [])
 
   const annees = useMemo(() => {
     const set = new Set()
@@ -32,8 +43,10 @@ export default function RentabiliteView({ transactions = [], categories = [], ac
     const d = t._date || t.date_valeur
     if (!d || String(d).slice(0, 4) !== anneeActive) return false
     if (t.categorie_id && transfertIds.has(t.categorie_id)) return false
+    const cib = (t.contrepartie_iban || '').replace(/\s/g, '').toUpperCase()
+    if (cib && ibanGroupe.has(cib)) return false
     return true
-  }), [transactions, anneeActive, transfertIds])
+  }), [transactions, anneeActive, transfertIds, ibanGroupe])
 
   const glob = useMemo(() => {
     let e = 0, s = 0
