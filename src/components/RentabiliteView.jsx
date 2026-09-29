@@ -6,7 +6,8 @@ const eur = (v) => Math.round(v).toLocaleString('fr-BE') + ' €'
 const MOIS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc']
 
 export default function RentabiliteView({ transactions = [], categories = [], activitesSoc = [], color = '#0080BD', ventilations = {} }) {
-  const [annee, setAnnee] = useState(null)
+  const [anneesSel, setAnneesSel] = useState(null)
+  const [scopeAct, setScopeAct] = useState('all')
   const [deplie, setDeplie] = useState(null)
   const [ibanGroupe, setIbanGroupe] = useState(() => new Set())
 
@@ -24,7 +25,15 @@ export default function RentabiliteView({ transactions = [], categories = [], ac
     for (const t of transactions) { const d = t._date || t.date_valeur; if (d) set.add(String(d).slice(0, 4)) }
     return Array.from(set).sort((a, b) => b.localeCompare(a))
   }, [transactions])
-  const anneeActive = annee || annees[0] || String(new Date().getFullYear())
+  const anSel = useMemo(() => (anneesSel && anneesSel.size) ? anneesSel : new Set(annees.length ? annees : [String(new Date().getFullYear())]), [anneesSel, annees])
+  const anLabel = Array.from(anSel).sort().join(' + ')
+  function toggleAnnee(a) {
+    setAnneesSel(prev => {
+      const base = new Set((prev && prev.size) ? prev : annees)
+      if (base.has(a)) base.delete(a); else base.add(a)
+      return base
+    })
+  }
 
   const catById = useMemo(() => Object.fromEntries(categories.map(c => [c.id, c])), [categories])
   const parentIdDe = (id) => { const c = catById[id]; return c ? (c.parent_id || c.id) : null }
@@ -41,12 +50,12 @@ export default function RentabiliteView({ transactions = [], categories = [], ac
 
   const txAn = useMemo(() => transactions.filter(t => {
     const d = t._date || t.date_valeur
-    if (!d || String(d).slice(0, 4) !== anneeActive) return false
+    if (!d || !anSel.has(String(d).slice(0, 4))) return false
     if (t.categorie_id && transfertIds.has(t.categorie_id)) return false
     const cib = (t.contrepartie_iban || '').replace(/\s/g, '').toUpperCase()
     if (cib && ibanGroupe.has(cib)) return false
     return true
-  }), [transactions, anneeActive, transfertIds, ibanGroupe])
+  }), [transactions, anSel, transfertIds, ibanGroupe])
 
   // Éclatement : une transaction ventilée est remplacée par ses lignes (montant signé/catégorie/activité)
   const lignesAn = useMemo(() => {
@@ -60,8 +69,8 @@ export default function RentabiliteView({ transactions = [], categories = [], ac
         out.push({ montant: t.montant, activite: t.activite, categorie_id: t.categorie_id, _date: dt })
       }
     }
-    return out
-  }, [txAn, ventilations])
+    return scopeAct === 'all' ? out : out.filter(l => l.activite === scopeAct)
+  }, [txAn, ventilations, scopeAct])
 
   const glob = useMemo(() => {
     let e = 0, s = 0
@@ -120,12 +129,25 @@ export default function RentabiliteView({ transactions = [], categories = [], ac
 
   return (
     <div style={{ fontFamily: FONT }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' }}>
-        <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 600 }}>Exercice :</span>
-        {(annees.length ? annees : [anneeActive]).map(a => (
-          <button key={a} onClick={() => setAnnee(a)} style={{ padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 700, fontFamily: FONT, border: a === anneeActive ? `2px solid ${color}` : '1px solid #e2e8f0', background: a === anneeActive ? '#f8fafc' : '#fff', color: '#1e293b' }}>{a}</button>
-        ))}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 600 }}>Exercice(s) :</span>
+        {(annees.length ? annees : [anLabel]).map(a => {
+          const on = anSel.has(a)
+          return <button key={a} onClick={() => toggleAnnee(a)} style={{ padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 700, fontFamily: FONT, border: on ? `2px solid ${color}` : '1px solid #e2e8f0', background: on ? `${color}14` : '#fff', color: on ? '#0f172a' : '#94a3b8' }}>{a}</button>
+        })}
+        {annees.length > 1 && <button onClick={() => setAnneesSel(new Set(annees))} style={{ padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, fontFamily: FONT, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b' }}>Tous</button>}
       </div>
+
+      {activitesSoc.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 600 }}>Activité :</span>
+          <button onClick={() => setScopeAct('all')} style={{ padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 700, fontFamily: FONT, border: scopeAct === 'all' ? '2px solid #1e293b' : '1px solid #e2e8f0', background: scopeAct === 'all' ? '#1e293b14' : '#fff', color: scopeAct === 'all' ? '#0f172a' : '#94a3b8' }}>Tout LODE</button>
+          {activitesSoc.map(a => {
+            const on = scopeAct === a.code
+            return <button key={a.code} onClick={() => setScopeAct(a.code)} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 700, fontFamily: FONT, border: on ? `2px solid ${a.couleur || '#1e293b'}` : '1px solid #e2e8f0', background: on ? (a.couleur || '#1e293b') + '18' : '#fff', color: on ? '#0f172a' : '#94a3b8' }}><span style={{ width: '9px', height: '9px', borderRadius: '3px', background: a.couleur || '#94a3b8' }} />{a.label}</button>
+          })}
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px,1fr))', gap: '12px', marginBottom: '16px' }}>
         <div style={kpi}><div style={{ fontSize: '13px', color: '#64748b', marginBottom: '6px' }}>Entrées</div><div style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a' }}>{eur(glob.e)}</div></div>
@@ -133,7 +155,7 @@ export default function RentabiliteView({ transactions = [], categories = [], ac
         <div style={kpi}><div style={{ fontSize: '13px', color: '#64748b', marginBottom: '6px' }}>Résultat net</div><div style={{ fontSize: '24px', fontWeight: 700, color: glob.net >= 0 ? '#16a34a' : '#dc2626' }}>{glob.net >= 0 ? '+' : ''}{eur(glob.net)}</div></div>
       </div>
 
-      {parActivite.length > 0 && (
+      {scopeAct === 'all' && parActivite.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px,1fr))', gap: '12px', marginBottom: '20px' }}>
           {parActivite.filter(a => a.code !== '_none' || a.e || a.s).map(a => (
             <div key={a.code} style={card}>
@@ -151,7 +173,7 @@ export default function RentabiliteView({ transactions = [], categories = [], ac
 
       <div style={{ ...card, marginBottom: '20px' }}>
         <div style={{ fontSize: '13px', color: '#64748b', fontWeight: 600, marginBottom: '12px' }}>Dépenses par catégorie</div>
-        {parCategorie.length === 0 && <div style={{ color: '#94a3b8', fontSize: '13px' }}>Aucune dépense sur {anneeActive}.</div>}
+        {parCategorie.length === 0 && <div style={{ color: '#94a3b8', fontSize: '13px' }}>Aucune dépense sur {anLabel}.</div>}
         {parCategorie.map(c => {
           const enfants = Object.values(c.enfants).sort((a, b) => b.total - a.total)
           const ouvrable = enfants.length > 0
