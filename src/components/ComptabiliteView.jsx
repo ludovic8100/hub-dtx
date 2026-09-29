@@ -87,7 +87,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const [facturesParTx, setFacturesParTx] = useState({}) // { transaction_id: nb de factures liées } -> badge +N
   const [loading, setLoading] = useState(true)
   const [loadingTx, setLoadingTx] = useState(false)
-  const [filtre, setFiltre] = useState({ compte: 'tous', type: 'tous', libelle: '', periodes: [], categorie: 'toutes', facture: 'toutes', employe: 'tous' })
+  const [filtre, setFiltre] = useState({ compte: 'tous', type: 'tous', libelle: '', periodes: [], categorie: 'toutes', facture: 'toutes', employe: 'tous', activite: 'toutes' })
   const [onglet, setOnglet] = useState('mouvements') // 'mouvements' | 'factures'
   const [montantsMasques, setMontantsMasques] = useState(true) // masquer soldes/entrées/sorties par défaut
   const [periodeOuverte, setPeriodeOuverte] = useState(false)
@@ -194,7 +194,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   }, [comptes.map(c=>c.id).join(',')])
 
   // Reset pagination quand les filtres changent
-  useEffect(() => { setPage(1) }, [filtre.compte, filtre.type, filtre.libelle, filtre.periodes, filtre.categorie, filtre.facture, filtre.employe])
+  useEffect(() => { setPage(1) }, [filtre.compte, filtre.type, filtre.libelle, filtre.periodes, filtre.categorie, filtre.facture, filtre.employe, filtre.activite])
 
   // Au 1er chargement des transactions : cocher l'année en cours (2026) par défaut, si aucune période choisie
   const [periodeInitialisee, setPeriodeInitialisee] = useState(false)
@@ -496,6 +496,16 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
         const direct = String(t.employe_id || '') === String(filtre.employe)
         const via = parts.some(v => String(v.employe_id) === String(filtre.employe))
         if (!direct && !via) return false
+      }
+    }
+    if (filtre.activite !== 'toutes') {
+      const vent = ventilations[t.id] || []
+      if (filtre.activite === 'none') {
+        if (t.activite || vent.some(v => v.activite)) return false
+      } else {
+        const directA = t.activite === filtre.activite
+        const viaA = vent.some(v => v.activite === filtre.activite)
+        if (!directA && !viaA) return false
       }
     }
     return true
@@ -805,6 +815,17 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
           </div>
         )}
 
+        {activitesSoc.length > 0 && (
+          <div style={{ display:'flex', flexDirection:'column', gap:'3px' }}>
+            <label style={{ fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em' }}>Activité</label>
+            <select value={filtre.activite} onChange={e=>setFiltre(f=>({...f,activite:e.target.value}))} style={{ padding:'7px 10px', border:'1px solid #e2e8f0', borderRadius:'6px', fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif", cursor:'pointer' }}>
+              <option value="toutes">Toutes</option>
+              <option value="none">— Non tagué —</option>
+              {activitesSoc.map(a => <option key={a.code} value={a.code}>{a.label}</option>)}
+            </select>
+          </div>
+        )}
+
         {/* Filtre facture */}
         <div style={{ display:'flex', flexDirection:'column', gap:'3px' }}>
           <label style={{ fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em' }}>Facture</label>
@@ -821,10 +842,10 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
         </div>
 
         {/* Reset */}
-        {(filtre.compte!=='tous'||filtre.type!=='tous'||filtre.libelle||filtre.periodes.length>0||filtre.categorie!=='toutes'||filtre.facture!=='toutes'||filtre.employe!=='tous') && (
+        {(filtre.compte!=='tous'||filtre.type!=='tous'||filtre.libelle||filtre.periodes.length>0||filtre.categorie!=='toutes'||filtre.facture!=='toutes'||filtre.employe!=='tous'||filtre.activite!=='toutes') && (
           <div style={{ display:'flex', flexDirection:'column', gap:'3px' }}>
             <label style={{ fontSize:'10px', color:'transparent' }}>.</label>
-            <button onClick={()=>setFiltre({compte:'tous',type:'tous',libelle:'',periodes:[],categorie:'toutes',facture:'toutes',employe:'tous'})} style={{ padding:'7px 12px', borderRadius:'6px', fontSize:'12px', fontWeight:'600', cursor:'pointer', border:'1px solid #e2e8f0', background:'#fff', color:'#64748b' }}>
+            <button onClick={()=>setFiltre({compte:'tous',type:'tous',libelle:'',periodes:[],categorie:'toutes',facture:'toutes',employe:'tous',activite:'toutes'})} style={{ padding:'7px 12px', borderRadius:'6px', fontSize:'12px', fontWeight:'600', cursor:'pointer', border:'1px solid #e2e8f0', background:'#fff', color:'#64748b' }}>
               ✕ Reset
             </button>
           </div>
