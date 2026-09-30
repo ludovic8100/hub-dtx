@@ -48,6 +48,8 @@ function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, s
   const [page, setPage] = useState(1)
   const [lierPaiement, setLierPaiement] = useState(null) // facture en cours de liaison à un mouvement
   const [txAVerifier, setTxAVerifier] = useState([]) // mouvements sortants sans facture (paiements à vérifier)
+  const [mvtParTx, setMvtParTx] = useState({})       // { transaction_id: {montant,date_valeur,date_execution,contrepartie_nom} } — pour contrôler la cohérence du rapprochement
+  const [mvtLoaded, setMvtLoaded] = useState(false)  // true une fois les mouvements liés chargés (avant : pas d'alarme)
   const PAR_PAGE = 100
 
   // Lier une facture à un mouvement bancaire (écrit les DEUX côtés du lien)
@@ -89,6 +91,25 @@ function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, s
       })
   }, [societeCodes.join(','), sens])
 
+  // Charge les mouvements liés (montant/date/contrepartie) pour contrôler la cohérence du rapprochement
+  useEffect(() => {
+    const ids = [...new Set(factures.map(f => f.transaction_id).filter(Boolean))]
+    if (ids.length === 0) { setMvtParTx({}); setMvtLoaded(true); return }
+    let annule = false
+    setMvtLoaded(false)
+    ;(async () => {
+      const map = {}
+      for (let i = 0; i < ids.length; i += 200) {
+        const chunk = ids.slice(i, i + 200)
+        const { data } = await supabase.from('transactions')
+          .select('id,montant,date_valeur,date_execution,contrepartie_nom').in('id', chunk)
+        for (const t of (data || [])) map[t.id] = t
+      }
+      if (!annule) { setMvtParTx(map); setMvtLoaded(true) }
+    })()
+    return () => { annule = true }
+  }, [factures.map(f => f.transaction_id).filter(Boolean).sort().join(',')])
+
   // Paiements à vérifier : mouvements SORTANTS sans facture liée, ni justifiés « sans facture », ni « en attente »
   useEffect(() => {
     let annule = false
@@ -123,15 +144,28 @@ function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, s
     if (filtre.recherche && !(f.nom || '').toLowerCase().includes(filtre.recherche.toLowerCase())) return false
     return true
   })
+  // État de rapprochement d'une facture : 'non' (pas lié) | 'ok' (lié, montant identique) | 'douteux' (lié, montant ≠) | 'introuvable' (lien cassé)
+  const etatRappro = (f) => {
+    if (!f.transaction_id) return { etat: 'non' }
+    const mvt = mvtParTx[f.transaction_id]
+    if (!mvtLoaded) return { etat: 'ok', mvt }            // contrôle pas encore chargé : pas d'alarme
+    if (!mvt) return { etat: 'introuvable' }              // transaction_id qui ne pointe sur aucun mouvement
+    if (f.montant == null) return { etat: 'ok', mvt }     // montant facture inconnu : contrôle impossible
+    const ecart = Math.abs(Math.abs(Number(mvt.montant)) - Math.abs(Number(f.montant)))
+    return ecart <= 0.01 ? { etat: 'ok', mvt } : { etat: 'douteux', mvt }
+  }
+  const estDouteux = (e) => e === 'douteux' || e === 'introuvable'
   const filtrees = baseFiltre.filter(f => {
     const payee = !!f.transaction_id
     if (filtre.statut === 'payees' && !payee) return false
     if (filtre.statut === 'nonpayees' && payee) return false
+    if (filtre.statut === 'douteux' && !estDouteux(etatRappro(f).etat)) return false
     return true
   })
   const total = baseFiltre.length
   const nbPayees = baseFiltre.filter(f => f.transaction_id).length
   const nbNonPayees = total - nbPayees
+  const nbDouteux = baseFiltre.filter(f => estDouteux(etatRappro(f).etat)).length
   // Paiements à vérifier, recalculés selon les mêmes filtres année + société
   const nbPaiementsAVerifier = txAVerifier.filter(t => {
     const code = t.comptes_bancaires?.societes?.code
@@ -156,10 +190,12 @@ function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, s
     { label: 'Total rentrées', value: total, c: color, sub: `${nbPayees} encaissées • ${nbNonPayees} à vérifier` },
     { label: 'Encaissées', value: nbPayees, c: '#16a34a', sub: 'liées à un mouvement', clic: 'payees' },
     { label: 'Factures à encaisser', value: nbNonPayees, c: '#dc2626', sub: 'aucun mouvement lié', clic: 'nonpayees' },
+    { label: 'Rapprochements douteux', value: nbDouteux, c: '#d97706', sub: 'montant ≠ mouvement lié', clic: 'douteux' },
   ] : [
     { label: 'Total dépenses', value: total, c: color, sub: `${nbPayees} payées • ${nbNonPayees} à vérifier` },
     { label: 'Payées', value: nbPayees, c: '#16a34a', sub: 'liées à un paiement', clic: 'payees' },
     { label: 'Factures à vérifier', value: nbNonPayees, c: '#dc2626', sub: 'aucun paiement lié', clic: 'nonpayees' },
+    { label: 'Rapprochements douteux', value: nbDouteux, c: '#d97706', sub: 'montant ≠ paiement lié', clic: 'douteux' },
     { label: 'Paiements à vérifier', value: nbPaiementsAVerifier, c: '#ea580c', sub: 'mouvement sans facture' },
   ]
 
@@ -172,11 +208,19 @@ function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, s
         {facturesPage.length === 0 && <div style={{ padding: '50px', textAlign: 'center', color: '#94a3b8' }}>Aucune facture</div>}
         {facturesPage.map((f, i) => {
           const payee = !!f.transaction_id
+          const r = etatRappro(f)
+          const mvt = r.mvt
+          const detailMvt = mvt ? `${mvt.contrepartie_nom || 'mouvement'} ${fmt(mvt.montant)} du ${fmtDate(mvt.date_valeur || mvt.date_execution)}` : ''
+          const titreBadge =
+            r.etat === 'non' ? 'Cliquer pour retrouver et lier le mouvement'
+            : r.etat === 'douteux' ? `⚠ Montant du ${vente ? 'mouvement' : 'paiement'} (${fmt(mvt ? Math.abs(mvt.montant) : null)}) ≠ facture (${fmt(f.montant)}) — cliquer pour délier`
+            : r.etat === 'introuvable' ? 'Lien cassé : le mouvement lié est introuvable — cliquer pour délier'
+            : `Rapproché avec ${detailMvt} — cliquer pour délier`
           const cells = [
             ...(multiSociete ? [<span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: '600' }}>{f.societe}</span>] : []),
             <span onClick={(e) => { e.stopPropagation(); payee ? delierPaiement(f) : setLierPaiement(f) }} style={{ cursor: 'pointer' }}
-              title={payee ? (vente ? 'Encaissée — cliquer pour délier le mouvement' : 'Payée — cliquer pour délier le paiement') : 'Cliquer pour retrouver et lier le mouvement'}>
-              <Badge payee={payee} labelPayee={vente ? "✓ Encaissée" : "✓ Payée"} labelNon="🔍 Rechercher mouvement" />
+              title={titreBadge}>
+              <BadgeRappro etat={r.etat} vente={vente} montantMvt={mvt ? Math.abs(mvt.montant) : null} />
             </span>,
             <span style={{ fontSize: '12.5px', color: '#64748b', fontWeight: '600' }}>{fmtDate(f.date_facture)}</span>,
             <span style={{ fontSize: '13px', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '10px' }}>{(f.nom || '').replace(/\.pdf$/i, '')}</span>,
@@ -329,6 +373,22 @@ function Badge({ payee, labelPayee, labelNon }) {
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: '700', background: payee ? '#dcfce7' : '#fee2e2', color: payee ? '#16a34a' : '#dc2626' }}>
       {payee ? labelPayee : labelNon}
+    </span>
+  )
+}
+
+// Badge de rapprochement à 3 états : vert (lié, montant OK), orange (lié mais montant ≠ / lien cassé), rouge (pas lié)
+function BadgeRappro({ etat, vente, montantMvt }) {
+  const map = {
+    ok:          { bg: '#dcfce7', fg: '#16a34a', txt: vente ? '✓ Encaissée' : '✓ Payée' },
+    non:         { bg: '#fee2e2', fg: '#dc2626', txt: '🔍 Rechercher mouvement' },
+    douteux:     { bg: '#fef3c7', fg: '#b45309', txt: `⚠ ${fmt(montantMvt)}` },
+    introuvable: { bg: '#fef3c7', fg: '#b45309', txt: '⚠ lien cassé' },
+  }
+  const s = map[etat] || map.non
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: '700', background: s.bg, color: s.fg }}>
+      {s.txt}
     </span>
   )
 }
