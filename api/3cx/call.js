@@ -2,7 +2,10 @@
 // 3CX appelle : POST /api/3cx/call  (JSON) après chaque appel externe.
 // Auth : Basic (mot de passe = secret) OU ?key=<secret>, relayé à la RPC crm_log_appel.
 // La RPC vérifie le secret, retrouve le client par son numéro normalisé, et insère dans « appels ».
-// Env (Vercel) : SUPABASE_URL, SUPABASE_ANON_KEY.
+// Clé publishable Supabase (publique, identique au front src/lib/supabase.js).
+// On n'utilise plus SUPABASE_ANON_KEY : les clés JWT legacy ont été désactivées (migration sécurité).
+const SB_URL = 'https://tndwonqdbeszkcztkzqe.supabase.co'
+const SB_KEY = 'sb_publishable_xBt6ZaZGh5trEloyMCNRuA_MN-jesVJ'
 
 function getSecret(req) {
   if (req.query && req.query.key) return String(req.query.key)
@@ -34,11 +37,11 @@ export default async function handler(req, res) {
   if (startRaw) { const d = new Date(startRaw); if (!isNaN(d.getTime())) start = d.toISOString() }
 
   try {
-    const r = await fetch(`${process.env.SUPABASE_URL}/rest/v1/rpc/crm_log_appel`, {
+    const r = await fetch(`${SB_URL}/rest/v1/rpc/crm_log_appel`, {
       method: 'POST',
       headers: {
-        apikey: process.env.SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${process.env.SUPABASE_ANON_KEY}`,
+        apikey: SB_KEY,
+        Authorization: `Bearer ${SB_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({

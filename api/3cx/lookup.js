@@ -4,7 +4,10 @@
 // Le secret n'est PAS stocké ici : il est relayé à la fonction RPC crm_lookup,
 // qui le vérifie contre config_secrets (clé « threecx_api_secret ») avant de répondre.
 // Aucune donnée n'est renvoyée sans le bon secret.
-// Env (Vercel) : SUPABASE_URL, SUPABASE_ANON_KEY (déjà configurées).
+// Clé publishable Supabase (publique, identique au front src/lib/supabase.js).
+// On n'utilise plus SUPABASE_ANON_KEY : les clés JWT legacy ont été désactivées (migration sécurité).
+const SB_URL = 'https://tndwonqdbeszkcztkzqe.supabase.co'
+const SB_KEY = 'sb_publishable_xBt6ZaZGh5trEloyMCNRuA_MN-jesVJ'
 
 function getSecret(req) {
   if (req.query && req.query.key) return String(req.query.key)
@@ -31,11 +34,11 @@ export default async function handler(req, res) {
   if (!number) return res.status(200).json({ contacts: [] })
 
   try {
-    const r = await fetch(`${process.env.SUPABASE_URL}/rest/v1/rpc/crm_lookup`, {
+    const r = await fetch(`${SB_URL}/rest/v1/rpc/crm_lookup`, {
       method: 'POST',
       headers: {
-        apikey: process.env.SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${process.env.SUPABASE_ANON_KEY}`,
+        apikey: SB_KEY,
+        Authorization: `Bearer ${SB_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ p_number: String(number), p_secret: secret }),
