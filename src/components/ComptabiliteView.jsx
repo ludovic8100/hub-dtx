@@ -390,16 +390,21 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
 
   // Lier une facture d'achat choisie dans le sélecteur -> écrit les DEUX côtés du lien.
   // Fonctionne pour un seul mouvement ({tx}) ou une sélection multiple ({ids}).
-  async function lierFactureChoisie(facture) {
+  async function lierFactureChoisie(factureOuListe) {
     const sel = selecteurFacture
     if (!sel) return
     const ids = sel.ids || (sel.tx ? [sel.tx.id] : [])
     if (ids.length === 0) return
-    await supabase.from('transactions').update({ facture_url: facture.url, rapproche: true, facture_thumb_url: null, en_attente_facture: false }).in('id', ids)
-    // Modèle facture<->paiement 1:1 : la facture est rattachée au 1er mouvement de la sélection
-    await supabase.from('factures_achat').update({ transaction_id: ids[0] }).eq('fichier_id', facture.fichier_id)
-    setTransactions(prev => prev.map(t => ids.includes(t.id) ? { ...t, facture_url: facture.url, rapproche: true, facture_thumb_url: null, en_attente_facture: false } : t))
-    setTxSelection(prev => prev && ids.includes(prev.id) ? { ...prev, facture_url: facture.url, rapproche: true, facture_thumb_url: null, en_attente_facture: false } : prev)
+    const factures = Array.isArray(factureOuListe) ? factureOuListe : [factureOuListe]
+    if (factures.length === 0) return
+    const premiere = factures[0]
+    // Un mouvement peut porter plusieurs factures (paiement groupé, ex Amazon).
+    // Côté mouvement : facture_url = 1re facture (pour l'aperçu). Côté factures : toutes rattachées au 1er mouvement.
+    await supabase.from('transactions').update({ facture_url: premiere.url, rapproche: true, facture_thumb_url: null, en_attente_facture: false }).in('id', ids)
+    await supabase.from('factures_achat').update({ transaction_id: ids[0] }).in('fichier_id', factures.map(f => f.fichier_id))
+    setTransactions(prev => prev.map(t => ids.includes(t.id) ? { ...t, facture_url: premiere.url, rapproche: true, facture_thumb_url: null, en_attente_facture: false } : t))
+    setTxSelection(prev => prev && ids.includes(prev.id) ? { ...prev, facture_url: premiere.url, rapproche: true, facture_thumb_url: null, en_attente_facture: false } : prev)
+    setFacturesParTx(prev => ({ ...prev, [ids[0]]: (prev[ids[0]] || 0) + factures.length }))
     setSelecteurFacture(null)
     if (sel.ids) viderSelection()
     fetch('https://n8n.srv1082740.hstgr.cloud/webhook/backfill-thumbs2', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' }).catch(()=>{})
@@ -1120,6 +1125,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
             dateCible={multi ? undefined : (sel.tx.date_valeur || sel.tx.date_execution)}
             contrepartieCible={multi ? undefined : sel.tx.contrepartie_nom}
             sousTitre={multi ? `${sel.ids.length} mouvement${sel.ids.length > 1 ? 's' : ''} · ${fmt(sel.montant)}` : undefined}
+            multi={!multi}
             onChoisir={lierFactureChoisie}
             onClose={() => setSelecteurFacture(null)}
           />

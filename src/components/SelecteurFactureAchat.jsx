@@ -63,12 +63,16 @@ function ApercuFacture({ fid, nom }) {
   )
 }
 
-export default function SelecteurFactureAchat({ societeCode, montantCible, dateCible, contrepartieCible, onChoisir, onClose, sousTitre }) {
+export default function SelecteurFactureAchat({ societeCode, montantCible, dateCible, contrepartieCible, onChoisir, onClose, sousTitre, multi = false }) {
   const [tous, setTous] = useState([])
   const [loading, setLoading] = useState(true)
   const [recherche, setRecherche] = useState('')
   const [apercu, setApercu] = useState(null)
+  const [selection, setSelection] = useState({}) // fichier_id -> facture (mode multi : plusieurs factures pour 1 mouvement)
   const cible = Math.abs(parseFloat(montantCible) || 0)
+  const toggle = (f) => setSelection(prev => { const n = { ...prev }; if (n[f.fichier_id]) delete n[f.fichier_id]; else n[f.fichier_id] = f; return n })
+  const selList = Object.values(selection)
+  const totalSel = selList.reduce((s, f) => s + (parseFloat(f.montant) || 0), 0)
 
   // Charger une seule fois toutes les factures non liées de la société
   useEffect(() => {
@@ -104,7 +108,7 @@ export default function SelecteurFactureAchat({ societeCode, montantCible, dateC
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: '14px', width: 'min(620px, 94vw)', maxHeight: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
-          <div style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a' }}>Lier une facture</div>
+          <div style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a' }}>{multi ? 'Lier une ou plusieurs factures' : 'Lier une facture'}</div>
           <div style={{ fontSize: '12.5px', color: '#64748b', marginTop: '3px' }}>{sousTitre ? sousTitre : (<>Mouvement de <strong>{fmt(montantCible)}</strong>{societeCode ? ` · ${societeCode}` : ''}</>)}</div>
         </div>
         <div style={{ padding: '12px 20px', borderBottom: '1px solid #f1f5f9' }}>
@@ -118,12 +122,16 @@ export default function SelecteurFactureAchat({ societeCode, montantCible, dateC
           {!loading && factures.length === 0 && <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>Aucune facture correspondante.</div>}
           {!loading && factures.map(f => {
             const exact = Math.abs((parseFloat(f.montant) || 0) - cible) < 0.01
+            const coche = !!selection[f.fichier_id]
             return (
-              <div key={f.fichier_id} onClick={() => onChoisir(f)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '11px 20px', borderBottom: '1px solid #f8fafc', cursor: 'pointer' }}
-                onMouseEnter={e => { e.currentTarget.style.background = '#f8fafc'; setApercu({ fid: f.fichier_id, nom: (f.nom || '').replace(/\.pdf$/i, '') }) }} onMouseLeave={e => { e.currentTarget.style.background = '#fff' }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(f.nom || '').replace(/\.pdf$/i, '')}</div>
-                  <div style={{ fontSize: '11.5px', color: '#94a3b8' }}>{fmtDate(f.date_facture)}</div>
+              <div key={f.fichier_id} onClick={() => multi ? toggle(f) : onChoisir(f)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '11px 20px', borderBottom: '1px solid #f8fafc', cursor: 'pointer', background: coche ? '#eff6ff' : '#fff' }}
+                onMouseEnter={e => { e.currentTarget.style.background = coche ? '#e0efff' : '#f8fafc'; setApercu({ fid: f.fichier_id, nom: (f.nom || '').replace(/\.pdf$/i, '') }) }} onMouseLeave={e => { e.currentTarget.style.background = coche ? '#eff6ff' : '#fff' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '11px', minWidth: 0 }}>
+                  {multi && <span style={{ width: '18px', height: '18px', flexShrink: 0, borderRadius: '5px', border: `2px solid ${coche ? '#2563eb' : '#cbd5e1'}`, background: coche ? '#2563eb' : '#fff', color: '#fff', fontSize: '12px', fontWeight: '900', lineHeight: '15px', textAlign: 'center' }}>{coche ? '✓' : ''}</span>}
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(f.nom || '').replace(/\.pdf$/i, '')}</div>
+                    <div style={{ fontSize: '11.5px', color: '#94a3b8' }}>{fmtDate(f.date_facture)}</div>
+                  </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
                   {exact && <span style={{ fontSize: '10px', fontWeight: '700', color: '#16a34a', background: '#dcfce7', padding: '2px 7px', borderRadius: '12px' }}>montant exact</span>}
@@ -133,8 +141,17 @@ export default function SelecteurFactureAchat({ societeCode, montantCible, dateC
             )
           })}
         </div>
-        <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9', textAlign: 'right' }}>
-          <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', cursor: 'pointer', fontSize: '13px', fontWeight: '600', fontFamily: FONT }}>Annuler</button>
+        <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+          <div style={{ fontSize: '12.5px', color: '#64748b', fontWeight: '600' }}>
+            {multi && selList.length > 0 && (() => {
+              const ok = cible > 0 && Math.abs(totalSel - cible) < 0.01
+              return <span>{selList.length} sélectionnée{selList.length > 1 ? 's' : ''} · {fmt(totalSel)}{cible > 0 && <span style={{ color: ok ? '#16a34a' : '#d97706', fontWeight: '700' }}>{ok ? ' ✓ = mouvement' : ` ≠ mouvement (${fmt(cible)})`}</span>}</span>
+            })()}
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', cursor: 'pointer', fontSize: '13px', fontWeight: '600', fontFamily: FONT }}>Annuler</button>
+            {multi && <button onClick={() => selList.length && onChoisir(selList)} disabled={selList.length === 0} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: selList.length ? '#2563eb' : '#cbd5e1', color: '#fff', cursor: selList.length ? 'pointer' : 'default', fontSize: '13px', fontWeight: '700', fontFamily: FONT }}>Lier {selList.length || ''} facture{selList.length > 1 ? 's' : ''}</button>}
+          </div>
         </div>
       </div>
       {apercu && <ApercuFacture fid={apercu.fid} nom={apercu.nom} />}

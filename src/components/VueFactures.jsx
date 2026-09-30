@@ -65,13 +65,22 @@ function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, s
   }
   // Délier un paiement (remet la facture en « à vérifier » et libère le mouvement)
   async function delierPaiement(facture) {
-    if (facture.url) {
+    const tid = facture.transaction_id
+    // Retire cette facture du lien
+    await supabase.from('factures_achat').update({ transaction_id: null }).eq('fichier_id', facture.fichier_id)
+    if (tid) {
+      // Paiement groupé : reste-t-il d'autres factures liées à ce mouvement ?
+      const { data: reste } = await supabase.from('factures_achat').select('url').eq('transaction_id', tid).neq('fichier_id', facture.fichier_id).limit(1)
+      if (reste && reste.length) {
+        // Oui : le mouvement reste rapproché, on garde une facture_url valide (pour l'aperçu)
+        await supabase.from('transactions').update({ facture_url: reste[0].url, facture_thumb_url: null }).eq('id', tid)
+      } else {
+        // Non : on libère complètement le mouvement
+        await supabase.from('transactions').update({ facture_url: null, rapproche: false, facture_thumb_url: null }).eq('id', tid)
+      }
+    } else if (facture.url) {
       await supabase.from('transactions').update({ facture_url: null, rapproche: false, facture_thumb_url: null }).eq('facture_url', facture.url)
     }
-    if (facture.transaction_id) {
-      await supabase.from('transactions').update({ facture_url: null, rapproche: false, facture_thumb_url: null }).eq('id', facture.transaction_id)
-    }
-    await supabase.from('factures_achat').update({ transaction_id: null }).eq('fichier_id', facture.fichier_id)
     setFactures(prev => prev.map(f => f.fichier_id === facture.fichier_id ? { ...f, transaction_id: null } : f))
   }
 
@@ -144,14 +153,26 @@ function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, s
     if (filtre.recherche && !(f.nom || '').toLowerCase().includes(filtre.recherche.toLowerCase())) return false
     return true
   })
-  // État de rapprochement d'une facture : 'non' (pas lié) | 'ok' (lié, montant identique) | 'douteux' (lié, montant ≠) | 'introuvable' (lien cassé)
+  // Paiements groupés : un même mouvement peut porter plusieurs factures (ex Amazon).
+  // On contrôle la SOMME des factures partageant le même mouvement vs le montant du mouvement.
+  const sommeParTx = {}, groupeCompletParTx = {}, nbParTx = {}
+  for (const f of factures) {
+    const tid = f.transaction_id
+    if (!tid) continue
+    nbParTx[tid] = (nbParTx[tid] || 0) + 1
+    sommeParTx[tid] = (sommeParTx[tid] || 0) + (Number(f.montant) || 0)
+    if (f.montant == null) groupeCompletParTx[tid] = false
+    else if (groupeCompletParTx[tid] === undefined) groupeCompletParTx[tid] = true
+  }
+  const nbGroupe = (f) => f.transaction_id ? (nbParTx[f.transaction_id] || 1) : 1
+  // État de rapprochement : 'non' (pas lié) | 'ok' | 'douteux' (montant/somme ≠) | 'introuvable' (lien cassé)
   const etatRappro = (f) => {
     if (!f.transaction_id) return { etat: 'non' }
     const mvt = mvtParTx[f.transaction_id]
-    if (!mvtLoaded) return { etat: 'ok', mvt }            // contrôle pas encore chargé : pas d'alarme
-    if (!mvt) return { etat: 'introuvable' }              // transaction_id qui ne pointe sur aucun mouvement
-    if (f.montant == null) return { etat: 'ok', mvt }     // montant facture inconnu : contrôle impossible
-    const ecart = Math.abs(Math.abs(Number(mvt.montant)) - Math.abs(Number(f.montant)))
+    if (!mvtLoaded) return { etat: 'ok', mvt }
+    if (!mvt) return { etat: 'introuvable' }
+    if (!groupeCompletParTx[f.transaction_id]) return { etat: 'ok', mvt }  // un montant manque dans le groupe : contrôle impossible
+    const ecart = Math.abs(Math.abs(Number(mvt.montant)) - Math.abs(Number(sommeParTx[f.transaction_id])))
     return ecart <= 0.01 ? { etat: 'ok', mvt } : { etat: 'douteux', mvt }
   }
   const estDouteux = (e) => e === 'douteux' || e === 'introuvable'
@@ -211,11 +232,12 @@ function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, s
           const r = etatRappro(f)
           const mvt = r.mvt
           const detailMvt = mvt ? `${mvt.contrepartie_nom || 'mouvement'} ${fmt(mvt.montant)} du ${fmtDate(mvt.date_valeur || mvt.date_execution)}` : ''
+          const grp = nbGroupe(f)
           const titreBadge =
             r.etat === 'non' ? 'Cliquer pour retrouver et lier le mouvement'
-            : r.etat === 'douteux' ? `⚠ Montant du ${vente ? 'mouvement' : 'paiement'} (${fmt(mvt ? Math.abs(mvt.montant) : null)}) ≠ facture (${fmt(f.montant)}) — cliquer pour délier`
+            : r.etat === 'douteux' ? `⚠ ${grp > 1 ? `Paiement groupé (${grp} factures) : total ${fmt(sommeParTx[f.transaction_id])}` : `Facture ${fmt(f.montant)}`} ≠ ${vente ? 'mouvement' : 'paiement'} (${fmt(mvt ? Math.abs(mvt.montant) : null)}) — cliquer pour délier`
             : r.etat === 'introuvable' ? 'Lien cassé : le mouvement lié est introuvable — cliquer pour délier'
-            : `Rapproché avec ${detailMvt} — cliquer pour délier`
+            : `${grp > 1 ? `Paiement groupé (${grp} factures) · ` : ''}Rapproché avec ${detailMvt} — cliquer pour délier`
           const cells = [
             ...(multiSociete ? [<span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: '600' }}>{f.societe}</span>] : []),
             <span onClick={(e) => { e.stopPropagation(); payee ? delierPaiement(f) : setLierPaiement(f) }} style={{ cursor: 'pointer' }}
