@@ -224,7 +224,7 @@ function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, s
             </span>,
             <span style={{ fontSize: '12.5px', color: '#64748b', fontWeight: '600' }}>{fmtDate(f.date_facture)}</span>,
             <span style={{ fontSize: '13px', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '10px' }}>{(f.nom || '').replace(/\.pdf$/i, '')}</span>,
-            ...(masquerMontant ? [] : [<span style={{ textAlign: 'right', display: 'block', fontSize: '13.5px', fontWeight: '700', color: f.montant == null ? '#cbd5e1' : (vente ? '#16a34a' : '#dc2626') }}>{f.montant == null ? '—' : fmt(f.montant)}</span>]),
+            ...(masquerMontant ? [] : [<span style={{ textAlign: 'right', display: 'block', fontSize: '13.5px', fontWeight: '700', color: f.montant == null ? '#cbd5e1' : (vente ? '#16a34a' : '#dc2626') }}>{f.montant == null ? '—' : (vente ? '+ ' : '- ') + fmt(Math.abs(f.montant))}</span>]),
             <button onClick={(e) => { e.stopPropagation(); basculerSens(f) }} title={vente ? 'Reclasser dans les Dépenses' : 'Reclasser dans les Rentrées'} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '30px', height: '30px', margin: '0 auto', borderRadius: '7px', border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', cursor: 'pointer' }}><i className="ti ti-transfer" style={{ fontSize: '16px' }} /></button>,
           ]
           return <Ligne key={f.fichier_id} cols={cols} items={cells} onClick={() => ouvrir(f)} clickable={!!f.url} alt={i % 2 === 1} title={f.nom} />
@@ -301,7 +301,7 @@ function VueVentes({ tables, color }) {
             <span style={{ fontSize: '12.5px', color: '#64748b', fontWeight: '600' }}>{fmtDate(f.date_facture)}</span>,
             <span style={{ fontSize: '12.5px', color: '#475569', fontWeight: '600' }}>{f.numero || '—'}</span>,
             <span style={{ fontSize: '13px', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '10px' }}>{f.client_nom || f.objet || '—'}</span>,
-            <span style={{ textAlign: 'right', display: 'block', fontSize: '13.5px', fontWeight: '700', color: '#16a34a' }}>{fmt(f.total_ttc)}</span>,
+            <span style={{ textAlign: 'right', display: 'block', fontSize: '13.5px', fontWeight: '700', color: '#16a34a' }}>{'+ ' + fmt(f.total_ttc)}</span>,
           ]
           return <Ligne key={f.id} cols={['100px', '110px', '110px', '1fr', '130px']} items={cells} alt={i % 2 === 1} />
         })}
