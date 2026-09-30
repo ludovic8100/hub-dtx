@@ -1,0 +1,34 @@
+name: Qlik — Contrats seuls
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Test sans écriture"
+        type: boolean
+        default: false
+
+concurrency:
+  group: qlik-contrats
+  cancel-in-progress: false
+
+jobs:
+  contrats:
+    runs-on: ubuntu-latest
+    env:
+      QLIK_API_KEY: ${{ secrets.QLIK_API_KEY }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install deps
+        run: pip install -r scripts/requirements.txt
+      - name: Verifier les secrets
+        run: |
+          if [ -z "$QLIK_API_KEY" ]; then echo "::error::Secret QLIK_API_KEY manquant"; exit 1; fi
+          if [ -z "$SUPABASE_SERVICE_KEY" ] && [ -z "$DRY_RUN" ]; then echo "::error::SUPABASE_SERVICE_KEY manquant"; exit 1; fi
+      - name: Contrats
+        run: python scripts/qlik_contrats.py

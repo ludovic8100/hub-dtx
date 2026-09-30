@@ -37,6 +37,11 @@ MEAS = [
     (ONLY("Policy.Type.FR"),  "type_production", "text"),
     (ONLY("Sous-agent (nom)"),"nom_sa",          "text"),
     (ONLY("Date effet"),      "date_creation",   "date"),
+    (ONLY("Etat contrat"),        "etat_contrat", "text"),
+    (ONLY("Contrat.Etat_Motif"),  "motif_etat",   "text"),
+    (ONLY("Gestionnaire"),        "gestionnaire", "text"),
+    (ONLY("Contrat.Date Etat"),   "date_etat",    "date"),
+    (ONLY("AnneeEtat"),           "annee_etat",   "text"),
 ]
 
 
