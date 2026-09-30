@@ -11,7 +11,7 @@ Env : QLIK_API_KEY, SUPABASE_SERVICE_KEY (+ DRY_RUN=1).
 import os, json, ssl, sys, urllib.request
 from websocket import create_connection
 sys.path.insert(0, os.path.dirname(__file__))
-from qlik_clients import parse_date, split_nom
+from qlik_clients import parse_date, qnum_to_date, split_nom
 
 QLIK_HOST="h6las9b8umw8ppb.eu.qlikcloud.com"; QLIK_APP_ID="111414a5-e645-4397-8311-9bed88033407"
 QLIK_KEY=os.environ.get("QLIK_API_KEY",""); SUPA_URL=os.environ.get("SUPABASE_URL","https://tndwonqdbeszkcztkzqe.supabase.co")
@@ -58,7 +58,7 @@ def extract():
             rec={}
             for j,(_,col,kind) in enumerate(MEAS):
                 v=(row[j+1].get("qText") or "").strip()
-                rec[col]=parse_date(v) if kind=="date" else (v or None)
+                rec[col]=qnum_to_date(row[j+1].get("qNum"), v) if kind=="date" else (v or None)
             nom,prenom=split_nom(rec.pop("_nom"))
             rec["nom_client"]=nom.upper() if nom else None
             rec["prenom_client"]=prenom.upper() if prenom else None

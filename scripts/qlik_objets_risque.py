@@ -11,7 +11,7 @@ Rechargement complet. Env : QLIK_API_KEY, SUPABASE_SERVICE_KEY (+ DRY_RUN=1).
 import os, json, ssl, sys, urllib.request
 from websocket import create_connection
 sys.path.insert(0, os.path.dirname(__file__))
-from qlik_clients import dossier_from_numero, parse_date
+from qlik_clients import dossier_from_numero, parse_date, qnum_to_date
 
 QLIK_HOST="h6las9b8umw8ppb.eu.qlikcloud.com"; QLIK_APP_ID="111414a5-e645-4397-8311-9bed88033407"
 QLIK_KEY=os.environ.get("QLIK_API_KEY",""); SUPA_URL=os.environ.get("SUPABASE_URL","https://tndwonqdbeszkcztkzqe.supabase.co")
@@ -59,7 +59,7 @@ def extract():
                  "garantie":(row[2].get("qText") or "").strip() or None}
             for j,(_,col,kind) in enumerate(MEAS):
                 v=(row[len(DIMS)+j].get("qText") or "").strip()
-                rec[col]=parse_date(v) if kind=="date" else (v or None)
+                rec[col]=qnum_to_date(row[len(DIMS)+j].get("qNum"), v) if kind=="date" else (v or None)
             rec["dossier"]=dossier_from_numero(rec.pop("_numero"))
             if not rec.get("police"): continue
             out.append(rec)

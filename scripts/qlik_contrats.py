@@ -17,7 +17,7 @@ Env : QLIK_API_KEY, SUPABASE_SERVICE_KEY (+ DRY_RUN=1).
 import os, json, ssl, sys, urllib.request
 from websocket import create_connection
 sys.path.insert(0, os.path.dirname(__file__))
-from qlik_clients import dossier_from_numero, parse_date, load_code_map, map_code, na  # réutilisation
+from qlik_clients import dossier_from_numero, parse_date, qnum_to_date, load_code_map, map_code, na  # réutilisation
 
 QLIK_HOST   = "h6las9b8umw8ppb.eu.qlikcloud.com"
 QLIK_APP_ID = "111414a5-e645-4397-8311-9bed88033407"
@@ -85,7 +85,7 @@ def extract():
             rec = {}
             for i, (_, col, kind) in enumerate(MEAS):
                 v = (row[i + 1].get("qText") or "").strip()
-                rec[col] = parse_date(v) if kind == "date" else (v or None)
+                rec[col] = qnum_to_date(row[i + 1].get("qNum"), v) if kind == "date" else (v or None)
             # Dimension PoliceUnique (row[0]) = clé stable d'upsert (auparavant ignorée)
             rec["police_unique"] = (row[0].get("qText") or "").strip() or None
             rec["dossier"] = dossier_from_numero(rec.pop("_numero"))

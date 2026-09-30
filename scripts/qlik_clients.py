@@ -90,6 +90,21 @@ def split_nom(full):
     return (toks[0], " ".join(toks[1:]) or None)
 
 
+def qnum_to_date(qnum, txt=None):
+    """Date depuis le numero de serie Qlik/Excel (epoque 1899-12-30), insensible
+    a la locale. Corrige l'inversion jour/mois du parsing texte (Qlik sort ses
+    dates en format americain M/J via =Date(...)). Fallback texte si pas de qNum."""
+    try:
+        if qnum is not None and str(qnum) not in ("NaN", ""):
+            n = float(qnum)
+            if n > 0:
+                import datetime as _dt
+                return (_dt.date(1899, 12, 30) + _dt.timedelta(days=int(round(n)))).isoformat()
+    except (ValueError, TypeError):
+        pass
+    return parse_date(txt)
+
+
 def parse_date(txt):
     if not txt:
         return None
@@ -135,7 +150,7 @@ def extract():
             for i, (_, col, kind) in enumerate(MEAS):
                 v = (row[i + 1].get("qText") or "").strip()
                 if kind == "date":
-                    rec[col] = parse_date(v)
+                    rec[col] = qnum_to_date(row[i + 1].get("qNum"), v)
                 else:
                     rec[col] = v or None
             nom, prenom = split_nom(rec.pop("_nom_prenom"))
