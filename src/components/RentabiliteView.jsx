@@ -41,7 +41,7 @@ export default function RentabiliteView({ transactions = [], categories = [], ac
   const transfertIds = useMemo(() => {
     const ids = new Set()
     for (const c of categories) {
-      if ((c.nom || '').toUpperCase() === 'TRANSFERT') { ids.add(c.id); for (const s of categories) if (s.parent_id === c.id) ids.add(s.id) }
+      if (['TRANSFERT','COMPTE COURANT'].includes((c.nom || '').toUpperCase())) { ids.add(c.id); for (const s of categories) if (s.parent_id === c.id) ids.add(s.id) }
     }
     return ids
   }, [categories])
