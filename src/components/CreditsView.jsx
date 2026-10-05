@@ -145,12 +145,15 @@ export default function CreditsView() {
     const fin=finMap[ct.id]
     const typeC = fin?.type_credit || (ct.type_production==='Prêts Individuels'?'PAT':(ct.type_production==='Leasing'?'Leasing':'PH'))
     const annee = ct.date_creation ? new Date(ct.date_creation).getFullYear() : null
+    const dateDeb=(fin&&fin.date_debut)||ct.date_creation||null
+    const okFin=!!(fin&&Number(fin.capital_initial)>0&&Number(fin.taux_actuel)>0&&Number(fin.duree_mois)>0&&dateDeb)
     let a=null
-    if(fin){
-      const tm=tauxPour({...fin,capital_initial:Number(fin.capital_initial),taux_actuel:Number(fin.taux_actuel),duree_mois:Number(fin.duree_mois)},taux)
-      a=analyser({...fin,capital_initial:Number(fin.capital_initial),taux_actuel:Number(fin.taux_actuel),duree_mois:Number(fin.duree_mois),mensualite_actuelle:fin.mensualite_actuelle?Number(fin.mensualite_actuelle):null},tm,frais)
+    if(okFin){
+      const fc={...fin,capital_initial:Number(fin.capital_initial),taux_actuel:Number(fin.taux_actuel),duree_mois:Number(fin.duree_mois),date_debut:dateDeb,mensualite_actuelle:fin.mensualite_actuelle?Number(fin.mensualite_actuelle):null}
+      const tm=tauxPour(fc,taux)
+      a=analyser(fc,tm,frais)
     }
-    return { ct, fin, typeC, annee, a, complet: !!fin }
+    return { ct, fin, typeC, annee, a, complet: okFin }
   })
 
   const annees = [...new Set(rows.map(r=>r.annee).filter(Boolean))].sort((a,b)=>b-a)
