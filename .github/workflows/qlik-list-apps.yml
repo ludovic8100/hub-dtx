@@ -1,0 +1,20 @@
+name: Qlik — Liste des apps
+on:
+  workflow_dispatch: {}
+concurrency:
+  group: qlik-list-apps
+  cancel-in-progress: false
+jobs:
+  list:
+    runs-on: ubuntu-latest
+    env:
+      QLIK_API_KEY: ${{ secrets.QLIK_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verifier le secret
+        run: if [ -z "$QLIK_API_KEY" ]; then echo "::error::Secret QLIK_API_KEY manquant"; exit 1; fi
+      - name: Lister les apps Qlik
+        run: python scripts/qlik_list_apps.py
