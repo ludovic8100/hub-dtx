@@ -173,6 +173,7 @@ export default function Sidebar() {
       {currentModules.map(m => <NavItem key={m.key} item={m} />)}
       {activeSociete === 'dynassur' && <ClientSearch accentLight={accentLight} />}
       <div style={{ marginTop:'8px', paddingTop:'8px', borderTop:'1px solid rgba(255,255,255,0.08)' }}>
+        {(isAdmin || perms.acc_tools) && <NavItem item={{ key:'tools', label:'Outils', icon:'ti-tools', path:'/tools' }} />}
         <NavItem item={{ key:'tickets', label:'Tickets', icon:'ti-ticket', path:'/tickets', badge: ticketsBadge }} />
       </div>
       {isAdmin && (

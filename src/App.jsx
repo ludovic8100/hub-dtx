@@ -17,6 +17,8 @@ const DashboardGroupe     = lazy(() => import('./pages/groupe/DashboardGroupe'))
 
 const DashboardDynassur   = lazy(() => import('./pages/dynassur/DashboardDynassur'))
 const Tickets             = lazy(() => import('./pages/Tickets'))
+const ToolsHome           = lazy(() => import('./pages/tools/ToolsHome'))
+const ToolBce             = lazy(() => import('./pages/tools/ToolBce'))
 const DynassurTaches      = lazy(() => import('./pages/dynassur/DynassurTaches'))
 const DtxTaches           = lazy(() => import('./pages/dtx/DtxTaches'))
 const LodeTaches          = lazy(() => import('./pages/lode/LodeTaches'))
@@ -187,6 +189,8 @@ export default function App() {
 
           {/* Admin */}
           <Route path="/tickets" element={<P><Tickets /></P>} />
+          <Route path="/tools"     element={<P need="acc_tools"><ToolsHome /></P>} />
+          <Route path="/tools/bce" element={<P need="acc_tools"><ToolBce /></P>} />
           <Route path="/admin/sync" element={<A><SyncCenter /></A>} />
           <Route path="/admin/rdv-categories" element={<A><RdvCategories /></A>} />
           <Route path="/admin/liens-casses" element={<A><LiensCasses /></A>} />
