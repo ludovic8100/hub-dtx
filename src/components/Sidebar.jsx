@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth, SOCIETES_CONFIG } from '../lib/auth'
 import { useTicketsBadge } from '../lib/useTicketsBadge'
+import { useNotesFraisBadge } from '../lib/useNotesFraisBadge'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
@@ -133,6 +134,7 @@ function ClientSearch({ accentLight }) {
 export default function Sidebar() {
   const { perms, isAdmin, activeSociete } = useAuth()
   const ticketsBadge = useTicketsBadge()
+  const notesFraisBadge = useNotesFraisBadge()
   const navigate = useNavigate()
   const location = useLocation()
   if (!perms) return null
@@ -181,7 +183,7 @@ export default function Sidebar() {
           <div style={{ fontSize:'10px', fontWeight:'700', color:'rgba(255,255,255,0.25)', letterSpacing:'0.1em', textTransform:'uppercase', padding:'8px 12px 5px' }}>
             Administration
           </div>
-          {MODULES_ADMIN.map(m => <NavItem key={m.key} item={m} />)}
+          {MODULES_ADMIN.map(m => <NavItem key={m.key} item={m.key === 'admin_notes_frais' ? { ...m, badge: notesFraisBadge } : m} />)}
         </div>
       )}
     </nav>
