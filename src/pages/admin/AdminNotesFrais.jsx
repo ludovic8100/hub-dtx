@@ -62,6 +62,7 @@ export default function AdminNotesFrais() {
       const { data: v, error: ev } = await supabase.rpc('nf_valider', { p_note_id: sel.id })
       if (ev) throw ev
       const nowIso = new Date().toISOString()
+      let pdfUrl = null, pdfPath = null
       try {
         const blob = await genererPdfNote({
           entiteKey: sel.societe,
@@ -75,11 +76,12 @@ export default function AdminNotesFrais() {
         const up = await supabase.storage.from('notes-frais').upload(path, blob, { upsert: true, contentType: 'application/pdf' })
         if (!up.error) {
           const { data: su } = await supabase.storage.from('notes-frais').createSignedUrl(path, 60 * 60 * 24 * 365)
+          pdfPath = path; pdfUrl = su?.signedUrl || null
           await supabase.rpc('nf_set_piece', { p_note_id: sel.id, p_path: path, p_url: su?.signedUrl || null })
         }
       } catch (e) { console.error('Pièce PDF :', e) }
       try {
-        fetch('https://n8n.srv1082740.hstgr.cloud/webhook/nf-notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: 'validee', societe: sel.societe, numero: v?.numero, titre: sel.titre, periode: sel.periode, total: v?.total ?? totTTC, auteur_nom: sel.auteur_nom, auteur_email: sel.auteur_email }) }).catch(() => {})
+        fetch('https://n8n.srv1082740.hstgr.cloud/webhook/nf-notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: 'validee', societe: sel.societe, numero: v?.numero, titre: sel.titre, periode: sel.periode, total: v?.total ?? totTTC, auteur_nom: sel.auteur_nom, auteur_email: sel.auteur_email, pdf_url: pdfUrl, pdf_path: pdfPath }) }).catch(() => {})
       } catch { /* notification best-effort */ }
       notify(true, `Note ${v?.numero || ''} approuvée — pièce et dépense générées.`)
       setSel(null); setLignes([]); load()
