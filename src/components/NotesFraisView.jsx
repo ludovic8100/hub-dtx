@@ -92,6 +92,16 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
   const [benefIban, setBenefIban] = useState('')
   const [showSig, setShowSig] = useState(false)
   const [sigImage, setSigImage] = useState('')
+  const [collabList, setCollabList] = useState([]) // admin : liste des bénéficiaires possibles
+
+  // ── Admin : charger la liste des collaborateurs pour le sélecteur bénéficiaire ──
+  useEffect(() => {
+    if (!isAdmin) return
+    let ok = true
+    supabase.from('user_permissions').select('user_email, collab_code, nom').eq('actif', true).order('nom')
+      .then(({ data }) => { if (ok) setCollabList(data || []) })
+    return () => { ok = false }
+  }, [isAdmin])
 
   const loadNotes = useCallback(async () => {
     setLoading(true)
@@ -115,6 +125,22 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
     setSel({ id: null, societe: entiteKey, titre, periode, statut: 'brouillon', note: '', auteur_email: myEmail, auteur_code: myCode, auteur_nom: myNom })
     setLignes([])
   }
+  function changeBenef(email) {
+    const c = collabList.find(x => x.user_email === email)
+    if (!c) return
+    const code = (c.collab_code || email.split('@')[0] || '').toUpperCase()
+    const nom = c.nom || ''
+    // Regénérer le titre si c'est le pattern auto (YYYYMMDD - NF - CODE)
+    setSel(s => {
+      let titre = s.titre
+      if (/^\d{8}\s*-\s*NF\s*-\s*\S+$/.test(titre)) {
+        const prefix = titre.replace(/-\s*NF\s*-\s*\S+$/, '- NF - ')
+        titre = prefix + code
+      }
+      return { ...s, auteur_email: email.toLowerCase(), auteur_code: code, auteur_nom: nom, titre }
+    })
+  }
+
   function addLigne() {
     setLignes(ls => [...ls, { _key: uid(), id: null, date: todayISO(), categorie: '', description: '', montant_ttc: '', taux_tva: showTVA ? 21 : 0, km_distance: '', km_taux: KM_TAUX_DEFAUT, justificatif_path: null, justificatif_nom: null }])
   }
@@ -140,7 +166,7 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
   }
   async function viewJustif(path) {
     const { data, error } = await supabase.storage.from('notes-frais').createSignedUrl(path, 3600)
-    if (error || !data?.signedUrl) { alert('Impossible d\u2019ouvrir le justificatif.'); return }
+    if (error || !data?.signedUrl) { alert('Impossible d’ouvrir le justificatif.'); return }
     window.open(data.signedUrl, '_blank', 'noopener')
   }
   async function removeJustif(k, path) {
@@ -244,9 +270,9 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
     setSel(s => ({ ...s, statut: 'brouillon', validee_at: null, facture_achat_id: null })); loadNotes()
   }
   async function telechargerPiece() {
-    if (!sel?.piece_pdf_path) { alert('Pi\u00e8ce PDF non disponible.'); return }
+    if (!sel?.piece_pdf_path) { alert('Pièce PDF non disponible.'); return }
     const { data, error } = await supabase.storage.from('notes-frais').createSignedUrl(sel.piece_pdf_path, 3600)
-    if (error || !data?.signedUrl) { alert('Impossible d\u2019ouvrir la pi\u00e8ce PDF.'); return }
+    if (error || !data?.signedUrl) { alert('Impossible d’ouvrir la pièce PDF.'); return }
     window.open(data.signedUrl, '_blank', 'noopener')
   }
 
@@ -374,7 +400,14 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
                   style={{ ...sheetInp, fontSize: 19, fontWeight: 800, color: NAVY, borderBottom: lockEdit ? '1px solid transparent' : '1px solid #e2e8f0', marginBottom: 14 }} />
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 16 }}>
                   <div><div style={infoLbl}>Émetteur</div><div style={infoVal}>{ENT.label}</div></div>
-                  <div><div style={infoLbl}>Collaborateur</div><div style={infoVal}>{sel.auteur_nom || myNom || myEmail}</div></div>
+                  <div><div style={infoLbl}>Bénéficiaire</div>
+                    {isAdmin && sel.statut === 'brouillon' && collabList.length > 0
+                      ? <select value={sel.auteur_email || myEmail} onChange={e => changeBenef(e.target.value)} style={{ ...sheetInp, fontWeight: 700, color: '#1e293b' }}>
+                          {!collabList.find(c => c.user_email === (sel.auteur_email || myEmail)) && <option value={sel.auteur_email || myEmail}>{sel.auteur_nom || myNom || myEmail}</option>}
+                          {collabList.map(c => <option key={c.user_email} value={c.user_email}>{c.nom || c.user_email}{c.collab_code ? ` (${c.collab_code})` : ''}</option>)}
+                        </select>
+                      : <div style={infoVal}>{sel.auteur_nom || myNom || myEmail}</div>}
+                  </div>
                   <div><div style={infoLbl}>Période</div><input disabled={lockEdit} value={sel.periode || ''} onChange={e => setSel(s => ({ ...s, periode: e.target.value }))} placeholder="Ex : Juillet 2026" style={{ ...sheetInp, borderBottom: lockEdit ? '1px solid transparent' : '1px solid #e2e8f0' }} /></div>
                   <div><div style={infoLbl}>Statut</div><div style={{ ...infoVal, display: 'flex', alignItems: 'center', gap: 8 }}><Badge s={sel.statut} />{sel.validee_at && <span style={{ fontSize: 12, fontWeight: 500, color: '#94a3b8' }}>le {fmtD(sel.validee_at)}</span>}</div></div>
                 </div>
