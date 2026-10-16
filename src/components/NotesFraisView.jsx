@@ -79,11 +79,11 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
   const myNom = perms?.nom || ''
   const ENT = ENTITES[entiteKey] || ENTITES.dynassur
   const ACCENT = ENT.color
-  const showTVA = entiteKey === 'lode'  // Seul LODE deduit la TVA ; autres entites : pas de TVA
+  const isGroupe = entiteKey === 'groupe'  // Vue groupe = toutes les sociétés
 
   const [loading, setLoading] = useState(true)
   const [notes, setNotes] = useState([])
-  const [scope, setScope] = useState('mine') // admin : mine | all
+  const [scope, setScope] = useState(isGroupe && isAdmin ? 'all' : 'mine') // admin groupe : toutes par défaut
   const [q, setQ] = useState('')
   const [sel, setSel] = useState(null)       // note en cours d'édition (id=null = nouvelle)
   const [lignes, setLignes] = useState([])
@@ -98,17 +98,20 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
   useEffect(() => {
     if (!isAdmin) return
     let ok = true
-    supabase.from('user_permissions').select('user_email, collab_code, nom').eq('actif', true).order('nom')
+    supabase.from('user_permissions').select('user_email, collab_code, nom').order('nom')
       .then(({ data }) => { if (ok) setCollabList(data || []) })
     return () => { ok = false }
   }, [isAdmin])
 
   const loadNotes = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.from('notes_frais').select('*').eq('societe', entiteKey).order('titre', { ascending: false, nullsFirst: false })
+    let query = supabase.from('notes_frais').select('*')
+    // Vue groupe + admin = toutes les sociétés ; sinon filtre sur l'entité
+    if (!(isGroupe && isAdmin)) query = query.eq('societe', entiteKey)
+    const { data } = await query.order('titre', { ascending: false, nullsFirst: false })
     setNotes(data || [])
     setLoading(false)
-  }, [entiteKey])
+  }, [entiteKey, isAdmin, isGroupe])
   useEffect(() => { loadNotes() }, [loadNotes])
 
   async function openNote(n) {
@@ -117,12 +120,13 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
     setSel(n)
   }
   const capMois = x => x ? x.charAt(0).toUpperCase() + x.slice(1) : x
-  async function newNote() {
+  async function newNote(societe) {
+    const soc = societe || (isGroupe ? 'dynassur' : entiteKey)
     const d = new Date()
     const jour = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
     const periode = capMois(d.toLocaleDateString('fr-BE', { month: 'long', year: 'numeric' }))
     const titre = `${jour} - NF - ${myCode}`
-    setSel({ id: null, societe: entiteKey, titre, periode, statut: 'brouillon', note: '', auteur_email: myEmail, auteur_code: myCode, auteur_nom: myNom })
+    setSel({ id: null, societe: soc, titre, periode, statut: 'brouillon', note: '', auteur_email: myEmail, auteur_code: myCode, auteur_nom: myNom })
     setLignes([])
   }
   function changeBenef(email) {
@@ -159,14 +163,14 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
   async function uploadJustif(k, file) {
     if (!file) return
     const safe = file.name.replace(/[^\w.\-]/g, '_')
-    const path = `${entiteKey}/${uid()}-${safe}`
+    const path = `${sel?.societe || entiteKey}/${uid()}-${safe}`
     const { error } = await supabase.storage.from('notes-frais').upload(path, file, { upsert: false, contentType: file.type || undefined })
     if (error) { alert('Upload du justificatif échoué : ' + error.message); return }
     updLigne(k, { justificatif_path: path, justificatif_nom: file.name })
   }
   async function viewJustif(path) {
     const { data, error } = await supabase.storage.from('notes-frais').createSignedUrl(path, 3600)
-    if (error || !data?.signedUrl) { alert('Impossible d’ouvrir le justificatif.'); return }
+    if (error || !data?.signedUrl) { alert('Impossible d\u2019ouvrir le justificatif.'); return }
     window.open(data.signedUrl, '_blank', 'noopener')
   }
   async function removeJustif(k, path) {
@@ -175,6 +179,10 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
   }
   const pieceNom = l => l.justificatif_nom || (l.justificatif_path ? l.justificatif_path.split('/').pop().replace(/^[^-]+-/, '') : '')
 
+  // TVA visible seulement pour LODE (y compris si la note est pour LODE en vue groupe)
+  const showTVA = (sel?.societe || entiteKey) === 'lode'
+  // Couleur d'accent dynamique : suit la société de la note en édition
+  const noteAccent = (sel && ENTITES[sel.societe]?.color) || ACCENT
   const calc = lignes.map(l => ({ ...l, ...calcLigne(l) }))
   const totTTC = calc.reduce((s, l) => s + l.montant_ttc, 0)
   const totTVA = calc.reduce((s, l) => s + l.montant_tva, 0)
@@ -211,7 +219,7 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
     }
     setBusy(true)
     const head = {
-      societe: entiteKey, titre: (sel.titre || '').trim() || null, periode: (sel.periode || '').trim() || null, note: (sel.note || '').trim() || null,
+      societe: sel.societe || entiteKey, titre: (sel.titre || '').trim() || null, periode: (sel.periode || '').trim() || null, note: (sel.note || '').trim() || null,
       auteur_email: sel.auteur_email || myEmail, auteur_code: sel.auteur_code || myCode, auteur_nom: sel.auteur_nom || myNom,
       statut: 'brouillon',
     }
@@ -240,7 +248,7 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
       if (es) { setBusy(false); alert('Soumission échouée : ' + es.message); return }
       try {
         const { data: nn } = await supabase.from('notes_frais').select('numero').eq('id', noteId).single()
-        fetch('https://n8n.srv1082740.hstgr.cloud/webhook/nf-notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: 'soumise', societe: entiteKey, numero: nn?.numero, titre: head.titre, periode: head.periode, total: totTTC, auteur_nom: head.auteur_nom, auteur_email: head.auteur_email, admin_email: 'lde@dynassur.be' }) }).catch(() => {})
+        fetch('https://n8n.srv1082740.hstgr.cloud/webhook/nf-notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: 'soumise', societe: head.societe, numero: nn?.numero, titre: head.titre, periode: head.periode, total: totTTC, auteur_nom: head.auteur_nom, auteur_email: head.auteur_email, admin_email: 'lde@dynassur.be' }) }).catch(() => {})
       } catch { /* notification best-effort */ }
     }
     setBusy(false); setShowSig(false); setSigImage(''); setSel(null); setLignes([]); loadNotes()
@@ -270,9 +278,9 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
     setSel(s => ({ ...s, statut: 'brouillon', validee_at: null, facture_achat_id: null })); loadNotes()
   }
   async function telechargerPiece() {
-    if (!sel?.piece_pdf_path) { alert('Pièce PDF non disponible.'); return }
+    if (!sel?.piece_pdf_path) { alert('Pi\u00e8ce PDF non disponible.'); return }
     const { data, error } = await supabase.storage.from('notes-frais').createSignedUrl(sel.piece_pdf_path, 3600)
-    if (error || !data?.signedUrl) { alert('Impossible d’ouvrir la pièce PDF.'); return }
+    if (error || !data?.signedUrl) { alert('Impossible d\u2019ouvrir la pi\u00e8ce PDF.'); return }
     window.open(data.signedUrl, '_blank', 'noopener')
   }
 
@@ -323,6 +331,7 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
                       <thead><tr style={{ textAlign: 'left', color: '#94a3b8', fontSize: 11, textTransform: 'uppercase' }}>
                         <th style={{ padding: '8px 10px' }}>N°</th>
                         <th style={{ padding: '8px 10px' }}>Titre</th>
+                        {isGroupe && <th style={{ padding: '8px 10px' }}>Société</th>}
                         <th style={{ padding: '8px 10px' }}>Période</th>
                         {isAdmin && scope === 'all' && <th style={{ padding: '8px 10px' }}>Auteur</th>}
                         <th style={{ padding: '8px 10px', textAlign: 'right' }}>Total TTC</th>
@@ -335,6 +344,7 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
                           <tr key={n.id} style={{ borderTop: '1px solid #eef2f7' }}>
                             <td style={{ padding: '9px 10px', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap' }}>{n.numero || <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                             <td style={{ padding: '9px 10px', fontWeight: 600, color: '#1e293b' }}>{n.titre || <span style={{ color: '#cbd5e1' }}>(sans titre)</span>}</td>
+                            {isGroupe && <td style={{ padding: '9px 10px', color: '#475569', fontSize: 12.5 }}>{(ENTITES[n.societe] || {}).label || n.societe}</td>}
                             <td style={{ padding: '9px 10px', color: '#475569' }}>{n.periode || '—'}</td>
                             {isAdmin && scope === 'all' && <td style={{ padding: '9px 10px', color: '#475569' }}>{n.auteur_nom || n.auteur_code || n.auteur_email}</td>}
                             <td style={{ padding: '9px 10px', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>{eur(n.total)}</td>
@@ -380,26 +390,34 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
 
             <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 3px rgba(15,23,42,.07)' }}>
 
-              <div style={{ background: ENT.color, padding: '18px 24px', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+              {(() => { const NE = ENTITES[sel.societe] || ENT; return (
+              <div style={{ background: NE.color, padding: '18px 24px', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
                 <div style={{ width: 54, height: 54, borderRadius: 12, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
-                  {ENT.logo ? <img src={ENT.logo} alt="" style={{ maxWidth: '78%', maxHeight: '78%', objectFit: 'contain' }} />
-                    : <span style={{ fontSize: 26, fontWeight: 800, color: ENT.color }}>{(ENT.label || '?').trim()[0]}</span>}
+                  {NE.logo ? <img src={NE.logo} alt="" style={{ maxWidth: '78%', maxHeight: '78%', objectFit: 'contain' }} />
+                    : <span style={{ fontSize: 26, fontWeight: 800, color: NE.color }}>{(NE.label || '?').trim()[0]}</span>}
                 </div>
                 <div style={{ flex: 1, minWidth: 160 }}>
                   <div style={{ color: '#fff', fontSize: 20, fontWeight: 800, letterSpacing: '.01em' }}>NOTE DE FRAIS</div>
                   <div style={{ color: 'rgba(255,255,255,.85)', fontSize: 12.5 }}>Pièce justificative de remboursement</div>
                 </div>
                 <div style={{ textAlign: 'right', color: '#fff' }}>
-                  <div style={{ fontWeight: 800, fontSize: 14 }}>{ENT.label}</div>
+                  <div style={{ fontWeight: 800, fontSize: 14 }}>{NE.label}</div>
                   {sel.numero && <div style={{ fontSize: 12, opacity: .85, marginTop: 2 }}>{sel.numero}</div>}
                 </div>
               </div>
+              ); })()}
 
               <div style={{ padding: '18px 24px', borderBottom: '1px solid #eef2f7' }}>
                 <input disabled={lockEdit} value={sel.titre || ''} onChange={e => setSel(s => ({ ...s, titre: e.target.value }))} placeholder="ex : 20260819 - NF - LDE"
                   style={{ ...sheetInp, fontSize: 19, fontWeight: 800, color: NAVY, borderBottom: lockEdit ? '1px solid transparent' : '1px solid #e2e8f0', marginBottom: 14 }} />
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 16 }}>
-                  <div><div style={infoLbl}>Émetteur</div><div style={infoVal}>{ENT.label}</div></div>
+                  <div><div style={infoLbl}>Société</div>
+                    {isGroupe && isAdmin && sel.statut === 'brouillon'
+                      ? <select value={sel.societe || 'dynassur'} onChange={e => setSel(s => ({ ...s, societe: e.target.value }))} style={{ ...sheetInp, fontWeight: 700, color: '#1e293b' }}>
+                          {Object.values(ENTITES).filter(e => e.key !== 'groupe').map(e => <option key={e.key} value={e.key}>{e.label}</option>)}
+                        </select>
+                      : <div style={infoVal}>{(ENTITES[sel.societe] || ENT).label}</div>}
+                  </div>
                   <div><div style={infoLbl}>Bénéficiaire</div>
                     {isAdmin && sel.statut === 'brouillon' && collabList.length > 0
                       ? <select value={sel.auteur_email || myEmail} onChange={e => changeBenef(e.target.value)} style={{ ...sheetInp, fontWeight: 700, color: '#1e293b' }}>
@@ -422,7 +440,7 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
                 <div style={{ overflowX: 'auto', border: '1px solid #eef2f7', borderRadius: 10 }}>
                   <table style={{ width: '100%', minWidth: 760, borderCollapse: 'collapse', fontSize: 13 }}>
                     <thead>
-                      <tr style={{ background: ENT.color }}>
+                      <tr style={{ background: noteAccent }}>
                         <th style={thS}>Date</th>
                         <th style={thS}>Catégorie</th>
                         <th style={{ ...thS, minWidth: 170 }}>Description</th>
@@ -467,7 +485,7 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
                               {km ? <span style={{ color: '#cbd5e1' }}>—</span>
                                 : l.justificatif_path
                                   ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
-                                      <button onClick={() => viewJustif(l.justificatif_path)} title={l.justificatif_nom || 'Justificatif'} style={{ ...btn('#fff', ACCENT, `1px solid ${ACCENT}`), padding: '3px 9px', fontSize: 11.5 }}>📎 Voir</button>
+                                      <button onClick={() => viewJustif(l.justificatif_path)} title={l.justificatif_nom || 'Justificatif'} style={{ ...btn('#fff', noteAccent, `1px solid ${noteAccent}`), padding: '3px 9px', fontSize: 11.5 }}>📎 Voir</button>
                                       {pieceNom(l) && <span title={pieceNom(l)} style={{ maxWidth: 170, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11.5, color: '#64748b', display: 'inline-block', verticalAlign: 'middle' }}>{pieceNom(l)}</span>}
                                       {!lockEdit && <button onClick={() => removeJustif(l._key, l.justificatif_path)} title="Retirer" style={{ ...btn('#fff', '#dc2626', '1px solid #fecaca'), padding: '3px 8px', fontSize: 11.5 }}>✕</button>}
                                     </span>
@@ -485,13 +503,13 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
                     </tbody>
                   </table>
                 </div>
-                {!lockEdit && <button onClick={addLigne} style={{ ...btn('#fff', ACCENT, `1px dashed ${ACCENT}`), width: '100%', marginTop: 10, padding: '10px', fontWeight: 700 }}>+ Ajouter une ligne</button>}
+                {!lockEdit && <button onClick={addLigne} style={{ ...btn('#fff', noteAccent, `1px dashed ${noteAccent}`), width: '100%', marginTop: 10, padding: '10px', fontWeight: 700 }}>+ Ajouter une ligne</button>}
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 28, padding: '14px 24px 20px', borderTop: '1px solid #eef2f7', flexWrap: 'wrap' }}>
                 {showTVA && <div style={{ textAlign: 'right' }}><div style={infoLbl}>Total HT</div><div style={{ fontSize: 16, fontWeight: 700 }}>{eur(totHT)}</div></div>}
                 {showTVA && <div style={{ textAlign: 'right' }}><div style={infoLbl}>TVA</div><div style={{ fontSize: 16, fontWeight: 700 }}>{eur(totTVA)}</div></div>}
-                <div style={{ textAlign: 'right' }}><div style={infoLbl}>Total à rembourser</div><div style={{ fontSize: 22, fontWeight: 800, color: ACCENT }}>{eur(totTTC)}</div></div>
+                <div style={{ textAlign: 'right' }}><div style={infoLbl}>Total à rembourser</div><div style={{ fontSize: 22, fontWeight: 800, color: noteAccent }}>{eur(totTTC)}</div></div>
               </div>
               {sel.statut === 'validee' && (
                 <div style={{ borderTop: '1px solid #eef2f7', background: '#f8fafc', padding: '18px 24px', display: 'flex', gap: 22, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -501,7 +519,7 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
                       Bénéficiaire : <b style={{ color: '#1e293b' }}>{sel.auteur_nom || myNom || '—'}</b><br />
                       IBAN : {benefIban ? <b style={{ color: '#1e293b' }}>{ibanEspace(benefIban)}</b> : <b style={{ color: '#dc2626' }}>à renseigner</b>}<br />
                       Communication : <b style={{ color: '#1e293b' }}>{sel.numero || '—'}</b><br />
-                      Montant : <b style={{ color: ACCENT }}>{eur(sel.total || totTTC)}</b>
+                      Montant : <b style={{ color: noteAccent }}>{eur(sel.total || totTTC)}</b>
                     </div>
                   </div>
                   {qrUrl
