@@ -483,7 +483,7 @@ function CreateModal({ collabs, cats = CATEGORIES, catType = {}, lockedSociete =
       const asg = f.gestionnaire ? f.gestionnaire.toUpperCase() : null
       const dest = [...new Set([asg, ...f.participants].filter(cc => cc && cc !== myCode))]
       const emails = dest.map(code => collabs.find(x => (x.code || '').toUpperCase() === code)?.email).filter(Boolean)
-      if (emails.length) envoyerAlerte(emails, `Nouveau ticket #${data.id}`, mailTicket({ ...data }, `Un nouveau ticket a été créé par <b>${myCode}</b>${data.dossier_client ? ` (dossier #${data.dossier_client})` : ''}.<br>Vous y êtes associé. Cliquez ci-dessous pour le consulter.`))
+      if (emails.length) envoyerAlerte(emails, `Nouveau ticket [#${data.id}]`, mailTicket({ ...data }, `Un nouveau ticket a été créé par <b>${myCode}</b>${data.dossier_client ? ` (dossier #${data.dossier_client})` : ''}.<br>Vous y êtes associé. Cliquez ci-dessous pour le consulter.`))
       onCreated()
     } catch (e) { setErr('Erreur : ' + (e.message || '')) }
     setSaving(false)
@@ -642,7 +642,7 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
       const p2 = Array.isArray(merged.participants) ? merged.participants.map(x => (x || '').toUpperCase()) : []
       const dest = [...new Set([(merged.gestionnaire || '').toUpperCase(), (merged.cree_par || '').toUpperCase(), ...p2].filter(cc => cc && cc !== myCode))]
       const emails = emailsOf(dest)
-      if (emails.length) envoyerAlerte(emails, `Ticket #${t.id} — mise à jour`, mailTicket(merged, `Une adaptation a été apportée à ce ticket par <b>${myCode}</b>.<br><i>${sysMsg}</i><br>Merci de cliquer sur le lien ci-dessous pour la consulter et réagir si besoin.`))
+      if (emails.length) envoyerAlerte(emails, `Ticket [#${t.id}] — mise à jour`, mailTicket(merged, `Une adaptation a été apportée à ce ticket par <b>${myCode}</b>.<br><i>${sysMsg}</i><br>Merci de cliquer sur le lien ci-dessous pour la consulter et réagir si besoin.`))
     }
     await loadMsgs(); onChanged()
   }
@@ -656,7 +656,7 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
     // Alerte : concernés sauf auteur
     const concernes = [...new Set([(t.gestionnaire||'').toUpperCase(), (t.cree_par||'').toUpperCase(), ...parts].filter(c => c && c !== myCode))]
     const emails = emailsOf(concernes)
-    if (emails.length) envoyerAlerte(emails, `Nouveau message sur le ticket #${t.id}`, mailTicket(t, `Bonjour,<br>${myCode} a écrit un message sur ce ticket :<br><i>"${txt.slice(0,200)}"</i>`))
+    if (emails.length) envoyerAlerte(emails, `Nouveau message sur le ticket [#${t.id}]`, mailTicket(t, `Bonjour,<br>${myCode} a écrit un message sur ce ticket :<br><i>"${txt.slice(0,200)}"</i>`))
     setReply(''); setSending(false); await loadMsgs(); onChanged()
   }
 
@@ -669,7 +669,7 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
       await supabase.from('taches').update({ derniere_activite: new Date().toISOString() }).eq('id', t.id)
       const concernes = [...new Set([(t.gestionnaire || '').toUpperCase(), (t.cree_par || '').toUpperCase(), ...parts].filter(c => c && c !== myCode))]
       const emails = emailsOf(concernes)
-      if (emails.length) envoyerAlerte(emails, `Pièce jointe ajoutée au ticket #${t.id}`, mailTicket(t, `Bonjour,<br>${myCode} a ajouté ${arr.length > 1 ? arr.length + ' pièces jointes' : 'une pièce jointe'} au ticket.`))
+      if (emails.length) envoyerAlerte(emails, `Pièce jointe ajoutée au ticket [#${t.id}]`, mailTicket(t, `Bonjour,<br>${myCode} a ajouté ${arr.length > 1 ? arr.length + ' pièces jointes' : 'une pièce jointe'} au ticket.`))
     } catch (e) { alert("Échec de l'envoi de la pièce jointe : " + (e.message || '')) }
     setUpBusy(false); await loadMsgs(); onChanged()
   }
