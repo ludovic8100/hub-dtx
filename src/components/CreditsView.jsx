@@ -209,7 +209,7 @@ export default function CreditsView() {
       <div style={{...D.card,padding:0,overflowX:"auto"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
           <thead><tr style={{background:C.bg,color:C.textM,textAlign:"left"}}>
-            {["Client","Organisme","Type","Année","Cap. restant","Temps restant","Baisse/mois","Gain total","Statut",""].map(h=>(
+            {["Client","Organisme","Type","Année","Capital initial","Taux","Durée totale","Cap. restant","Temps restant","Baisse/mois","Gain total","Statut",""].map(h=>(
               <th key={h} style={{padding:"10px 12px",fontWeight:600,whiteSpace:"nowrap",borderBottom:`1px solid ${C.border}`}}>{h}</th>
             ))}
           </tr></thead>
@@ -223,6 +223,9 @@ export default function CreditsView() {
                   <td style={{padding:"10px 12px"}}>{ct.compagnie}<div style={{fontSize:11,color:C.textL}}>{ct.police}</div></td>
                   <td style={{padding:"10px 12px"}}><span style={{fontSize:11,padding:"2px 8px",borderRadius:12,background:r.typeC==="PH"?"#E3F2FD":r.typeC==="PAT"?"#FFF3E0":"#EEE",color:r.typeC==="PH"?"#1565C0":r.typeC==="PAT"?"#E65100":"#666"}}>{r.typeC}</span></td>
                   <td style={{padding:"10px 12px"}}>{r.annee||"—"}</td>
+                  <td style={{padding:"10px 12px"}}>{r.fin?fmtEUR(Number(r.fin.capital_initial)):"—"}</td>
+                  <td style={{padding:"10px 12px"}}>{r.fin?`${Number(r.fin.taux_actuel).toFixed(2)} %`:"—"}</td>
+                  <td style={{padding:"10px 12px",whiteSpace:"nowrap"}}>{r.fin?fmtDuree(Number(r.fin.duree_mois)):"—"}</td>
                   <td style={{padding:"10px 12px"}}>{a?fmtEUR(a.capRest):"—"}</td>
                   <td style={{padding:"10px 12px",whiteSpace:"nowrap"}}>{a?fmtDuree(a.dureeRestante):"—"}</td>
                   <td style={{padding:"10px 12px",fontWeight:600,color:a?(a.baisse>0?C.ok:C.danger):C.textL}}>{a?(a.baisse>0?"−":"+")+fmtEUR2(Math.abs(a.baisse)):"—"}</td>
