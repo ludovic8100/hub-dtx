@@ -105,9 +105,9 @@ function Editeur({ type, doc, onClose, onSaved }) {
     objet: '', notes: '', remise_pct: 0,
     date_devis: todayISO(), date_validite: addDays(todayISO(), 30),
     date_facture: todayISO(), date_echeance: addDays(todayISO(), DELAI_PAIEMENT_JOURS),
-    statut: 'brouillon', langue: 'fr', ...(doc || {}),
+    statut: 'brouillon', langue: 'fr', type: 'facture', responsable: '', ...(doc || {}),
   })
-  const [lignes, setLignes] = useState([{ titre: '', descriptif: '', description: '', quantite: 1, prix_unitaire: 0, remise_pct: 0, tva_pct: 21, photos: [] }])
+  const [lignes, setLignes] = useState([{ titre: '', descriptif: '', description: '', quantite: 1, prix_unitaire: 0, remise_pct: 0, tva_pct: 21, tva_categorie: 'S', photos: [] }])
   const [afficherTVAC, setAfficherTVAC] = useState(false)
   const [saving, setSaving] = useState(false)
   const [importPDF, setImportPDF] = useState({ loading: false, msg: '', drag: false })
@@ -132,6 +132,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
             prix_unitaire: l.prix_public || 0,
             remise_pct: l.remise_pct || 0,
             tva_pct: l.taux_tva || 21,
+            tva_categorie: (l.taux_tva || 21) > 0 ? 'S' : 'AE',
             photos: [], optionnelle: false,
           })
         }
@@ -294,7 +295,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
     }
     if (imgs.length) setLignes(p => p.map((l, j) => j === i ? { ...l, photos: [...(l.photos || []), ...imgs] } : l))
   }
-  const addLigne = () => setLignes(p => [...p, { titre: '', descriptif: '', description: '', quantite: 1, prix_unitaire: 0, remise_pct: 0, tva_pct: 21, photos: [] }])
+  const addLigne = () => setLignes(p => [...p, { titre: '', descriptif: '', description: '', quantite: 1, prix_unitaire: 0, remise_pct: 0, tva_pct: 21, tva_categorie: 'S', photos: [] }])
   const delLigne = i => setLignes(p => p.filter((_, j) => j !== i))
 
   const save = async () => {
@@ -309,9 +310,11 @@ function Editeur({ type, doc, onClose, onSaved }) {
         client_tva: f.client_tva, objet: f.objet, notes: f.notes,
         remise_pct: Number(f.remise_pct) || 0, statut: f.statut, langue: f.langue || 'fr',
         total_ht: tot.ht, total_tva: tot.tva, total_ttc: tot.ttc,
+        responsable: f.responsable || null,
       }
       if (isDevis) { payload.date_devis = f.date_devis; payload.date_validite = f.date_validite }
       else { payload.date_facture = f.date_facture; payload.date_echeance = f.date_echeance; if (f.devis_id) payload.devis_id = f.devis_id }
+      if (!isDevis) { payload.type = f.type || 'facture'; if (f.total_projet_ttc !== undefined && f.total_projet_ttc !== null && f.total_projet_ttc !== '') payload.total_projet_ttc = Number(f.total_projet_ttc); if (f.facture_origine_id) payload.facture_origine_id = f.facture_origine_id }
 
       if (docId) {
         await supabase.from(table).update(payload).eq('id', docId)
@@ -330,6 +333,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
         photos: l.photos || [], optionnelle: !!l.optionnelle,
         quantite: Number(l.quantite) || 0, prix_unitaire: Number(l.prix_unitaire) || 0,
         remise_pct: Number(l.remise_pct) || 0, tva_pct: Number(l.tva_pct) || 0,
+        tva_categorie: (Number(l.tva_pct) || 0) > 0 ? 'S' : (l.tva_categorie || 'AE'),
         total_ht: (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * (1 - (Number(l.remise_pct) || 0) / 100),
       }))
       if (lignesPayload.length) {
@@ -423,6 +427,28 @@ function Editeur({ type, doc, onClose, onSaved }) {
           </>}
         </div>
 
+        {/* Type de facture + responsable */}
+        <div style={{ display: 'grid', gridTemplateColumns: mobE ? '1fr' : (isDevis ? '1fr' : '1fr 1fr'), gap: 10, marginBottom: 16 }}>
+          {!isDevis && (
+            <div><label style={lbl}>Type de facture</label>
+              <select style={inp} value={f.type || 'facture'} onChange={e => set('type', e.target.value)}>
+                <option value="facture">Facture</option>
+                <option value="acompte">Acompte</option>
+                <option value="solde">Solde</option>
+                <option value="note_credit">Note de crédit</option>
+              </select>
+            </div>
+          )}
+          <div><label style={lbl}>Responsable</label>
+            <select style={inp} value={f.responsable || ''} onChange={e => set('responsable', e.target.value)}>
+              <option value="">—</option>
+              <option value="LDE">LDE — Ludovic Detilloux</option>
+              <option value="JCL">JCL — Jean-Charles Lorange</option>
+              <option value="LLO">LLO — Ludivine Lorange</option>
+            </select>
+          </div>
+        </div>
+
         {/* Import PDF fournisseur (glisser-déposer) */}
         <div
           onDragOver={e => { e.preventDefault(); setImportPDF(p => ({ ...p, drag: true })) }}
@@ -467,6 +493,17 @@ function Editeur({ type, doc, onClose, onSaved }) {
                         {TVA_TAUX.map(t => <option key={t.val} value={t.val}>{t.val}%</option>)}
                       </select>
                     </ChampL>
+                    {(Number(l.tva_pct) || 0) === 0 && (
+                      <ChampL label="Cat.">
+                        <select style={{ ...inp, width: 60, padding: '6px' }} value={l.tva_categorie || 'AE'} onChange={e => setLigne(i, 'tva_categorie', e.target.value)}>
+                          <option value="AE">AE</option>
+                          <option value="Z">Z</option>
+                          <option value="E">E</option>
+                          <option value="K">K</option>
+                          <option value="G">G</option>
+                        </select>
+                      </ChampL>
+                    )}
                     <ChampL label="HT"><div style={{ minWidth: 78, textAlign: 'right', fontWeight: 700, color: NAVY, padding: '7px 0' }}>{eur(totLigne)}</div></ChampL>
                     <ChampL label="TTC"><div style={{ minWidth: 82, textAlign: 'right', fontWeight: 700, color: ORANGE, padding: '7px 0' }}>{eur(totTTC)}</div></ChampL>
                     <button onClick={() => delLigne(i)} title="Supprimer la ligne" style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 18, alignSelf: 'center', marginTop: 12 }}>×</button>
@@ -1347,7 +1384,7 @@ export default function LodeDevisFactures() {
     const lignes = await getLignes('devis', devisDoc.id)
     const { data: num } = await supabase.rpc('next_lode_numero', { p_type: 'facture' })
     const { data: fact, error } = await supabase.from('lode_factures').insert({
-      numero: num, devis_id: devisDoc.id, statut: 'brouillon',
+      numero: num, devis_id: devisDoc.id, statut: 'brouillon', type: 'facture', responsable: devisDoc.responsable || null,
       client_nom: devisDoc.client_nom, client_adresse: devisDoc.client_adresse, client_cp: devisDoc.client_cp,
       client_ville: devisDoc.client_ville, client_email: devisDoc.client_email, client_telephone: devisDoc.client_telephone,
       client_tva: devisDoc.client_tva, objet: devisDoc.objet, notes: devisDoc.notes, remise_pct: devisDoc.remise_pct,
@@ -1359,7 +1396,7 @@ export default function LodeDevisFactures() {
     if (lignes.length) {
       await supabase.from('lode_factures_lignes').insert(lignes.map((l, i) => ({
         facture_id: fact.id, position: i, description: l.description, quantite: l.quantite,
-        prix_unitaire: l.prix_unitaire, remise_pct: l.remise_pct, tva_pct: l.tva_pct, total_ht: l.total_ht,
+        prix_unitaire: l.prix_unitaire, remise_pct: l.remise_pct, tva_pct: l.tva_pct, tva_categorie: l.tva_categorie || ((Number(l.tva_pct) || 0) > 0 ? 'S' : 'AE'), total_ht: l.total_ht,
       })))
     }
     setTab('factures'); load()
