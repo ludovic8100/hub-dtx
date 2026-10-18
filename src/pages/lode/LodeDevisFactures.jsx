@@ -1415,6 +1415,7 @@ export default function LodeDevisFactures() {
   const [editing, setEditing] = useState(null) // {type, doc}
   const [busy, setBusy] = useState(null)
   const [suivi, setSuivi] = useState(null)      // devis dont on affiche le suivi
+  const [sort, setSort] = useState({ key: 'numero', dir: 'desc' })
 
   const load = async () => {
     setLoading(true)
@@ -1498,6 +1499,24 @@ export default function LodeDevisFactures() {
   }
 
   const liste = tab === 'devis' ? devis : factures
+  const COLS = [
+    { h: 'N°', key: 'numero', align: 'left' },
+    { h: 'Client', key: 'client_nom', align: 'left' },
+    { h: 'Objet', key: 'objet', align: 'left' },
+    { h: 'Date', key: 'date', align: 'left' },
+    { h: 'Total TTC', key: 'total_ttc', align: 'right' },
+    { h: 'Statut', key: 'statut', align: 'left' },
+    { h: 'Actions', key: null, align: 'left' },
+  ]
+  const sortVal = (doc, k) => k === 'date' ? ((tab === 'devis' ? doc.date_devis : doc.date_facture) || '') : doc[k]
+  const listeTriee = [...liste].sort((a, b) => {
+    const k = sort.key
+    const va = sortVal(a, k), vb = sortVal(b, k)
+    let cmp
+    if (k === 'total_ttc') cmp = (Number(va) || 0) - (Number(vb) || 0)
+    else cmp = String(va ?? '').localeCompare(String(vb ?? ''), 'fr', { numeric: true, sensitivity: 'base' })
+    return sort.dir === 'asc' ? cmp : -cmp
+  })
   const STAT = tab === 'devis' ? STATUTS_DEVIS : STATUTS_FACT
   const C = LODE.couleur
   const C_DARK = '#7c2d12'
@@ -1542,7 +1561,7 @@ export default function LodeDevisFactures() {
           ) : mob ? (
             /* === Vue mobile : cartes empilées === */
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {liste.map((doc) => {
+              {listeTriee.map((doc) => {
                 const s = STAT[doc.statut] || STAT.brouillon
                 const t = tab === 'devis' ? 'devis' : 'facture'
                 return (
@@ -1579,12 +1598,12 @@ export default function LodeDevisFactures() {
             <DataCard style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 760 }}>
                 <thead style={{ background: '#f8fafc' }}>
-                  <tr>{['N°', 'Client', 'Objet', 'Date', 'Total TTC', 'Statut', 'Actions'].map(h => (
-                    <th key={h} style={{ padding: '11px 14px', textAlign: h === 'Total TTC' ? 'right' : 'left', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.03em' }}>{h}</th>
+                  <tr>{COLS.map(c => (
+                    <th key={c.h} onClick={() => c.key && setSort(s => ({ key: c.key, dir: s.key === c.key && s.dir === 'asc' ? 'desc' : 'asc' }))} style={{ padding: '11px 14px', textAlign: c.align, fontSize: 10, fontWeight: 700, color: sort.key === c.key ? C : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.03em', cursor: c.key ? 'pointer' : 'default', userSelect: 'none', whiteSpace: 'nowrap' }}>{c.h}{sort.key === c.key ? (sort.dir === 'asc' ? ' \u25B2' : ' \u25BC') : (c.key ? ' \u21C5' : '')}</th>
                   ))}</tr>
                 </thead>
                 <tbody>
-                  {liste.map((doc) => {
+                  {listeTriee.map((doc) => {
                     const s = STAT[doc.statut] || STAT.brouillon
                     return (
                       <tr key={doc.id} style={{ borderTop: '1px solid #f1f5f9' }}
