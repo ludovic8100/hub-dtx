@@ -105,10 +105,13 @@ function Editeur({ type, doc, onClose, onSaved }) {
     objet: '', notes: '', remise_pct: 0,
     date_devis: todayISO(), date_validite: addDays(todayISO(), 30),
     date_facture: todayISO(), date_echeance: addDays(todayISO(), DELAI_PAIEMENT_JOURS),
-    statut: 'brouillon', langue: 'fr', type: 'facture', responsable: '', ...(doc || {}),
+    statut: 'brouillon', langue: 'fr', type: 'facture', responsable: '', total_projet_ttc: '', facture_origine_id: null, ...(doc || {}),
   })
   const [lignes, setLignes] = useState([{ titre: '', descriptif: '', description: '', quantite: 1, prix_unitaire: 0, remise_pct: 0, tva_pct: 21, tva_categorie: 'S', photos: [] }])
   const [afficherTVAC, setAfficherTVAC] = useState(false)
+  const [acomptesDispo, setAcomptesDispo] = useState([])
+  const [acomptesSel, setAcomptesSel] = useState([])
+  const [acLignes, setAcLignes] = useState({})
   const [saving, setSaving] = useState(false)
   const [importPDF, setImportPDF] = useState({ loading: false, msg: '', drag: false })
 
@@ -252,7 +255,62 @@ function Editeur({ type, doc, onClose, onSaved }) {
     }
   }, [doc])
 
-  const tot = calcTotaux(lignes, f.remise_pct)
+  // Charge les acomptes du client a deduire (uniquement pour un SOLDE en creation)
+  useEffect(() => {
+    if (isDevis || f.type !== 'solde' || doc?.id || !f.client_id) { setAcomptesDispo([]); return }
+    let annule = false
+    ;(async () => {
+      const { data: acs } = await supabase.from('lode_factures')
+        .select('id,numero,date_facture,objet,total_ht,total_tva,total_ttc')
+        .eq('type', 'acompte').eq('client_id', f.client_id).order('date_facture')
+      if (annule) return
+      const list = acs || []
+      setAcomptesDispo(list)
+      if (list.length) {
+        const { data: ls } = await supabase.from('lode_factures_lignes')
+          .select('facture_id,tva_pct,tva_categorie,total_ht')
+          .in('facture_id', list.map(a => a.id))
+        if (annule) return
+        const map = {}
+        for (const l of (ls || [])) { (map[l.facture_id] = map[l.facture_id] || []).push(l) }
+        setAcLignes(map)
+      } else { setAcLignes({}) }
+    })()
+    return () => { annule = true }
+  }, [isDevis, f.type, f.client_id, doc])
+
+  // Lignes de deduction d'acompte (negatives, par taux) pour un SOLDE en creation
+  const lignesDeduction = (!isDevis && f.type === 'solde' && !doc?.id)
+    ? acomptesSel.flatMap(aid => {
+        const ac = acomptesDispo.find(a => a.id === aid); if (!ac) return []
+        const groups = {}
+        for (const l of (acLignes[aid] || [])) {
+          const pct = Number(l.tva_pct) || 0
+          const cat = l.tva_categorie || (pct > 0 ? 'S' : 'AE')
+          const k = pct + '|' + cat
+          groups[k] = (groups[k] || 0) + (Number(l.total_ht) || 0)
+        }
+        if (!Object.keys(groups).length) {
+          const ht = Number(ac.total_ht) || 0
+          const pct = ht ? Math.round((Number(ac.total_tva) || 0) / ht * 100) : 0
+          groups[pct + '|' + (pct > 0 ? 'S' : 'AE')] = ht
+        }
+        return Object.entries(groups).map(([k, ht]) => {
+          const [pct, cat] = k.split('|')
+          return {
+            titre: 'Acompte déjà facturé — ' + ac.numero,
+            descriptif: ac.date_facture ? ('Acompte du ' + String(ac.date_facture).slice(0, 10)) : '',
+            description: 'Acompte déjà facturé — ' + ac.numero,
+            quantite: 1, prix_unitaire: -(Math.round(Number(ht) * 100) / 100),
+            remise_pct: 0, tva_pct: Number(pct), tva_categorie: cat,
+            photos: [], optionnelle: false, _deduction: true,
+          }
+        })
+      })
+    : []
+
+  const tot = calcTotaux([...lignes, ...lignesDeduction], f.remise_pct)
+  const totDeduction = lignesDeduction.length ? calcTotaux(lignesDeduction, 0).ttc : 0
   const set = (k, v) => setF(p => ({ ...p, [k]: v }))
   const setLigne = (i, k, v) => setLignes(p => p.map((l, j) => j === i ? { ...l, [k]: v } : l))
   // Compresse/redimensionne une image avant upload (max 1400px, qualité 82%)
@@ -314,7 +372,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
       }
       if (isDevis) { payload.date_devis = f.date_devis; payload.date_validite = f.date_validite }
       else { payload.date_facture = f.date_facture; payload.date_echeance = f.date_echeance; if (f.devis_id) payload.devis_id = f.devis_id }
-      if (!isDevis) { payload.type = f.type || 'facture'; if (f.total_projet_ttc !== undefined && f.total_projet_ttc !== null && f.total_projet_ttc !== '') payload.total_projet_ttc = Number(f.total_projet_ttc); if (f.facture_origine_id) payload.facture_origine_id = f.facture_origine_id }
+      if (!isDevis) { payload.type = f.type || 'facture'; if (f.total_projet_ttc !== undefined && f.total_projet_ttc !== null && f.total_projet_ttc !== '') payload.total_projet_ttc = Number(f.total_projet_ttc); if (f.type === 'solde' && acomptesSel[0]) payload.facture_origine_id = acomptesSel[0]; else if (f.facture_origine_id) payload.facture_origine_id = f.facture_origine_id }
 
       if (docId) {
         await supabase.from(table).update(payload).eq('id', docId)
@@ -326,7 +384,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
         if (error) throw error
         docId = data.id
       }
-      const lignesPayload = lignes.filter(l => (l.titre || '').trim() || (l.description || '').trim() || (l.descriptif || '').trim()).map((l, i) => ({
+      const lignesPayload = [...lignes, ...lignesDeduction].filter(l => (l.titre || '').trim() || (l.description || '').trim() || (l.descriptif || '').trim()).map((l, i) => ({
         [fk]: docId, position: i,
         titre: l.titre || '', descriptif: l.descriptif || '',
         description: l.description || l.titre || '',
@@ -449,6 +507,34 @@ function Editeur({ type, doc, onClose, onSaved }) {
           </div>
         </div>
 
+        {/* Acompte / Solde : total projet + deduction des acomptes */}
+        {!isDevis && (f.type === 'acompte' || f.type === 'solde') && (
+          <div style={{ border: '1px solid #fed7aa', background: '#FFF7ED', borderRadius: 10, padding: 12, marginBottom: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: mobE ? '1fr' : '1fr 1fr', gap: 10 }}>
+              <div><label style={lbl}>Total projet TTC (pour mémoire)</label>
+                <input type="number" step="0.01" style={inp} value={f.total_projet_ttc || ''} onChange={e => set('total_projet_ttc', e.target.value)} placeholder="ex: 10000.00" /></div>
+            </div>
+            {f.type === 'solde' && !doc?.id && (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: ORANGE, marginBottom: 6 }}>Acomptes déjà facturés à déduire</div>
+                {!f.client_id && <div style={{ fontSize: 12, color: '#b45309' }}>Lie d'abord le client (bouton plus haut) pour retrouver ses acomptes.</div>}
+                {f.client_id && acomptesDispo.length === 0 && <div style={{ fontSize: 12, color: '#64748b' }}>Aucun acompte trouvé pour ce client.</div>}
+                {acomptesDispo.map(ac => (
+                  <label key={ac.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, padding: '4px 0', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={acomptesSel.includes(ac.id)} onChange={e => setAcomptesSel(p => e.target.checked ? [...p, ac.id] : p.filter(x => x !== ac.id))} />
+                    <span style={{ fontWeight: 700 }}>{ac.numero}</span>
+                    <span style={{ color: '#64748b' }}>{(ac.date_facture || '').slice(0, 10)}{ac.objet ? ' · ' + ac.objet : ''}</span>
+                    <span style={{ marginLeft: 'auto', fontWeight: 700 }}>{eur(ac.total_ttc)}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+            {f.type === 'solde' && doc?.id && (
+              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 8 }}>Solde existant : les lignes « Acompte déjà facturé » sont modifiables directement dans les lignes ci-dessous.</div>
+            )}
+          </div>
+        )}
+
         {/* Import PDF fournisseur (glisser-déposer) */}
         <div
           onDragOver={e => { e.preventDefault(); setImportPDF(p => ({ ...p, drag: true })) }}
@@ -549,6 +635,9 @@ function Editeur({ type, doc, onClose, onSaved }) {
             {Object.entries(tot.parTaux).filter(([, v]) => v > 0).map(([t, v]) => (
               <div key={t} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '2px 0', color: '#64748b' }}><span>TVA {t}%</span><span>{eur(v)}</span></div>
             ))}
+            {totDeduction < 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '2px 0', color: '#b45309' }}><span>Acomptes déduits</span><span>{eur(totDeduction)}</span></div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 800, color: ORANGE, padding: '8px 0', borderTop: '2px solid #f1f5f9', marginTop: 4 }}><span>Total TTC</span><span>{eur(tot.ttc)}</span></div>
           </div>
         </div>
