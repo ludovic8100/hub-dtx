@@ -112,6 +112,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
   const [acomptesDispo, setAcomptesDispo] = useState([])
   const [acomptesSel, setAcomptesSel] = useState([])
   const [acLignes, setAcLignes] = useState({})
+  const [origines, setOrigines] = useState([])
   const [saving, setSaving] = useState(false)
   const [importPDF, setImportPDF] = useState({ loading: false, msg: '', drag: false })
 
@@ -279,6 +280,33 @@ function Editeur({ type, doc, onClose, onSaved }) {
     return () => { annule = true }
   }, [isDevis, f.type, f.client_id, doc])
 
+  // Note de credit : factures du client pouvant etre creditees
+  useEffect(() => {
+    if (isDevis || f.type !== 'note_credit' || !f.client_id) { setOrigines([]); return }
+    let annule = false
+    supabase.from('lode_factures').select('id,numero,date_facture,total_ttc')
+      .eq('client_id', f.client_id).neq('type', 'note_credit').order('date_facture', { ascending: false })
+      .then(({ data }) => { if (!annule) setOrigines(data || []) })
+    return () => { annule = true }
+  }, [isDevis, f.type, f.client_id])
+
+  // Reprend les lignes de la facture d'origine en negatif
+  const reprendreLignesNegatif = async () => {
+    if (!f.facture_origine_id) return
+    const { data } = await supabase.from('lode_factures_lignes').select('*').eq('facture_id', f.facture_origine_id).order('position')
+    if (!data || !data.length) { alert('Aucune ligne sur la facture sélectionnée.'); return }
+    setLignes(data.map(l => ({
+      titre: l.titre || l.description || '', descriptif: l.descriptif || '',
+      description: l.description || l.titre || '',
+      quantite: Number(l.quantite) || 0, prix_unitaire: -Math.abs(Number(l.prix_unitaire) || 0),
+      remise_pct: Number(l.remise_pct) || 0, tva_pct: Number(l.tva_pct) || 0,
+      tva_categorie: l.tva_categorie || ((Number(l.tva_pct) || 0) > 0 ? 'S' : 'AE'),
+      photos: Array.isArray(l.photos) ? l.photos : [], optionnelle: false,
+    })))
+    const ori = origines.find(o => o.id === f.facture_origine_id)
+    if (ori && !f.objet) set('objet', 'Note de crédit relative à la facture ' + ori.numero)
+  }
+
   // Lignes de deduction d'acompte (negatives, par taux) pour un SOLDE en creation
   const lignesDeduction = (!isDevis && f.type === 'solde' && !doc?.id)
     ? acomptesSel.flatMap(aid => {
@@ -378,7 +406,8 @@ function Editeur({ type, doc, onClose, onSaved }) {
         await supabase.from(table).update(payload).eq('id', docId)
         await supabase.from(tableLignes).delete().eq(fk, docId)
       } else {
-        const { data: num } = await supabase.rpc('next_lode_numero', { p_type: type })
+        const pType = (!isDevis && f.type === 'note_credit') ? 'note_credit' : type
+        const { data: num } = await supabase.rpc('next_lode_numero', { p_type: pType })
         payload.numero = num
         const { data, error } = await supabase.from(table).insert(payload).select('id').single()
         if (error) throw error
@@ -532,6 +561,27 @@ function Editeur({ type, doc, onClose, onSaved }) {
             {f.type === 'solde' && doc?.id && (
               <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 8 }}>Solde existant : les lignes « Acompte déjà facturé » sont modifiables directement dans les lignes ci-dessous.</div>
             )}
+          </div>
+        )}
+
+        {/* Note de credit : facture a crediter */}
+        {!isDevis && f.type === 'note_credit' && (
+          <div style={{ border: '1px solid #fecaca', background: '#fef2f2', borderRadius: 10, padding: 12, marginBottom: 14 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#dc2626', marginBottom: 6 }}>Note de crédit — facture à créditer</div>
+            {!f.client_id && <div style={{ fontSize: 12, color: '#b45309' }}>Lie d'abord le client pour retrouver ses factures.</div>}
+            {f.client_id && (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: 220 }}>
+                  <label style={lbl}>Facture d'origine</label>
+                  <select style={inp} value={f.facture_origine_id || ''} onChange={e => set('facture_origine_id', e.target.value)}>
+                    <option value="">—</option>
+                    {origines.map(o => <option key={o.id} value={o.id}>{o.numero} · {eur(o.total_ttc)} · {(o.date_facture || '').slice(0, 10)}</option>)}
+                  </select>
+                </div>
+                <button type="button" disabled={!f.facture_origine_id} onClick={reprendreLignesNegatif} style={{ background: f.facture_origine_id ? '#dc2626' : '#cbd5e1', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 14px', fontSize: 12, fontWeight: 700, cursor: f.facture_origine_id ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap' }}>↩ Reprendre les lignes en négatif</button>
+              </div>
+            )}
+            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 6 }}>La note de crédit annule tout ou partie de la facture sélectionnée (montants négatifs).</div>
           </div>
         )}
 
@@ -699,7 +749,7 @@ async function exportPDF(type, doc, lignes) {
 
   // ---- Titre document (haut droite) ----
   d.setFontSize(20); d.setTextColor(...O); d.setFont(undefined, 'bold')
-  const titre = isDevis ? L.devis : L.facture
+  const titre = isDevis ? L.devis : (doc.type === 'note_credit' ? 'Note de crédit' : L.facture)
   d.text(`${titre}  ${doc.numero || ''}`, PW - 16, 18, { align: 'right' })
   d.setFontSize(8.5); d.setTextColor(...GREY); d.setFont(undefined, 'normal')
   let yh = 25
@@ -994,7 +1044,7 @@ async function exportExcel(type, doc, lignes) {
   const isDevis = type === 'devis'
   const L = I18N[doc.langue] || I18N.fr
   const rows = [
-    [LODE.raison_sociale, '', '', isDevis ? L.devis : L.facture],
+    [LODE.raison_sociale, '', '', isDevis ? L.devis : (doc.type === 'note_credit' ? 'Note de crédit' : L.facture)],
     [LODE.adresse, '', '', doc.numero],
     [`${LODE.cp} ${LODE.ville}`, '', '', isDevis ? `${L.validite} : ${fmtDate(doc.date_validite)}` : `${L.echeance} : ${fmtDate(doc.date_echeance)}`],
     [`TVA ${LODE.tva}`, '', '', ''],
@@ -1016,8 +1066,8 @@ async function exportExcel(type, doc, lignes) {
   const ws = XLSX.utils.aoa_to_sheet(rows)
   ws['!cols'] = [{ wch: 40 }, { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 8 }, { wch: 14 }]
   const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, isDevis ? L.devis : L.facture)
-  XLSX.writeFile(wb, `${isDevis ? L.devis : L.facture}_${doc.numero}.xlsx`)
+  XLSX.utils.book_append_sheet(wb, ws, isDevis ? L.devis : (doc.type === 'note_credit' ? 'Note de crédit' : L.facture))
+  XLSX.writeFile(wb, `${isDevis ? L.devis : (doc.type === 'note_credit' ? 'Note de crédit' : L.facture)}_${doc.numero}.xlsx`)
 }
 
 // Export Word (.doc) éditable — via HTML que Word ouvre nativement
@@ -1059,7 +1109,7 @@ async function exportWord(type, doc, lignes) {
         new Paragraph({ children: [new TextRun({ text: `TVA ${LODE.tva}`, size: 18 })] }),
       ] }),
       new TableCell({ borders: noBorder, width: { size: 50, type: WidthType.PERCENTAGE }, children: [
-        new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${isDevis ? L.devis : L.facture} ${doc.numero || ''}`, bold: true, color: O, size: 36 })] }),
+        new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${isDevis ? L.devis : (doc.type === 'note_credit' ? 'Note de crédit' : L.facture)} ${doc.numero || ''}`, bold: true, color: O, size: 36 })] }),
         new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${L.date} ${fmtDate(isDevis ? doc.date_devis : doc.date_facture)}`, size: 18, color: GREY })] }),
         new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${isDevis ? L.validite : L.echeance} ${fmtDate(isDevis ? doc.date_validite : doc.date_echeance)}`, size: 18, color: GREY })] }),
       ] }),
@@ -1165,7 +1215,7 @@ async function exportWord(type, doc, lignes) {
   const blob = await Packer.toBlob(docObj)
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
-  link.href = url; link.download = `${isDevis ? L.devis : L.facture}_${doc.numero}.docx`
+  link.href = url; link.download = `${isDevis ? L.devis : (doc.type === 'note_credit' ? 'Note de crédit' : L.facture)}_${doc.numero}.docx`
   link.click()
   URL.revokeObjectURL(url)
 }
