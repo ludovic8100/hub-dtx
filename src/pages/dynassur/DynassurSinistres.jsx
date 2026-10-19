@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
 import { ENTITES } from '../../lib/entites'
@@ -9,6 +9,242 @@ const E = ENTITES.dynassur
 const NAVY = '#0D2F5E'
 const eur = n => new Intl.NumberFormat('fr-BE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(Number(n || 0))
 const fmtD = d => { if (!d) return '—'; const x = new Date(d); return isNaN(x) ? '—' : x.toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit', year: 'numeric' }) }
+const fmtDT = d => { if (!d) return '—'; const x = new Date(d); return isNaN(x) ? '—' : x.toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' + x.toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' }) }
+
+/* ── Mapping garanties BRIO (NL) → catégories workflow ── */
+const GARANTIE_MAP = {
+  'BA Motorvoertuig': 'rc_auto',
+  'Bestuurder': 'rc_auto',
+  'Inzittenden': 'rc_auto',
+  'Eigen Schade': 'omnium',
+  'Volledige Omnium': 'omnium',
+  'Gedeeltelijke Omnium': 'omnium',
+  'Glasbraak (Voertuig)': 'omnium',
+  'Brand (Voertuig)': 'omnium',
+  'Diefstal (Voertuig)': 'omnium',
+  'Natuurkrachten (Voertuig)': 'omnium',
+  'Aanrijding met wild (Voertuig)': 'omnium',
+  'Aanraking voertuigen': 'omnium',
+  'Bijstand': 'assistance',
+  'Repatriëring': 'assistance',
+  'Rechtsbijstand': 'pj_auto',
+  'Rechtsbijstand (Voertuig)': 'pj_auto',
+  'Rechtsbijstand verkeer': 'pj_auto',
+}
+
+function detectGaranties(garantieStr) {
+  if (!garantieStr) return ['rc_auto']
+  const parts = String(garantieStr).split(' / ').map(s => s.trim())
+  const cats = new Set()
+  parts.forEach(p => { if (GARANTIE_MAP[p]) cats.add(GARANTIE_MAP[p]) })
+  if (cats.size === 0) cats.add('rc_auto')
+  return [...cats]
+}
+
+const CAT_LABELS = {
+  common: 'Tronc commun',
+  rc_auto: 'RC Auto',
+  omnium: 'Omnium',
+  assistance: 'Assistance',
+  pj_auto: 'Protection Juridique Auto',
+}
+const CAT_COLORS = {
+  common: '#6366f1',
+  rc_auto: '#2563eb',
+  omnium: '#7c3aed',
+  assistance: '#ea580c',
+  pj_auto: '#0d9488',
+}
+
+/* ── Panneau slide-over workflow ── */
+function WorkflowPanel({ sinistre, onClose }) {
+  const [definitions, setDefinitions] = useState([])
+  const [progress, setProgress] = useState({})
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(null)
+  const [expandedStep, setExpandedStep] = useState(null)
+
+  const garanties = useMemo(() => detectGaranties(sinistre.garantie), [sinistre.garantie])
+  const cats = useMemo(() => ['common', ...garanties], [garanties])
+
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    const [defRes, progRes] = await Promise.all([
+      supabase.from('sinistre_workflow_definitions')
+        .select('*')
+        .in('garantie', cats)
+        .order('garantie').order('step_order'),
+      supabase.from('sinistre_workflow_progress')
+        .select('*')
+        .eq('pointeur_sinistre', sinistre.pointeur_sinistre)
+    ])
+    if (defRes.data) setDefinitions(defRes.data)
+    if (progRes.data) {
+      const map = {}
+      progRes.data.forEach(p => { map[p.step_id] = p })
+      setProgress(map)
+    }
+    setLoading(false)
+  }, [sinistre.pointeur_sinistre, cats])
+
+  useEffect(() => { loadData() }, [loadData])
+
+  const toggleStep = async (stepId) => {
+    const existing = progress[stepId]
+    setSaving(stepId)
+    if (existing && existing.checked) {
+      await supabase.from('sinistre_workflow_progress')
+        .delete()
+        .eq('pointeur_sinistre', sinistre.pointeur_sinistre)
+        .eq('step_id', stepId)
+      setProgress(p => { const n = { ...p }; delete n[stepId]; return n })
+    } else {
+      const row = {
+        pointeur_sinistre: sinistre.pointeur_sinistre,
+        step_id: stepId,
+        checked: true,
+        checked_by: 'Utilisateur',
+        checked_at: new Date().toISOString(),
+      }
+      const { data } = await supabase.from('sinistre_workflow_progress')
+        .upsert(row, { onConflict: 'pointeur_sinistre,step_id' })
+        .select()
+      if (data && data[0]) setProgress(p => ({ ...p, [stepId]: data[0] }))
+    }
+    setSaving(null)
+  }
+
+  const totalSteps = definitions.length
+  const doneSteps = definitions.filter(d => progress[d.id]?.checked).length
+  const pct = totalSteps > 0 ? Math.round((doneSteps / totalSteps) * 100) : 0
+
+  const grouped = useMemo(() => {
+    const g = {}
+    cats.forEach(c => { g[c] = [] })
+    definitions.forEach(d => { if (g[d.garantie]) g[d.garantie].push(d) })
+    return g
+  }, [definitions, cats])
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.35)', zIndex: 1100 }} />
+      <div style={{
+        position: 'fixed', top: 0, right: 0, bottom: 0, width: '100%', maxWidth: 520,
+        background: '#fff', zIndex: 1101, display: 'flex', flexDirection: 'column',
+        boxShadow: '-8px 0 30px rgba(0,0,0,0.15)',
+        animation: 'slideIn .25s ease-out',
+      }}>
+        <style>{`@keyframes slideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}`}</style>
+
+        {/* Header */}
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0', background: `linear-gradient(135deg, ${E.color}, ${E.colorDark})`, color: '#fff', flexShrink: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <div style={{ fontSize: 11, opacity: .8, textTransform: 'uppercase', letterSpacing: '.05em' }}>Workflow sinistre</div>
+              <div style={{ fontSize: 18, fontWeight: 800 }}>{sinistre.reference_sinistre || sinistre.pointeur_sinistre}</div>
+              <div style={{ fontSize: 13, opacity: .9, marginTop: 2 }}>{sinistre.sinistre_nom || '—'}</div>
+            </div>
+            <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+          </div>
+
+          {/* Progress bar */}
+          <div style={{ marginTop: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, opacity: .9, marginBottom: 4 }}>
+              <span>{doneSteps}/{totalSteps} étapes complétées</span>
+              <span style={{ fontWeight: 700 }}>{pct}%</span>
+            </div>
+            <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.2)' }}>
+              <div style={{ height: '100%', borderRadius: 3, background: '#fff', width: `${pct}%`, transition: 'width .3s ease' }} />
+            </div>
+          </div>
+
+          {/* Garanties détectées */}
+          <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+            {garanties.map(g => (
+              <span key={g} style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.2)', color: '#fff', textTransform: 'uppercase' }}>
+                {CAT_LABELS[g] || g}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Steps */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
+          {loading ? (
+            <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
+              <i className="ti ti-loader-2" style={{ fontSize: 28, display: 'block', marginBottom: 10, animation: 'spin 1s linear infinite' }} />
+              Chargement du workflow…
+            </div>
+          ) : (
+            Object.entries(grouped).map(([cat, steps]) => {
+              if (steps.length === 0) return null
+              const catDone = steps.filter(s => progress[s.id]?.checked).length
+              const catColor = CAT_COLORS[cat] || '#64748b'
+              return (
+                <div key={cat} style={{ marginBottom: 20 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                    <div style={{ width: 4, height: 20, borderRadius: 2, background: catColor }} />
+                    <span style={{ fontSize: 13, fontWeight: 800, color: NAVY, textTransform: 'uppercase', letterSpacing: '.03em' }}>{CAT_LABELS[cat] || cat}</span>
+                    <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>{catDone}/{steps.length}</span>
+                  </div>
+                  {steps.map(step => {
+                    const done = progress[step.id]?.checked
+                    const prog = progress[step.id]
+                    const expanded = expandedStep === step.id
+                    return (
+                      <div key={step.id} style={{ marginBottom: 6, border: '1px solid ' + (done ? '#dcfce7' : '#e2e8f0'), borderRadius: 10, background: done ? '#f0fdf4' : '#fff', transition: 'all .2s' }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px', cursor: 'pointer' }}
+                          onClick={() => setExpandedStep(expanded ? null : step.id)}>
+                          <button onClick={e => { e.stopPropagation(); toggleStep(step.id) }}
+                            disabled={saving === step.id}
+                            style={{
+                              width: 22, height: 22, minWidth: 22, borderRadius: 6, border: `2px solid ${done ? '#16a34a' : '#cbd5e1'}`,
+                              background: done ? '#16a34a' : '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              marginTop: 1, transition: 'all .2s', opacity: saving === step.id ? 0.5 : 1,
+                            }}>
+                            {done && <span style={{ color: '#fff', fontSize: 14, fontWeight: 800, lineHeight: 1 }}>✓</span>}
+                          </button>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: done ? '#16a34a' : NAVY, textDecoration: done ? 'line-through' : 'none', transition: 'all .2s' }}>
+                              {step.titre}
+                            </div>
+                            {done && prog && (
+                              <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>
+                                ✓ {prog.checked_by} — {fmtDT(prog.checked_at)}
+                              </div>
+                            )}
+                          </div>
+                          <i className={`ti ti-chevron-${expanded ? 'up' : 'down'}`} style={{ color: '#94a3b8', fontSize: 16, marginTop: 3 }} />
+                        </div>
+                        {expanded && (
+                          <div style={{ padding: '0 14px 12px 46px', fontSize: 12, color: '#475569', lineHeight: 1.5 }}>
+                            {step.description && <p style={{ margin: '0 0 8px' }}>{step.description}</p>}
+                            {step.documents && (
+                              <div style={{ marginBottom: 8 }}>
+                                <span style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Documents requis</span>
+                                <div style={{ marginTop: 2 }}>{step.documents}</div>
+                              </div>
+                            )}
+                            {step.pieges && (
+                              <div style={{ background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 6, padding: '6px 10px', marginTop: 4 }}>
+                                <span style={{ fontSize: 10, fontWeight: 700, color: '#b45309', textTransform: 'uppercase' }}>⚠ Pièges à éviter</span>
+                                <div style={{ color: '#92400e', marginTop: 2 }}>{step.pieges}</div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })
+          )}
+        </div>
+      </div>
+    </>
+  )
+}
 
 function etatStyle(etat) {
   const e = (etat || '').toLowerCase()
@@ -58,7 +294,7 @@ function MontantCard({ label, value, col }) {
   )
 }
 
-function SinistreDetail({ s, onClose }) {
+function SinistreDetail({ s, onClose, onWorkflow }) {
   const es = etatStyle(s.etat)
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '6vh 16px' }}>
@@ -72,6 +308,9 @@ function SinistreDetail({ s, onClose }) {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 5, background: es.bg, color: es.fg }}>{es.label}</span>
+              <button onClick={() => { onClose(); onWorkflow(s) }} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '4px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }} title="Ouvrir le workflow">
+                <i className="ti ti-list-check" style={{ fontSize: 16 }} /> Workflow
+              </button>
               <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', width: 30, height: 30, borderRadius: 8, cursor: 'pointer', fontSize: 16 }}>✕</button>
             </div>
           </div>
@@ -111,6 +350,7 @@ export default function DynassurSinistres() {
   const [annee, setAnnee] = useState('')
   const [q, setQ] = useState('')
   const [detail, setDetail] = useState(null)
+  const [workflow, setWorkflow] = useState(null)
   const [sort, setSort] = useState({ key: 'ouverture', dir: 'desc' })
 
   async function charger() {
@@ -246,9 +486,10 @@ export default function DynassurSinistres() {
                     { k: 'gestionnaire', label: 'Gestionnaire' },
                     { k: 'domaine', label: 'Domaine' },
                     { k: 'paye', label: 'Payé', align: 'right' },
+                    { k: '_wf', label: '', nosort: true, align: 'center', w: 44 },
                   ].map(c => (
-                    <th key={c.k} onClick={() => setSort(s => s.key === c.k ? { key: c.k, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: c.k, dir: 'asc' })}
-                      style={{ padding: '10px 14px', textAlign: c.align || 'left', cursor: 'pointer', userSelect: 'none', color: sort.key === c.k ? NAVY : '#64748b' }}>
+                    <th key={c.k} onClick={() => !c.nosort && setSort(s => s.key === c.k ? { key: c.k, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: c.k, dir: 'asc' })}
+                      style={{ padding: '10px 14px', textAlign: c.align || 'left', cursor: c.nosort ? 'default' : 'pointer', userSelect: 'none', color: sort.key === c.k ? NAVY : '#64748b', width: c.w || 'auto' }}>
                       {c.label}{sort.key === c.k && <span style={{ marginLeft: 4 }}>{sort.dir === 'asc' ? '▲' : '▼'}</span>}
                     </th>
                   ))}
@@ -271,6 +512,13 @@ export default function DynassurSinistres() {
                       <td style={{ padding: '9px 14px', color: '#475569', whiteSpace: 'nowrap' }}>{s.gestionnaire || '—'}</td>
                       <td style={{ padding: '9px 14px', color: '#64748b', fontSize: 12 }}>{s.domaine || '—'}</td>
                       <td style={{ padding: '9px 14px', textAlign: 'right', fontWeight: 600, color: NAVY, whiteSpace: 'nowrap' }}>{s.montant_paye ? eur(s.montant_paye) : '—'}</td>
+                      <td style={{ padding: '9px 8px', textAlign: 'center' }}>
+                        <button onClick={e => { e.stopPropagation(); setWorkflow(s) }}
+                          style={{ background: `${E.color}15`, border: `1px solid ${E.color}40`, color: E.color, borderRadius: 6, padding: '3px 8px', cursor: 'pointer', fontSize: 11, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 3 }}
+                          title="Ouvrir le workflow">
+                          <i className="ti ti-list-check" style={{ fontSize: 13 }} />
+                        </button>
+                      </td>
                     </tr>
                   )
                 })}
@@ -285,7 +533,8 @@ export default function DynassurSinistres() {
         </div>
       )}
 
-      {detail && <SinistreDetail s={detail} onClose={() => setDetail(null)} />}
+      {detail && <SinistreDetail s={detail} onClose={() => setDetail(null)} onWorkflow={s => { setDetail(null); setWorkflow(s) }} />}
+      {workflow && <WorkflowPanel sinistre={workflow} onClose={() => setWorkflow(null)} />}
     </Layout>
   )
 }
