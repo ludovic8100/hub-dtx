@@ -94,6 +94,13 @@ async function envoyerAlerte(destEmails, subject, htmlBody) {
     })
   } catch (e) { /* silencieux : l'alerte ne doit pas casser l'action */ }
 }
+function mailClient(nom, message) {
+  const corps = (message || '').replace(/\n/g, '<br>')
+  return `<div style="font-family:'Segoe UI',Arial,sans-serif;font-size:14px;color:#222;line-height:1.5">`
+    + `${nom ? 'Bonjour ' + nom + ',' : 'Bonjour,'}<br><br>${corps}<br><br>`
+    + `<span style="color:#666">Pour nous répondre, répondez simplement à ce message — votre réponse sera ajoutée à votre dossier.</span><br><br>`
+    + `<b>Dynassur</b><br>info@dynassur.be</div>`
+}
 function mailTicket(t, intro) {
   return `<div style="font-family:Arial,sans-serif;color:#1A3A6B">
     <p>${intro}</p>
@@ -588,6 +595,18 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
   const [t, setT] = useState(ticket)
   const [msgs, setMsgs] = useState([])
   const [reply, setReply] = useState('')
+  const [cli, setCli] = useState(null)
+  const [auClient, setAuClient] = useState(false)
+  useEffect(() => {
+    let on = true
+    ;(async () => {
+      let c = null
+      if (t.client_id) { const { data } = await supabase.from('clients').select('id,email,prenom,nom').eq('id', t.client_id).maybeSingle(); c = data }
+      if (!c && t.dossier_client) { const { data } = await supabase.from('clients').select('id,email,prenom,nom').eq('dossier', t.dossier_client).not('email', 'is', null).limit(1); c = (data && data[0]) || null }
+      if (on) setCli(c)
+    })()
+    return () => { on = false }
+  }, [t.client_id, t.dossier_client])
   const [checklist, setChecklist] = useState(Array.isArray(t.checklist) ? t.checklist : [])
   const [newItem, setNewItem] = useState('')
   const [commentDrafts, setCommentDrafts] = useState({})
@@ -667,7 +686,8 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
     const concernes = [...new Set([(t.gestionnaire||'').toUpperCase(), (t.cree_par||'').toUpperCase(), ...parts].filter(c => c && c !== myCode))]
     const emails = emailsOf(concernes)
     if (emails.length) envoyerAlerte(emails, `Nouveau message sur le ticket [#${t.id}]`, mailTicket(t, `Bonjour,<br>${myCode} a écrit un message sur ce ticket :<br><i>"${txt.slice(0,200)}"</i>`))
-    setReply(''); setSending(false); await loadMsgs(); onChanged()
+    if (auClient && cli?.email) { const nomCli = [cli.prenom, cli.nom].filter(Boolean).join(' '); envoyerAlerte([cli.email], `Ticket [#${t.id}] — ${t.titre}`, mailClient(nomCli, txt)) }
+    setReply(''); setAuClient(false); setSending(false); await loadMsgs(); onChanged()
   }
 
   const attachFiles = async (fileList) => {
@@ -859,6 +879,12 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
             <DropZone compact disabled={upBusy} onFiles={attachFiles} />
             {upBusy && <div style={{ fontSize: 11, color: C.textL, marginTop: 4 }}>Envoi de la pièce jointe…</div>}
           </div>
+          {cli?.email && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px 0', fontSize: 12, color: C.textM, cursor: 'pointer' }}>
+              <input type="checkbox" checked={auClient} onChange={e => setAuClient(e.target.checked)} />
+              ✉ Envoyer aussi au client ({cli.email})
+            </label>
+          )}
           <div style={{ display: 'flex', gap: 8, padding: '10px 16px', borderTop: `1px solid ${C.border}`, alignItems: 'center' }}>
             <input style={{ ...S.input, borderRadius: 20 }} value={reply} onChange={e => setReply(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply() } }} placeholder="Écrire une réponse…" />
             <button onClick={sendReply} disabled={sending} style={{ ...S.btn('primary'), borderRadius: '50%', width: 42, height: 42, padding: 0, fontSize: 16 }}>➤</button>
