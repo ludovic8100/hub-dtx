@@ -161,6 +161,7 @@ export default function TicketsView() {
   const [loading, setLoading] = useState(true)
   const [scope, setScope] = useState('mine')       // mine / unassigned / all
   const [fStatut, setFStatut] = useState('actifs') // actifs / tous / <statut>
+  const [q, setQ] = useState('')          // recherche plein-texte
   const [fSoc, setFSoc] = useState('tous')
   const [fCat, setFCat] = useState('tous')
   const [fCollab, setFCollab] = useState('tous')
@@ -242,6 +243,11 @@ export default function TicketsView() {
     if (fCollab !== 'tous' && (t.gestionnaire || '').toUpperCase() !== fCollab.toUpperCase()) return false
     if (fStatut === 'actifs' && t.ticket_statut === 'cloture') return false
     else if (fStatut !== 'actifs' && fStatut !== 'tous' && t.ticket_statut !== fStatut) return false
+    if (q.trim()) {
+      const n = q.trim().toLowerCase()
+      const hay = ['#' + t.id, String(t.id), t.titre, t.dossier_client, socLabel(t.entite), t.ticket_categorie, codeLabel(t.gestionnaire), codeLabel(t.cree_par), ...(Array.isArray(t.participants) ? t.participants.map(codeLabel) : [])].filter(Boolean).join(' ').toLowerCase()
+      if (!hay.includes(n)) return false
+    }
     return true
   })
   const COLS = [
@@ -300,6 +306,10 @@ export default function TicketsView() {
 
       {/* Filtres */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+        <div style={{ position: 'relative' }}>
+          <input style={{ ...S.input, width: 240, paddingRight: 26 }} placeholder="🔎 Rechercher (n°, titre, dossier, nom…)" value={q} onChange={e => setQ(e.target.value)} />
+          {q && <span onClick={() => setQ('')} title="Effacer" style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: C.textL, fontWeight: 700 }}>×</span>}
+        </div>
         <select style={{ ...S.input, width: 'auto' }} value={fStatut} onChange={e => setFStatut(e.target.value)}>
           <option value="actifs">Tickets actifs</option>
           <option value="tous">Tous statuts</option>
