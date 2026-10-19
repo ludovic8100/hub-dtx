@@ -15,11 +15,19 @@ const FUND_RISK = {
   'pension life': 0, 'ag life stability': 10, 'ag life income': 15,
   'ag life balanced': 50, 'ag life growth': 75, 'ag life dynamic': 85,
   'ag life equities': 90, 'top rendement': 5, 'capital branch 21': 0,
-  // Baloise
+  // Baloise — fonds réels extraits des PDFs
+  'r-valor fund': 85, 'megatrends fund': 80, 'infrastructure fund': 55,
+  'bgf world technology fund': 90, 'jpm global focus fund': 75,
+  'c-quadrat arts balanced fund': 50,
+  'bfi global equity select': 85, 'bfi megatrends select': 80,
+  'bfi multi asset select': 45, 'bfi positive impact select': 65,
+  'bfi real estate and infrastructure select': 55,
+  'compte branche 21': 0, 'compte branche 21 - 0%': 0,
   'european bonds': 10, 'balanced': 50, 'growth': 75, 'equities': 90,
   'branche 21': 0, 'branche 26': 0, 'invest 1': 30, 'invest 2': 50,
   'invest 3': 70,
-  // NN
+  // NN — fonds réels extraits des PDFs
+  'nn life star fund': 70, 'nn life star fund - eur': 70,
   'fng sustainable impact': 60, 'fng patrimonial balanced': 45,
   'fng patrimonial defensive': 20, 'fng growth': 70,
   'nn life strategy defensive': 15, 'nn life strategy balanced': 45,
@@ -63,14 +71,33 @@ const QUESTIONS = [
 ]
 
 // ═══════════════════════════════════════════════════════════════════════
+// DÉTECTION DE COMPAGNIE
+// ═══════════════════════════════════════════════════════════════════════
+
+function detectCompany(text) {
+  if (/baloise/i.test(text) || /bfi\s+(global|megatrends|multi|positive|real)/i.test(text)) return 'baloise'
+  if (/\bnn\b\s*(insurance|belgium|strategy|life)/i.test(text) || /www\.nn\.be/i.test(text)) return 'nn'
+  if (/ag\s*insurance/i.test(text) || /aginsurance\.be/i.test(text) || /\bag\s*life\b/i.test(text) || /pension\s*life/i.test(text)) return 'ag'
+  if (/\baxa\b/i.test(text)) return 'axa'
+  if (/\ballianz\b/i.test(text)) return 'allianz'
+  return null
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 // PARSERS — un par compagnie
 // ═══════════════════════════════════════════════════════════════════════
 
 function parseAG(text) {
   const d = {}
   let m
+  // Nom / prénom — format standard "Preneur : M. NOM Prénom"
   m = text.match(/Preneur\s*[:\-]?\s*(?:M\.\s*|Mme\s*)?([A-ZÀ-Ú\s]+?)\s+([\wéèêëàâäîïôöùûüç\s-]+?)(?:\n|Date)/i)
   if (m) { d.last_name = m[1].trim(); d.first_name = m[2].trim() }
+  // Format INAMI — "candidate-affiliée : Madame NOM Prénom"
+  if (!d.last_name) {
+    m = text.match(/(?:candidat[e]?[\s-]*affiliée?)\s*[:\-]?\s*(?:Madame|Monsieur|M\.|Mme)\s+([A-ZÀ-Ú]{2,})\s+([\wéèêëàâäîïôöùûüç-]+)/i)
+    if (m) { d.last_name = m[1].trim(); d.first_name = m[2].trim() }
+  }
   if (!d.last_name) {
     m = text.match(/(?:Affilié|Nom)\s*[:\-]?\s*([A-ZÀ-Ú\s]+?)\s*(?:\n|Prénom)/i)
     if (m) d.last_name = m[1].trim()
@@ -82,6 +109,7 @@ function parseAG(text) {
   m = text.match(/[Nn]°?\s*(?:de\s*contrat)?\s*:?\s*([\d/]+)/)
   if (m) d.contract_number = m[1]
   m = text.match(/[Dd]ate\s*de\s*naissance\s*[:\-]?\s*(\d{2}[/.-]\d{2}[/.-]\d{4})/)
+  if (!m) m = text.match(/née?\s*le\s*(\d{2}[/.-]\d{2}[/.-]\d{4})/i)
   if (m) d.birth_date = m[1]
   m = text.match(/[Aa]dresse\s*[:\-]?\s*(.+?)(?:\n|$)/m)
   if (m) d.address = m[1].trim()
@@ -95,6 +123,8 @@ function parseAG(text) {
   for (const t of types) {
     if (text.toLowerCase().includes(t.toLowerCase())) { d.contract_type = t; break }
   }
+  // INAMI / convention de pension
+  if (!d.contract_type && /inami|convention\s*de\s*pension/i.test(text)) d.contract_type = 'Convention de pension INAMI'
   if (!d.contract_type) d.contract_type = 'Vie'
   // Fonds
   d.funds = {}
@@ -114,7 +144,104 @@ function parseAG(text) {
       if (pct > 0 && pct <= 100 && name.length > 2) d.funds[name] = pct
     }
   }
+  // Pure Branche 21 (INAMI) — si aucun fonds trouvé mais texte INAMI
+  if (Object.keys(d.funds).length === 0 && /inami|convention\s*de\s*pension|taux\s*garanti/i.test(text)) {
+    d.funds['Branche 21 (taux garanti)'] = 100
+  }
   d.company = 'AG Insurance'
+  return d
+}
+
+function parseBaloise(text) {
+  const d = {}
+  let m
+  // Nom / prénom — section PRENEUR
+  m = text.match(/(?:Preneur|PRENEUR)[^\n]*\n[^\n]*?([A-ZÀ-Ú]{2,})\s+([A-ZÀ-Úa-zà-ÿ]+)/i)
+  if (!m) m = text.match(/(?:Preneur|Titulaire)\s*[:\-]?\s*(?:M\.\s*|Mme\s*)?([A-ZÀ-Ú]{2,})\s+([\wéèêëàâäîïôöùûüç-]+)/i)
+  if (m) { d.last_name = m[1].trim(); d.first_name = m[2].trim() }
+  // N° client
+  m = text.match(/[Nn]°?\s*(?:client|contrat|police)\s*[:\-]?\s*([\d/.]+)/i)
+  if (m) d.contract_number = m[1]
+  // Date de naissance
+  m = text.match(/[Dd]ate\s*de\s*naissance\s*[:\-]?\s*(\d{2}[/.-]\d{2}[/.-]\d{4})/)
+  if (!m) m = text.match(/née?\s*le\s*(\d{2}[/.-]\d{2}[/.-]\d{4})/i)
+  if (m) d.birth_date = m[1]
+  // Adresse
+  m = text.match(/((?:Rue|Avenue|Chaussée|Boulevard|Place|Allée|Chemin|Chée)[^\n]+)/i)
+  if (m) d.address = m[1].trim()
+  // Type de contrat
+  if (/engagement\s*individuel\s*de\s*pension|eip/i.test(text)) d.contract_type = 'EIP'
+  else if (/plci|pension\s*libre\s*compl/i.test(text)) d.contract_type = 'PLCI'
+  else if (/[ée]pargne[\s-]*pension/i.test(text)) d.contract_type = 'Épargne-pension'
+  else if (/[ée]pargne[\s-]*long\s*terme/i.test(text)) d.contract_type = 'Épargne long terme'
+  else if (/save\s*plan/i.test(text)) d.contract_type = 'Save Plan'
+  else d.contract_type = 'Vie'
+  // Fonds — pattern Baloise : "Nom du fonds    XX,XX %"
+  d.funds = {}
+  const fundPat = /([\wÀ-ÿ][\wÀ-ÿ\s&'°/-]*?)\s+(\d{1,3}[.,]\d{2})\s*%/g
+  while ((m = fundPat.exec(text)) !== null) {
+    let name = m[1].trim()
+    const pct = parseFloat(m[2].replace(',', '.'))
+    // Filtrer les faux positifs
+    if (/^(page|frais|taxe|prime|total|montant|date|taux)/i.test(name)) continue
+    if (pct <= 0 || pct > 100) continue
+    if (name.length < 3) continue
+    // Compte Branche 21 - 0% → risque 0
+    if (/compte\s*branche\s*21/i.test(name)) name = 'Compte Branche 21'
+    d.funds[name] = pct
+  }
+  // Fallback si pas de fonds trouvés via pattern principal
+  if (Object.keys(d.funds).length === 0) {
+    const fp2 = /([A-Za-zÀ-ÿ][\w\sÀ-ÿ&'°/-]+?)\s*[:\-]\s*(\d{1,3}(?:[.,]\d+)?)\s*%/g
+    while ((m = fp2.exec(text)) !== null) {
+      const name = m[1].trim()
+      const pct = parseFloat(m[2].replace(',', '.'))
+      if (pct > 0 && pct <= 100 && name.length > 2 && !/^(page|frais|taxe|prime|total)/i.test(name)) {
+        d.funds[name] = pct
+      }
+    }
+  }
+  d.company = 'Baloise'
+  return d
+}
+
+function parseNN(text) {
+  const d = {}
+  let m
+  // Nom — "Nom    Monsieur Denis DEMARET"
+  m = text.match(/Nom\s+(?:Monsieur|Madame|M\.|Mme)\s+([\wéèêëàâäîïôöùûüç-]+)\s+([A-ZÀ-Ú]{2,})/i)
+  if (m) { d.first_name = m[1].trim(); d.last_name = m[2].trim() }
+  if (!d.last_name) {
+    m = text.match(/(?:Preneur|Titulaire|Affilié)\s*[:\-]?\s*(?:M\.\s*|Mme\s*)?([A-ZÀ-Ú]{2,})\s+([\wéèêëàâäîïôöùûüç-]+)/i)
+    if (m) { d.last_name = m[1].trim(); d.first_name = m[2].trim() }
+  }
+  // N° contrat
+  m = text.match(/[Nn]°?\s*(?:de\s*)?(?:contrat|police)\s*[:\-]?\s*([\d/.]+)/i)
+  if (m) d.contract_number = m[1]
+  // Date de naissance
+  m = text.match(/[Dd]ate\s*de\s*naissance\s*[:\-]?\s*(\d{2}[/.-]\d{2}[/.-]\d{4})/)
+  if (m) d.birth_date = m[1]
+  // Adresse
+  m = text.match(/((?:Rue|Avenue|Chaussée|Boulevard|Place|Allée|Chemin|Chée)[^\n]+)/i)
+  if (m) d.address = m[1].trim()
+  // Type de produit — "Nom du produit" field
+  if (/[ée]pargne[\s-]*pension/i.test(text)) d.contract_type = 'Épargne-pension'
+  else if (/eip|engagement\s*individuel/i.test(text)) d.contract_type = 'EIP'
+  else if (/plci|pension\s*libre/i.test(text)) d.contract_type = 'PLCI'
+  else if (/branche\s*23/i.test(text)) d.contract_type = 'Branche 23'
+  else d.contract_type = 'Vie'
+  // Fonds — "NN Life Star fund - EUR: 100,00 %"  ou  "Fund Name    XX,XX %"
+  d.funds = {}
+  const fundPat = /([\wÀ-ÿ][\wÀ-ÿ\s&'°/-]*?(?:\s*-\s*[A-Z]{3})?)\s*[:\-]?\s*(\d{1,3}[.,]\d{2})\s*%/g
+  while ((m = fundPat.exec(text)) !== null) {
+    let name = m[1].trim()
+    const pct = parseFloat(m[2].replace(',', '.'))
+    if (/^(page|frais|taxe|prime|total|nom\s*du\s*fonds)/i.test(name)) continue
+    if (pct <= 0 || pct > 100) continue
+    if (name.length < 3) continue
+    d.funds[name] = pct
+  }
+  d.company = 'NN Insurance'
   return d
 }
 
@@ -126,7 +253,19 @@ function computeRiskScore(funds) {
   let totalPct = 0, weightedRisk = 0
   for (const [name, pct] of Object.entries(funds)) {
     const key = name.toLowerCase().trim()
-    const risk = FUND_RISK[key] ?? 50 // défaut modéré si fonds inconnu
+    let risk = FUND_RISK[key]
+    // Heuristique par mots-clés si fonds inconnu
+    if (risk === undefined) {
+      if (/branche\s*21|garanti|taux\s*garanti/i.test(key)) risk = 0
+      else if (/equity|equities|action|growth|dynamic|technolog/i.test(key)) risk = 80
+      else if (/balanced|mixte|multi\s*asset/i.test(key)) risk = 50
+      else if (/bond|obligation|defensive|stability|income/i.test(key)) risk = 15
+      else if (/infrastructure|real\s*estate|immobil/i.test(key)) risk = 55
+      else if (/impact|sustainable|esg/i.test(key)) risk = 60
+      else if (/megatrend|thematic/i.test(key)) risk = 75
+      else if (/star\s*fund/i.test(key)) risk = 70
+      else risk = 50 // défaut modéré
+    }
     weightedRisk += risk * pct
     totalPct += pct
   }
@@ -457,19 +596,21 @@ export default function ToolQuestionnaire() {
     setLoading(true)
     try {
       const text = await extractText(file)
-      // Détection compagnie (extensible)
+      const company = detectCompany(text)
       let parsed
-      if (/ag\s*insurance/i.test(text) || /pension\s*life/i.test(text) || /ag\s*life/i.test(text)) {
-        parsed = parseAG(text)
-      } else {
-        // Tenter AG par défaut pour l'instant
-        parsed = parseAG(text)
-        if (!parsed.contract_number && !Object.keys(parsed.funds).length) {
-          throw new Error("Compagnie non reconnue. Seul AG Insurance est supporté pour l'instant. Baloise, NN, AXA et Allianz arrivent bientôt.")
-        }
+      switch (company) {
+        case 'baloise': parsed = parseBaloise(text); break
+        case 'nn': parsed = parseNN(text); break
+        case 'ag': parsed = parseAG(text); break
+        default:
+          // Tenter AG par défaut, si rien ne matche
+          parsed = parseAG(text)
+          if (!parsed.contract_number && !Object.keys(parsed.funds).length) {
+            throw new Error("Compagnie non reconnue. Compagnies supportées : AG Insurance, Baloise, NN Insurance. Vérifiez que le PDF est bien un contrat Vie avec répartition des fonds.")
+          }
       }
       if (!Object.keys(parsed.funds || {}).length) {
-        throw new Error("Aucun fonds détecté dans le PDF. Vérifiez que c'est bien un relevé de contrat Vie avec répartition des fonds.")
+        throw new Error("Aucun fonds détecté dans le PDF. Vérifiez que c'est bien un relevé de contrat Vie avec répartition des fonds (pas une assurance solde restant dû, décès, ou hospitalisation).")
       }
       setContract(parsed)
       const res = generateAnswers(parsed)
@@ -545,7 +686,7 @@ export default function ToolQuestionnaire() {
               1. Importer le PDF du contrat
             </div>
             <div style={{ fontSize: 13, color: '#64748b', marginBottom: 14, lineHeight: 1.5 }}>
-              Importez le relevé PDF du contrat Vie (consultation AG Insurance, relevé Baloise, etc.).
+              Importez le relevé PDF du contrat Vie (AG Insurance, Baloise, NN Insurance).
               Le système analyse les fonds, déduit le profil de risque et remplit automatiquement les 14 questions.
             </div>
             <div style={{
@@ -563,7 +704,7 @@ export default function ToolQuestionnaire() {
                     <i className="ti ti-file-upload" style={{ color: '#94a3b8' }} />
                   </div>
                   <div style={{ fontSize: 14, color: '#475569', fontWeight: 600 }}>Cliquez ou glissez un PDF ici</div>
-                  <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>PDF de contrat Vie — AG Insurance (autres compagnies bientôt)</div>
+                  <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>AG Insurance • Baloise • NN Insurance</div>
                 </>
               )}
             </div>
@@ -659,11 +800,12 @@ export default function ToolQuestionnaire() {
 
         {/* Info compagnies */}
         <div style={{
-          marginTop: 20, padding: '12px 16px', background: '#fffbeb', border: '1px solid #fde68a',
-          borderRadius: 10, fontSize: 12, color: '#92400e', lineHeight: 1.5,
+          marginTop: 20, padding: '12px 16px', background: '#f0fdf4', border: '1px solid #bbf7d0',
+          borderRadius: 10, fontSize: 12, color: '#166534', lineHeight: 1.5,
         }}>
-          <strong>Compagnies supportées :</strong> AG Insurance.
-          <br />En cours de développement : Baloise, NN, AXA, Allianz.
+          <strong>Compagnies supportées :</strong> AG Insurance, Baloise, NN Insurance.
+          <br />Les fonds inconnus sont classés automatiquement par mots-clés (equity, balanced, defensive, etc.).
+          <br /><span style={{ color: '#92400e' }}>En cours : AXA, Allianz.</span>
         </div>
       </div>
     </Layout>
