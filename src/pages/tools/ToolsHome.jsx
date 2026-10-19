@@ -13,6 +13,14 @@ const TOOLS = [
     path: '/tools/bce',
     ready: true,
   },
+  {
+    key: 'questionnaire',
+    title: 'Questionnaire Investisseur',
+    desc: "Reconstituer un questionnaire profil investisseur à partir d'un contrat d'assurance-vie (PDF). Profil déduit automatiquement.",
+    icon: 'ti-file-check',
+    path: '/tools/questionnaire',
+    ready: true,
+  },
 ]
 
 export default function ToolsHome() {
