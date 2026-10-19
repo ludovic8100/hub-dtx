@@ -42,6 +42,8 @@ export default function LodeRentabilite() {
   const [q, setQ] = useState('')
   const [filtre, setFiltre] = useState('non')
   const [saving, setSaving] = useState(null)
+  const [qR, setQR] = useState('')
+  const [filtreR, setFiltreR] = useState('non')
 
   const charger = async () => {
     setLoading(true)
@@ -49,7 +51,7 @@ export default function LodeRentabilite() {
       supabase.from('lode_devis').select('id,numero,objet,client_nom,statut,total_ht,date_devis,responsable').order('date_devis', { ascending: false }),
       supabase.from('lode_factures').select('id,numero,devis_id,type,total_ht,date_facture,responsable'),
       supabase.from('factures_achat').select('id,nom,montant,date_facture,lode_devis_id').eq('societe', 'LODE').eq('sens', 'achat').order('date_facture', { ascending: false }),
-      supabase.from('transactions').select('id,montant,date_valeur,categorie_id,activite').eq('activite', 'rental'),
+      supabase.from('transactions').select('id,montant,date_valeur,categorie_id,activite,responsable,contrepartie_nom').eq('activite', 'rental'),
       supabase.from('categories').select('id,nom'),
     ])
     setDevis(d.data || []); setFactures(f.data || []); setAchats(a.data || []); setTx(t.data || [])
@@ -120,6 +122,24 @@ export default function LodeRentabilite() {
     for (const t of txF) { const n = cats[t.categorie_id] || 'Non catégorisé'; (m[n] ||= 0); m[n] += Number(t.montant) || 0 }
     return Object.entries(m).map(([n, v]) => ({ nom: n, v })).sort((a, b) => Math.abs(b.v) - Math.abs(a.v))
   }, [txF, cats])
+
+  const rentalParResp = useMemo(() => {
+    const m = {}
+    for (const t of txF) { const r = t.responsable || '— non attribué'; (m[r] ||= { rec: 0, dep: 0 }); const v = Number(t.montant) || 0; if (v >= 0) m[r].rec += v; else m[r].dep += -v }
+    return Object.entries(m).map(([r, v]) => ({ resp: r, rec: v.rec, dep: v.dep, net: v.rec - v.dep })).sort((a, b) => b.net - a.net)
+  }, [txF])
+  const nbNonAttr = useMemo(() => txF.filter(t => !t.responsable).length, [txF])
+  const txAttr = useMemo(() => {
+    let l = txF.filter(t => filtreR === 'tous' || !t.responsable)
+    if (qR.trim()) { const sx = qR.toLowerCase(); l = l.filter(t => ((t.contrepartie_nom || '') + ' ' + (cats[t.categorie_id] || '')).toLowerCase().includes(sx)) }
+    return [...l].sort((a, b) => (b.date_valeur || '').localeCompare(a.date_valeur || ''))
+  }, [txF, filtreR, qR, cats])
+  const attribuer = async (id, r) => {
+    setSaving(id)
+    const { error } = await supabase.from('transactions').update({ responsable: r || null }).eq('id', id)
+    if (!error) setTx(pp => pp.map(t => t.id === id ? { ...t, responsable: r || null } : t))
+    setSaving(null)
+  }
 
   const tabBtn = (k, label) => (
     <button onClick={() => setOnglet(k)} style={{ padding: '9px 18px', borderRadius: 10, border: '1px solid ' + (onglet === k ? OR : '#e2e8f0'), background: onglet === k ? OR : '#fff', color: onglet === k ? '#fff' : '#475569', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>{label}</button>
@@ -247,10 +267,53 @@ export default function LodeRentabilite() {
               <Kpi label="Charges" value={eur(rDep)} c="#dc2626" sub="loyers · énergie · entretien" />
               <Kpi label="Résultat net" value={eur(rNet)} c={col(rNet)} sub={rRec > 0 ? pctTxt(rNet / rRec * 100) : '—'} />
               <Kpi label="Opérations" value={`${txF.length}`} c="#0891b2" sub="activité « rental »" />
+              <Kpi label="À attribuer" value={`${nbNonAttr}`} c="#f59e0b" sub="sans commercial" />
             </div>
 
-            <div style={{ fontSize: 12, color: '#b45309', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '8px 10px', marginTop: 12 }}>
-              Attribution par commercial (Ludivine ≈ 99 %) : <b>pas encore active</b> — les transactions locatives n'ont pas de commercial en base. Mécanisme à décider (voir message).
+            {rentalParResp.length > 0 && (
+              <div style={card}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: ORD, marginBottom: 8 }}>Résultat par commercial</div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead><tr><th style={th}>Commercial</th><th style={thR}>Recettes</th><th style={thR}>Charges</th><th style={thR}>Net</th></tr></thead>
+                    <tbody>{rentalParResp.map(r => (
+                      <tr key={r.resp}><td style={{ ...td, fontWeight: 700, color: r.resp.startsWith('—') ? '#b45309' : ORD }}>{r.resp}</td><td style={{ ...tdR, color: '#16a34a' }}>{eur(r.rec)}</td><td style={{ ...tdR, color: '#dc2626' }}>− {eur(r.dep)}</td><td style={{ ...tdR, fontWeight: 800, color: col(r.net) }}>{eur(r.net)}</td></tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            <div style={card}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: ORD }}>Attribuer les opérations à un commercial</div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input placeholder="Libellé / catégorie…" value={qR} onChange={e => setQR(e.target.value)} style={{ ...inp, minWidth: 180 }} />
+                  <select value={filtreR} onChange={e => setFiltreR(e.target.value)} style={inp}><option value="non">Non attribuées</option><option value="tous">Toutes</option></select>
+                </div>
+              </div>
+              <div style={{ fontSize: 12, color: '#94a3b8', margin: '6px 0 10px' }}>{nbNonAttr} opération(s) sans commercial{txAttr.length > 80 ? ' — 80 affichées' : ''}. Attribue au fur et à mesure.</div>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead><tr><th style={th}>Date</th><th style={th}>Libellé</th><th style={thR}>Montant</th><th style={th}>Commercial</th></tr></thead>
+                  <tbody>
+                    {txAttr.slice(0, 80).map(t => (
+                      <tr key={t.id} style={t.responsable ? { background: '#f0fdf4' } : null}>
+                        <td style={td}>{(t.date_valeur || '').slice(0, 10)}</td>
+                        <td style={td}>{t.contrepartie_nom || cats[t.categorie_id] || '—'}<div style={{ fontSize: 10, color: '#cbd5e1' }}>{cats[t.categorie_id] || ''}</div></td>
+                        <td style={{ ...tdR, color: (Number(t.montant) || 0) >= 0 ? '#16a34a' : '#dc2626' }}>{eur(t.montant)}</td>
+                        <td style={td}>
+                          <select value={t.responsable || ''} disabled={saving === t.id} onChange={e => attribuer(t.id, e.target.value)} style={{ ...inp, minWidth: 140, opacity: saving === t.id ? 0.5 : 1 }}>
+                            <option value="">— non attribué</option>
+                            {RESP.map(r => <option key={r} value={r}>{r}</option>)}
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
+                    {!txAttr.length && <tr><td style={td} colSpan={4}><span style={{ color: '#94a3b8' }}>Aucune opération.</span></td></tr>}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             <div style={card}>
