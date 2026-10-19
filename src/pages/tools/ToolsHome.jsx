@@ -2,14 +2,12 @@ import Layout from '../../components/Layout'
 import { useNavigate } from 'react-router-dom'
 
 // ─── Boîte à outils interne ───
-// Ajouter un outil = ajouter une entrée ici (ready:false => carte grisée "Bientôt").
-// Chaque outil ready:true doit avoir sa route dans App.jsx (gated need="acc_tools").
 const TOOLS = [
   {
     key: 'bce',
     title: 'Recherche BCE',
     desc: "Rechercher une entreprise belge par nom ou n° BCE et consulter ses données officielles (KBO/BCE).",
-    icon: 'ti-building-bank',
+    img: '/assets/tools/icon-bce.png',
     path: '/tools/bce',
     ready: true,
   },
@@ -17,54 +15,136 @@ const TOOLS = [
     key: 'questionnaire',
     title: 'Questionnaire Investisseur',
     desc: "Reconstituer un questionnaire profil investisseur à partir d'un contrat d'assurance-vie (PDF). Profil déduit automatiquement.",
-    icon: 'ti-file-check',
+    img: '/assets/tools/icon-questionnaire.png',
     path: '/tools/questionnaire',
     ready: true,
   },
+  {
+    key: 'dev',
+    title: 'En cours de développement',
+    desc: "De nouveaux outils arrivent bientôt. Restez connectés !",
+    img: '/assets/tools/icon-ai.png',
+    path: null,
+    ready: false,
+  },
 ]
+
+/* ── Card style ── */
+const cardBase = {
+  border: '1px solid #e2e8f0',
+  borderRadius: 14,
+  background: '#fff',
+  overflow: 'hidden',
+  display: 'flex',
+  flexDirection: 'row',
+  minHeight: 160,
+  transition: 'all 0.2s ease',
+}
 
 export default function ToolsHome() {
   const navigate = useNavigate()
+
   return (
     <Layout currentPage="Outils">
       <div style={{ fontFamily: "'Segoe UI', sans-serif", width: '100%' }}>
-        <div style={{ marginBottom: 18 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#1A3A6B', margin: 0 }}>🧰 Outils</h1>
-          <div style={{ fontSize: 14, color: '#8A9BBE', marginTop: 2 }}>Boîte à outils interne — utilitaires pour nous faciliter le travail</div>
+        {/* Header */}
+        <div style={{ marginBottom: 20 }}>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#1A3A6B', margin: 0 }}>
+            Outils
+          </h1>
+          <div style={{ fontSize: 14, color: '#8A9BBE', marginTop: 2 }}>
+            Boîte à outils interne — utilitaires pour nous faciliter le travail
+          </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(260px,1fr))', gap: 14 }}>
+        {/* Grid */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+          gap: 18,
+        }}>
           {TOOLS.map(t => (
-            <div key={t.key}
+            <div
+              key={t.key}
               onClick={() => t.ready && navigate(t.path)}
-              onMouseEnter={e => { if (t.ready) { e.currentTarget.style.borderColor = '#0ea5e9'; e.currentTarget.style.boxShadow = '0 4px 14px rgba(14,165,233,0.15)' } }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = 'none' }}
+              onMouseEnter={e => {
+                if (t.ready) {
+                  e.currentTarget.style.borderColor = '#0ea5e9'
+                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(14,165,233,0.18)'
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                }
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.borderColor = '#e2e8f0'
+                e.currentTarget.style.boxShadow = 'none'
+                e.currentTarget.style.transform = 'none'
+              }}
               style={{
-                border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 16px 14px', background: '#fff',
-                cursor: t.ready ? 'pointer' : 'default', opacity: t.ready ? 1 : 0.55, transition: 'all 0.15s',
-                display: 'flex', flexDirection: 'column', minHeight: 140,
+                ...cardBase,
+                cursor: t.ready ? 'pointer' : 'default',
+                opacity: t.ready ? 1 : 0.7,
+              }}
+            >
+              {/* Left half — icon */}
+              <div style={{
+                width: '42%',
+                background: t.ready
+                  ? 'linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%)'
+                  : 'linear-gradient(135deg, #f1f5f9 0%, #f8fafc 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 16,
+                flexShrink: 0,
               }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                <div style={{ width: 38, height: 38, borderRadius: 9, background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <i className={`ti ${t.icon}`} style={{ fontSize: 20, color: '#0369a1' }} />
-                </div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: '#1e293b' }}>{t.title}</div>
+                <img
+                  src={t.img}
+                  alt={t.title}
+                  style={{
+                    width: '85%',
+                    maxWidth: 120,
+                    height: 'auto',
+                    objectFit: 'contain',
+                    filter: t.ready ? 'none' : 'grayscale(0.4)',
+                  }}
+                />
               </div>
-              <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.5, flex: 1 }}>{t.desc}</div>
-              <div style={{ marginTop: 12, fontSize: 12.5, fontWeight: 700, color: t.ready ? '#0ea5e9' : '#94a3b8' }}>
-                {t.ready ? 'Ouvrir →' : 'Bientôt'}
+
+              {/* Right half — text */}
+              <div style={{
+                flex: 1,
+                padding: '18px 18px 14px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+              }}>
+                <div style={{
+                  fontSize: 15,
+                  fontWeight: 700,
+                  color: '#1e293b',
+                  marginBottom: 8,
+                }}>
+                  {t.title}
+                </div>
+                <div style={{
+                  fontSize: 12.5,
+                  color: '#64748b',
+                  lineHeight: 1.55,
+                  flex: 1,
+                }}>
+                  {t.desc}
+                </div>
+                <div style={{
+                  marginTop: 12,
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  color: t.ready ? '#0ea5e9' : '#94a3b8',
+                }}>
+                  {t.ready ? 'Ouvrir →' : 'Bientôt'}
+                </div>
               </div>
             </div>
           ))}
-
-          <div style={{
-            border: '1.5px dashed #cbd5e1', borderRadius: 12, padding: '16px', background: '#fafafa',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            textAlign: 'center', minHeight: 140, color: '#94a3b8',
-          }}>
-            <i className="ti ti-plus" style={{ fontSize: 22, marginBottom: 6 }} />
-            <div style={{ fontSize: 12.5, lineHeight: 1.5 }}>Un outil à ajouter ?<br />Dis-le et on le branche ici.</div>
-          </div>
         </div>
       </div>
     </Layout>
