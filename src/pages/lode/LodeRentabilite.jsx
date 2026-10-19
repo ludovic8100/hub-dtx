@@ -10,6 +10,7 @@ const eur = v => (Math.round(Number(v) || 0)).toLocaleString('fr-BE') + ' €'
 const pctTxt = v => v == null ? '—' : `${v > 0 ? '+' : ''}${Math.round(v)} %`
 const col = v => v > 0 ? '#16a34a' : v < 0 ? '#dc2626' : '#64748b'
 const RESP = ['LDE', 'JCL', 'LLO']
+const achHT = (a) => (Number(a.montant) || 0) / (1 + (a.tva_taux == null ? 21 : Number(a.tva_taux)) / 100)
 const MOIS = ['', 'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc']
 
 const card = { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 16, marginTop: 16 }
@@ -50,7 +51,7 @@ export default function LodeRentabilite() {
     const [d, f, a, t, c] = await Promise.all([
       supabase.from('lode_devis').select('id,numero,objet,client_nom,statut,total_ht,date_devis,responsable').order('date_devis', { ascending: false }),
       supabase.from('lode_factures').select('id,numero,devis_id,type,total_ht,date_facture,responsable'),
-      supabase.from('factures_achat').select('id,nom,montant,date_facture,lode_devis_id').eq('societe', 'LODE').eq('sens', 'achat').order('date_facture', { ascending: false }),
+      supabase.from('factures_achat').select('id,nom,montant,date_facture,lode_devis_id,tva_taux').eq('societe', 'LODE').eq('sens', 'achat').order('date_facture', { ascending: false }),
       supabase.from('transactions').select('id,montant,date_valeur,categorie_id,activite,responsable,contrepartie_nom').eq('activite', 'rental'),
       supabase.from('categories').select('id,nom'),
     ])
@@ -72,7 +73,7 @@ export default function LodeRentabilite() {
   const facturesF = useMemo(() => factures.filter(f => inY(f.date_facture)), [factures, annee])
   const achatsF = useMemo(() => achats.filter(a => inY(a.date_facture)), [achats, annee])
   const caParDevis = useMemo(() => { const m = {}; for (const f of facturesF) { if (!f.devis_id) continue; (m[f.devis_id] ||= { ht: 0, n: 0 }); m[f.devis_id].ht += Number(f.total_ht) || 0; m[f.devis_id].n++ } return m }, [facturesF])
-  const achParDevis = useMemo(() => { const m = {}; for (const a of achatsF) { if (!a.lode_devis_id) continue; (m[a.lode_devis_id] ||= { v: 0, n: 0 }); m[a.lode_devis_id].v += Number(a.montant) || 0; m[a.lode_devis_id].n++ } return m }, [achatsF])
+  const achParDevis = useMemo(() => { const m = {}; for (const a of achatsF) { if (!a.lode_devis_id) continue; (m[a.lode_devis_id] ||= { v: 0, n: 0 }); m[a.lode_devis_id].v += achHT(a); m[a.lode_devis_id].n++ } return m }, [achatsF])
 
   const chantiersAll = useMemo(() => devis.map(d => {
     const ca = caParDevis[d.id] || { ht: 0, n: 0 }, ac = achParDevis[d.id] || { v: 0, n: 0 }
@@ -88,9 +89,10 @@ export default function LodeRentabilite() {
   }, [chantiersAll])
 
   const caTot = useMemo(() => facturesF.reduce((s, f) => s + (Number(f.total_ht) || 0), 0), [facturesF])
-  const achTot = useMemo(() => achatsF.reduce((s, a) => s + (Number(a.montant) || 0), 0), [achatsF])
+  const achTot = useMemo(() => achatsF.reduce((s, a) => s + achHT(a), 0), [achatsF])
+  const achTotTTC = useMemo(() => achatsF.reduce((s, a) => s + (Number(a.montant) || 0), 0), [achatsF])
   const caHorsCh = useMemo(() => facturesF.filter(f => !f.devis_id).reduce((s, f) => s + (Number(f.total_ht) || 0), 0), [facturesF])
-  const fraisGen = useMemo(() => achatsF.filter(a => !a.lode_devis_id).reduce((s, a) => s + (Number(a.montant) || 0), 0), [achatsF])
+  const fraisGen = useMemo(() => achatsF.filter(a => !a.lode_devis_id).reduce((s, a) => s + achHT(a), 0), [achatsF])
   const fraisGenN = useMemo(() => achatsF.filter(a => !a.lode_devis_id).length, [achatsF])
 
   const optionsDevis = useMemo(() => devis.map(d => ({ id: d.id, label: `${d.numero} · ${(d.objet || '').slice(0, 34)}${d.client_nom ? ' · ' + d.client_nom : ''}` })), [devis])
@@ -98,6 +100,19 @@ export default function LodeRentabilite() {
     setSaving(id)
     const { error } = await supabase.from('factures_achat').update({ lode_devis_id: dv || null }).eq('id', id)
     if (!error) setAchats(p => p.map(a => a.id === id ? { ...a, lode_devis_id: dv || null } : a))
+    setSaving(null)
+  }
+  const setTaux = async (id, v) => {
+    setSaving(id)
+    const t = Number(v)
+    const { error } = await supabase.from('factures_achat').update({ tva_taux: t }).eq('id', id)
+    if (!error) setAchats(p => p.map(a => a.id === id ? { ...a, tva_taux: t } : a))
+    setSaving(null)
+  }
+  const setRespCh = async (id, r) => {
+    setSaving(id)
+    const { error } = await supabase.from('lode_devis').update({ responsable: r || null }).eq('id', id)
+    if (!error) setDevis(p => p.map(d => d.id === id ? { ...d, responsable: r || null } : d))
     setSaving(null)
   }
   const achatsListe = useMemo(() => {
@@ -178,7 +193,7 @@ export default function LodeRentabilite() {
           {onglet === 'protect' ? <>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 4 }}>
               <Kpi label="CA facturé (HT)" value={eur(caTot)} c={OR} sub={`${facturesF.length} factures`} />
-              <Kpi label="Achats" value={eur(achTot)} c="#9333ea" sub={`${achatsF.length} factures d'achat`} />
+              <Kpi label="Achats (HT)" value={eur(achTot)} c="#9333ea" sub={`${eur(achTotTTC)} TTC · ${achatsF.length} fact.`} />
               <Kpi label="Marge brute" value={eur(caTot - achTot)} c={col(caTot - achTot)} sub={caTot > 0 ? pctTxt((caTot - achTot) / caTot * 100) : '—'} />
               <Kpi label="À rattacher" value={`${fraisGenN}`} c="#f59e0b" sub={`${eur(fraisGen)} non affectés`} />
             </div>
@@ -188,7 +203,7 @@ export default function LodeRentabilite() {
                 <div style={{ fontSize: 14, fontWeight: 800, color: ORD, marginBottom: 8 }}>Marge par commercial</div>
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead><tr><th style={th}>Commercial</th><th style={thR}>CA HT</th><th style={thR}>Achats</th><th style={thR}>Marge</th><th style={thR}>%</th></tr></thead>
+                    <thead><tr><th style={th}>Commercial</th><th style={thR}>CA HT</th><th style={thR}>Achats HT</th><th style={thR}>Marge</th><th style={thR}>%</th></tr></thead>
                     <tbody>{parCommercial.map(r => (
                       <tr key={r.resp}><td style={{ ...td, fontWeight: 700, color: ORD }}>{r.resp}</td><td style={tdR}>{eur(r.ca)}</td><td style={tdR}>{eur(r.achat)}</td><td style={{ ...tdR, fontWeight: 800, color: col(r.marge) }}>{eur(r.marge)}</td><td style={{ ...tdR, color: col(r.marge) }}>{pctTxt(r.pct)}</td></tr>
                     ))}</tbody>
@@ -199,15 +214,20 @@ export default function LodeRentabilite() {
 
             <div style={card}>
               <div style={{ fontSize: 14, fontWeight: 800, color: ORD }}>Marge par chantier</div>
-              <div style={{ fontSize: 12, color: '#94a3b8', margin: '4px 0 10px' }}>Marge = CA HT − achats rattachés. ⚠️ Le HT des achats n'est pas encore défini : les achats sont pris au montant enregistré (voir décision en cours).</div>
+              <div style={{ fontSize: 12, color: '#94a3b8', margin: '4px 0 10px' }}>Marge = CA HT − achats HT rattachés. Les achats (TTC) sont convertis en HT via leur taux de TVA — 21 % par défaut, ajustable dans la liste ci-dessous.</div>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead><tr><th style={th}>Chantier</th><th style={th}>Resp.</th><th style={thR}>CA HT</th><th style={thR}>Achats</th><th style={thR}>Marge</th><th style={thR}>%</th></tr></thead>
+                  <thead><tr><th style={th}>Chantier</th><th style={th}>Resp.</th><th style={thR}>CA HT</th><th style={thR}>Achats HT</th><th style={thR}>Marge</th><th style={thR}>%</th></tr></thead>
                   <tbody>
                     {chantiers.filter(c => c.actif).map(c => (
                       <tr key={c.id}>
                         <td style={td}><span style={{ fontWeight: 600, color: ORD }}>{c.numero}</span> <span style={{ color: '#64748b' }}>{(c.objet || '').slice(0, 40)}</span><div style={{ fontSize: 11, color: '#94a3b8' }}>{c.client_nom}</div></td>
-                        <td style={td}>{c.responsable || '—'}</td>
+                        <td style={td}>
+                          <select value={c.responsable || ''} disabled={saving === c.id} onChange={e => setRespCh(c.id, e.target.value)} style={{ ...inp, padding: '5px 8px', minWidth: 80, opacity: saving === c.id ? 0.5 : 1 }}>
+                            <option value="">—</option>
+                            {RESP.map(r => <option key={r} value={r}>{r}</option>)}
+                          </select>
+                        </td>
                         <td style={tdR}>{eur(c.caHT)}<div style={{ fontSize: 10, color: '#cbd5e1' }}>{c.caN} f.</div></td>
                         <td style={tdR}>{eur(c.achat)}<div style={{ fontSize: 10, color: '#cbd5e1' }}>{c.achatN} a.</div></td>
                         <td style={{ ...tdR, fontWeight: 800, color: col(c.marge) }}>{eur(c.marge)}</td>
@@ -240,13 +260,19 @@ export default function LodeRentabilite() {
               <div style={{ fontSize: 12, color: '#94a3b8', margin: '6px 0 10px' }}>{achatsListe.length} achat(s){achatsListe.length > 80 ? ' — 80 affichés' : ''}.</div>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead><tr><th style={th}>Date</th><th style={th}>Fournisseur</th><th style={thR}>Montant</th><th style={th}>Chantier</th></tr></thead>
+                  <thead><tr><th style={th}>Date</th><th style={th}>Fournisseur</th><th style={thR}>Montant TTC</th><th style={th}>TVA</th><th style={thR}>HT</th><th style={th}>Chantier</th></tr></thead>
                   <tbody>
                     {achatsListe.slice(0, 80).map(a => (
                       <tr key={a.id} style={a.lode_devis_id ? { background: '#f0fdf4' } : null}>
                         <td style={td}>{(a.date_facture || '').slice(0, 10)}</td>
                         <td style={td}>{a.nom || '—'}</td>
                         <td style={tdR}>{eur(a.montant)}</td>
+                        <td style={td}>
+                          <select value={a.tva_taux == null ? 21 : a.tva_taux} disabled={saving === a.id} onChange={e => setTaux(a.id, e.target.value)} style={{ ...inp, padding: '5px 8px', minWidth: 72, opacity: saving === a.id ? 0.5 : 1 }}>
+                            {[21, 12, 6, 0].map(t => <option key={t} value={t}>{t} %</option>)}
+                          </select>
+                        </td>
+                        <td style={tdR}>{eur(achHT(a))}</td>
                         <td style={td}>
                           <select value={a.lode_devis_id || ''} disabled={saving === a.id} onChange={e => rattacher(a.id, e.target.value)} style={{ ...inp, minWidth: 230, opacity: saving === a.id ? 0.5 : 1 }}>
                             <option value="">— Hors chantier (frais généraux)</option>
@@ -255,7 +281,7 @@ export default function LodeRentabilite() {
                         </td>
                       </tr>
                     ))}
-                    {!achatsListe.length && <tr><td style={td} colSpan={4}><span style={{ color: '#94a3b8' }}>Aucun achat.</span></td></tr>}
+                    {!achatsListe.length && <tr><td style={td} colSpan={6}><span style={{ color: '#94a3b8' }}>Aucun achat.</span></td></tr>}
                   </tbody>
                 </table>
               </div>
