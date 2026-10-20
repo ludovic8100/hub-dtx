@@ -724,10 +724,9 @@ function Editeur({ type, doc, onClose, onSaved }) {
 // Les devis gardent leur nom habituel.
 function nomFichierDoc(doc, type, ext) {
   if (type === 'devis') return `Devis_${doc.numero}.${ext}`
-  const numCompact = String(doc.numero || '').replace(/-/g, '')
   const client = String(doc.client_nom || 'Client').replace(/[\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim()
   const montant = Math.abs(Number(doc.total_ttc || 0)).toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false })
-  return `${numCompact} - ${client} - ${montant} EUR.${ext}`
+  return `${String(doc.numero || '').trim()} - ${client} - ${montant}€.${ext}`
 }
 async function exportPDF(type, doc, lignes) {
   await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
