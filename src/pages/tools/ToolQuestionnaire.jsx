@@ -4,9 +4,10 @@ import Layout from '../../components/Layout'
 import { supabase } from '../../lib/supabase'
 import jsPDF from 'jspdf'
 import * as pdfjsLib from 'pdfjs-dist'
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.js?url'
 
-// Disable worker — use main thread (fake worker) to avoid CDN/bundling issues
-pdfjsLib.GlobalWorkerOptions.workerSrc = ''
+// Configure pdf.js worker via Vite ?url import
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
 // ═══════════════════════════════════════════════════════════════════════
 // FUND RISK DATABASE — ajouter les fonds par compagnie ici
