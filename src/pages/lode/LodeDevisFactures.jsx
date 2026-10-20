@@ -720,6 +720,15 @@ function Editeur({ type, doc, onClose, onSaved }) {
 // ════════════════════════════════════════════════════════════════
 //  EXPORTS PDF / EXCEL
 // ════════════════════════════════════════════════════════════════
+// Nom de fichier des pièces de vente : « 2026001 - CLIENT - 980,10 EUR.pdf » (montant TTC).
+// Les devis gardent leur nom habituel.
+function nomFichierDoc(doc, type, ext) {
+  if (type === 'devis') return `Devis_${doc.numero}.${ext}`
+  const numCompact = String(doc.numero || '').replace(/-/g, '')
+  const client = String(doc.client_nom || 'Client').replace(/[\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim()
+  const montant = Math.abs(Number(doc.total_ttc || 0)).toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false })
+  return `${numCompact} - ${client} - ${montant} EUR.${ext}`
+}
 async function exportPDF(type, doc, lignes) {
   await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
   await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js')
@@ -1035,7 +1044,7 @@ async function exportPDF(type, doc, lignes) {
   })
 
   numeroterPages()
-  d.save(`${titre}_${doc.numero}.pdf`)
+  d.save(type === 'devis' ? `${titre}_${doc.numero}.pdf` : nomFichierDoc(doc, type, 'pdf'))
 }
 
 async function exportExcel(type, doc, lignes) {
@@ -1216,7 +1225,7 @@ async function exportWord(type, doc, lignes) {
   const blob = await Packer.toBlob(docObj)
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
-  link.href = url; link.download = `${isDevis ? L.devis : (doc.type === 'note_credit' ? 'Note de crédit' : L.facture)}_${doc.numero}.docx`
+  link.href = url; link.download = isDevis ? `${L.devis}_${doc.numero}.docx` : nomFichierDoc(doc, type, 'docx')
   link.click()
   URL.revokeObjectURL(url)
 }
