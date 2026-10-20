@@ -50,6 +50,7 @@ const DashboardLode       = lazy(() => import('./pages/lode/DashboardLode'))
 const LodeClients         = lazy(() => import('./pages/lode/LodeClients'))
 const LodeBanque          = lazy(() => import('./pages/lode/LodeBanque'))
 const LodeComptabilite    = lazy(() => import('./pages/lode/LodeComptabilite'))
+const LodeRentabilite     = lazy(() => import('./pages/lode/LodeRentabilite'))
 const LodeDevisFactures   = lazy(() => import('./pages/lode/LodeDevisFactures'))
 const DtxDevisFactures    = lazy(() => import('./pages/dtx/DtxDevisFactures'))
 const DynDevisFactures    = lazy(() => import('./pages/dyn/DynDevisFactures'))
@@ -175,6 +176,7 @@ export default function App() {
           <Route path="/config" element={<A><ConfigModule /></A>} />
           <Route path="/lode/banque"        element={<A><LodeBanque /></A>} />
           <Route path="/lode/comptabilite"  element={<P need="lode_comptabilite"><LodeComptabilite /></P>} />
+          <Route path="/lode/rentabilite"   element={<P need="lode_rentabilite"><LodeRentabilite /></P>} />
 
           {/* Hexagroup */}
           <Route path="/hexagroup"               element={<P need="hex_dashboard"><DashboardHexagroup /></P>} />
