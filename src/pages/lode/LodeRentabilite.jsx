@@ -30,6 +30,22 @@ function Kpi({ label, value, c, sub }) {
   )
 }
 
+function ApercuFacture({ fid, nom }) {
+  const [etat, setEtat] = useState('load')
+  useEffect(() => { setEtat('load') }, [fid])
+  const src = `https://n8n.srv1082740.hstgr.cloud/webhook/apercu-facture?fid=${encodeURIComponent(fid)}`
+  return (
+    <div style={{ position: 'fixed', top: '50%', right: 24, transform: 'translateY(-50%)', zIndex: 2100, width: 520, maxWidth: '48vw', maxHeight: '88vh', background: '#fff', borderRadius: 14, boxShadow: '0 20px 60px rgba(0,0,0,0.35)', border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', pointerEvents: 'none' }}>
+      <div style={{ padding: '10px 14px', background: '#0f172a', color: '#fff', fontSize: 12, fontWeight: 600, fontFamily: FONT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>\U0001F4C4 {nom}</div>
+      <div style={{ overflowY: 'auto', background: '#f8fafc' }}>
+        <img src={src} alt="Apercu facture" onLoad={() => setEtat('ok')} onError={() => setEtat('err')} style={{ width: '100%', height: 'auto', display: etat === 'ok' ? 'block' : 'none' }} />
+        {etat === 'load' && <div style={{ padding: '34px 20px', textAlign: 'center', color: '#94a3b8', fontSize: 13, fontFamily: FONT }}>Chargement de l'aperçu…</div>}
+        {etat === 'err' && <div style={{ padding: '34px 20px', textAlign: 'center', color: '#94a3b8', fontSize: 13, fontFamily: FONT }}>Aperçu indisponible.</div>}
+      </div>
+    </div>
+  )
+}
+
 export default function LodeRentabilite() {
   const [onglet, setOnglet] = useState('protect')
   const [devis, setDevis] = useState([])
@@ -43,6 +59,7 @@ export default function LodeRentabilite() {
   const [q, setQ] = useState('')
   const [filtre, setFiltre] = useState('non')
   const [saving, setSaving] = useState(null)
+  const [apercu, setApercu] = useState(null)
   const [qR, setQR] = useState('')
   const [filtreR, setFiltreR] = useState('non')
 
@@ -51,7 +68,7 @@ export default function LodeRentabilite() {
     const [d, f, a, t, c] = await Promise.all([
       supabase.from('lode_devis').select('id,numero,objet,client_nom,statut,total_ht,date_devis,responsable').order('date_devis', { ascending: false }),
       supabase.from('lode_factures').select('id,numero,devis_id,type,total_ht,date_facture,responsable'),
-      supabase.from('factures_achat').select('id,nom,montant,date_facture,lode_devis_id,tva_taux').eq('societe', 'LODE').eq('sens', 'achat').order('date_facture', { ascending: false }),
+      supabase.from('factures_achat').select('id,nom,montant,date_facture,lode_devis_id,tva_taux,fichier_id').eq('societe', 'LODE').eq('sens', 'achat').order('date_facture', { ascending: false }),
       supabase.from('transactions').select('id,montant,date_valeur,categorie_id,activite,responsable,contrepartie_nom').eq('activite', 'rental'),
       supabase.from('categories').select('id,nom'),
     ])
@@ -260,10 +277,13 @@ export default function LodeRentabilite() {
               <div style={{ fontSize: 12, color: '#94a3b8', margin: '6px 0 10px' }}>{achatsListe.length} achat(s){achatsListe.length > 80 ? ' — 80 affichés' : ''}.</div>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead><tr><th style={th}>Date</th><th style={th}>Fournisseur</th><th style={thR}>Montant TTC</th><th style={th}>TVA</th><th style={thR}>HT</th><th style={th}>Chantier</th></tr></thead>
+                  <thead><tr><th style={th}></th><th style={th}>Date</th><th style={th}>Fournisseur</th><th style={thR}>Montant TTC</th><th style={th}>TVA</th><th style={thR}>HT</th><th style={th}>Chantier</th></tr></thead>
                   <tbody>
                     {achatsListe.slice(0, 80).map(a => (
                       <tr key={a.id} style={a.lode_devis_id ? { background: '#f0fdf4' } : null}>
+                        <td style={{ ...td, textAlign: 'center', width: 44 }}>
+                          {a.fichier_id ? <button title="Aperçu facture" onClick={() => setApercu(c => c && c.fid === a.fichier_id ? null : { fid: a.fichier_id, nom: (a.nom || '').replace(/\.pdf$/i, '') })} onMouseEnter={() => setApercu({ fid: a.fichier_id, nom: (a.nom || '').replace(/\.pdf$/i, '') })} onMouseLeave={() => setApercu(null)} style={{ border: '1px solid #e2e8f0', background: '#fff', borderRadius: 8, padding: '4px 8px', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>\U0001F4C4</button> : <span style={{ color: '#cbd5e1' }}>—</span>}
+                        </td>
                         <td style={td}>{(a.date_facture || '').slice(0, 10)}</td>
                         <td style={td}>{a.nom || '—'}</td>
                         <td style={tdR}>{eur(a.montant)}</td>
@@ -281,11 +301,12 @@ export default function LodeRentabilite() {
                         </td>
                       </tr>
                     ))}
-                    {!achatsListe.length && <tr><td style={td} colSpan={6}><span style={{ color: '#94a3b8' }}>Aucun achat.</span></td></tr>}
+                    {!achatsListe.length && <tr><td style={td} colSpan={7}><span style={{ color: '#94a3b8' }}>Aucun achat.</span></td></tr>}
                   </tbody>
                 </table>
               </div>
             </div>
+            {apercu && <ApercuFacture fid={apercu.fid} nom={apercu.nom} />}
           </> : <>
             {/* RENTAL */}
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 4 }}>
