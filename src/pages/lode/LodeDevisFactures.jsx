@@ -1466,6 +1466,22 @@ function ChampL({ label, children }) {
   )
 }
 
+function ApercuFacture({ fid, nom }) {
+  const [etat, setEtat] = useState('load')
+  useEffect(() => { setEtat('load') }, [fid])
+  const src = `https://n8n.srv1082740.hstgr.cloud/webhook/apercu-facture?fid=${encodeURIComponent(fid)}`
+  return (
+    <div style={{ position: 'fixed', top: '50%', right: 24, transform: 'translateY(-50%)', zIndex: 2100, width: 520, maxWidth: '48vw', maxHeight: '88vh', background: '#fff', borderRadius: 14, boxShadow: '0 20px 60px rgba(0,0,0,0.35)', border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', pointerEvents: 'none' }}>
+      <div style={{ padding: '10px 14px', background: '#0f172a', color: '#fff', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>\U0001F4C4 {nom}</div>
+      <div style={{ overflowY: 'auto', background: '#f8fafc' }}>
+        <img src={src} alt="Apercu facture" onLoad={() => setEtat('ok')} onError={() => setEtat('err')} style={{ width: '100%', height: 'auto', display: etat === 'ok' ? 'block' : 'none' }} />
+        {etat === 'load' && <div style={{ padding: '34px 20px', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>Chargement de l\'apercu…</div>}
+        {etat === 'err' && <div style={{ padding: '34px 20px', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>Apercu indisponible.</div>}
+      </div>
+    </div>
+  )
+}
+
 export default function LodeDevisFactures() {
   const [tab, setTab] = useState('devis')
   const [devis, setDevis] = useState([])
@@ -1474,6 +1490,7 @@ export default function LodeDevisFactures() {
   const [editing, setEditing] = useState(null) // {type, doc}
   const [busy, setBusy] = useState(null)
   const [suivi, setSuivi] = useState(null)      // devis dont on affiche le suivi
+  const [apercu, setApercu] = useState(null)      // {fid,nom} apercu PDF au survol
   const [sort, setSort] = useState({ key: 'numero', dir: 'desc' })
 
   const load = async () => {
@@ -1641,8 +1658,14 @@ export default function LodeDevisFactures() {
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
                       <ActionButton tone="grey" onClick={() => setEditing({ type: t, doc })}>Modifier</ActionButton>
                       {tab === 'devis' && <ActionButton tone="accent" color={C} onClick={() => setSuivi(doc)}>📊 Suivi</ActionButton>}
-                      <ActionButton tone="pdf" disabled={busy === doc.id + 'pdf'} onClick={() => doExport('pdf', t, doc)}>{busy === doc.id + 'pdf' ? '…' : 'PDF'}</ActionButton>
-                      <ActionButton tone="excel" disabled={busy === doc.id + 'word'} onClick={() => doExport('word', t, doc)}>{busy === doc.id + 'word' ? '…' : 'Word'}</ActionButton>
+                      {tab === 'devis'
+                        ? <>
+                            <ActionButton tone="pdf" disabled={busy === doc.id + 'pdf'} onClick={() => doExport('pdf', t, doc)}>{busy === doc.id + 'pdf' ? '…' : 'PDF'}</ActionButton>
+                            <ActionButton tone="excel" disabled={busy === doc.id + 'word'} onClick={() => doExport('word', t, doc)}>{busy === doc.id + 'word' ? '…' : 'Word'}</ActionButton>
+                          </>
+                        : doc.pdf_url
+                          ? <ActionButton tone="pdf" onClick={() => window.open(doc.pdf_url, '_blank', 'noopener')} onMouseEnter={() => doc.pdf_fid && setApercu({ fid: doc.pdf_fid, nom: doc.numero })} onMouseLeave={() => setApercu(null)}>Ouvrir</ActionButton>
+                          : <span style={{ color: '#cbd5e1', fontSize: 12 }}>PDF non archive</span>}
                       {PEPPOL_ACTIF && tab === 'factures' && doc.client_tva && doc.statut !== 'payée' && doc.statut !== 'annulée' && (
                         <ActionButton tone="peppol" disabled={busy === doc.id + 'peppol'} onClick={() => envoyerPeppol(doc)}>{busy === doc.id + 'peppol' ? '…' : '📨 Peppol'}</ActionButton>
                       )}
@@ -1679,8 +1702,14 @@ export default function LodeDevisFactures() {
                           <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
                             <ActionButton tone="grey" onClick={() => setEditing({ type: tab === 'devis' ? 'devis' : 'facture', doc })}>Modifier</ActionButton>
                             {tab === 'devis' && <ActionButton tone="accent" color={C} onClick={() => setSuivi(doc)}>📊 Suivi</ActionButton>}
-                            <ActionButton tone="pdf" disabled={busy === doc.id + 'pdf'} onClick={() => doExport('pdf', tab === 'devis' ? 'devis' : 'facture', doc)}>{busy === doc.id + 'pdf' ? '…' : 'PDF'}</ActionButton>
-                            <ActionButton tone="excel" disabled={busy === doc.id + 'word'} onClick={() => doExport('word', tab === 'devis' ? 'devis' : 'facture', doc)}>{busy === doc.id + 'word' ? '…' : 'Word'}</ActionButton>
+                            {tab === 'devis'
+                              ? <>
+                                  <ActionButton tone="pdf" disabled={busy === doc.id + 'pdf'} onClick={() => doExport('pdf', 'devis', doc)}>{busy === doc.id + 'pdf' ? '…' : 'PDF'}</ActionButton>
+                                  <ActionButton tone="excel" disabled={busy === doc.id + 'word'} onClick={() => doExport('word', 'devis', doc)}>{busy === doc.id + 'word' ? '…' : 'Word'}</ActionButton>
+                                </>
+                              : doc.pdf_url
+                                ? <ActionButton tone="pdf" onClick={() => window.open(doc.pdf_url, '_blank', 'noopener')} onMouseEnter={() => doc.pdf_fid && setApercu({ fid: doc.pdf_fid, nom: doc.numero })} onMouseLeave={() => setApercu(null)}>Ouvrir</ActionButton>
+                                : <span style={{ color: '#cbd5e1', fontSize: 12 }}>\u2014</span>}
                             {PEPPOL_ACTIF && tab === 'factures' && doc.client_tva && doc.statut !== 'payée' && doc.statut !== 'annulée' && (
                               <ActionButton tone="peppol" disabled={busy === doc.id + 'peppol'} onClick={() => envoyerPeppol(doc)}>{busy === doc.id + 'peppol' ? '…' : '📨 Peppol'}</ActionButton>
                             )}
@@ -1698,6 +1727,7 @@ export default function LodeDevisFactures() {
 
       {editing && <Editeur type={editing.type} doc={editing.doc} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load() }} />}
       {suivi && <SuiviModal doc={suivi} color={C} onClose={() => setSuivi(null)} onChanged={() => { load() }} />}
+      {apercu && <ApercuFacture fid={apercu.fid} nom={apercu.nom} />}
     </Layout>
   )
 }
