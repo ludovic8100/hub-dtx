@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { PEPPOL_ACTIF } from '../../lib/peppol'
 import Layout from '../../components/Layout'
 import { LODE, TVA_TAUX, CGV, DELAI_PAIEMENT_JOURS } from '../../lib/lodeConfig'
 import { I18N, CGV_I18N, LANGUES } from '../../lib/lodeI18n'
@@ -1497,6 +1498,7 @@ export default function LodeDevisFactures() {
   // Envoi de la facture sur le réseau Peppol via le proxy Billit (n8n)
   const PEPPOL_WEBHOOK = 'https://n8n.srv1082740.hstgr.cloud/webhook/lode-peppol-send'
   const envoyerPeppol = async (doc) => {
+    if (!PEPPOL_ACTIF) { alert('Le lien Peppol est désactivé pour le moment.'); return }
     if (!confirm(`Envoyer la facture ${doc.numero} sur le réseau Peppol via Billit ?`)) return
     setBusy(doc.id + 'peppol')
     try {
@@ -1633,7 +1635,7 @@ export default function LodeDevisFactures() {
                       {tab === 'devis' && <ActionButton tone="accent" color={C} onClick={() => setSuivi(doc)}>📊 Suivi</ActionButton>}
                       <ActionButton tone="pdf" disabled={busy === doc.id + 'pdf'} onClick={() => doExport('pdf', t, doc)}>{busy === doc.id + 'pdf' ? '…' : 'PDF'}</ActionButton>
                       <ActionButton tone="excel" disabled={busy === doc.id + 'word'} onClick={() => doExport('word', t, doc)}>{busy === doc.id + 'word' ? '…' : 'Word'}</ActionButton>
-                      {tab === 'factures' && doc.client_tva && doc.statut !== 'payée' && doc.statut !== 'annulée' && (
+                      {PEPPOL_ACTIF && tab === 'factures' && doc.client_tva && doc.statut !== 'payée' && doc.statut !== 'annulée' && (
                         <ActionButton tone="peppol" disabled={busy === doc.id + 'peppol'} onClick={() => envoyerPeppol(doc)}>{busy === doc.id + 'peppol' ? '…' : '📨 Peppol'}</ActionButton>
                       )}
                       {tab === 'devis' && doc.statut === 'accepté' && <ActionButton tone="accent" color={C} onClick={() => convertir(doc)}>→ Facture</ActionButton>}
@@ -1671,7 +1673,7 @@ export default function LodeDevisFactures() {
                             {tab === 'devis' && <ActionButton tone="accent" color={C} onClick={() => setSuivi(doc)}>📊 Suivi</ActionButton>}
                             <ActionButton tone="pdf" disabled={busy === doc.id + 'pdf'} onClick={() => doExport('pdf', tab === 'devis' ? 'devis' : 'facture', doc)}>{busy === doc.id + 'pdf' ? '…' : 'PDF'}</ActionButton>
                             <ActionButton tone="excel" disabled={busy === doc.id + 'word'} onClick={() => doExport('word', tab === 'devis' ? 'devis' : 'facture', doc)}>{busy === doc.id + 'word' ? '…' : 'Word'}</ActionButton>
-                            {tab === 'factures' && doc.client_tva && doc.statut !== 'payée' && doc.statut !== 'annulée' && (
+                            {PEPPOL_ACTIF && tab === 'factures' && doc.client_tva && doc.statut !== 'payée' && doc.statut !== 'annulée' && (
                               <ActionButton tone="peppol" disabled={busy === doc.id + 'peppol'} onClick={() => envoyerPeppol(doc)}>{busy === doc.id + 'peppol' ? '…' : '📨 Peppol'}</ActionButton>
                             )}
                             {tab === 'devis' && doc.statut === 'accepté' && <ActionButton tone="accent" color={C} onClick={() => convertir(doc)}>→ Facture</ActionButton>}
