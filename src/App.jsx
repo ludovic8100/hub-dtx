@@ -20,6 +20,7 @@ const Tickets             = lazy(() => import('./pages/Tickets'))
 const ToolsHome           = lazy(() => import('./pages/tools/ToolsHome'))
 const ToolBce             = lazy(() => import('./pages/tools/ToolBce'))
 const ToolQuestionnaire   = lazy(() => import('./pages/tools/ToolQuestionnaire'))
+const ToolDevoirInfo      = lazy(() => import('./pages/tools/ToolDevoirInfo'))
 const DynassurTaches      = lazy(() => import('./pages/dynassur/DynassurTaches'))
 const DtxTaches           = lazy(() => import('./pages/dtx/DtxTaches'))
 const LodeTaches          = lazy(() => import('./pages/lode/LodeTaches'))
@@ -195,6 +196,7 @@ export default function App() {
           <Route path="/tools"     element={<P need="acc_tools"><ToolsHome /></P>} />
           <Route path="/tools/bce" element={<P need="acc_tools"><ToolBce /></P>} />
           <Route path="/tools/questionnaire" element={<P need="acc_tools"><ToolQuestionnaire /></P>} />
+          <Route path="/tools/devoir-information" element={<P need="acc_tools"><ToolDevoirInfo /></P>} />
           <Route path="/admin/sync" element={<A><SyncCenter /></A>} />
           <Route path="/admin/rdv-categories" element={<A><RdvCategories /></A>} />
           <Route path="/admin/liens-casses" element={<A><LiensCasses /></A>} />

@@ -20,6 +20,14 @@ const TOOLS = [
     ready: true,
   },
   {
+    key: 'devoir-info',
+    title: "Devoir d'information non-vie",
+    desc: "Remplir le devoir d'information IARD depuis le client et le contrat, conseil personnalisé généré depuis les garanties, signature sur tablette.",
+    img: '/assets/tools/icon-questionnaire.png',
+    path: '/tools/devoir-information',
+    ready: true,
+  },
+  {
     key: 'dev',
     title: 'En cours de développement',
     desc: "De nouveaux outils arrivent bientôt. Restez connectés !",
