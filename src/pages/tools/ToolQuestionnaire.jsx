@@ -1108,7 +1108,25 @@ export default function ToolQuestionnaire() {
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     {Object.entries(funds).map(([name, pct]) => {
-                      const riskVal = FUND_RISK[name.toLowerCase().trim()]
+                      // Compute the effective risk for this fund (same logic as computeRiskScore)
+                      const key = name.toLowerCase().trim()
+                      let riskVal = FUND_RISK[key]
+                      if (riskVal === undefined) {
+                        if (/branche\s*21|garanti|taux\s*garanti/i.test(key)) riskVal = 0
+                        else if (/equity|equities|action|growth|dynamic|technolog/i.test(key)) riskVal = 80
+                        else if (/balanced|mixte|multi\s*asset/i.test(key)) riskVal = 50
+                        else if (/bond|obligation|defensive|stability|income/i.test(key)) riskVal = 15
+                        else if (/infrastructure|real\s*estate|immobil/i.test(key)) riskVal = 55
+                        else if (/impact|sustainable|esg/i.test(key)) riskVal = 60
+                        else if (/megatrend|thematic/i.test(key)) riskVal = 75
+                        else if (/star\s*fund/i.test(key)) riskVal = 70
+                        else riskVal = 50
+                      }
+                      const fundProfile = riskToProfile(riskVal)
+                      const classColors = {
+                        'Défensif': '#16a34a', 'Conservateur': '#22c55e',
+                        'Neutre / Équilibré': '#f59e0b', 'Dynamique': '#ea580c', 'Offensif': '#dc2626',
+                      }
                       return (
                         <div key={name} style={{
                           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -1117,9 +1135,13 @@ export default function ToolQuestionnaire() {
                           <span style={{ color: '#334155', fontWeight: 500 }}>{name}</span>
                           <span style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                             <span style={{ color: '#1A3A6B', fontWeight: 700 }}>{pct}%</span>
-                            {riskVal !== undefined && (
-                              <span style={{ color: '#94a3b8', fontSize: 11 }}>risque: {riskVal}</span>
-                            )}
+                            <span style={{
+                              color: classColors[fundProfile] || '#64748b', fontSize: 11, fontWeight: 600,
+                              padding: '1px 6px', borderRadius: 4,
+                              background: `${classColors[fundProfile] || '#64748b'}15`,
+                            }}>
+                              {fundProfile} ({riskVal})
+                            </span>
                           </span>
                         </div>
                       )
@@ -1131,9 +1153,11 @@ export default function ToolQuestionnaire() {
                     const rs = computeRiskScore(funds)
                     const pr = riskToProfile(rs)
                     const profileColors = {
-                      'Conservateur': '#16a34a',
-                      'Équilibré / Modéré': '#ea580c',
-                      'Dynamique / Risqué': '#dc2626',
+                      'Défensif': '#16a34a',
+                      'Conservateur': '#22c55e',
+                      'Neutre / Équilibré': '#f59e0b',
+                      'Dynamique': '#ea580c',
+                      'Offensif': '#dc2626',
                     }
                     return (
                       <div style={{
