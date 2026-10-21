@@ -370,7 +370,7 @@ export default function TicketsView() {
             <thead><tr style={{ background: C.bg, color: C.textM }}>
               {COLS.map(c => (
                 <th key={c.key} onClick={() => toggleSort(c.key)} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, textTransform: 'uppercase', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', userSelect: 'none' }}>
-                  {c.label}{sort.col === c.key ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                  {c.label}<span style={{ marginLeft: 4, fontSize: 10, opacity: sort.col === c.key ? 1 : 0.3 }}>{sort.col === c.key ? (sort.dir === 'asc' ? '▲' : '▼') : '⇅'}</span>
                 </th>
               ))}
             </tr></thead>
