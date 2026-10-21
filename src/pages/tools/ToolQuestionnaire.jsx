@@ -92,85 +92,105 @@ function computeRiskScore(funds) {
 }
 
 function riskToProfile(score) {
-  if (score < 15) return 'Conservateur'
-  if (score < 60) return 'Équilibré / Modéré'
-  return 'Dynamique / Risqué'
+  if (score < 10) return 'Défensif'
+  if (score < 30) return 'Conservateur'
+  if (score < 55) return 'Neutre / Équilibré'
+  if (score < 75) return 'Dynamique'
+  return 'Offensif'
 }
 
 function generateAnswers(profile, riskScore, purpose) {
   const answers = {}
+  const isDefensif = profile === 'Défensif'
+  const isConservateur = profile === 'Conservateur'
+  const isNeutre = profile === 'Neutre / Équilibré'
+  const isDynamique = profile === 'Dynamique'
+  const isOffensif = profile === 'Offensif'
+  const isLowRisk = isDefensif || isConservateur
+  const isHighRisk = isDynamique || isOffensif
 
   // Q1 Objectif
-  if (profile === 'Conservateur') answers[1] = 'a'
-  else if (profile === 'Dynamique / Risqué') answers[1] = 'c'
+  if (isLowRisk) answers[1] = 'a'
+  else if (isHighRisk) answers[1] = 'c'
   else answers[1] = 'b'
 
   // Q2 Horizon
   if (purpose === 'pension') answers[2] = 'c'
-  else if (profile === 'Conservateur') answers[2] = 'a'
+  else if (isLowRisk) answers[2] = 'a'
+  else if (isHighRisk) answers[2] = 'c'
   else answers[2] = 'b'
 
-  // Q3 Part patrimoine
-  if (profile === 'Conservateur') answers[3] = 'a'
-  else if (profile === 'Dynamique / Risqué') answers[3] = 'c'
-  else answers[3] = 'b'
+  // Q3 Part patrimoine — immobilier toujours < 10%
+  answers[3] = 'a'
 
   // Q4 Réaction baisse
-  if (profile === 'Conservateur') answers[4] = 'a'
-  else if (profile === 'Dynamique / Risqué') answers[4] = 'c'
+  if (isLowRisk) answers[4] = 'a'
+  else if (isHighRisk) answers[4] = 'c'
   else answers[4] = 'b'
 
   // Q5 Expérience
-  answers[5] = 'a'
+  if (isOffensif) answers[5] = 'c'
+  else if (isDynamique) answers[5] = 'b'
+  else answers[5] = 'a'
 
   // Q6 Niveau de risque
-  if (profile === 'Conservateur') answers[6] = 'a'
-  else if (profile === 'Dynamique / Risqué') answers[6] = 'c'
+  if (isLowRisk) answers[6] = 'a'
+  else if (isHighRisk) answers[6] = 'c'
   else answers[6] = 'b'
 
   // Q7 Source revenus
   answers[7] = 'b'
 
   // Q8 Situation financière
-  answers[8] = 'b'
+  if (isOffensif) answers[8] = 'c'
+  else answers[8] = 'b'
 
   // Q9 Liquidité court terme
   if (purpose === 'pension') answers[9] = 'c'
-  else if (profile === 'Conservateur') answers[9] = 'a'
+  else if (isLowRisk) answers[9] = 'a'
+  else if (isHighRisk) answers[9] = 'c'
   else answers[9] = 'b'
 
   // Q10 Réaction fluctuations
-  if (profile === 'Conservateur') answers[10] = 'a'
-  else if (profile === 'Dynamique / Risqué') answers[10] = 'c'
+  if (isLowRisk) answers[10] = 'a'
+  else if (isHighRisk) answers[10] = 'c'
   else answers[10] = 'b'
 
   // Q11 Connaissance
-  answers[11] = 'a'
+  if (isOffensif) answers[11] = 'c'
+  else if (isDynamique) answers[11] = 'b'
+  else answers[11] = 'a'
 
   // Q12 Objectif rendement
-  if (profile === 'Conservateur') answers[12] = 'a'
-  else if (profile === 'Dynamique / Risqué') answers[12] = 'c'
+  if (isLowRisk) answers[12] = 'a'
+  else if (isHighRisk) answers[12] = 'c'
   else answers[12] = 'b'
 
   // Q13 Tolérance perte
-  if (profile === 'Conservateur') answers[13] = 'a'
-  else if (profile === 'Dynamique / Risqué') answers[13] = 'c'
+  if (isDefensif) answers[13] = 'a'
+  else if (isConservateur) answers[13] = 'a'
+  else if (isOffensif) answers[13] = 'c'
+  else if (isDynamique) answers[13] = 'c'
   else answers[13] = 'b'
 
   // Q14 Diversification
-  answers[14] = 'a'
+  if (isHighRisk) answers[14] = 'c'
+  else if (isNeutre) answers[14] = 'b'
+  else answers[14] = 'a'
 
-  // Ajuster pour cohérence score/profil
+  // Ajuster pour cohérence score/profil (5 profils FSMA)
   let score = 0
   for (const v of Object.values(answers)) score += SCORING[v]
 
   const profileRanges = {
-    'Conservateur': [14, 23],
-    'Équilibré / Modéré': [24, 33],
-    'Dynamique / Risqué': [34, 42],
+    'Défensif': [14, 19],
+    'Conservateur': [20, 25],
+    'Neutre / Équilibré': [26, 31],
+    'Dynamique': [32, 37],
+    'Offensif': [38, 42],
   }
   const [lo, hi] = profileRanges[profile]
-  const hypotheticals = [5, 8, 11, 14]
+  const hypotheticals = [5, 7, 8, 11, 14]
   let attempts = 0
   while (score < lo && attempts < 10) {
     for (const q of hypotheticals) {
@@ -199,9 +219,11 @@ function calcScore(answers) {
 }
 
 function scoreToProfile(score) {
-  if (score <= 23) return 'Conservateur'
-  if (score <= 33) return 'Équilibré / Modéré'
-  return 'Dynamique / Risqué'
+  if (score <= 19) return 'Défensif'
+  if (score <= 25) return 'Conservateur'
+  if (score <= 31) return 'Neutre / Équilibré'
+  if (score <= 37) return 'Dynamique'
+  return 'Offensif'
 }
 
 // ═══════════════════════════════════════════════════════════════════════
