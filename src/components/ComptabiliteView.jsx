@@ -20,6 +20,10 @@ const SHAREPOINT_FACTURES = {
   PRIVE:    'https://dynassur.sharepoint.com/sites/ADMINISTRATION/Documents%20partages/COMPTA/FACTURES/_PRIVE',
 }
 
+// Sociétés dont les factures d'achat sont intégralement rangées en _<SOC>/ACHATS/<année>.
+// PRIVE et HEXAGROUP en sont exclus (pas de dossier ACHATS complet) : pour eux on ouvre la racine.
+const SOCIETES_ACHATS = ['DYNASSUR', 'DTX', 'LODE']
+
 // ── VUE CONSOLIDÉE GROUPE ──
 function VueConsolidee({ comptes }) {
   const COLORS = { DYNASSUR:'#0080BD', DTX:'#94a3b8', LODE:'#ea580c', HEXAGROUP:'#dc2626', PRIVE:'#0d9488' }
@@ -374,7 +378,12 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   // Cliquer la croix rouge : ouvrir le dossier SharePoint pour trouver/copier la facture
   function ouvrirDossierFactures(tx) {
     const code = tx.comptes_bancaires?.societes?.code || societeCodes[0]
-    const url = SHAREPOINT_FACTURES[code] || SHAREPOINT_FACTURES.DYNASSUR
+    let url = SHAREPOINT_FACTURES[code] || SHAREPOINT_FACTURES.DYNASSUR
+    // Sociétés rangées en ACHATS/<année> : ouvrir directement le dossier de l'année du mouvement
+    if (SOCIETES_ACHATS.includes(code)) {
+      const annee = String(tx._date || '').slice(0, 4)
+      url += /^\d{4}$/.test(annee) ? `/ACHATS/${annee}` : '/ACHATS'
+    }
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
