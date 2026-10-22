@@ -21,6 +21,7 @@ const ToolsHome           = lazy(() => import('./pages/tools/ToolsHome'))
 const ToolBce             = lazy(() => import('./pages/tools/ToolBce'))
 const ToolQuestionnaire   = lazy(() => import('./pages/tools/ToolQuestionnaire'))
 const ToolDevoirInfo      = lazy(() => import('./pages/tools/ToolDevoirInfo'))
+const ToolsSuccession     = lazy(() => import('./pages/tools/ToolsSuccession'))
 const DynassurTaches      = lazy(() => import('./pages/dynassur/DynassurTaches'))
 const DtxTaches           = lazy(() => import('./pages/dtx/DtxTaches'))
 const LodeTaches          = lazy(() => import('./pages/lode/LodeTaches'))
@@ -72,6 +73,7 @@ const DtxNotesFrais       = lazy(() => import('./pages/dtx/DtxNotesFrais'))
 const LodeNotesFrais      = lazy(() => import('./pages/lode/LodeNotesFrais'))
 const HexagroupNotesFrais = lazy(() => import('./pages/hexagroup/HexagroupNotesFrais'))
 const PriveNotesFrais     = lazy(() => import('./pages/prive/PriveNotesFrais'))
+const PriveSuccession     = lazy(() => import('./pages/prive/PriveSuccession'))
 const GroupeNotesFrais    = lazy(() => import('./pages/groupe/GroupeNotesFrais'))
 
 function ProtectedRoute({ children, requireAdmin = false, need = null }) {
@@ -190,6 +192,7 @@ export default function App() {
           <Route path="/prive"               element={<P need="prive_dashboard"><DashboardPrive /></P>} />
           <Route path="/prive/banque"        element={<A><PriveBanque /></A>} />
           <Route path="/prive/comptabilite"  element={<P need="prive_comptabilite"><PriveComptabilite /></P>} />
+          <Route path="/prive/succession"   element={<P need="prive_succession"><PriveSuccession /></P>} />
 
           {/* Admin */}
           <Route path="/tickets" element={<P><Tickets /></P>} />
@@ -197,6 +200,7 @@ export default function App() {
           <Route path="/tools/bce" element={<P need="acc_tools"><ToolBce /></P>} />
           <Route path="/tools/questionnaire" element={<P need="acc_tools"><ToolQuestionnaire /></P>} />
           <Route path="/tools/devoir-information" element={<P need="acc_tools"><ToolDevoirInfo /></P>} />
+          <Route path="/tools/succession" element={<P need="prive_succession"><ToolsSuccession /></P>} />
           <Route path="/admin/sync" element={<A><SyncCenter /></A>} />
           <Route path="/admin/rdv-categories" element={<A><RdvCategories /></A>} />
           <Route path="/admin/liens-casses" element={<A><LiensCasses /></A>} />
