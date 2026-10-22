@@ -30,13 +30,15 @@ function Kpi({ label, value, c, sub }) {
   )
 }
 
-function ApercuFacture({ fid, nom }) {
+const CAN_HOVER = typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia('(hover: hover)').matches
+
+function ApercuFacture({ fid, nom, pin, onClose }) {
   const [etat, setEtat] = useState('load')
   useEffect(() => { setEtat('load') }, [fid])
   const src = `https://n8n.srv1082740.hstgr.cloud/webhook/apercu-facture?fid=${encodeURIComponent(fid)}`
   return (
-    <div style={{ position: 'fixed', top: '50%', right: 24, transform: 'translateY(-50%)', zIndex: 2100, width: 520, maxWidth: '48vw', maxHeight: '88vh', background: '#fff', borderRadius: 14, boxShadow: '0 20px 60px rgba(0,0,0,0.35)', border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', pointerEvents: 'none' }}>
-      <div style={{ padding: '10px 14px', background: '#0f172a', color: '#fff', fontSize: 12, fontWeight: 600, fontFamily: FONT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>\U0001F4C4 {nom}</div>
+    <div style={{ position: 'fixed', top: '50%', right: 24, transform: 'translateY(-50%)', zIndex: 2100, width: 520, maxWidth: '48vw', maxHeight: '88vh', background: '#fff', borderRadius: 14, boxShadow: '0 20px 60px rgba(0,0,0,0.35)', border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', pointerEvents: pin ? 'auto' : 'none' }}>
+      <div style={{ padding: '10px 14px', background: '#0f172a', color: '#fff', fontSize: 12, fontWeight: 600, fontFamily: FONT, display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>📄 {nom}</span>{pin && <button onClick={onClose} style={{ border: 'none', background: 'rgba(255,255,255,0.15)', color: '#fff', borderRadius: 6, padding: '2px 9px', cursor: 'pointer', fontSize: 14, lineHeight: 1.3 }}>✕</button>}</div>
       <div style={{ overflowY: 'auto', background: '#f8fafc' }}>
         <img src={src} alt="Apercu facture" onLoad={() => setEtat('ok')} onError={() => setEtat('err')} style={{ width: '100%', height: 'auto', display: etat === 'ok' ? 'block' : 'none' }} />
         {etat === 'load' && <div style={{ padding: '34px 20px', textAlign: 'center', color: '#94a3b8', fontSize: 13, fontFamily: FONT }}>Chargement de l'aperçu…</div>}
@@ -282,7 +284,7 @@ export default function LodeRentabilite() {
                     {achatsListe.slice(0, 80).map(a => (
                       <tr key={a.id} style={a.lode_devis_id ? { background: '#f0fdf4' } : null}>
                         <td style={{ ...td, textAlign: 'center', width: 44 }}>
-                          {a.fichier_id ? <button title="Aperçu facture" onClick={() => setApercu(c => c && c.fid === a.fichier_id ? null : { fid: a.fichier_id, nom: (a.nom || '').replace(/\.pdf$/i, '') })} onMouseEnter={() => setApercu({ fid: a.fichier_id, nom: (a.nom || '').replace(/\.pdf$/i, '') })} onMouseLeave={() => setApercu(null)} style={{ border: '1px solid #e2e8f0', background: '#fff', borderRadius: 8, padding: '4px 8px', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>\U0001F4C4</button> : <span style={{ color: '#cbd5e1' }}>—</span>}
+                          {a.fichier_id ? <button title="Aperçu facture" onClick={() => setApercu(c => c && c.pin && c.fid === a.fichier_id ? null : { fid: a.fichier_id, nom: (a.nom || '').replace(/\.pdf$/i, ''), pin: true })} onMouseEnter={() => { if (CAN_HOVER) setApercu(c => c && c.pin ? c : { fid: a.fichier_id, nom: (a.nom || '').replace(/\.pdf$/i, ''), pin: false }) }} onMouseLeave={() => setApercu(c => c && c.pin ? c : null)} style={{ border: '1px solid #e2e8f0', background: '#fff', borderRadius: 8, padding: '4px 8px', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>📄</button> : <span style={{ color: '#cbd5e1' }}>—</span>}
                         </td>
                         <td style={td}>{(a.date_facture || '').slice(0, 10)}</td>
                         <td style={td}>{a.nom || '—'}</td>
@@ -306,7 +308,7 @@ export default function LodeRentabilite() {
                 </table>
               </div>
             </div>
-            {apercu && <ApercuFacture fid={apercu.fid} nom={apercu.nom} />}
+            {apercu && <ApercuFacture fid={apercu.fid} nom={apercu.nom} pin={apercu.pin} onClose={() => setApercu(null)} />}
           </> : <>
             {/* RENTAL */}
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 4 }}>
