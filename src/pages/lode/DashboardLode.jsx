@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
 import { useAuth } from '../../lib/auth'
@@ -13,8 +14,9 @@ const fmtDate = v => v ? new Date(v).toLocaleDateString('fr-BE', { day: '2-digit
 const C = LODE.couleur
 const C_DARK = '#7c2d12'
 
-function KpiCard({ label, value, icon, color, sub }) {
+function KpiCard({ label, value, icon, color, sub, onClick }) {
   return (
+    <div onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
     <DataCard style={{ padding: 20, borderTop: `3px solid ${color}`, borderRadius: 14 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
@@ -27,12 +29,15 @@ function KpiCard({ label, value, icon, color, sub }) {
         </div>
       </div>
     </DataCard>
+    </div>
   )
 }
 
 export default function DashboardLode() {
   const { perms, user, isAdmin } = useAuth()
   const [taches, setTaches] = useState([])
+  const [tickets, setTickets] = useState([])
+  const navigate = useNavigate()
   const [txStats, setTxStats] = useState({ entrees: 0, sorties: 0 })
   const [loading, setLoading] = useState(true)
   const mob = useMobile()
@@ -46,13 +51,15 @@ export default function DashboardLode() {
     async function load() {
       const { data: socData } = await supabase.from('societes').select('id').eq('code', 'LODE').single()
       const socId = socData?.id
-      const [{ data: tsk }, { data: txs }] = await Promise.all([
+      const [{ data: tsk }, { data: txs }, { data: tck }] = await Promise.all([
         supabase.from('taches').select('id,titre,gestionnaire,echeance,statut')
-          .in('statut', ['todo', 'en_cours', 'en_attente', 'retard']).eq('entite', 'lode').order('echeance', { ascending: true }).limit(10),
+          .in('statut', ['todo', 'en_cours', 'en_attente', 'retard']).eq('entite', 'lode').or('is_ticket.is.null,is_ticket.eq.false').order('echeance', { ascending: true }).limit(10),
         socId ? supabase.from('transactions').select('montant').eq('societe_id', socId)
           .gte('date_valeur', annee + '-' + mois + '-01').lte('date_valeur', annee + '-' + mois + '-31') : { data: [] },
+        supabase.from('taches').select('id,titre,gestionnaire,ticket_statut,priorite,derniere_activite').eq('is_ticket', true).neq('statut', 'terminee').eq('entite', 'lode').order('derniere_activite', { ascending: false }).limit(50),
       ])
       setTaches(tsk || [])
+      setTickets(tck || [])
       const entrees = (txs || []).filter(t => t.montant > 0).reduce((s, t) => s + t.montant, 0)
       const sorties = (txs || []).filter(t => t.montant < 0).reduce((s, t) => s + Math.abs(t.montant), 0)
       setTxStats({ entrees, sorties })
@@ -72,6 +79,7 @@ export default function DashboardLode() {
           subtitle="LODE SRL — aperçu de l'activité"
           stats={[
             { label: 'Tâches en cours', value: loading ? '…' : taches.length },
+            { label: 'Tickets ouverts', value: loading ? '…' : tickets.length },
             { label: 'Entrées ce mois', value: loading ? '…' : fmt(txStats.entrees) },
             { label: 'Sorties ce mois', value: loading ? '…' : fmt(txStats.sorties) },
           ]}
@@ -82,7 +90,8 @@ export default function DashboardLode() {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14, marginBottom: 22 }}>
-          <KpiCard label="Tâches en cours" value={loading ? '…' : taches.length} icon="ti-checkbox" color="#f59e0b" sub={nbRetard + ' en retard'} />
+          <KpiCard label="Tâches en cours" value={loading ? '…' : taches.length} icon="ti-checkbox" color="#f59e0b" sub={nbRetard + ' en retard'} onClick={() => navigate('/lode/taches')} />
+          <KpiCard label="Tickets ouverts" value={loading ? '…' : tickets.length} icon="ti-ticket" color="#0ea5e9" sub="cliquer pour voir" onClick={() => navigate('/tickets')} />
           <KpiCard label="Entrées ce mois" value={loading ? '…' : fmt(txStats.entrees)} icon="ti-trending-up" color="#16a34a" />
           <KpiCard label="Sorties ce mois" value={loading ? '…' : fmt(txStats.sorties)} icon="ti-trending-down" color="#dc2626" />
         </div>
@@ -105,7 +114,7 @@ export default function DashboardLode() {
                   {taches.map((t, i) => {
                     const retard = t.echeance && new Date(t.echeance) < now
                     return (
-                      <div key={t.id} style={{
+                      <div key={t.id} onClick={() => navigate('/lode/taches?tache=' + t.id)} style={{ cursor: 'pointer',
                         display: 'grid', gridTemplateColumns: '1fr auto auto', alignItems: 'center', gap: 8,
                         padding: '10px 18px', borderBottom: i < taches.length - 1 ? '1px solid #f8fafc' : 'none',
                         background: retard ? '#fff5f5' : '#fff',
@@ -119,6 +128,30 @@ export default function DashboardLode() {
                       </div>
                     )
                   })}
+                </div>
+          }
+        </DataCard>
+        <div style={{ height: 18 }} />
+        <DataCard>
+          <div style={{ padding: '14px 18px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <i className="ti ti-ticket" style={{ fontSize: 15, color: '#0ea5e9' }} />
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>Tickets ouverts</span>
+            <span onClick={() => navigate('/tickets')} style={{ marginLeft: 'auto', fontSize: 12, color: '#0ea5e9', cursor: 'pointer', fontWeight: 600 }}>Tous les tickets →</span>
+          </div>
+          {loading
+            ? <div style={{ padding: 30, textAlign: 'center', color: '#94a3b8' }}>Chargement…</div>
+            : tickets.length === 0
+              ? <div style={{ padding: 30, textAlign: 'center', color: '#16a34a', fontSize: 13 }}>Aucun ticket ouvert</div>
+              : <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+                  {tickets.map((t, i) => (
+                    <div key={t.id} onClick={() => navigate('/tickets?ticket=' + t.id)} style={{ cursor: 'pointer', display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: 8, padding: '10px 18px', borderBottom: i < tickets.length - 1 ? '1px solid #f8fafc' : 'none' }}>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: '#1e293b' }}>#{t.id} — {t.titre || '—'}</div>
+                        <div style={{ fontSize: 11, color: '#94a3b8' }}>{t.gestionnaire || 'non assigné'} · {fmtDate(t.derniere_activite)}</div>
+                      </div>
+                      <StatusBadge tone="blue" label={t.ticket_statut || 'ouvert'} />
+                    </div>
+                  ))}
                 </div>
           }
         </DataCard>
