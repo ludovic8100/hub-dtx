@@ -22,6 +22,7 @@ const STATUTS = [
   { k: 'resolu', label: 'Résolu', bg: '#E8F5E9', fg: '#2E7D32' },
   { k: 'cloture', label: 'Clôturé', bg: '#ECEFF1', fg: '#546E7A' },
 ]
+const STATUT_BAR = { nouveau: '#1565C0', en_cours: '#E65100', en_attente: '#E74C3C', resolu: '#2E7D32', cloture: '#546E7A' }
 const PRIOS = [
   { k: 'basse', label: 'Basse', col: '#95A5A6' },
   { k: 'moyenne', label: 'Normale', col: '#29ABE2' },
@@ -179,6 +180,7 @@ export default function TicketsView() {
   const [createPrefill, setCreatePrefill] = useState(null)
   const [sel, setSel] = useState(null)             // ticket ouvert (détail)
   const [mobile, setMobile] = useState(isMobile())
+  const [unread, setUnread] = useState({})
 
   useEffect(() => { const h = () => setMobile(isMobile()); window.addEventListener('resize', h); return () => window.removeEventListener('resize', h) }, [])
 
@@ -208,6 +210,24 @@ export default function TicketsView() {
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
+  // Non-lus pour moi (messages d'un autre que moi, pas encore dans lu_par)
+  useEffect(() => {
+    if (!myCode || !tickets.length) { setUnread({}); return }
+    let on = true
+    ;(async () => {
+      const ids = tickets.map(t => t.id); const map = {}
+      for (let i = 0; i < ids.length; i += 300) {
+        const { data } = await supabase.from('tickets_messages').select('tache_id,auteur_code,lu_par').in('tache_id', ids.slice(i, i + 300))
+        for (const m of (data || [])) {
+          const au = (m.auteur_code || '').toUpperCase()
+          const lus = (Array.isArray(m.lu_par) ? m.lu_par : []).map(x => (x || '').toUpperCase())
+          if (au && au !== myCode && !lus.includes(myCode)) map[m.tache_id] = (map[m.tache_id] || 0) + 1
+        }
+      }
+      if (on) setUnread(map)
+    })()
+    return () => { on = false }
+  }, [tickets, myCode])
   useEffect(() => { supabase.from('ticket_categories').select('label,type').eq('actif', true).order('ordre').then(({ data }) => { if (data && data.length) { setCats(data.map(r => r.label)); setCatType(Object.fromEntries(data.map(r => [r.label, r.type || 'gestion']))) } }) }, [])
 
   // Ouverture directe d'un ticket via le lien e-mail (?ticket=ID)
@@ -379,8 +399,8 @@ export default function TicketsView() {
                 const s = st(t.ticket_statut), p = pr(t.priorite)
                 return (
                   <tr key={t.id} onClick={() => setSel(t)} style={{ borderTop: `1px solid #EEF1F6`, cursor: 'pointer', opacity: t.ticket_statut === 'cloture' ? 0.6 : 1 }}>
-                    <td style={{ padding: '11px 14px', fontFamily: 'monospace', color: C.textL, fontWeight: 700 }}>#{t.id}</td>
-                    <td style={{ padding: '11px 14px', fontWeight: 600, color: NAVY }}>{t.priorite === 'urgente' && <span style={URGENT_STYLE}>URGENT</span>}<span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: p.col, marginRight: 8 }} />{t.titre}</td>
+                    <td style={{ padding: '11px 14px', fontFamily: 'monospace', color: C.textL, fontWeight: 700, whiteSpace: 'nowrap' }}>{unread[t.id] ? <span title={`${unread[t.id]} message(s) non lu(s)`} style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: C.danger, marginRight: 6, verticalAlign: 'middle' }} /> : null}#{t.id}</td>
+                    <td style={{ padding: '11px 14px', fontWeight: unread[t.id] ? 800 : 600, color: NAVY }}>{t.priorite === 'urgente' && <span style={URGENT_STYLE}>URGENT</span>}<span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: p.col, marginRight: 8 }} />{t.titre}</td>
                     <td style={{ padding: '11px 14px', fontSize: 12, color: C.textM }}>{socLabel(t.entite)}</td>
                     <td style={{ padding: '11px 14px', color: C.textL, fontSize: 12 }}>{t.ticket_categorie || '—'}</td>
                     <td style={{ padding: '11px 14px' }}><span style={{ fontSize: 11, fontWeight: 700, color: p.col }}>{p.label}</span></td>
@@ -598,6 +618,7 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
   const [cli, setCli] = useState(null)
   const [auClient, setAuClient] = useState(false)
   const [filFiltre, setFilFiltre] = useState('tout')
+  const [showCheck, setShowCheck] = useState(Array.isArray(t.checklist) && t.checklist.length > 0)
   useEffect(() => {
     let on = true
     ;(async () => {
@@ -744,7 +765,6 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
       <div style={{ padding: '16px 20px', borderBottom: `1px solid ${C.border}` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
           <span style={{ fontFamily: 'monospace', fontWeight: 700, color: C.textL }}>#{t.id}</span>
-          <span style={S.badge(s.bg, s.fg)}>{s.label}</span>
           <span style={{ width: 9, height: 9, borderRadius: '50%', background: p.col }} /><span style={{ fontSize: 11, color: p.col, fontWeight: 700 }}>{p.label}</span>
           <button onClick={onClose} style={{ marginLeft: 'auto', border: 'none', background: C.bg, borderRadius: 8, padding: '6px 10px', cursor: 'pointer' }}>✕</button>
         </div>
@@ -752,49 +772,58 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
         <div style={{ fontSize: 12, color: C.textL, marginTop: 4 }}>{t.ticket_categorie} · ouvert par {t.cree_par} · {fmtDT(t.date_creation || t.created_at)}</div>
       </div>
 
-      {/* Chips infos + actions */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '12px 20px', background: '#FAFBFD', borderBottom: `1px solid #EEF1F6`, alignItems: 'center' }}>
-        {canManage && (
-          <select style={{ ...S.input, width: 'auto', padding: '5px 8px', fontSize: 12 }} value={t.gestionnaire || ''} onChange={e => assigner(e.target.value)}>
-            <option value="">— À attribuer —</option>
-            {collabs.map(c => <option key={c.code} value={c.code}>{c.nom_complet}</option>)}
-          </select>
-        )}
-        <div style={{ fontSize: 12, marginLeft: 4 }}>Société : <b style={{ color: t.entite ? MID : C.danger }}>{t.entite ? socLabel(t.entite) : '⚠ aucune'}</b></div>
-        {canManage && (
-          <select style={{ ...S.input, width: 'auto', padding: '5px 8px', fontSize: 12 }} value={t.entite || ''} onChange={e => changerSociete(e.target.value)}>
-            <option value="">— Société —</option>
-            {SOCIETES.map(s => <option key={s.k} value={s.k}>{s.label}</option>)}
-          </select>
-        )}
-        {canManage && t.ticket_statut !== 'cloture' && (
-          <select style={{ ...S.input, width: 'auto', padding: '5px 8px', fontSize: 12 }} value={t.ticket_statut} onChange={e => changeStatut(e.target.value)}>
-            {STATUTS.filter(x => x.k !== 'cloture').map(x => <option key={x.k} value={x.k}>{x.label}</option>)}
-          </select>
-        )}
+      {/* Statut — pleine largeur, coloré */}
+      {t.ticket_statut === 'cloture' ? (
+        <div style={{ padding: '10px 20px', background: '#ECEFF1', borderBottom: `1px solid #EEF1F6`, textAlign: 'center', fontWeight: 700, color: '#546E7A', fontSize: 13 }}>Clôturé</div>
+      ) : (
+        <div style={{ display: 'flex', gap: 6, padding: '10px 20px', background: '#fff', borderBottom: `1px solid #EEF1F6` }}>
+          {STATUTS.filter(x => x.k !== 'cloture').map(x => {
+            const active = t.ticket_statut === x.k, col = STATUT_BAR[x.k]
+            return (
+              <button key={x.k} onClick={() => { if (canManage && !active) changeStatut(x.k) }} disabled={!canManage} style={{ flex: 1, padding: '9px 6px', borderRadius: 8, border: `1.5px solid ${col}`, background: active ? col : '#fff', color: active ? '#fff' : col, fontWeight: 700, fontSize: 12, cursor: canManage ? 'pointer' : 'default', opacity: (!active && !canManage) ? 0.4 : 1 }}>{x.label}</button>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Assigné + Société */}
+      <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', padding: '12px 20px', background: '#fff', borderBottom: `1px solid #EEF1F6`, alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <span style={{ fontSize: 11, textTransform: 'uppercase', color: C.textL, fontWeight: 700 }}>Assigné</span>
+          {canManage ? (
+            <select style={{ ...S.input, width: 'auto', padding: '5px 8px', fontSize: 12 }} value={t.gestionnaire || ''} onChange={e => assigner(e.target.value)}>
+              <option value="">— À attribuer —</option>
+              {collabs.map(c => <option key={c.code} value={c.code}>{c.nom_complet}</option>)}
+            </select>
+          ) : <b style={{ fontSize: 13, color: t.gestionnaire ? NAVY : C.danger }}>{t.gestionnaire ? codeLabel(t.gestionnaire) : '⚠ personne'}</b>}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <span style={{ fontSize: 11, textTransform: 'uppercase', color: C.textL, fontWeight: 700 }}>Société</span>
+          {canManage ? (
+            <select style={{ ...S.input, width: 'auto', padding: '5px 8px', fontSize: 12 }} value={t.entite || ''} onChange={e => changerSociete(e.target.value)}>
+              <option value="">— Société —</option>
+              {SOCIETES.map(so => <option key={so.k} value={so.k}>{so.label}</option>)}
+            </select>
+          ) : <b style={{ fontSize: 13, color: t.entite ? MID : C.danger }}>{t.entite ? socLabel(t.entite) : '⚠ aucune'}</b>}
+        </div>
       </div>
 
-      {/* Intervenants : assigné + participants, bien visibles */}
-      <div style={{ padding: '12px 20px', background: '#fff', borderBottom: `1px solid #EEF1F6` }}>
-        <div style={{ fontSize: 11, textTransform: 'uppercase', color: C.textL, fontWeight: 700, marginBottom: 8 }}>👥 Intervenants</div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: t.gestionnaire ? '#E8F5E9' : '#FDECEA', color: t.gestionnaire ? '#1B5E20' : C.danger, borderRadius: 14, padding: '4px 11px', fontSize: 12, fontWeight: 700 }}>
-            <span style={{ fontSize: 9, opacity: .75 }}>ASSIGNÉ</span>{t.gestionnaire ? codeLabel(t.gestionnaire) : '⚠ personne'}
+      {/* Participants */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '12px 20px', background: '#fff', borderBottom: `1px solid #EEF1F6`, alignItems: 'center' }}>
+        <span style={{ fontSize: 11, textTransform: 'uppercase', color: C.textL, fontWeight: 700 }}>Participants</span>
+        {parts.map(pc => (
+          <span key={pc} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#E3F2FD', color: '#1565C0', borderRadius: 14, padding: '4px 11px', fontSize: 12, fontWeight: 600 }}>
+            {codeLabel(pc)}
+            {t.ticket_statut !== 'cloture' && <span onClick={() => removeParticipant(pc)} title="Retirer du suivi" style={{ cursor: 'pointer', color: '#1565C0', fontWeight: 700 }}>×</span>}
           </span>
-          {parts.map(pc => (
-            <span key={pc} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#E3F2FD', color: '#1565C0', borderRadius: 14, padding: '4px 11px', fontSize: 12, fontWeight: 600 }}>
-              <span style={{ fontSize: 9, opacity: .75 }}>SUIVI</span>{codeLabel(pc)}
-              {t.ticket_statut !== 'cloture' && <span onClick={() => removeParticipant(pc)} title="Retirer du suivi" style={{ cursor: 'pointer', color: '#1565C0', fontWeight: 700 }}>×</span>}
-            </span>
-          ))}
-          {parts.length === 0 && <span style={{ fontSize: 12, color: C.textL }}>aucun participant en suivi</span>}
-          {t.ticket_statut !== 'cloture' && (
-            <select style={{ ...S.input, width: 'auto', padding: '4px 8px', fontSize: 12 }} value="" onChange={e => { addParticipant(e.target.value); e.target.value = '' }}>
-              <option value="">+ Ajouter un participant…</option>
-              {collabs.filter(c => !parts.includes((c.code || '').toUpperCase()) && (c.code || '').toUpperCase() !== (t.gestionnaire || '').toUpperCase()).map(c => <option key={c.code} value={c.code}>{c.nom_complet}</option>)}
-            </select>
-          )}
-        </div>
+        ))}
+        {parts.length === 0 && <span style={{ fontSize: 12, color: C.textL }}>aucun</span>}
+        {t.ticket_statut !== 'cloture' && (
+          <select style={{ ...S.input, width: 'auto', padding: '4px 8px', fontSize: 12 }} value="" onChange={e => { addParticipant(e.target.value); e.target.value = '' }}>
+            <option value="">+ Ajouter…</option>
+            {collabs.filter(c => !parts.includes((c.code || '').toUpperCase()) && (c.code || '').toUpperCase() !== (t.gestionnaire || '').toUpperCase()).map(c => <option key={c.code} value={c.code}>{c.nom_complet}</option>)}
+          </select>
+        )}
       </div>
 
       {/* Description initiale */}
@@ -802,9 +831,12 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
 
       {/* Checklist */}
       <div style={{ padding: '12px 20px', borderBottom: `1px solid #EEF1F6`, background: '#fff' }}>
-        <div style={{ fontSize: 11, textTransform: 'uppercase', color: C.textL, fontWeight: 700, marginBottom: 8 }}>
-          Checklist {checklist.length > 0 && <span style={{ color: C.textM }}>· {checklist.filter(c => c.fait).length}/{checklist.length}</span>}
+        <div onClick={() => setShowCheck(v => !v)} style={{ fontSize: 11, textTransform: 'uppercase', color: C.textL, fontWeight: 700, marginBottom: showCheck ? 8 : 0, cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span>{showCheck ? '▾' : '▸'}</span>
+          <span>Checklist <span style={{ textTransform: 'none', fontWeight: 400 }}>(sous-étapes internes — optionnel)</span></span>
+          {checklist.length > 0 && <span style={{ color: C.textM }}>· {checklist.filter(c => c.fait).length}/{checklist.length} fait</span>}
         </div>
+        {showCheck && (<>
         {checklist.length > 0 && (
           <div style={{ height: 4, background: '#EEF1F6', borderRadius: 4, marginBottom: 12, overflow: 'hidden' }}>
             <div style={{ height: '100%', width: `${Math.round(checklist.filter(c => c.fait).length / checklist.length * 100)}%`, background: C.ok, transition: 'width .2s' }} />
@@ -842,6 +874,7 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
             <button onClick={addItem} style={{ ...S.btn('ghost'), padding: '7px 14px' }}>+ Ajouter</button>
           </div>
         )}
+        </>)}
       </div>
 
       {/* Barre historique */}
