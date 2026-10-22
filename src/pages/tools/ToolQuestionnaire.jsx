@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase'
 import jsPDF from 'jspdf'
 import * as pdfjsLib from 'pdfjs-dist'
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.js?url'
+import Tesseract from 'tesseract.js'
 
 // Configure pdf.js worker via Vite ?url import
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
@@ -241,7 +242,7 @@ function purposeFromType(typeProd) {
 // PDF TEXT EXTRACTION — extract funds, dates from proposition PDF
 // ═══════════════════════════════════════════════════════════════════════
 
-async function extractTextFromPDF(file) {
+async function extractTextFromPDF(file, onProgress) {
   const arrayBuffer = await file.arrayBuffer()
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
   let fullText = ''
@@ -251,7 +252,42 @@ async function extractTextFromPDF(file) {
     const pageText = content.items.map(item => item.str).join(' ')
     fullText += pageText + '\n'
   }
-  return fullText
+
+  // If pdfjs extracted meaningful text, return it
+  if (fullText.trim().length > 50) {
+    console.log('[PDF] Text extracted via pdfjs-dist:', fullText.length, 'chars')
+    return fullText
+  }
+
+  // Fallback: OCR via Tesseract.js (for PDFs with text rendered as vector paths)
+  console.log('[PDF] pdfjs-dist returned empty text — falling back to OCR...')
+  if (onProgress) onProgress('OCR en cours... (peut prendre 30-60 secondes)')
+
+  let ocrText = ''
+  const scale = 2.0 // 2x resolution for better OCR
+  for (let i = 1; i <= pdf.numPages; i++) {
+    if (onProgress) onProgress(`OCR page ${i}/${pdf.numPages}...`)
+    const page = await pdf.getPage(i)
+    const viewport = page.getViewport({ scale })
+    const canvas = document.createElement('canvas')
+    canvas.width = viewport.width
+    canvas.height = viewport.height
+    const ctx = canvas.getContext('2d')
+    await page.render({ canvasContext: ctx, viewport }).promise
+
+    const { data: { text } } = await Tesseract.recognize(canvas, 'fra', {
+      logger: m => {
+        if (m.status === 'recognizing text' && onProgress) {
+          onProgress(`OCR page ${i}/${pdf.numPages}... ${Math.round((m.progress || 0) * 100)}%`)
+        }
+      }
+    })
+    ocrText += text + '\n'
+    console.log(`[OCR] Page ${i}:`, text.substring(0, 200))
+  }
+
+  console.log('[PDF] OCR total text:', ocrText.length, 'chars')
+  return ocrText
 }
 
 /**
@@ -305,18 +341,19 @@ function parseFundsBaloise(text) {
   if (sections.length === 0) sections.push(text)
 
   for (const section of sections) {
-    // Match fund name + percentage pattern
-    const fundPattern = /([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\-'.()0-9%]+?)\s+(\d{1,3}[.,]\d{2})\s*%/g
+    // Match fund name + percentage pattern (handles OCR spacing)
+    const fundPattern = /([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\-'.()0-9&]+?)\s+(\d{1,3}[.,]\d{2})\s*%/g
     let match
     while ((match = fundPattern.exec(section)) !== null) {
       let name = match[1].trim()
       const pct = parseFloat(match[2].replace(',', '.'))
 
-      // Clean up Baloise concatenation artifacts
-      name = name.replace(/^\s*[-–]\s*/, '')
+      // Clean up Baloise concatenation artifacts and OCR noise
+      name = name.replace(/^\s*[-–—]\s*/, '')
+      name = name.replace(/\s+/g, ' ').trim()
 
-      // Skip headers
-      if (/^(Fonds|Total|Nom|Date|Prime|Montant|Strat|Participation)/i.test(name)) continue
+      // Skip headers and non-fund lines
+      if (/^(Fonds|Total|Nom|Date|Prime|Montant|Strat|Participation|Forme|Garantie|Constitution|Taxe)/i.test(name)) continue
       if (pct <= 0 || pct > 100) continue
       if (name.length < 3) continue
 
@@ -372,14 +409,19 @@ function extractDates(text) {
   if (agDebut) dateDebut = agDebut[1]
   if (agFin) dateFin = agFin[1]
 
-  // Baloise format
+  // Baloise format (also handles OCR variations)
   if (!dateDebut) {
-    const balDebut = text.match(/Date\s*(?:de\s*)?prise\s*d['']?\s*effet\s*[:.]?\s*(\d{2}[/.-]\d{2}[/.-]\d{4})/i)
+    const balDebut = text.match(/Date\s*(?:de\s*)?prise\s*d[''’]?\s*effet\s*[:.;]?\s*(\d{2}[/.-]\d{2}[/.-]\d{4})/i)
     if (balDebut) dateDebut = balDebut[1]
   }
   if (!dateFin) {
-    const balFin = text.match(/Date\s*(?:du?\s*)?terme\s*[:.]?\s*(\d{2}[/.-]\d{2}[/.-]\d{4})/i)
+    const balFin = text.match(/Date\s*(?:du?\s*)?terme\s*[:.;]?\s*(\d{2}[/.-]\d{2}[/.-]\d{4})/i)
     if (balFin) dateFin = balFin[1]
+  }
+  // Baloise "Echéance principale" format
+  if (!dateFin) {
+    const balEch = text.match(/[ÉéEe]ch[ée]ance\s*principale\s*[:.;]?\s*(\d{2}[/.-]\d{2}[/.-]\d{4})/i)
+    if (balEch) dateFin = balEch[1]
   }
 
   // Generic: "date d'effet" / "date d'échéance" / "échéance"
@@ -642,6 +684,7 @@ export default function ToolQuestionnaire() {
   // PDF extraction state
   const [pdfFile, setPdfFile] = useState(null)
   const [extracting, setExtracting] = useState(false)
+  const [extractionProgress, setExtractionProgress] = useState('')
   const [extractedText, setExtractedText] = useState('')
   const [extractionWarning, setExtractionWarning] = useState(null)
   const [pdfDates, setPdfDates] = useState({ dateDebut: null, dateFin: null })
@@ -755,7 +798,9 @@ export default function ToolQuestionnaire() {
     setExtractionWarning(null)
 
     try {
-      const text = await extractTextFromPDF(file)
+      setExtractionProgress('Extraction du texte...')
+      const text = await extractTextFromPDF(file, setExtractionProgress)
+      setExtractionProgress('')
       console.log('=== PDF RAW TEXT ===')
       console.log(text)
       setExtractedText(text)
@@ -1108,7 +1153,7 @@ export default function ToolQuestionnaire() {
               {extracting && (
                 <div style={{ fontSize: 13, color: '#1A3A6B', marginTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div style={{ width: 16, height: 16, border: '2px solid #1A3A6B', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                  Extraction en cours...
+                  {extractionProgress || 'Extraction en cours...'}
                   <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
                 </div>
               )}
