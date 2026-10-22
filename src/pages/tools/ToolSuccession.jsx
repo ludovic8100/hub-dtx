@@ -1947,10 +1947,10 @@ async function prefillFromClient(client) {
 
   // === PHASE 1: Direct queries on person's own dossier ===
   const [ownIncendieRows, familleRows, entrepriseRows, vieRows] = await Promise.all([
-    sql(\`SELECT DISTINCT o.description, o.type_risque FROM objets_risque o JOIN contrats c ON o.dossier=c.dossier AND o.police=c.police WHERE o.dossier='\${safeDossier}' AND o.domaine='Incendie risques simples' AND o.situation='En cours' AND o.type_risque='Bâtiment'\`),
+    sql(\`SELECT DISTINCT o.description, o.type_risque FROM objets_risque o JOIN contrats c ON o.dossier=c.dossier AND o.police=c.police WHERE o.dossier='\${safeDossier}' AND o.domaine='Incendie risques simples' AND o.situation IN ('En cours','Suspendu') AND o.type_risque='Bâtiment'\`),
     sql(\`SELECT DISTINCT p.membre_nom, c.dossier AS membre_dossier, c.date_naissance, c.cp FROM parentes p LEFT JOIN clients c ON UPPER(TRIM(p.membre_nom)) LIKE '%' || UPPER(TRIM(c.nom)) || '%' AND UPPER(TRIM(p.membre_nom)) LIKE '%' || UPPER(TRIM(c.prenom)) || '%' WHERE p.dossier_principal='\${safeDossier}' AND p.groupe_type='01-Famille' AND UPPER(TRIM(p.membre_nom)) NOT LIKE '%\${safeNom.toUpperCase()}%\${safePrenom.toUpperCase()}%' AND UPPER(TRIM(p.membre_nom)) NOT LIKE '%\${safePrenom.toUpperCase()}%\${safeNom.toUpperCase()}%'\`),
     sql(\`SELECT DISTINCT p.membre_nom FROM parentes p WHERE p.dossier_principal='\${safeDossier}' AND p.groupe_type='02-Entreprise' AND UPPER(TRIM(p.membre_nom)) NOT LIKE '%\${safeNom.toUpperCase()}%'\`),
-    sql(\`SELECT DISTINCT o.police, o.compagnie, o.garantie, o.description, c.type_production FROM objets_risque o JOIN contrats c ON o.dossier=c.dossier AND o.police=c.police WHERE o.dossier='\${safeDossier}' AND o.domaine='Vie et placements' AND o.situation='En cours'\`)
+    sql(\`SELECT DISTINCT o.police, o.compagnie, o.garantie, o.description, c.type_production FROM objets_risque o JOIN contrats c ON o.dossier=c.dossier AND o.police=c.police WHERE o.dossier='\${safeDossier}' AND o.domaine='Vie et placements' AND o.situation IN ('En cours','Suspendu')\`)
   ]);
 
   // === PHASE 2: RECURSIVE company chain discovery ===
@@ -2018,8 +2018,8 @@ async function prefillFromClient(client) {
   if (compDossierKeys.length) {
     const dossierList = compDossierKeys.map(d => \`'\${d.replace(/'/g,"''")}'\`).join(',');
     const [cInc, cVie] = await Promise.all([
-      sql(\`SELECT DISTINCT o.description, o.type_risque, o.dossier FROM objets_risque o JOIN contrats c ON o.dossier=c.dossier AND o.police=c.police WHERE o.dossier IN (\${dossierList}) AND o.domaine='Incendie risques simples' AND o.situation='En cours' AND o.type_risque='Bâtiment'\`),
-      sql(\`SELECT DISTINCT o.police, o.compagnie, o.garantie, o.description, c.type_production, o.dossier FROM objets_risque o JOIN contrats c ON o.dossier=c.dossier AND o.police=c.police WHERE o.dossier IN (\${dossierList}) AND o.domaine='Vie et placements' AND o.situation='En cours'\`)
+      sql(\`SELECT DISTINCT o.description, o.type_risque, o.dossier FROM objets_risque o JOIN contrats c ON o.dossier=c.dossier AND o.police=c.police WHERE o.dossier IN (\${dossierList}) AND o.domaine='Incendie risques simples' AND o.situation IN ('En cours','Suspendu') AND o.type_risque='Bâtiment'\`),
+      sql(\`SELECT DISTINCT o.police, o.compagnie, o.garantie, o.description, c.type_production, o.dossier FROM objets_risque o JOIN contrats c ON o.dossier=c.dossier AND o.police=c.police WHERE o.dossier IN (\${dossierList}) AND o.domaine='Vie et placements' AND o.situation IN ('En cours','Suspendu')\`)
     ]);
     companyIncendieRows = cInc;
     companyVieRows = cVie;
