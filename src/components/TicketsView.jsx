@@ -597,6 +597,7 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
   const [reply, setReply] = useState('')
   const [cli, setCli] = useState(null)
   const [auClient, setAuClient] = useState(false)
+  const [filFiltre, setFilFiltre] = useState('tout')
   useEffect(() => {
     let on = true
     ;(async () => {
@@ -753,7 +754,6 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
 
       {/* Chips infos + actions */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '12px 20px', background: '#FAFBFD', borderBottom: `1px solid #EEF1F6`, alignItems: 'center' }}>
-        <div style={{ fontSize: 12 }}>Assigné : <b>{t.gestionnaire ? codeLabel(t.gestionnaire) : '⚠ personne'}</b></div>
         {canManage && (
           <select style={{ ...S.input, width: 'auto', padding: '5px 8px', fontSize: 12 }} value={t.gestionnaire || ''} onChange={e => assigner(e.target.value)}>
             <option value="">— À attribuer —</option>
@@ -774,22 +774,27 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
         )}
       </div>
 
-      {/* Participants */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '10px 20px', background: '#FAFBFD', borderBottom: `1px solid #EEF1F6`, alignItems: 'center' }}>
-        <span style={{ fontSize: 12, color: C.textM, fontWeight: 600 }}>Participants :</span>
-        {parts.length === 0 && <span style={{ fontSize: 12, color: C.textL }}>aucun</span>}
-        {parts.map(pc => (
-          <span key={pc} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#E3F2FD', color: '#1565C0', borderRadius: 14, padding: '3px 10px', fontSize: 12, fontWeight: 600 }}>
-            {codeLabel(pc)}
-            {t.ticket_statut !== 'cloture' && <span onClick={() => removeParticipant(pc)} style={{ cursor: 'pointer', color: '#1565C0', fontWeight: 700 }}>×</span>}
+      {/* Intervenants : assigné + participants, bien visibles */}
+      <div style={{ padding: '12px 20px', background: '#fff', borderBottom: `1px solid #EEF1F6` }}>
+        <div style={{ fontSize: 11, textTransform: 'uppercase', color: C.textL, fontWeight: 700, marginBottom: 8 }}>👥 Intervenants</div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: t.gestionnaire ? '#E8F5E9' : '#FDECEA', color: t.gestionnaire ? '#1B5E20' : C.danger, borderRadius: 14, padding: '4px 11px', fontSize: 12, fontWeight: 700 }}>
+            <span style={{ fontSize: 9, opacity: .75 }}>ASSIGNÉ</span>{t.gestionnaire ? codeLabel(t.gestionnaire) : '⚠ personne'}
           </span>
-        ))}
-        {t.ticket_statut !== 'cloture' && (
-          <select style={{ ...S.input, width: 'auto', padding: '4px 8px', fontSize: 12 }} value="" onChange={e => { addParticipant(e.target.value); e.target.value = '' }}>
-            <option value="">+ Ajouter…</option>
-            {collabs.filter(c => !parts.includes((c.code || '').toUpperCase()) && (c.code || '').toUpperCase() !== (t.gestionnaire || '').toUpperCase()).map(c => <option key={c.code} value={c.code}>{c.nom_complet}</option>)}
-          </select>
-        )}
+          {parts.map(pc => (
+            <span key={pc} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#E3F2FD', color: '#1565C0', borderRadius: 14, padding: '4px 11px', fontSize: 12, fontWeight: 600 }}>
+              <span style={{ fontSize: 9, opacity: .75 }}>SUIVI</span>{codeLabel(pc)}
+              {t.ticket_statut !== 'cloture' && <span onClick={() => removeParticipant(pc)} title="Retirer du suivi" style={{ cursor: 'pointer', color: '#1565C0', fontWeight: 700 }}>×</span>}
+            </span>
+          ))}
+          {parts.length === 0 && <span style={{ fontSize: 12, color: C.textL }}>aucun participant en suivi</span>}
+          {t.ticket_statut !== 'cloture' && (
+            <select style={{ ...S.input, width: 'auto', padding: '4px 8px', fontSize: 12 }} value="" onChange={e => { addParticipant(e.target.value); e.target.value = '' }}>
+              <option value="">+ Ajouter un participant…</option>
+              {collabs.filter(c => !parts.includes((c.code || '').toUpperCase()) && (c.code || '').toUpperCase() !== (t.gestionnaire || '').toUpperCase()).map(c => <option key={c.code} value={c.code}>{c.nom_complet}</option>)}
+            </select>
+          )}
+        </div>
       </div>
 
       {/* Description initiale */}
@@ -839,10 +844,16 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
         )}
       </div>
 
-      {/* Fil de suivi */}
+      {/* Barre historique */}
+      <div style={{ display: 'flex', gap: 6, padding: '8px 20px', background: '#fff', borderBottom: `1px solid #EEF1F6`, alignItems: 'center' }}>
+        <span style={{ fontSize: 11, textTransform: 'uppercase', color: C.textL, fontWeight: 700, marginRight: 4 }}>Historique</span>
+        {[['tout', 'Tout'], ['conversation', 'Conversation'], ['historique', 'Événements']].map(([k, lbl]) => (
+          <button key={k} onClick={() => setFilFiltre(k)} style={{ border: `1px solid ${filFiltre === k ? MID : C.border}`, background: filFiltre === k ? MID : '#fff', color: filFiltre === k ? '#fff' : C.textM, borderRadius: 14, padding: '3px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{lbl}</button>
+        ))}
+      </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: 20, background: C.bg, minHeight: 200 }}>
-        {loadingMsgs ? <div style={{ textAlign: 'center', color: C.textL }}>…</div> : msgs.map(m => {
-          if (m.type === 'systeme') return <div key={m.id} style={{ textAlign: 'center', margin: '10px 0' }}><span style={{ fontSize: 11, color: C.textL, fontStyle: 'italic', border: `1px dashed ${C.border}`, borderRadius: 20, padding: '3px 12px' }}>{m.message}</span></div>
+        {loadingMsgs ? <div style={{ textAlign: 'center', color: C.textL }}>…</div> : (msgs.filter(m => filFiltre === 'tout' ? true : filFiltre === 'conversation' ? (m.type === 'message' || m.type === 'email') : (m.type !== 'message' && m.type !== 'email')).length === 0 ? <div style={{ textAlign: 'center', color: C.textL, fontSize: 12, paddingTop: 20 }}>Rien à afficher ici.</div> : msgs.filter(m => filFiltre === 'tout' ? true : filFiltre === 'conversation' ? (m.type === 'message' || m.type === 'email') : (m.type !== 'message' && m.type !== 'email')).map(m => {
+          if (m.type === 'systeme') return <div key={m.id} style={{ display: 'flex', gap: 8, alignItems: 'baseline', margin: '5px 0', color: C.textL, fontSize: 12 }}><span style={{ color: MID }}>•</span><span style={{ flex: 1 }}>{m.message}</span><span style={{ fontSize: 10, whiteSpace: 'nowrap' }}>{fmtDT(m.created_at)}</span></div>
           if (m.type === 'piece_jointe') {
             const ownPj = (m.auteur_code || '').toUpperCase() === myCode
             return (
@@ -864,12 +875,13 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
                 {!own && <span style={{ ...S.avatar, width: 22, height: 22 }}>{(m.auteur_code || '?').slice(0, 3)}</span>}
                 <span style={{ fontWeight: 700, fontSize: 12 }}>{m.auteur_nom || m.auteur_code}</span>
                 <span style={{ fontSize: 10, color: C.textL }}>{fmtDT(m.created_at)}</span>
+                {m.type === 'email' && <span style={{ fontSize: 9, fontWeight: 700, color: '#1565C0', background: '#E3F2FD', borderRadius: 8, padding: '1px 6px' }}>✉ MAIL</span>}
                 {own && <span style={{ ...S.avatar, width: 22, height: 22 }}>{(m.auteur_code || '?').slice(0, 3)}</span>}
               </div>
               <div style={{ display: 'inline-block', textAlign: 'left', maxWidth: '80%', background: own ? '#E3F2FD' : '#fff', border: own ? 'none' : `1px solid #EEF1F6`, borderRadius: 10, padding: '9px 12px', fontSize: 13, color: '#2D3748' }}>{m.message}</div>
             </div>
           )
-        })}
+        }))}
       </div>
 
       {/* Actions bas */}
