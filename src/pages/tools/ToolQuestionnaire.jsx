@@ -242,29 +242,9 @@ function purposeFromType(typeProd) {
 // PDF TEXT EXTRACTION — extract funds, dates from proposition PDF
 // ═══════════════════════════════════════════════════════════════════════
 
-async function extractTextFromPDF(file, onProgress) {
-  const arrayBuffer = await file.arrayBuffer()
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
-  let fullText = ''
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i)
-    const content = await page.getTextContent()
-    const pageText = content.items.map(item => item.str).join(' ')
-    fullText += pageText + '\n'
-  }
-
-  // If pdfjs extracted meaningful text, return it
-  if (fullText.trim().length > 50) {
-    console.log('[PDF] Text extracted via pdfjs-dist:', fullText.length, 'chars')
-    return fullText
-  }
-
-  // Fallback: OCR via Tesseract.js (for PDFs with text rendered as vector paths)
-  console.log('[PDF] pdfjs-dist returned empty text — falling back to OCR...')
-  if (onProgress) onProgress('OCR en cours... (peut prendre 30-60 secondes)')
-
+async function ocrPdfPages(pdf, onProgress) {
   let ocrText = ''
-  const scale = 2.0 // 2x resolution for better OCR
+  const scale = 3.0 // 3x resolution for better OCR accuracy
   for (let i = 1; i <= pdf.numPages; i++) {
     if (onProgress) onProgress(`OCR page ${i}/${pdf.numPages}...`)
     const page = await pdf.getPage(i)
@@ -273,9 +253,12 @@ async function extractTextFromPDF(file, onProgress) {
     canvas.width = viewport.width
     canvas.height = viewport.height
     const ctx = canvas.getContext('2d')
+    // White background (improves OCR on transparent PDFs)
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
     await page.render({ canvasContext: ctx, viewport }).promise
 
-    const { data: { text } } = await Tesseract.recognize(canvas, 'fra', {
+    const { data: { text } } = await Tesseract.recognize(canvas, 'eng+fra', {
       logger: m => {
         if (m.status === 'recognizing text' && onProgress) {
           onProgress(`OCR page ${i}/${pdf.numPages}... ${Math.round((m.progress || 0) * 100)}%`)
@@ -283,11 +266,51 @@ async function extractTextFromPDF(file, onProgress) {
       }
     })
     ocrText += text + '\n'
-    console.log(`[OCR] Page ${i}:`, text.substring(0, 200))
+    console.log(`[OCR] Page ${i} (${canvas.width}x${canvas.height}):`, text.substring(0, 300))
+  }
+  console.log('[OCR] Total text:', ocrText.length, 'chars')
+  return ocrText
+}
+
+async function extractTextFromPDF(file, onProgress) {
+  const arrayBuffer = await file.arrayBuffer()
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+
+  // Step 1: Try pdfjs-dist text extraction
+  let fullText = ''
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i)
+    const content = await page.getTextContent()
+    const pageText = content.items.map(item => item.str).join(' ')
+    fullText += pageText + '\n'
+  }
+  console.log('[PDF] pdfjs-dist extracted:', fullText.trim().length, 'chars')
+  console.log('[PDF] pdfjs sample:', fullText.substring(0, 500))
+
+  // Step 2: Check if pdfjs text is usable (contains recognizable patterns)
+  const hasUsableText = fullText.trim().length > 100 &&
+    (/\d{2}[/.-]\d{2}[/.-]\d{4}/.test(fullText) || // contains a date
+     /\d{1,3}[.,]\d{2}\s*%/.test(fullText) ||        // contains a percentage
+     /BFI|Branche|Select|Fund|Equity|pension|invest/i.test(fullText)) // contains fund keywords
+
+  if (hasUsableText) {
+    console.log('[PDF] pdfjs text is usable — using it directly')
+    return fullText
   }
 
-  console.log('[PDF] OCR total text:', ocrText.length, 'chars')
-  return ocrText
+  // Step 3: Fallback to OCR (text empty, garbled, or no recognizable patterns)
+  console.log('[PDF] pdfjs text not usable — falling back to OCR...')
+  if (onProgress) onProgress('OCR en cours... (peut prendre 30-60 secondes)')
+
+  const ocrText = await ocrPdfPages(pdf, onProgress)
+
+  // Return whichever has more usable content
+  if (ocrText.trim().length > fullText.trim().length) {
+    return ocrText
+  }
+  // If OCR also failed, return pdfjs text (handlePdfUpload will handle the no-data case)
+  console.log('[PDF] OCR also returned little text, returning pdfjs text as fallback')
+  return fullText.trim().length > ocrText.trim().length ? fullText : ocrText
 }
 
 /**
@@ -330,34 +353,49 @@ function parseFundsAG(text) {
 function parseFundsBaloise(text) {
   const funds = {}
 
-  // Look for investment strategy section (handles concatenated text)
-  const stratIdx = text.search(/Strat[ée]gie\s*d['']?\s*investissement/i)
+  // Look for investment strategy section (handles concatenated text and OCR noise)
+  const stratIdx = text.search(/Strat[ée]gi[ec]\s*d[''’]?\s*investissement/i)
   const partIdx = text.search(/Participation\s*aux\s*b[ée]n[ée]fices/i)
+  const bfiIdx = text.search(/BFI\s/i)
 
-  // Search in both sections
+  // Search in relevant sections
   const sections = []
-  if (stratIdx >= 0) sections.push(text.substring(stratIdx, stratIdx + 2000))
-  if (partIdx >= 0) sections.push(text.substring(partIdx, partIdx + 2000))
+  if (stratIdx >= 0) sections.push(text.substring(stratIdx, stratIdx + 3000))
+  if (partIdx >= 0) sections.push(text.substring(partIdx, partIdx + 3000))
+  if (bfiIdx >= 0 && stratIdx < 0) sections.push(text.substring(Math.max(0, bfiIdx - 200), bfiIdx + 2000))
   if (sections.length === 0) sections.push(text)
 
   for (const section of sections) {
-    // Match fund name + percentage pattern (handles OCR spacing)
+    // Pattern 1: fund name + percentage (standard)
     const fundPattern = /([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\-'.()0-9&]+?)\s+(\d{1,3}[.,]\d{2})\s*%/g
     let match
     while ((match = fundPattern.exec(section)) !== null) {
       let name = match[1].trim()
       const pct = parseFloat(match[2].replace(',', '.'))
-
-      // Clean up Baloise concatenation artifacts and OCR noise
       name = name.replace(/^\s*[-–—]\s*/, '')
       name = name.replace(/\s+/g, ' ').trim()
-
-      // Skip headers and non-fund lines
-      if (/^(Fonds|Total|Nom|Date|Prime|Montant|Strat|Participation|Forme|Garantie|Constitution|Taxe)/i.test(name)) continue
+      if (/^(Fonds|Total|Nom|Date|Prime|Montant|Strat|Participation|Forme|Garantie|Constitution|Taxe|Versement|Page|Brut)/i.test(name)) continue
       if (pct <= 0 || pct > 100) continue
       if (name.length < 3) continue
-
       funds[name] = pct
+    }
+
+    // Pattern 2: OCR sometimes puts percentage on next line or with spaces
+    // Look specifically for known BFI fund patterns
+    const bfiPattern = /BFI\s+([A-Za-z\s\-&]+?)(?:Select|Fund)?\s*[\n\r:]*\s*(\d{1,3}[.,]\d{2})\s*%/gi
+    while ((match = bfiPattern.exec(section)) !== null) {
+      let name = 'BFI ' + match[1].trim()
+      if (!name.toLowerCase().includes('select')) name += ' Select'
+      name = name.replace(/\s+/g, ' ').trim()
+      const pct = parseFloat(match[2].replace(',', '.'))
+      if (pct > 0 && pct <= 100) funds[name] = pct
+    }
+
+    // Pattern 3: "Compte Branche 21" patterns
+    const br21Pattern = /Compte\s+Branche\s*21[^%]*?(\d{1,3}[.,]\d{2})\s*%/gi
+    while ((match = br21Pattern.exec(section)) !== null) {
+      const pct = parseFloat(match[1].replace(',', '.'))
+      if (pct > 0 && pct <= 100) funds['Compte Branche 21'] = pct
     }
   }
 
