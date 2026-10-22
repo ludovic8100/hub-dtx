@@ -102,12 +102,13 @@ function mailClient(nom, message) {
     + `<span style="color:#666">Pour nous répondre, répondez simplement à ce message — votre réponse sera ajoutée à votre dossier.</span><br><br>`
     + `<b>Dynassur</b><br>info@dynassur.be</div>`
 }
-function mailTicket(t, intro) {
+function mailTicket(t, intro, extraHtml = '', withClose = false) {
   return `<div style="font-family:Arial,sans-serif;color:#1A3A6B">
     <p>${intro}</p>
     <p style="margin:14px 0"><b>Ticket #${t.id}</b> — ${t.titre || ''}<br>
     <span style="color:#8A9BBE;font-size:13px">${t.ticket_categorie || ''}</span></p>
-    <p><a href="${HUB_URL}/tickets?ticket=${t.id}" style="background:#1E5799;color:#fff;text-decoration:none;padding:9px 16px;border-radius:8px;display:inline-block">Ouvrir le ticket</a></p>
+    ${extraHtml || ''}
+    <p style="margin-top:14px"><a href="${HUB_URL}/tickets?ticket=${t.id}" style="background:#1E5799;color:#fff;text-decoration:none;padding:9px 16px;border-radius:8px;display:inline-block">Ouvrir le ticket</a>${withClose ? ` &nbsp; <a href="${HUB_URL}/tickets?ticket=${t.id}&do=resolve" style="background:#2E7D32;color:#fff;text-decoration:none;padding:9px 16px;border-radius:8px;display:inline-block">✅ Clôturer (Résolu)</a>` : ''}</p>
     <p style="color:#8A9BBE;font-size:12px;margin-top:16px">Hub DTX — notification automatique</p>
   </div>`
 }
@@ -268,7 +269,7 @@ export default function TicketsView() {
     if (fSoc !== 'tous' && (t.entite || '').toLowerCase() !== fSoc) return false
     if (fCat !== 'tous' && t.ticket_categorie !== fCat) return false
     if (fCollab !== 'tous' && (t.gestionnaire || '').toUpperCase() !== fCollab.toUpperCase()) return false
-    if (fStatut === 'actifs' && t.ticket_statut === 'cloture') return false
+    if (fStatut === 'actifs' && ['cloture', 'resolu'].includes(t.ticket_statut)) return false
     else if (fStatut !== 'actifs' && fStatut !== 'tous' && t.ticket_statut !== fStatut) return false
     if (q.trim()) {
       const n = q.trim().toLowerCase()
@@ -364,7 +365,7 @@ export default function TicketsView() {
       {(() => {
         const base = scope === 'all' ? tickets : visibles
         const parStatut = k => base.filter(t => t.ticket_statut === k)
-        const actifs = base.filter(t => t.ticket_statut !== 'cloture')
+        const actifs = base.filter(t => !['cloture', 'resolu'].includes(t.ticket_statut))
         return (
           <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'nowrap' }}>
             <StatCard label="Total" count={base.length} tickets={base} color={NAVY} />
@@ -398,7 +399,7 @@ export default function TicketsView() {
               {rows.map(t => {
                 const s = st(t.ticket_statut), p = pr(t.priorite)
                 return (
-                  <tr key={t.id} onClick={() => setSel(t)} style={{ borderTop: `1px solid #EEF1F6`, cursor: 'pointer', opacity: t.ticket_statut === 'cloture' ? 0.6 : 1 }}>
+                  <tr key={t.id} onClick={() => setSel(t)} style={{ borderTop: `1px solid #EEF1F6`, cursor: 'pointer', opacity: ['cloture', 'resolu'].includes(t.ticket_statut) ? 0.6 : 1 }}>
                     <td style={{ padding: '11px 14px', fontFamily: 'monospace', color: C.textL, fontWeight: 700, whiteSpace: 'nowrap' }}>{unread[t.id] ? <span title={`${unread[t.id]} message(s) non lu(s)`} style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: C.danger, marginRight: 6, verticalAlign: 'middle' }} /> : null}#{t.id}</td>
                     <td style={{ padding: '11px 14px', fontWeight: unread[t.id] ? 800 : 600, color: NAVY }}>{t.priorite === 'urgente' && <span style={URGENT_STYLE}>URGENT</span>}<span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: p.col, marginRight: 8 }} />{t.titre}</td>
                     <td style={{ padding: '11px 14px', fontSize: 12, color: C.textM }}>{socLabel(t.entite)}</td>
@@ -428,7 +429,7 @@ export default function TicketsView() {
 function TicketCard({ t, codeLabel, onOpen }) {
   const s = st(t.ticket_statut), p = pr(t.priorite)
   return (
-    <div onClick={onOpen} style={{ background: '#fff', border: `1px solid ${C.border}`, borderRadius: 12, padding: 14, marginBottom: 10, cursor: 'pointer', opacity: t.ticket_statut === 'cloture' ? 0.65 : 1 }}>
+    <div onClick={onOpen} style={{ background: '#fff', border: `1px solid ${C.border}`, borderRadius: 12, padding: 14, marginBottom: 10, cursor: 'pointer', opacity: ['cloture', 'resolu'].includes(t.ticket_statut) ? 0.65 : 1 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
         <span style={{ fontFamily: 'monospace', fontSize: 12, color: C.textL, fontWeight: 700 }}>#{t.id}</span>
         <span style={S.badge(s.bg, s.fg)}>{s.label}</span>
@@ -618,7 +619,6 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
   const [cli, setCli] = useState(null)
   const [auClient, setAuClient] = useState(false)
   const [filFiltre, setFilFiltre] = useState('tout')
-  const [showCheck, setShowCheck] = useState(Array.isArray(t.checklist) && t.checklist.length > 0)
   useEffect(() => {
     let on = true
     ;(async () => {
@@ -682,18 +682,25 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
   }, [t.id, myCode, onChanged])
   useEffect(() => { loadMsgs() }, [loadMsgs])
 
+  const filRecentHtml = () => {
+    const list = (msgs || []).filter(m => m.type === 'message' || m.type === 'email').slice(-6)
+    if (!list.length) return ''
+    const esc = x => (x || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    return `<div style="margin-top:12px;border-top:1px solid #E6EAF2;padding-top:10px"><div style="font-size:11px;color:#8A9BBE;text-transform:uppercase;font-weight:700;margin-bottom:8px">Derniers échanges</div>`
+      + list.map(m => `<div style="margin-bottom:10px"><b>${esc(m.auteur_nom || m.auteur_code || '?')}</b> <span style="color:#8A9BBE;font-size:11px">${fmtDT(m.created_at)}</span><br><span style="color:#2D3748">${esc(m.message).replace(/\n/g, '<br>')}</span></div>`).join('')
+      + `</div>`
+  }
   const touch = async (patch, sysMsg) => {
     const now = new Date().toISOString()
+    setT(x => ({ ...x, ...patch }))
     await supabase.from('taches').update({ ...patch, derniere_activite: now }).eq('id', t.id)
     if (sysMsg) await supabase.from('tickets_messages').insert({ tache_id: t.id, auteur_code: myCode, type: 'systeme', message: sysMsg })
-    setT(x => ({ ...x, ...patch }))
-    // Alerte e-mail à CHAQUE modification : créateur + assigné + participants, sauf l'auteur du changement
     if (sysMsg) {
       const merged = { ...t, ...patch }
       const p2 = Array.isArray(merged.participants) ? merged.participants.map(x => (x || '').toUpperCase()) : []
       const dest = [...new Set([(merged.gestionnaire || '').toUpperCase(), (merged.cree_par || '').toUpperCase(), ...p2].filter(cc => cc && cc !== myCode))]
       const emails = emailsOf(dest)
-      if (emails.length) envoyerAlerte(emails, `Ticket [#${t.id}] — mise à jour`, mailTicket(merged, `Une adaptation a été apportée à ce ticket par <b>${myCode}</b>.<br><i>${sysMsg}</i><br>Merci de cliquer sur le lien ci-dessous pour la consulter et réagir si besoin.`))
+      if (emails.length) envoyerAlerte(emails, `Ticket [#${t.id}] — mise à jour`, mailTicket(merged, `Une adaptation a été apportée à ce ticket par <b>${myCode}</b>.<br><i>${sysMsg}</i>`, filRecentHtml(), true))
     }
     await loadMsgs(); onChanged()
   }
@@ -707,7 +714,7 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
     // Alerte : concernés sauf auteur
     const concernes = [...new Set([(t.gestionnaire||'').toUpperCase(), (t.cree_par||'').toUpperCase(), ...parts].filter(c => c && c !== myCode))]
     const emails = emailsOf(concernes)
-    if (emails.length) envoyerAlerte(emails, `Nouveau message sur le ticket [#${t.id}]`, mailTicket(t, `Bonjour,<br>${myCode} a écrit un message sur ce ticket :<br><i>"${txt.slice(0,200)}"</i>`))
+    if (emails.length) envoyerAlerte(emails, `Nouveau message sur le ticket [#${t.id}]`, mailTicket(t, `Bonjour,<br>${myCode} a écrit un message sur ce ticket :<br><i>"${txt.slice(0,200)}"</i>`, filRecentHtml(), true))
     if (auClient && cli?.email) { const nomCli = [cli.prenom, cli.nom].filter(Boolean).join(' '); envoyerAlerte([cli.email], `Ticket [#${t.id}] — ${t.titre}`, mailClient(nomCli, txt)) }
     setReply(''); setAuClient(false); setSending(false); await loadMsgs(); onChanged()
   }
@@ -721,14 +728,16 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
       await supabase.from('taches').update({ derniere_activite: new Date().toISOString() }).eq('id', t.id)
       const concernes = [...new Set([(t.gestionnaire || '').toUpperCase(), (t.cree_par || '').toUpperCase(), ...parts].filter(c => c && c !== myCode))]
       const emails = emailsOf(concernes)
-      if (emails.length) envoyerAlerte(emails, `Pièce jointe ajoutée au ticket [#${t.id}]`, mailTicket(t, `Bonjour,<br>${myCode} a ajouté ${arr.length > 1 ? arr.length + ' pièces jointes' : 'une pièce jointe'} au ticket.`))
+      if (emails.length) envoyerAlerte(emails, `Pièce jointe ajoutée au ticket [#${t.id}]`, mailTicket(t, `Bonjour,<br>${myCode} a ajouté ${arr.length > 1 ? arr.length + ' pièces jointes' : 'une pièce jointe'} au ticket.`, filRecentHtml(), true))
     } catch (e) { alert("Échec de l'envoi de la pièce jointe : " + (e.message || '')) }
     setUpBusy(false); await loadMsgs(); onChanged()
   }
 
   const changeStatut = async (nk) => {
     const ancien = st(t.ticket_statut).label
-    await touch({ ticket_statut: nk }, `Statut : ${ancien} → ${st(nk).label} (${myCode})`)
+    const reouvre = (t.ticket_statut === 'resolu' || t.ticket_statut === 'cloture')
+    const extra = reouvre ? { cloture_par: null, date_cloture: null, statut: 'en_cours' } : {}
+    await touch({ ticket_statut: nk, ...extra }, `Statut : ${ancien} → ${st(nk).label} (${myCode})`)
   }
   const assigner = async (code) => {
     const c = code ? code.toUpperCase() : null
@@ -755,9 +764,21 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
   const cloturer = async () => {
     await touch({ ticket_statut: 'cloture', cloture_par: myCode, statut: 'terminee', date_cloture: new Date().toISOString() }, `Ticket clôturé par ${myCode}`)
   }
+  const resoudre = async () => {
+    await touch({ ticket_statut: 'resolu', cloture_par: myCode, statut: 'terminee', date_cloture: new Date().toISOString() }, `Ticket marqué Résolu (clôturé) par ${myCode}`)
+  }
 
   const s = st(t.ticket_statut), p = pr(t.priorite)
   const canManage = isAdmin || (t.gestionnaire || '').toUpperCase() === myCode
+  const estClos = t.ticket_statut === 'resolu' || t.ticket_statut === 'cloture'
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search)
+    if (q.get('do') === 'resolve' && String(q.get('ticket')) === String(t.id)) {
+      q.delete('do'); window.history.replaceState({}, '', window.location.pathname + (q.toString() ? '?' + q.toString() : ''))
+      if (canManage && !estClos && window.confirm('Clôturer ce ticket (le passer en Résolu) ?')) resoudre()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <Overlay onClose={onClose} wide>
@@ -772,19 +793,16 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
         <div style={{ fontSize: 12, color: C.textL, marginTop: 4 }}>{t.ticket_categorie} · ouvert par {t.cree_par} · {fmtDT(t.date_creation || t.created_at)}</div>
       </div>
 
-      {/* Statut — pleine largeur, coloré */}
-      {t.ticket_statut === 'cloture' ? (
-        <div style={{ padding: '10px 20px', background: '#ECEFF1', borderBottom: `1px solid #EEF1F6`, textAlign: 'center', fontWeight: 700, color: '#546E7A', fontSize: 13 }}>Clôturé</div>
-      ) : (
-        <div style={{ display: 'flex', gap: 6, padding: '10px 20px', background: '#fff', borderBottom: `1px solid #EEF1F6` }}>
-          {STATUTS.filter(x => x.k !== 'cloture').map(x => {
-            const active = t.ticket_statut === x.k, col = STATUT_BAR[x.k]
-            return (
-              <button key={x.k} onClick={() => { if (canManage && !active) changeStatut(x.k) }} disabled={!canManage} style={{ flex: 1, padding: '9px 6px', borderRadius: 8, border: `1.5px solid ${col}`, background: active ? col : '#fff', color: active ? '#fff' : col, fontWeight: 700, fontSize: 12, cursor: canManage ? 'pointer' : 'default', opacity: (!active && !canManage) ? 0.4 : 1 }}>{x.label}</button>
-            )
-          })}
-        </div>
-      )}
+      {/* Statut — pleine largeur, coloré (Résolu = clôture auto) */}
+      <div style={{ display: 'flex', gap: 6, padding: '10px 20px', background: '#fff', borderBottom: `1px solid #EEF1F6` }}>
+        {STATUTS.filter(x => x.k !== 'cloture').map(x => {
+          const active = t.ticket_statut === x.k || (x.k === 'resolu' && t.ticket_statut === 'cloture')
+          const col = STATUT_BAR[x.k]
+          return (
+            <button key={x.k} onClick={() => { if (!canManage || active) return; if (x.k === 'resolu') resoudre(); else changeStatut(x.k) }} disabled={!canManage} style={{ flex: 1, padding: '9px 6px', borderRadius: 8, border: `1.5px solid ${col}`, background: active ? col : '#fff', color: active ? '#fff' : col, fontWeight: 700, fontSize: 12, cursor: canManage ? 'pointer' : 'default', opacity: (!active && !canManage) ? 0.4 : 1 }}>{x.label}</button>
+          )
+        })}
+      </div>
 
       {/* Assigné + Société */}
       <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', padding: '12px 20px', background: '#fff', borderBottom: `1px solid #EEF1F6`, alignItems: 'center' }}>
@@ -814,11 +832,11 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
         {parts.map(pc => (
           <span key={pc} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#E3F2FD', color: '#1565C0', borderRadius: 14, padding: '4px 11px', fontSize: 12, fontWeight: 600 }}>
             {codeLabel(pc)}
-            {t.ticket_statut !== 'cloture' && <span onClick={() => removeParticipant(pc)} title="Retirer du suivi" style={{ cursor: 'pointer', color: '#1565C0', fontWeight: 700 }}>×</span>}
+            {!estClos && <span onClick={() => removeParticipant(pc)} title="Retirer du suivi" style={{ cursor: 'pointer', color: '#1565C0', fontWeight: 700 }}>×</span>}
           </span>
         ))}
         {parts.length === 0 && <span style={{ fontSize: 12, color: C.textL }}>aucun</span>}
-        {t.ticket_statut !== 'cloture' && (
+        {!estClos && (
           <select style={{ ...S.input, width: 'auto', padding: '4px 8px', fontSize: 12 }} value="" onChange={e => { addParticipant(e.target.value); e.target.value = '' }}>
             <option value="">+ Ajouter…</option>
             {collabs.filter(c => !parts.includes((c.code || '').toUpperCase()) && (c.code || '').toUpperCase() !== (t.gestionnaire || '').toUpperCase()).map(c => <option key={c.code} value={c.code}>{c.nom_complet}</option>)}
@@ -828,54 +846,6 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
 
       {/* Description initiale */}
       {t.description && <div style={{ padding: '12px 20px', fontSize: 13, color: '#2D3748', borderBottom: `1px solid #EEF1F6`, background: '#fff' }}>{t.description}</div>}
-
-      {/* Checklist */}
-      <div style={{ padding: '12px 20px', borderBottom: `1px solid #EEF1F6`, background: '#fff' }}>
-        <div onClick={() => setShowCheck(v => !v)} style={{ fontSize: 11, textTransform: 'uppercase', color: C.textL, fontWeight: 700, marginBottom: showCheck ? 8 : 0, cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span>{showCheck ? '▾' : '▸'}</span>
-          <span>Checklist <span style={{ textTransform: 'none', fontWeight: 400 }}>(sous-étapes internes — optionnel)</span></span>
-          {checklist.length > 0 && <span style={{ color: C.textM }}>· {checklist.filter(c => c.fait).length}/{checklist.length} fait</span>}
-        </div>
-        {showCheck && (<>
-        {checklist.length > 0 && (
-          <div style={{ height: 4, background: '#EEF1F6', borderRadius: 4, marginBottom: 12, overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${Math.round(checklist.filter(c => c.fait).length / checklist.length * 100)}%`, background: C.ok, transition: 'width .2s' }} />
-          </div>
-        )}
-        {checklist.map(item => (
-          <div key={item.id} style={{ marginBottom: 8, padding: 8, background: item.fait ? '#F1F8F4' : C.bg, borderRadius: 8, border: `1px solid ${item.fait ? '#C8E6C9' : C.border}` }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input type="checkbox" checked={!!item.fait} onChange={() => toggleItem(item.id)} style={{ width: 17, height: 17, cursor: 'pointer', flexShrink: 0 }} />
-              <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: NAVY, textDecoration: item.fait ? 'line-through' : 'none', opacity: item.fait ? 0.6 : 1 }}>{item.texte}</span>
-              {item.fait && item.fait_par && <span style={{ fontSize: 10, color: C.textL }}>✓ {item.fait_par}</span>}
-              <span onClick={() => removeItem(item.id)} style={{ cursor: 'pointer', color: C.textL, fontSize: 14, padding: '0 4px' }}>×</span>
-            </div>
-            {(Array.isArray(item.commentaires) ? item.commentaires : []).map(com => (
-              <div key={com.id} style={{ marginTop: 6, marginLeft: 25, fontSize: 12, color: '#2D3748', background: '#fff', border: `1px solid #EEF1F6`, borderRadius: 8, padding: '5px 9px' }}>
-                <span style={{ fontWeight: 700, color: NAVY }}>{codeLabel(com.code) || com.nom || com.code}</span>
-                <span style={{ fontSize: 10, color: C.textL, marginLeft: 6 }}>{fmtDT(com.date)}</span>
-                <div>{com.texte}</div>
-              </div>
-            ))}
-            {item.remarque && <div style={{ marginTop: 6, marginLeft: 25, fontSize: 12, color: C.textL, fontStyle: 'italic' }}>Note : {item.remarque}</div>}
-            {t.ticket_statut !== 'cloture' && (
-              <div style={{ display: 'flex', gap: 6, marginTop: 6, marginLeft: 25 }}>
-                <input value={commentDrafts[item.id] || ''} onChange={e => setCommentDrafts(d => ({ ...d, [item.id]: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addComment(item.id) } }}
-                  placeholder="Commenter ce point…" style={{ ...S.input, fontSize: 12, padding: '5px 8px', background: '#fff' }} />
-                <button onClick={() => addComment(item.id)} style={{ ...S.btn('ghost'), padding: '5px 10px', fontSize: 12 }}>💬</button>
-              </div>
-            )}
-          </div>
-        ))}
-        {t.ticket_statut !== 'cloture' && (
-          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-            <input value={newItem} onChange={e => setNewItem(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem() } }}
-              placeholder="Ajouter un point à la checklist…" style={{ ...S.input, fontSize: 13 }} />
-            <button onClick={addItem} style={{ ...S.btn('ghost'), padding: '7px 14px' }}>+ Ajouter</button>
-          </div>
-        )}
-        </>)}
-      </div>
 
       {/* Barre historique */}
       <div style={{ display: 'flex', gap: 6, padding: '8px 20px', background: '#fff', borderBottom: `1px solid #EEF1F6`, alignItems: 'center' }}>
@@ -918,7 +888,7 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
       </div>
 
       {/* Actions bas */}
-      {t.ticket_statut !== 'cloture' ? (
+      {!estClos ? (
         <>
           <div style={{ padding: '10px 16px 0' }}>
             <DropZone compact disabled={upBusy} onFiles={attachFiles} />
@@ -934,11 +904,10 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
             <input style={{ ...S.input, borderRadius: 20 }} value={reply} onChange={e => setReply(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply() } }} placeholder="Écrire une réponse…" />
             <button onClick={sendReply} disabled={sending} style={{ ...S.btn('primary'), borderRadius: '50%', width: 42, height: 42, padding: 0, fontSize: 16 }}>➤</button>
           </div>
-          {canManage && <div style={{ padding: '0 16px 14px' }}><button style={{ ...S.btn('ok'), width: '100%' }} onClick={cloturer}>✓ Clôturer le ticket</button></div>}
         </>
       ) : (
         <div style={{ padding: '14px 20px', borderTop: `1px solid ${C.border}`, textAlign: 'center', color: C.textL, fontSize: 13 }}>
-          Ticket clôturé par {t.cloture_par || '—'}{canManage && <button style={{ ...S.btn('ghost'), marginLeft: 12 }} onClick={() => changeStatut('en_cours')}>Rouvrir</button>}
+          Ticket résolu / clôturé par {t.cloture_par || '—'}{canManage && <button style={{ ...S.btn('ghost'), marginLeft: 12 }} onClick={() => changeStatut('en_cours')}>Rouvrir</button>}
         </div>
       )}
     </Overlay>
