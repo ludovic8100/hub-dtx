@@ -692,6 +692,15 @@ export default function ToolQuestionnaire() {
   // ─── Load contrats for selected client ───
   async function selectClient(client) {
     setSelectedClient(client)
+    setSelectedContrat(null)
+    setFunds({})
+    setPdfFile(null)
+    setExtractedText('')
+    setExtractionWarning(null)
+    setPdfDates({ dateDebut: null, dateFin: null })
+    setHorizonYears(null)
+    setManualMode(false)
+    setAnswers({})
     setError(null)
     setLoadingContrats(true)
     try {
@@ -716,6 +725,11 @@ export default function ToolQuestionnaire() {
 
   // ─── Select contrat → go to upload step ───
   function selectContrat(contrat) {
+    // Vérifier que le contrat appartient au client sélectionné
+    if (selectedClient && contrat.dossier && contrat.dossier !== selectedClient.dossier) {
+      setError(`Ce contrat (dossier ${contrat.dossier}) n'appartient pas au client ${selectedClient.nom} ${selectedClient.prenom} (dossier ${selectedClient.dossier}).`)
+      return
+    }
     setSelectedContrat(contrat)
     setError(null)
     setPdfFile(null)
@@ -742,6 +756,8 @@ export default function ToolQuestionnaire() {
 
     try {
       const text = await extractTextFromPDF(file)
+      console.log('=== PDF RAW TEXT ===')
+      console.log(text)
       setExtractedText(text)
 
       if (text.trim().length < 50) {
@@ -754,6 +770,7 @@ export default function ToolQuestionnaire() {
 
       // Extract funds
       const extractedFunds = parseFundsGeneric(text)
+      console.log('=== EXTRACTED FUNDS ===', extractedFunds)
 
       if (Object.keys(extractedFunds).length === 0) {
         // Text found but no funds detected — could be pure Branche 21
@@ -771,6 +788,7 @@ export default function ToolQuestionnaire() {
 
       // Extract dates
       const dates = extractDates(text)
+      console.log('=== EXTRACTED DATES ===', dates)
       setPdfDates(dates)
 
       // Calculate horizon
@@ -807,6 +825,11 @@ export default function ToolQuestionnaire() {
 
   // ─── Proceed from upload to questionnaire ───
   function proceedToQuestionnaire() {
+    // Vérification de cohérence client ↔ contrat
+    if (selectedClient && selectedContrat && selectedContrat.dossier && selectedContrat.dossier !== selectedClient.dossier) {
+      setError(`Incohérence : le contrat sélectionné (dossier ${selectedContrat.dossier}) ne correspond pas au client ${selectedClient.nom} (dossier ${selectedClient.dossier}). Veuillez recommencer.`)
+      return
+    }
     if (Object.keys(funds).length === 0 && !manualMode) {
       setError('Veuillez d\'abord uploader un PDF ou encoder les fonds manuellement.')
       return
