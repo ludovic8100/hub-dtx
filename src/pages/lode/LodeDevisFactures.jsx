@@ -1043,7 +1043,9 @@ async function exportPDF(type, doc, lignes) {
   })
 
   numeroterPages()
-  d.save(type === 'devis' ? `${titre}_${doc.numero}.pdf` : nomFichierDoc(doc, type, 'pdf'))
+  const outName = type === 'devis' ? `${titre}_${doc.numero}.pdf` : nomFichierDoc(doc, type, 'pdf')
+  d.save(outName)
+  return d.output('datauristring').split(',')[1]
 }
 
 async function exportExcel(type, doc, lignes) {
@@ -1546,6 +1548,34 @@ export default function LodeDevisFactures() {
     } finally { setBusy(null) }
   }
 
+  const ARCHIVE_WEBHOOK = 'https://n8n.srv1082740.hstgr.cloud/webhook/lode-facture-archive'
+  // Facture : genere le PDF (telechargement) + archive dans SharePoint _LODE/VENTES et stocke pdf_fid/pdf_url
+  const genererFacturePDF = async (doc) => {
+    setBusy(doc.id + 'pdf')
+    try {
+      const lignes = await getLignes('facture', doc.id)
+      const b64 = await exportPDF('facture', doc, lignes)
+      try {
+        const annee = (doc.date_facture || doc.numero || '').toString().slice(0, 4) || String(new Date().getFullYear())
+        const fileName = nomFichierDoc(doc, 'facture', 'pdf')
+        const res = await fetch(ARCHIVE_WEBHOOK, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileName, annee, pdfBase64: b64 }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (res.ok && data.ok && data.fid) {
+          await supabase.from('lode_factures').update({ pdf_fid: data.fid, pdf_url: data.url }).eq('id', doc.id)
+          load()
+        } else {
+          alert('PDF telecharge \u2713\nArchivage SharePoint echoue \u2014 reessaie plus tard.')
+        }
+      } catch (e) {
+        alert('PDF telecharge \u2713\nArchivage SharePoint indisponible : ' + e.message)
+      }
+    } catch (e) { alert('Erreur generation PDF : ' + e.message) }
+    finally { setBusy(null) }
+  }
+
   const convertir = async (devisDoc) => {
     if (!confirm(`Convertir le devis ${devisDoc.numero} en facture ?`)) return
     const lignes = await getLignes('devis', devisDoc.id)
@@ -1663,9 +1693,10 @@ export default function LodeDevisFactures() {
                             <ActionButton tone="pdf" disabled={busy === doc.id + 'pdf'} onClick={() => doExport('pdf', t, doc)}>{busy === doc.id + 'pdf' ? '…' : 'PDF'}</ActionButton>
                             <ActionButton tone="excel" disabled={busy === doc.id + 'word'} onClick={() => doExport('word', t, doc)}>{busy === doc.id + 'word' ? '…' : 'Word'}</ActionButton>
                           </>
-                        : doc.pdf_url
-                          ? <ActionButton tone="pdf" onClick={() => window.open(doc.pdf_url, '_blank', 'noopener')} onMouseEnter={() => doc.pdf_fid && setApercu({ fid: doc.pdf_fid, nom: doc.numero })} onMouseLeave={() => setApercu(null)}>Ouvrir</ActionButton>
-                          : <span style={{ color: '#cbd5e1', fontSize: 12 }}>PDF non archive</span>}
+                        : <>
+                            <ActionButton tone="pdf" disabled={busy === doc.id + 'pdf'} onClick={() => genererFacturePDF(doc)}>{busy === doc.id + 'pdf' ? '…' : 'PDF'}</ActionButton>
+                            {doc.pdf_url && <ActionButton tone="pdf" onClick={() => window.open(doc.pdf_url, '_blank', 'noopener')} onMouseEnter={() => doc.pdf_fid && setApercu({ fid: doc.pdf_fid, nom: doc.numero })} onMouseLeave={() => setApercu(null)}>Ouvrir</ActionButton>}
+                          </>}
                       {PEPPOL_ACTIF && tab === 'factures' && doc.client_tva && doc.statut !== 'payée' && doc.statut !== 'annulée' && (
                         <ActionButton tone="peppol" disabled={busy === doc.id + 'peppol'} onClick={() => envoyerPeppol(doc)}>{busy === doc.id + 'peppol' ? '…' : '📨 Peppol'}</ActionButton>
                       )}
@@ -1707,9 +1738,10 @@ export default function LodeDevisFactures() {
                                   <ActionButton tone="pdf" disabled={busy === doc.id + 'pdf'} onClick={() => doExport('pdf', 'devis', doc)}>{busy === doc.id + 'pdf' ? '…' : 'PDF'}</ActionButton>
                                   <ActionButton tone="excel" disabled={busy === doc.id + 'word'} onClick={() => doExport('word', 'devis', doc)}>{busy === doc.id + 'word' ? '…' : 'Word'}</ActionButton>
                                 </>
-                              : doc.pdf_url
-                                ? <ActionButton tone="pdf" onClick={() => window.open(doc.pdf_url, '_blank', 'noopener')} onMouseEnter={() => doc.pdf_fid && setApercu({ fid: doc.pdf_fid, nom: doc.numero })} onMouseLeave={() => setApercu(null)}>Ouvrir</ActionButton>
-                                : <span style={{ color: '#cbd5e1', fontSize: 12 }}>\u2014</span>}
+                              : <>
+                                  <ActionButton tone="pdf" disabled={busy === doc.id + 'pdf'} onClick={() => genererFacturePDF(doc)}>{busy === doc.id + 'pdf' ? '…' : 'PDF'}</ActionButton>
+                                  {doc.pdf_url && <ActionButton tone="pdf" onClick={() => window.open(doc.pdf_url, '_blank', 'noopener')} onMouseEnter={() => doc.pdf_fid && setApercu({ fid: doc.pdf_fid, nom: doc.numero })} onMouseLeave={() => setApercu(null)}>Ouvrir</ActionButton>}
+                                </>}
                             {PEPPOL_ACTIF && tab === 'factures' && doc.client_tva && doc.statut !== 'payée' && doc.statut !== 'annulée' && (
                               <ActionButton tone="peppol" disabled={busy === doc.id + 'peppol'} onClick={() => envoyerPeppol(doc)}>{busy === doc.id + 'peppol' ? '…' : '📨 Peppol'}</ActionButton>
                             )}
