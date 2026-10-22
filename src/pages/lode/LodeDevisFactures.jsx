@@ -728,7 +728,7 @@ function nomFichierDoc(doc, type, ext) {
   const montant = Math.abs(Number(doc.total_ttc || 0)).toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false })
   return `${String(doc.numero || '').trim()} - ${client} - ${montant}€.${ext}`
 }
-async function exportPDF(type, doc, lignes) {
+async function exportPDF(type, doc, lignes, opts = {}) {
   await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
   await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js')
   const { jsPDF } = window.jspdf
@@ -1044,7 +1044,7 @@ async function exportPDF(type, doc, lignes) {
 
   numeroterPages()
   const outName = type === 'devis' ? `${titre}_${doc.numero}.pdf` : nomFichierDoc(doc, type, 'pdf')
-  d.save(outName)
+  if (opts.save !== false) d.save(outName)
   return d.output('datauristring').split(',')[1]
 }
 
@@ -1484,6 +1484,75 @@ function ApercuFacture({ fid, nom }) {
   )
 }
 
+function EnvoiFactureModal({ doc, b64, fileName, onClose, onSent }) {
+  const C = LODE.couleur
+  const [to, setTo] = useState(doc.client_email || '')
+  const [cc, setCc] = useState('contact@lode-group.be')
+  const [subject, setSubject] = useState(`Facture ${doc.numero} de LODE`)
+  const [body, setBody] = useState(`Bonjour ${doc.client_nom || ''},\n\nVeuillez trouver ci-joint notre facture ${doc.numero} d'un montant de ${eur(doc.total_ttc)}.\n\nBien a vous,\nLODE`)
+  const [sending, setSending] = useState(false)
+  const [err, setErr] = useState('')
+
+  const envoyer = async () => {
+    if (!to.trim()) { setErr('Destinataire manquant.'); return }
+    setSending(true); setErr('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) throw new Error('Session expiree \u2014 reconnecte-toi.')
+      const r = await fetch('/api/facture-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ entite: 'lode', client_email: to.trim(), cc: cc.trim(), subject, body, numero: doc.numero, fileName, pdfBase64: b64 }),
+      })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok || !j.ok) throw new Error(j.error || j.detail || ('HTTP ' + r.status))
+      try {
+        const annee = (doc.date_facture || doc.numero || '').toString().slice(0, 4) || String(new Date().getFullYear())
+        const ar = await fetch('https://n8n.srv1082740.hstgr.cloud/webhook/lode-facture-archive', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileName, annee, pdfBase64: b64 }),
+        })
+        const ad = await ar.json().catch(() => ({}))
+        if (ad.ok && ad.fid) {
+          const url = String(ad.url).includes('?') ? ad.url : ad.url + '?web=1'
+          await supabase.from('lode_factures').update({ pdf_fid: ad.fid, pdf_url: url }).eq('id', doc.id)
+        }
+      } catch (_) { /* archivage best-effort */ }
+      alert('Facture envoyee \u2713')
+      onSent()
+    } catch (e) { setErr(e.message); setSending(false) }
+  }
+
+  const champ = { width: '100%', padding: '9px 11px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13.5, fontFamily: 'inherit', boxSizing: 'border-box' }
+  const lbl = { fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 4, display: 'block' }
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.5)', zIndex: 9000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '5vh 16px', overflowY: 'auto' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 560, boxShadow: '0 20px 60px rgba(0,0,0,.25)', overflow: 'hidden' }}>
+        <div style={{ background: C, color: '#fff', padding: '16px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: 17, fontWeight: 800 }}>Envoyer la facture {doc.numero}</div>
+          <button onClick={onClose} style={{ background: 'rgba(255,255,255,.2)', border: 'none', color: '#fff', width: 30, height: 30, borderRadius: 15, cursor: 'pointer', fontSize: 16 }}>\u00d7</button>
+        </div>
+        <div style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 13 }}>
+          <div><label style={lbl}>A</label><input value={to} onChange={e => setTo(e.target.value)} style={champ} placeholder="client@email.be" /></div>
+          <div><label style={lbl}>Cc</label><input value={cc} onChange={e => setCc(e.target.value)} style={champ} placeholder="(optionnel)" /></div>
+          <div><label style={lbl}>Objet</label><input value={subject} onChange={e => setSubject(e.target.value)} style={champ} /></div>
+          <div><label style={lbl}>Message</label><textarea value={body} onChange={e => setBody(e.target.value)} rows={7} style={{ ...champ, resize: 'vertical', lineHeight: 1.5 }} /></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: '#f8fafc', border: '1px solid #eef2f6', borderRadius: 8, padding: '9px 12px', fontSize: 13 }}>
+            <span style={{ fontSize: 16 }}>\U0001F4CE</span><span style={{ color: '#475569', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileName}</span>
+          </div>
+          {err && <div style={{ color: '#dc2626', fontSize: 13, fontWeight: 600 }}>{err}</div>}
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
+            <button onClick={onClose} disabled={sending} style={{ padding: '10px 18px', border: '1px solid #e2e8f0', background: '#fff', color: '#475569', borderRadius: 10, fontWeight: 700, fontSize: 13.5, cursor: 'pointer' }}>Annuler</button>
+            <button onClick={envoyer} disabled={sending} style={{ padding: '10px 22px', border: 'none', background: '#16a34a', color: '#fff', borderRadius: 10, fontWeight: 700, fontSize: 13.5, cursor: sending ? 'wait' : 'pointer' }}>{sending ? 'Envoi\u2026' : '\u2709 Envoyer la facture'}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function LodeDevisFactures() {
   const [tab, setTab] = useState('devis')
   const [devis, setDevis] = useState([])
@@ -1493,6 +1562,7 @@ export default function LodeDevisFactures() {
   const [busy, setBusy] = useState(null)
   const [suivi, setSuivi] = useState(null)      // devis dont on affiche le suivi
   const [apercu, setApercu] = useState(null)      // {fid,nom} apercu PDF au survol
+  const [envoi, setEnvoi] = useState(null)        // { doc, b64, fileName } facture a envoyer par email
   const [sort, setSort] = useState({ key: 'numero', dir: 'desc' })
 
   const load = async () => {
@@ -1549,30 +1619,45 @@ export default function LodeDevisFactures() {
   }
 
   const ARCHIVE_WEBHOOK = 'https://n8n.srv1082740.hstgr.cloud/webhook/lode-facture-archive'
-  // Facture : genere le PDF (telechargement) + archive dans SharePoint _LODE/VENTES et stocke pdf_fid/pdf_url
+
+  // Facture : genere le PDF, l'archive dans SharePoint _LODE/VENTES, stocke pdf_fid/pdf_url, puis OUVRE le PDF dans SharePoint (aucun telechargement).
   const genererFacturePDF = async (doc) => {
+    const win = window.open('', '_blank')  // onglet reserve dans le geste de clic (anti popup-block)
     setBusy(doc.id + 'pdf')
     try {
       const lignes = await getLignes('facture', doc.id)
-      const b64 = await exportPDF('facture', doc, lignes)
-      try {
-        const annee = (doc.date_facture || doc.numero || '').toString().slice(0, 4) || String(new Date().getFullYear())
-        const fileName = nomFichierDoc(doc, 'facture', 'pdf')
-        const res = await fetch(ARCHIVE_WEBHOOK, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fileName, annee, pdfBase64: b64 }),
-        })
-        const data = await res.json().catch(() => ({}))
-        if (res.ok && data.ok && data.fid) {
-          await supabase.from('lode_factures').update({ pdf_fid: data.fid, pdf_url: data.url }).eq('id', doc.id)
-          load()
-        } else {
-          alert('PDF telecharge \u2713\nArchivage SharePoint echoue \u2014 reessaie plus tard.')
-        }
-      } catch (e) {
-        alert('PDF telecharge \u2713\nArchivage SharePoint indisponible : ' + e.message)
+      const b64 = await exportPDF('facture', doc, lignes, { save: false })
+      const annee = (doc.date_facture || doc.numero || '').toString().slice(0, 4) || String(new Date().getFullYear())
+      const fileName = nomFichierDoc(doc, 'facture', 'pdf')
+      const res = await fetch(ARCHIVE_WEBHOOK, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName, annee, pdfBase64: b64 }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data.ok && data.fid) {
+        const url = String(data.url).includes('?') ? data.url : data.url + '?web=1'
+        await supabase.from('lode_factures').update({ pdf_fid: data.fid, pdf_url: url }).eq('id', doc.id)
+        load()
+        if (win) win.location = url; else window.open(url, '_blank', 'noopener')
+      } else {
+        if (win) win.close()
+        alert('Archivage SharePoint echoue — reessaie dans un instant.')
       }
-    } catch (e) { alert('Erreur generation PDF : ' + e.message) }
+    } catch (e) {
+      if (win) win.close()
+      alert('Erreur PDF : ' + e.message)
+    } finally { setBusy(null) }
+  }
+
+  // Facture : prepare le PDF (base64, sans telechargement) puis ouvre le modal d'envoi par email.
+  const ouvrirEnvoiFacture = async (doc) => {
+    setBusy(doc.id + 'mail')
+    try {
+      const lignes = await getLignes('facture', doc.id)
+      const b64 = await exportPDF('facture', doc, lignes, { save: false })
+      const fileName = nomFichierDoc(doc, 'facture', 'pdf')
+      setEnvoi({ doc, b64, fileName })
+    } catch (e) { alert('Erreur preparation PDF : ' + e.message) }
     finally { setBusy(null) }
   }
 
@@ -1695,6 +1780,7 @@ export default function LodeDevisFactures() {
                           </>
                         : <>
                             <ActionButton tone="pdf" disabled={busy === doc.id + 'pdf'} onClick={() => genererFacturePDF(doc)}>{busy === doc.id + 'pdf' ? '…' : 'PDF'}</ActionButton>
+                            <ActionButton tone="accent" color={C} disabled={busy === doc.id + 'mail'} onClick={() => ouvrirEnvoiFacture(doc)}>{busy === doc.id + 'mail' ? '…' : '✉ Envoyer'}</ActionButton>
                             {doc.pdf_url && <ActionButton tone="pdf" onClick={() => window.open(doc.pdf_url, '_blank', 'noopener')} onMouseEnter={() => doc.pdf_fid && setApercu({ fid: doc.pdf_fid, nom: doc.numero })} onMouseLeave={() => setApercu(null)}>Ouvrir</ActionButton>}
                           </>}
                       {PEPPOL_ACTIF && tab === 'factures' && doc.client_tva && doc.statut !== 'payée' && doc.statut !== 'annulée' && (
@@ -1740,6 +1826,7 @@ export default function LodeDevisFactures() {
                                 </>
                               : <>
                                   <ActionButton tone="pdf" disabled={busy === doc.id + 'pdf'} onClick={() => genererFacturePDF(doc)}>{busy === doc.id + 'pdf' ? '…' : 'PDF'}</ActionButton>
+                                  <ActionButton tone="accent" color={C} disabled={busy === doc.id + 'mail'} onClick={() => ouvrirEnvoiFacture(doc)}>{busy === doc.id + 'mail' ? '…' : '✉ Envoyer'}</ActionButton>
                                   {doc.pdf_url && <ActionButton tone="pdf" onClick={() => window.open(doc.pdf_url, '_blank', 'noopener')} onMouseEnter={() => doc.pdf_fid && setApercu({ fid: doc.pdf_fid, nom: doc.numero })} onMouseLeave={() => setApercu(null)}>Ouvrir</ActionButton>}
                                 </>}
                             {PEPPOL_ACTIF && tab === 'factures' && doc.client_tva && doc.statut !== 'payée' && doc.statut !== 'annulée' && (
@@ -1760,6 +1847,7 @@ export default function LodeDevisFactures() {
       {editing && <Editeur type={editing.type} doc={editing.doc} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load() }} />}
       {suivi && <SuiviModal doc={suivi} color={C} onClose={() => setSuivi(null)} onChanged={() => { load() }} />}
       {apercu && <ApercuFacture fid={apercu.fid} nom={apercu.nom} />}
+      {envoi && <EnvoiFactureModal doc={envoi.doc} b64={envoi.b64} fileName={envoi.fileName} onClose={() => setEnvoi(null)} onSent={() => { setEnvoi(null); load() }} />}
     </Layout>
   )
 }
