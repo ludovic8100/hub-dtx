@@ -111,7 +111,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
   const [lignes, setLignes] = useState([{ titre: '', descriptif: '', description: '', quantite: 1, prix_unitaire: 0, remise_pct: 0, tva_pct: 21, tva_categorie: 'S', photos: [] }])
   const [afficherTVAC, setAfficherTVAC] = useState(false)
   const [acomptesDispo, setAcomptesDispo] = useState([])
-  const [acomptesSel, setAcomptesSel] = useState([])
+  const [acomptesSel, setAcomptesSel] = useState(doc?._preselAcomptes || [])
   const [acLignes, setAcLignes] = useState({})
   const [origines, setOrigines] = useState([])
   const [saving, setSaving] = useState(false)
@@ -1691,6 +1691,38 @@ export default function LodeDevisFactures() {
   }
 
   const liste = tab === 'devis' ? devis : factures
+
+  // Suivi acomptes : dossiers (par devis) avec un acompte facture mais un reste a facturer > 0.
+  const aSolder = (() => {
+    const acs = factures.filter(x => x.type === 'acompte')
+    if (!acs.length) return []
+    const parDevis = {}
+    factures.forEach(x => { const k = x.devis_id || ('f:' + x.id); (parDevis[k] = parDevis[k] || []).push(x) })
+    const out = []
+    acs.forEach(ac => {
+      const k = ac.devis_id || ('f:' + ac.id)
+      if (out.find(r => r.key === k)) return
+      const grp = parDevis[k] || [ac]
+      const projet = Math.max(0, ...grp.map(x => Number(x.total_projet_ttc) || 0))
+      const facture = grp.reduce((sum, x) => sum + (Number(x.total_ttc) || 0), 0)
+      const reste = Math.round((projet - facture) * 100) / 100
+      if (projet > 0 && reste > 0.01) out.push({ key: k, acompte: ac, grp, projet, facture, reste })
+    })
+    return out.sort((a, b) => b.reste - a.reste)
+  })()
+
+  const facturerSolde = (d) => {
+    const ac = d.acompte
+    setEditing({ type: 'facture', doc: {
+      type: 'solde',
+      client_id: ac.client_id, client_nom: ac.client_nom, client_adresse: ac.client_adresse,
+      client_cp: ac.client_cp, client_ville: ac.client_ville, client_email: ac.client_email,
+      client_telephone: ac.client_telephone, client_tva: ac.client_tva,
+      devis_id: ac.devis_id || null, total_projet_ttc: ac.total_projet_ttc,
+      langue: ac.langue || 'fr', objet: ac.objet || '',
+      _preselAcomptes: d.grp.filter(x => x.type === 'acompte').map(x => x.id),
+    } })
+  }
   const COLS = [
     { h: 'N°', key: 'numero', align: 'left' },
     { h: 'Client', key: 'client_nom', align: 'left' },
@@ -1744,6 +1776,31 @@ export default function LodeDevisFactures() {
 
         <TabsBar color={C} active={tab} onChange={setTab}
           tabs={[{ key: 'devis', label: 'Devis', count: devis.length }, { key: 'factures', label: 'Factures', count: factures.length }]} />
+
+        {tab === 'factures' && aSolder.length > 0 && (
+          <DataCard style={{ padding: 0, marginBottom: 14, border: '1px solid #fed7aa', overflow: 'hidden' }}>
+            <div style={{ background: '#fff7ed', color: '#9a3412', fontWeight: 800, fontSize: 13.5, padding: '10px 16px', borderBottom: '1px solid #fed7aa' }}>
+              ⏳ À solder — {aSolder.length} dossier{aSolder.length > 1 ? 's' : ''} avec acompte facturé, reste à facturer
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {aSolder.map(d => (
+                <div key={d.key} style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', justifyContent: 'space-between', padding: '11px 16px', borderTop: '1px solid #f8fafc' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, color: '#1e293b', fontSize: 14 }}>{d.acompte.client_nom}</div>
+                    <div style={{ color: '#94a3b8', fontSize: 12 }}>Acompte {d.acompte.numero} · projet {eur(d.projet)} · déjà facturé {eur(d.facture)}</div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 10.5, color: '#9a3412', fontWeight: 700, textTransform: 'uppercase', letterSpacing: .3 }}>Reste</div>
+                      <div style={{ fontWeight: 800, color: '#9a3412', fontSize: 16 }}>{eur(d.reste)}</div>
+                    </div>
+                    <button onClick={() => facturerSolde(d)} style={{ background: '#16a34a', color: '#fff', border: 'none', borderRadius: 9, padding: '9px 15px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>Facturer le solde</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </DataCard>
+        )}
 
         {loading ? <p style={{ color: '#94a3b8' }}>Chargement…</p> :
           liste.length === 0 ? (
