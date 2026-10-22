@@ -34,30 +34,6 @@ async function loadImageDataURL(url) {
   } catch { return null }
 }
 
-// Reduit une image (dataURL) a une vignette raisonnable avant insertion PDF :
-// evite des PDF de plusieurs Mo (erreur 413 a l'envoi) alors que les photos s'affichent petites.
-async function compressImageDataURL(dataUrl, max = 700, quality = 0.72) {
-  try {
-    if (!dataUrl || typeof dataUrl !== 'string') return dataUrl
-    const img = await new Promise((resolve, reject) => {
-      const im = new Image()
-      im.onload = () => resolve(im)
-      im.onerror = reject
-      im.src = dataUrl
-    })
-    const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height
-    if (!w || !h) return dataUrl
-    const scale = Math.min(1, max / Math.max(w, h))
-    const nw = Math.max(1, Math.round(w * scale)), nh = Math.max(1, Math.round(h * scale))
-    const cv = document.createElement('canvas'); cv.width = nw; cv.height = nh
-    const ctx = cv.getContext('2d')
-    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, nw, nh)  // aplatit la transparence (PNG -> JPEG)
-    ctx.drawImage(img, 0, 0, nw, nh)
-    const out = cv.toDataURL('image/jpeg', quality)
-    return (out && out.length < dataUrl.length) ? out : dataUrl
-  } catch { return dataUrl }
-}
-
 const eur = n => (Number(n) || 0).toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
 // Format euro pour jsPDF : séparateur de milliers = point, décimale = virgule (évite l'espace insécable mal rendu)
 const eurPDF = n => {
@@ -756,7 +732,7 @@ async function exportPDF(type, doc, lignes, opts = {}) {
   await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
   await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js')
   const { jsPDF } = window.jspdf
-  const d = new jsPDF()
+  const d = new jsPDF({ compress: true })  // Flate sur les flux : evite que le logo PNG soit embarque en bitmap brut (~5 Mo -> 413 a l envoi)
   const isDevis = type === 'devis'
   const tot = calcTotaux(lignes, doc.remise_pct)
   const O = [234, 88, 12]          // orange LODE
@@ -834,8 +810,7 @@ async function exportPDF(type, doc, lignes, opts = {}) {
         for (const photo of l.photos) {
           const src = photo.url || photo
           try {
-            const brut = (typeof src === 'string' && src.startsWith('data:')) ? src : await loadImageDataURL(src)
-            const dataUrl = await compressImageDataURL(brut)
+            const dataUrl = (typeof src === 'string' && src.startsWith('data:')) ? src : await loadImageDataURL(src)
             if (dataUrl) out[idx].push(dataUrl)
           } catch (e) { /* ignore */ }
         }
