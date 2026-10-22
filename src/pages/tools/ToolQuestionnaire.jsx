@@ -516,7 +516,7 @@ function horizonCategory(years) {
 // ═══════════════════════════════════════════════════════════════════════
 
 function buildPDF(clientInfo, contrat, answers, score, profile, funds, pdfDates, horizonYears) {
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+  const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true })
   const w = 210, mL = 25, mR = 25, cW = w - mL - mR
   let y = 18
 

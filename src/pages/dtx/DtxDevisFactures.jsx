@@ -423,7 +423,7 @@ async function exportPDF(type, doc, lignes) {
   await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
   await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js')
   const { jsPDF } = window.jspdf
-  const d = new jsPDF()
+  const d = new jsPDF({ compress: true })
   const isDevis = type === 'devis'
   const tot = calcTotaux(lignes, doc.remise_pct)
   const O = [234, 88, 12]          // orange DTX

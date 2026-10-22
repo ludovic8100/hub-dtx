@@ -193,7 +193,7 @@ export default function HexagroupCotisations() {
   const construirePDF = async (r) => {
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
     const { jsPDF } = window.jspdf
-    const d = new jsPDF()            // mm, A4 portrait (210 x 297)
+    const d = new jsPDF({ compress: true })            // mm, A4 portrait (210 x 297)
     const W = 210, LM = 14, RM = 196
     const grad = (x, y, w, h) => { const n = Math.max(4, Math.round(w * 2)); const bw = w / n; for (let i = 0; i < n; i++) { const [cr, cg, cb] = interp(STOPS, i / (n - 1)); d.setFillColor(cr, cg, cb); d.rect(x + i * bw, y, bw + 0.4, h, 'F') } }
     const tri = (p, c) => { d.setFillColor(c[0], c[1], c[2]); d.triangle(p[0][0], p[0][1], p[1][0], p[1][1], p[2][0], p[2][1], 'F') }

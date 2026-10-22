@@ -44,7 +44,7 @@ const T = {
 }
 
 export function buildDevoirInfoPdf(d) {
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+  const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true })
   const W = 210, mL = 18, mR = 18, cw = W - mL - mR, bottom = 262
   let y = 0
 
