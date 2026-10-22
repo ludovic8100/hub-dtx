@@ -23,8 +23,16 @@ const TOOLS = [
     key: 'devoir-info',
     title: "Devoir d'information non-vie",
     desc: "Remplir le devoir d'information IARD depuis le client et le contrat, conseil personnalisé généré depuis les garanties, signature sur tablette.",
-    img: '/assets/tools/icon-questionnaire.png',
+    img: '/assets/tools/icon_DI.png',
     path: '/tools/devoir-information',
+    ready: true,
+  },
+  {
+    key: 'succession',
+    title: 'Droit de Succession',
+    desc: "Simulateur successoral belge — calculez les droits de succession selon les régions (Wallonie, Flandre, Bruxelles) et comparez avec une assurance-vie.",
+    img: '/assets/tools/Icon_droit_succession.png',
+    path: '/tools/succession',
     ready: true,
   },
   {
