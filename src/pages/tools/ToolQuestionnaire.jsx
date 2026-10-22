@@ -739,9 +739,57 @@ export default function ToolQuestionnaire() {
   const [error, setError] = useState(null)
   const searchTimeout = useRef(null)
 
+  // ─── Right panel state ───
+  const [savedProfiles, setSavedProfiles] = useState([])
+  const [pendingContrats, setPendingContrats] = useState([])
+  const [loadingProfiles, setLoadingProfiles] = useState(false)
+  const [savingToDB, setSavingToDB] = useState(false)
+  const [savedToDBMsg, setSavedToDBMsg] = useState(null)
+  // Upload pre-filled questionnaire
+  const [uploadQFile, setUploadQFile] = useState(null)
+  const [uploadQExtracting, setUploadQExtracting] = useState(false)
+  const [uploadQProgress, setUploadQProgress] = useState('')
+  const [uploadQResult, setUploadQResult] = useState(null) // { answers, score, profile }
+  const [uploadQError, setUploadQError] = useState(null)
+
   // Computed score & profile
   const score = calcScore(answers)
   const profile = scoreToProfile(score)
+
+  // ─── Load saved profiles for selected client ───
+  const loadProfiles = useCallback(async (dossier) => {
+    if (!dossier) return
+    setLoadingProfiles(true)
+    try {
+      const { data } = await supabase
+        .from('profils_investisseur')
+        .select('*')
+        .eq('dossier', dossier)
+        .order('created_at', { ascending: false })
+      setSavedProfiles(data || [])
+    } catch (e) { console.error('loadProfiles error', e) }
+    setLoadingProfiles(false)
+  }, [])
+
+  // ─── Load pending Vie contracts (no profile yet) for selected client ───
+  const loadPendingContrats = useCallback(async (dossier) => {
+    if (!dossier) return
+    try {
+      // Get all Vie contracts
+      const { data: vieContrats } = await supabase
+        .from('contrats')
+        .select('*')
+        .eq('dossier', dossier)
+        .eq('domaine', 'Vie')
+      // Get contracts that already have a profile
+      const { data: profiles } = await supabase
+        .from('profils_investisseur')
+        .select('contrat_id')
+        .eq('dossier', dossier)
+      const profiledIds = new Set((profiles || []).map(p => p.contrat_id).filter(Boolean))
+      setPendingContrats((vieContrats || []).filter(c => !profiledIds.has(c.id)))
+    } catch (e) { console.error('loadPendingContrats error', e) }
+  }, [])
 
   // ─── Search clients ───
   const searchClients = useCallback(async (term) => {
@@ -797,6 +845,9 @@ export default function ToolQuestionnaire() {
         setError('Aucun contrat Vie trouvé pour ce client.')
       }
       setStep('select')
+      // Load right-panel data
+      loadProfiles(client.dossier)
+      loadPendingContrats(client.dossier)
     } catch (e) {
       setError(e.message)
     } finally {
@@ -945,11 +996,146 @@ export default function ToolQuestionnaire() {
   }
 
   // ─── Generate PDF ───
-  function handleGenerate() {
-    const doc = buildPDF(selectedClient, selectedContrat, answers, score, profile, funds, pdfDates, horizonYears)
+  async function handleGenerate() {
+    const currentScore = calcScore(answers)
+    const currentProfile = scoreToProfile(currentScore)
+    const doc = buildPDF(selectedClient, selectedContrat, answers, currentScore, currentProfile, funds, pdfDates, horizonYears)
     const blob = doc.output('blob')
     setPdfBlob(blob)
     setStep('done')
+    // Auto-save to DB
+    await saveProfileToDB(answers, currentScore, currentProfile, 'generated')
+  }
+
+  // ─── Save profile to Supabase ───
+  async function saveProfileToDB(ans, sc, prof, source) {
+    setSavingToDB(true)
+    setSavedToDBMsg(null)
+    try {
+      const row = {
+        client_id: selectedClient?.id || null,
+        contrat_id: selectedContrat?.id || null,
+        dossier: selectedClient?.dossier || null,
+        nom_client: [selectedClient?.nom, selectedClient?.prenom].filter(Boolean).join(' '),
+        profil: prof,
+        score: sc,
+        answers: ans,
+        funds: funds,
+        horizon_years: horizonYears,
+        purpose: purposeFromType(selectedContrat?.type_production),
+        source, // 'generated' or 'uploaded'
+      }
+      const { error: err } = await supabase.from('profils_investisseur').insert(row)
+      if (err) throw err
+      setSavedToDBMsg('Profil sauvegardé en base de données.')
+      // Refresh right panel
+      if (selectedClient?.dossier) {
+        loadProfiles(selectedClient.dossier)
+        loadPendingContrats(selectedClient.dossier)
+      }
+    } catch (e) {
+      setSavedToDBMsg(`Erreur sauvegarde : ${e.message}`)
+    } finally {
+      setSavingToDB(false)
+    }
+  }
+
+  // ─── Upload pre-filled questionnaire PDF — extract 14 answers via OCR ───
+  async function handleUploadedQuestionnaire(file) {
+    if (!file || !file.name.toLowerCase().endsWith('.pdf')) {
+      setUploadQError('Veuillez sélectionner un fichier PDF.')
+      return
+    }
+    setUploadQFile(file)
+    setUploadQExtracting(true)
+    setUploadQError(null)
+    setUploadQResult(null)
+
+    try {
+      setUploadQProgress('Extraction du texte du questionnaire...')
+      const text = await extractTextFromPDF(file, setUploadQProgress)
+      console.log('=== UPLOADED QUESTIONNAIRE TEXT ===', text)
+
+      if (text.trim().length < 30) {
+        setUploadQError('Le PDF semble être une image scannée — extraction impossible. Veuillez encoder les réponses manuellement.')
+        setUploadQExtracting(false)
+        return
+      }
+
+      // Parse 14 FSMA answers from the text
+      // Strategy: for each question, look for checked option (☑, [x], ✓) or the last option on the same line group
+      const extracted = {}
+      for (const q of QUESTIONS) {
+        const opts = Object.entries(q.opts) // [['a','...'],['b','...'],['c','...']]
+        let found = null
+
+        for (const [letter, optText] of opts) {
+          // Look for patterns indicating this option is selected:
+          // ☑, [x], [X], ✓, ✔, (x), or the option text preceded by a check mark
+          // Also look for "a)" or "b)" or "c)" with a marker
+          const shortText = optText.substring(0, 30).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+          const patterns = [
+            // Checkbox checked near option text
+            new RegExp(`[☑✓✔xX×■●]\\s*${letter}\\)`, 'i'),
+            new RegExp(`[☑✓✔xX×■●]\\s*${shortText}`, 'i'),
+            new RegExp(`\\[\\s*[xX×]\\s*\\]\\s*${letter}\\)`, 'i'),
+            new RegExp(`${letter}\\)\\s*[☑✓✔■●]`, 'i'),
+            // Bold or underlined option (common in filled PDFs)
+            new RegExp(`\\*\\*\\s*${letter}\\)`, 'i'),
+          ]
+
+          for (const pat of patterns) {
+            if (pat.test(text)) {
+              found = letter
+              break
+            }
+          }
+          if (found) break
+        }
+
+        if (found) {
+          extracted[q.n] = found
+        }
+      }
+
+      const answeredCount = Object.keys(extracted).length
+      if (answeredCount === 0) {
+        // Fallback: try to detect answers from sequential a/b/c pattern in text
+        // Look for lines like "Question 1 : b" or "1. b" or "Q1: c"
+        for (const q of QUESTIONS) {
+          const m = text.match(new RegExp(`(?:question|q\\.?|q)\\s*${q.n}\\s*[:.]?\\s*([abc])`, 'i'))
+            || text.match(new RegExp(`^\\s*${q.n}[\\.\\)\\s]+([abc])\\b`, 'im'))
+          if (m) extracted[q.n] = m[1].toLowerCase()
+        }
+      }
+
+      const finalCount = Object.keys(extracted).length
+      if (finalCount < 7) {
+        setUploadQError(`Seulement ${finalCount}/14 réponses détectées. Le PDF n'est peut-être pas un questionnaire FSMA rempli, ou le format n'est pas reconnu.`)
+        setUploadQExtracting(false)
+        return
+      }
+
+      // Fill missing answers with 'b' (neutral default)
+      for (const q of QUESTIONS) {
+        if (!extracted[q.n]) extracted[q.n] = 'b'
+      }
+
+      const qScore = calcScore(extracted)
+      const qProfile = scoreToProfile(qScore)
+
+      setUploadQResult({ answers: extracted, score: qScore, profile: qProfile, answeredCount: finalCount })
+
+      // If a client + contrat is selected, auto-save to DB
+      if (selectedClient && selectedContrat) {
+        await saveProfileToDB(extracted, qScore, qProfile, 'uploaded')
+      }
+    } catch (e) {
+      setUploadQError(`Erreur : ${e.message}`)
+    } finally {
+      setUploadQExtracting(false)
+      setUploadQProgress('')
+    }
   }
 
   function handleDownload() {
@@ -980,6 +1166,12 @@ export default function ToolQuestionnaire() {
     setHorizonYears(null)
     setPdfBlob(null)
     setError(null)
+    setSavedProfiles([])
+    setPendingContrats([])
+    setSavedToDBMsg(null)
+    setUploadQFile(null)
+    setUploadQResult(null)
+    setUploadQError(null)
   }
 
   // ─── Styles ───
@@ -1000,9 +1192,19 @@ export default function ToolQuestionnaire() {
     borderRadius: 8, outline: 'none', boxSizing: 'border-box',
   }
 
+  // ─── Right panel style ───
+  const panelCardStyle = {
+    border: '1px solid #e2e8f0', borderRadius: 10, padding: '14px 16px',
+    background: '#fff', marginBottom: 12,
+  }
+  const profileColors = {
+    'Défensif': '#16a34a', 'Conservateur': '#22c55e',
+    'Neutre / Équilibré': '#f59e0b', 'Dynamique': '#ea580c', 'Offensif': '#dc2626',
+  }
+
   return (
     <Layout currentPage="Questionnaire Profil">
-      <div style={{ fontFamily: "'Segoe UI', sans-serif", width: '100%', maxWidth: 760 }}>
+      <div style={{ fontFamily: "'Segoe UI', sans-serif", width: '100%' }}>
         <div style={{ marginBottom: 6 }}>
           <Link to="/tools" style={{ fontSize: 12.5, color: '#64748b', textDecoration: 'none' }}>← Outils</Link>
         </div>
@@ -1010,6 +1212,10 @@ export default function ToolQuestionnaire() {
           <h1 style={{ fontSize: 22, fontWeight: 800, color: '#1A3A6B', margin: 0 }}>Questionnaire Profil Investisseur</h1>
           <div style={{ fontSize: 14, color: '#8A9BBE', marginTop: 2 }}>Recherchez un client, sélectionnez un contrat Vie, uploadez la proposition, remplissez le questionnaire</div>
         </div>
+
+      <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
+      {/* ═══ LEFT COLUMN — main workflow ═══ */}
+      <div style={{ flex: 1, minWidth: 0, maxWidth: 760 }}>
 
         {error && (
           <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '12px 16px', marginBottom: 14, color: '#991b1b', fontSize: 13 }}>
@@ -1550,6 +1756,17 @@ export default function ToolQuestionnaire() {
             <div style={{ fontSize: 15, fontWeight: 700, color: '#16a34a', marginBottom: 8 }}>
               PDF généré avec succès
             </div>
+            {savingToDB && (
+              <div style={{ fontSize: 12, color: '#1A3A6B', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ width: 12, height: 12, border: '2px solid #1A3A6B', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                Sauvegarde en base de données...
+              </div>
+            )}
+            {savedToDBMsg && (
+              <div style={{ fontSize: 12, color: savedToDBMsg.startsWith('Erreur') ? '#dc2626' : '#16a34a', marginBottom: 6, fontWeight: 600 }}>
+                {savedToDBMsg}
+              </div>
+            )}
             <div style={{ fontSize: 13, color: '#64748b', marginBottom: 14 }}>
               Questionnaire pour <strong>{selectedClient?.nom} {selectedClient?.prenom}</strong> — Profil : <strong>{profile}</strong> ({score}/42)
               {horizonYears !== null && <> — Horizon : <strong>{horizonYears} ans</strong></>}
@@ -1567,6 +1784,158 @@ export default function ToolQuestionnaire() {
             </div>
           </div>
         )}
+      </div>
+      {/* ═══ END LEFT COLUMN ═══ */}
+
+      {/* ═══ RIGHT PANEL ═══ */}
+      <div style={{ width: 320, flexShrink: 0, position: 'sticky', top: 12, maxHeight: 'calc(100vh - 100px)', overflowY: 'auto' }}>
+
+        {/* ── Saved profiles ── */}
+        <div style={panelCardStyle}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <i className="ti ti-user-check" style={{ color: '#1A3A6B' }} />
+            Profils enregistrés
+          </div>
+          {!selectedClient ? (
+            <div style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic' }}>Sélectionnez un client pour voir ses profils</div>
+          ) : loadingProfiles ? (
+            <div style={{ fontSize: 12, color: '#94a3b8' }}>Chargement...</div>
+          ) : savedProfiles.length === 0 ? (
+            <div style={{ fontSize: 12, color: '#94a3b8' }}>Aucun profil enregistré</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {savedProfiles.map(p => (
+                <div key={p.id} style={{
+                  padding: '8px 10px', borderRadius: 6, background: '#f8fafc',
+                  border: '1px solid #e2e8f0', fontSize: 12,
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 700, color: profileColors[p.profil] || '#475569' }}>{p.profil}</span>
+                    <span style={{ color: '#94a3b8', fontSize: 11 }}>{p.score}/42</span>
+                  </div>
+                  <div style={{ color: '#64748b', marginTop: 2 }}>
+                    {p.nom_client}
+                    {p.source === 'uploaded' && <span style={{ marginLeft: 6, color: '#8b5cf6', fontSize: 10, fontWeight: 600 }}>PDF importé</span>}
+                  </div>
+                  <div style={{ color: '#94a3b8', fontSize: 10, marginTop: 2 }}>
+                    {new Date(p.created_at).toLocaleDateString('fr-BE')}
+                    {p.horizon_years ? ` — ${p.horizon_years} ans` : ''}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── Pending Vie contracts ── */}
+        <div style={panelCardStyle}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <i className="ti ti-alert-circle" style={{ color: '#f59e0b' }} />
+            Contrats Vie sans profil
+          </div>
+          {!selectedClient ? (
+            <div style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic' }}>Sélectionnez un client</div>
+          ) : pendingContrats.length === 0 ? (
+            <div style={{ fontSize: 12, color: '#16a34a', fontWeight: 600 }}>Tous les contrats ont un profil</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {pendingContrats.map(ct => (
+                <div
+                  key={ct.id}
+                  onClick={() => { selectContrat(ct); }}
+                  style={{
+                    padding: '6px 10px', borderRadius: 6, background: '#fffbeb',
+                    border: '1px solid #fed7aa', fontSize: 12, cursor: 'pointer',
+                    transition: 'all 0.15s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#fef3c7' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#fffbeb' }}
+                >
+                  <div style={{ fontWeight: 600, color: '#92400e' }}>
+                    {ct.compagnie || '—'} — {ct.police || '—'}
+                  </div>
+                  <div style={{ color: '#b45309', fontSize: 11, marginTop: 1 }}>
+                    {ct.type_production || '—'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── Upload pre-filled questionnaire ── */}
+        <div style={panelCardStyle}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <i className="ti ti-file-import" style={{ color: '#8b5cf6' }} />
+            Importer questionnaire rempli
+          </div>
+          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>
+            Uploadez un questionnaire FSMA déjà rempli — les réponses seront extraites automatiquement.
+          </div>
+
+          <div
+            style={{
+              border: '2px dashed #c4b5fd', borderRadius: 8, padding: '14px 10px',
+              textAlign: 'center', background: '#faf5ff', cursor: 'pointer',
+              transition: 'all 0.15s', fontSize: 12,
+            }}
+            onClick={() => document.getElementById('upload-q-input').click()}
+            onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = '#8b5cf6' }}
+            onDragLeave={e => { e.currentTarget.style.borderColor = '#c4b5fd' }}
+            onDrop={e => { e.preventDefault(); e.currentTarget.style.borderColor = '#c4b5fd'; if (e.dataTransfer.files[0]) handleUploadedQuestionnaire(e.dataTransfer.files[0]) }}
+          >
+            <input
+              id="upload-q-input"
+              type="file"
+              accept=".pdf"
+              style={{ display: 'none' }}
+              onChange={e => { if (e.target.files[0]) handleUploadedQuestionnaire(e.target.files[0]) }}
+            />
+            {uploadQFile ? (
+              <span style={{ color: '#6d28d9', fontWeight: 600 }}>{uploadQFile.name}</span>
+            ) : (
+              <span style={{ color: '#7c3aed' }}>Glissez ou cliquez — PDF questionnaire</span>
+            )}
+          </div>
+
+          {uploadQExtracting && (
+            <div style={{ fontSize: 11, color: '#7c3aed', marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ width: 12, height: 12, border: '2px solid #7c3aed', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+              {uploadQProgress || 'Extraction...'}
+            </div>
+          )}
+
+          {uploadQError && (
+            <div style={{ fontSize: 11, color: '#dc2626', marginTop: 8, background: '#fef2f2', padding: '6px 8px', borderRadius: 6 }}>
+              {uploadQError}
+            </div>
+          )}
+
+          {uploadQResult && (
+            <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 6, background: '#f5f3ff', border: '1px solid #c4b5fd' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: profileColors[uploadQResult.profile] || '#475569' }}>
+                {uploadQResult.profile}
+              </div>
+              <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                Score : {uploadQResult.score}/42 — {uploadQResult.answeredCount}/14 réponses détectées
+              </div>
+              {selectedClient && selectedContrat && (
+                <div style={{ fontSize: 10, color: '#16a34a', marginTop: 4, fontWeight: 600 }}>
+                  Sauvegardé pour {selectedClient.nom} {selectedClient.prenom}
+                </div>
+              )}
+              {(!selectedClient || !selectedContrat) && (
+                <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>
+                  Sélectionnez un client + contrat pour sauvegarder
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+      {/* ═══ END RIGHT PANEL ═══ */}
+
+      </div>{/* end flex container */}
       </div>
     </Layout>
   )
