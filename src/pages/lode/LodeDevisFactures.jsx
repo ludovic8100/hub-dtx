@@ -1532,7 +1532,7 @@ function EnvoiFactureModal({ doc, b64, fileName, onClose, onSent }) {
       <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 560, boxShadow: '0 20px 60px rgba(0,0,0,.25)', overflow: 'hidden' }}>
         <div style={{ background: C, color: '#fff', padding: '16px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: 17, fontWeight: 800 }}>Envoyer la facture {doc.numero}</div>
-          <button onClick={onClose} style={{ background: 'rgba(255,255,255,.2)', border: 'none', color: '#fff', width: 30, height: 30, borderRadius: 15, cursor: 'pointer', fontSize: 16 }}>\u00d7</button>
+          <button onClick={onClose} style={{ background: 'rgba(255,255,255,.2)', border: 'none', color: '#fff', width: 30, height: 30, borderRadius: 15, cursor: 'pointer', fontSize: 16 }}>{'\u00d7'}</button>
         </div>
         <div style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 13 }}>
           <div><label style={lbl}>A</label><input value={to} onChange={e => setTo(e.target.value)} style={champ} placeholder="client@email.be" /></div>
