@@ -1474,7 +1474,7 @@ function ApercuFacture({ fid, nom }) {
   const src = `https://n8n.srv1082740.hstgr.cloud/webhook/apercu-facture?fid=${encodeURIComponent(fid)}`
   return (
     <div style={{ position: 'fixed', top: '50%', right: 24, transform: 'translateY(-50%)', zIndex: 2100, width: 520, maxWidth: '48vw', maxHeight: '88vh', background: '#fff', borderRadius: 14, boxShadow: '0 20px 60px rgba(0,0,0,0.35)', border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', pointerEvents: 'none' }}>
-      <div style={{ padding: '10px 14px', background: '#0f172a', color: '#fff', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>\U0001F4C4 {nom}</div>
+      <div style={{ padding: '10px 14px', background: '#0f172a', color: '#fff', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>📄 {nom}</div>
       <div style={{ overflowY: 'auto', background: '#f8fafc' }}>
         <img src={src} alt="Apercu facture" onLoad={() => setEtat('ok')} onError={() => setEtat('err')} style={{ width: '100%', height: 'auto', display: etat === 'ok' ? 'block' : 'none' }} />
         {etat === 'load' && <div style={{ padding: '34px 20px', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>Chargement de l\'apercu…</div>}
@@ -1540,7 +1540,7 @@ function EnvoiFactureModal({ doc, b64, fileName, onClose, onSent }) {
           <div><label style={lbl}>Objet</label><input value={subject} onChange={e => setSubject(e.target.value)} style={champ} /></div>
           <div><label style={lbl}>Message</label><textarea value={body} onChange={e => setBody(e.target.value)} rows={7} style={{ ...champ, resize: 'vertical', lineHeight: 1.5 }} /></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: '#f8fafc', border: '1px solid #eef2f6', borderRadius: 8, padding: '9px 12px', fontSize: 13 }}>
-            <span style={{ fontSize: 16 }}>\U0001F4CE</span><span style={{ color: '#475569', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileName}</span>
+            <span style={{ fontSize: 16 }}>📎</span><span style={{ color: '#475569', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileName}</span>
           </div>
           {err && <div style={{ color: '#dc2626', fontSize: 13, fontWeight: 600 }}>{err}</div>}
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>

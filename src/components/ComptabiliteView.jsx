@@ -1103,7 +1103,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                 display:'flex', alignItems:'center', gap:'10px', width:'100%', padding:'9px 12px', border:'none', background:'none',
                 cursor:'pointer', fontSize:'13px', fontWeight:'600', color:'#0f172a', borderRadius:'7px', textAlign:'left'
               }} onMouseEnter={e=>e.currentTarget.style.background='#f1f5f9'} onMouseLeave={e=>e.currentTarget.style.background='none'}>
-                <i className="ti ti-arrow-back-up" style={{ fontSize:'17px', color:'#64748b' }} /> Repasser \u00e0 justifier
+                <i className="ti ti-arrow-back-up" style={{ fontSize:'17px', color:'#64748b' }} /> Repasser à justifier
               </button>
             ) : (
               <button onClick={()=>{ const tx = menuCroix.tx; setMenuCroix(null); marquerEnAttente(tx, true) }} style={{
