@@ -121,7 +121,7 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
   }
   const capMois = x => x ? x.charAt(0).toUpperCase() + x.slice(1) : x
   async function newNote(societe) {
-    const soc = societe || (isGroupe ? 'dynassur' : entiteKey)
+    const soc = (typeof societe === 'string' && societe) ? societe : (isGroupe ? 'dynassur' : entiteKey)
     const d = new Date()
     const jour = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
     const periode = capMois(d.toLocaleDateString('fr-BE', { month: 'long', year: 'numeric' }))
@@ -163,7 +163,8 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
   async function uploadJustif(k, file) {
     if (!file) return
     const safe = file.name.replace(/[^\w.\-]/g, '_')
-    const path = `${sel?.societe || entiteKey}/${uid()}-${safe}`
+    const prefix = (typeof sel?.societe === 'string' && sel.societe) ? sel.societe : entiteKey
+    const path = `${prefix}/${uid()}-${safe}`
     const { error } = await supabase.storage.from('notes-frais').upload(path, file, { upsert: false, contentType: file.type || undefined })
     if (error) { alert('Upload du justificatif échoué : ' + error.message); return }
     updLigne(k, { justificatif_path: path, justificatif_nom: file.name })
@@ -315,7 +316,7 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
             </div>
 
             <Card titre="Mes notes de frais" sous={isAdmin ? 'Admin : vous voyez toutes les notes de cette société.' : 'Vous voyez et gérez vos propres notes.'}
-              right={<button onClick={newNote} style={btn(ACCENT)}>+ Nouvelle note</button>}>
+              right={<button onClick={() => newNote()} style={btn(ACCENT)}>+ Nouvelle note</button>}>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
                 <input value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher (titre, période, auteur…)" style={{ ...inp, maxWidth: 300 }} />
                 {isAdmin && <div style={{ display: 'flex', gap: 0, border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
