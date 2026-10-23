@@ -94,6 +94,7 @@ const STATUTS_FACT = {
 // ════════════════════════════════════════════════════════════════
 function Editeur({ type, doc, onClose, onSaved }) {
   const isDevis = type === 'devis'
+  const verrouille = !isDevis && !!(doc && doc.id) && !!(doc && doc.statut) && doc.statut !== 'brouillon'
   const mobE = useMobile()
   const table = isDevis ? 'lode_devis' : 'lode_factures'
   const tableLignes = isDevis ? 'lode_devis_lignes' : 'lode_factures_lignes'
@@ -386,6 +387,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
   const delLigne = i => setLignes(p => p.filter((_, j) => j !== i))
 
   const save = async () => {
+    if (verrouille) { alert('Cette facture a déjà été émise/envoyée : elle ne peut plus être modifiée. Pour la corriger, créez une note de crédit.'); return }
     if (!f.client_nom.trim()) { alert('Le nom du client est obligatoire'); return }
     setSaving(true)
     try {
@@ -446,6 +448,12 @@ function Editeur({ type, doc, onClose, onSaved }) {
           </h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#94a3b8' }}>×</button>
         </div>
+
+        {verrouille && (
+          <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: 10, padding: '10px 14px', marginBottom: 14, fontSize: 13, fontWeight: 600 }}>
+            🔒 Facture déjà émise — lecture seule. Une facture émise ne peut jamais être modifiée ni supprimée : pour la corriger, créez une note de crédit.
+          </div>
+        )}
 
         {/* Client */}
         <div style={{ fontSize: 13, fontWeight: 800, color: ORANGE, marginBottom: 8 }}>Client</div>
@@ -710,7 +718,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
           <button onClick={onClose} style={{ background: '#f1f5f9', border: 'none', borderRadius: 9, padding: '10px 20px', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#64748b' }}>Annuler</button>
-          <button onClick={save} disabled={saving} style={{ background: ORANGE, border: 'none', borderRadius: 9, padding: '10px 24px', cursor: saving ? 'wait' : 'pointer', fontSize: 13, fontWeight: 700, color: '#fff' }}>{saving ? 'Enregistrement…' : 'Enregistrer'}</button>
+          <button onClick={save} disabled={saving || verrouille} style={{ background: verrouille ? '#cbd5e1' : ORANGE, border: 'none', borderRadius: 9, padding: '10px 24px', cursor: (saving || verrouille) ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700, color: '#fff' }}>{verrouille ? '🔒 Verrouillée' : (saving ? 'Enregistrement…' : 'Enregistrer')}</button>
         </div>
       </div>
     </div>
@@ -1027,6 +1035,28 @@ async function exportPDF(type, doc, lignes, opts = {}) {
   if (doc.notes) {
     y += 8; d.setFontSize(8.5); d.setTextColor(...GREY); d.setFont(undefined, 'normal')
     d.text(d.splitTextToSize(doc.notes, PW - 32), 16, y)
+  }
+
+  // ---- Mention légale TVA 6 % (rénovation habitation > 10 ans) ----
+  if ((lignes || []).some(l => Number(l.tva_pct) === 6)) {
+    const M6 = isDevis
+      ? ({
+          fr: "TVA 6 % (rénovation) : taux applicable sous réserve que l'habitation ait plus de 10 ans et soit utilisée, exclusivement ou à titre principal, comme logement privé. La mention légale complète figurera sur la facture.",
+          nl: "Btw 6 % (renovatie): tarief van toepassing mits de woning ouder is dan 10 jaar en uitsluitend of hoofdzakelijk als privéwoning wordt gebruikt. De volledige wettelijke vermelding verschijnt op de factuur.",
+        })
+      : ({
+          fr: "Taux de TVA 6 % : En l'absence de contestation écrite dans un délai d'un mois à compter de la réception de la facture, le client est présumé reconnaître que (1) les travaux sont effectués à une habitation dont la première occupation remonte à au moins dix ans avant la première facture relative à ces travaux, (2) que l'habitation est, après travaux, utilisée exclusivement ou à titre principal comme logement privé, et (3) que les travaux sont fournis et facturés à un consommateur final. Si l'une de ces conditions n'est pas remplie, le taux normal de 21 % s'applique et le client en est responsable envers l'État.",
+          nl: "Btw-tarief 6 % : Bij gebrek aan schriftelijke betwisting binnen één maand na ontvangst van de factuur wordt de klant geacht te erkennen dat (1) de werken worden verricht aan een woning waarvan de eerste ingebruikneming minstens tien jaar vóór de eerste factuur voor die werken plaatsvond, (2) dat de woning na de werken uitsluitend of hoofdzakelijk als privéwoning wordt gebruikt, en (3) dat de werken aan een eindverbruiker worden verstrekt en gefactureerd. Is een van die voorwaarden niet vervuld, dan geldt het normale tarief van 21 % en is de klant daarvoor aansprakelijk tegenover de Staat.",
+        })
+    const txt6 = M6[doc.langue] || M6.fr
+    const ln6 = d.splitTextToSize(txt6, PW - 40)
+    const h6 = ln6.length * 3.4 + 8
+    if (y + h6 > 286) { d.addPage(); y = 20 }
+    y += 10
+    d.setFillColor(255, 251, 235); d.setDrawColor(245, 158, 11); d.setLineWidth(0.3)
+    d.roundedRect(16, y - 5, PW - 32, h6, 2, 2, 'FD')
+    d.setFontSize(7.5); d.setTextColor(120, 53, 15); d.setFont(undefined, 'normal')
+    d.text(ln6, 20, y); y += h6 - 3
   }
 
   // ---- CGV (page 2) ----
@@ -1685,8 +1715,9 @@ export default function LodeDevisFactures() {
   }
 
   const supprimer = async (type, id) => {
+    if (type !== 'devis') { alert("Une facture ne peut pas être supprimée (numérotation légale continue). Pour l'annuler, créez une note de crédit."); return }
     if (!confirm('Supprimer définitivement ?')) return
-    await supabase.from(type === 'devis' ? 'lode_devis' : 'lode_factures').delete().eq('id', id)
+    await supabase.from('lode_devis').delete().eq('id', id)
     load()
   }
 
@@ -1844,7 +1875,7 @@ export default function LodeDevisFactures() {
                         <ActionButton tone="peppol" disabled={busy === doc.id + 'peppol'} onClick={() => envoyerPeppol(doc)}>{busy === doc.id + 'peppol' ? '…' : '📨 Peppol'}</ActionButton>
                       )}
                       {tab === 'devis' && doc.statut === 'accepté' && <ActionButton tone="accent" color={C} onClick={() => convertir(doc)}>→ Facture</ActionButton>}
-                      <ActionButton tone="danger" onClick={() => supprimer(t, doc.id)}>Supprimer</ActionButton>
+                      {t === 'devis' && <ActionButton tone="danger" onClick={() => supprimer(t, doc.id)}>Supprimer</ActionButton>}
                     </div>
                   </DataCard>
                 )
@@ -1890,7 +1921,7 @@ export default function LodeDevisFactures() {
                               <ActionButton tone="peppol" disabled={busy === doc.id + 'peppol'} onClick={() => envoyerPeppol(doc)}>{busy === doc.id + 'peppol' ? '…' : '📨 Peppol'}</ActionButton>
                             )}
                             {tab === 'devis' && doc.statut === 'accepté' && <ActionButton tone="accent" color={C} onClick={() => convertir(doc)}>→ Facture</ActionButton>}
-                            <ActionButton tone="danger" onClick={() => supprimer(tab === 'devis' ? 'devis' : 'facture', doc.id)}>×</ActionButton>
+                            {tab === 'devis' && <ActionButton tone="danger" onClick={() => supprimer(tab === 'devis' ? 'devis' : 'facture', doc.id)}>×</ActionButton>}
                           </div>
                         </td>
                       </tr>
