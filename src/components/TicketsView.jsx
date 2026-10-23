@@ -18,11 +18,10 @@ const socLabel = k => (SOCIETES.find(s => s.k === (k || '').toLowerCase())?.labe
 const STATUTS = [
   { k: 'nouveau', label: 'Nouveau', bg: '#E3F2FD', fg: '#1565C0' },
   { k: 'en_cours', label: 'En cours', bg: '#FFF3E0', fg: '#E65100' },
-  { k: 'en_attente', label: 'En attente', bg: '#F3E5F5', fg: '#7B1FA2' },
   { k: 'resolu', label: 'Résolu', bg: '#E8F5E9', fg: '#2E7D32' },
   { k: 'cloture', label: 'Clôturé', bg: '#ECEFF1', fg: '#546E7A' },
 ]
-const STATUT_BAR = { nouveau: '#1565C0', en_cours: '#E65100', en_attente: '#E74C3C', resolu: '#2E7D32', cloture: '#546E7A' }
+const STATUT_BAR = { nouveau: '#1565C0', en_cours: '#E65100', resolu: '#2E7D32', cloture: '#546E7A' }
 const PRIOS = [
   { k: 'basse', label: 'Basse', col: '#95A5A6' },
   { k: 'moyenne', label: 'Normale', col: '#29ABE2' },
@@ -373,7 +372,6 @@ export default function TicketsView() {
             <StatCard label="Total" count={base.length} tickets={base} color={NAVY} />
             <StatCard label="Actifs" count={actifs.length} tickets={actifs} color={CYAN} />
             <StatCard label="En cours" count={parStatut('en_cours').length} tickets={parStatut('en_cours')} color="#E65100" />
-            <StatCard label="En attente" count={parStatut('en_attente').length} tickets={parStatut('en_attente')} color="#7B1FA2" />
             <StatCard label="Résolus" count={parStatut('resolu').length} tickets={parStatut('resolu')} color="#2E7D32" />
             <StatCard label="Clôturés" count={parStatut('cloture').length} tickets={parStatut('cloture')} color="#546E7A" />
           </div>
