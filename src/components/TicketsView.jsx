@@ -34,6 +34,8 @@ const pr = k => PRIOS.find(p => p.k === k) || PRIOS[1]
 const URGENT_STYLE = { display: 'inline-block', background: '#E74C3C', color: '#fff', fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 6, marginRight: 8, letterSpacing: '.5px', verticalAlign: 'middle' }
 
 const fmtDT = d => d ? new Date(d).toLocaleString('fr-BE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''
+const fmtD = d => d ? new Date(d).toLocaleDateString('fr-BE') : '—'
+const joursEntre = (a, b) => { if (!a || !b) return null; return Math.max(0, Math.round((new Date(b) - new Date(a)) / 86400000)) }
 const rel = d => {
   if (!d) return ''
   const diff = (Date.now() - new Date(d).getTime()) / 1000
@@ -187,7 +189,7 @@ export default function TicketsView() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const sel = 'id,titre,description,entite,ticket_categorie,ticket_statut,ticket_origine,priorite,gestionnaire,cree_par,cloture_par,user_email,derniere_activite,date_creation,created_at,dossier_client,client_id,participants,checklist'
+    const sel = 'id,titre,description,entite,ticket_categorie,ticket_statut,ticket_origine,priorite,gestionnaire,cree_par,cloture_par,user_email,derniere_activite,date_creation,created_at,dossier_client,client_id,participants,checklist,date_cloture,ticket_echeance'
     let all = []
     for (let from = 0; ; from += 1000) {
       const { data, error } = await supabase.from('taches').select(sel).eq('is_ticket', true).order('derniere_activite', { ascending: false }).range(from, from + 999)
@@ -401,7 +403,7 @@ export default function TicketsView() {
                 return (
                   <tr key={t.id} onClick={() => setSel(t)} style={{ borderTop: `1px solid #EEF1F6`, cursor: 'pointer', opacity: ['cloture', 'resolu'].includes(t.ticket_statut) ? 0.6 : 1 }}>
                     <td style={{ padding: '11px 14px', fontFamily: 'monospace', color: C.textL, fontWeight: 700, whiteSpace: 'nowrap' }}>{unread[t.id] ? <span title={`${unread[t.id]} message(s) non lu(s)`} style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: C.danger, marginRight: 6, verticalAlign: 'middle' }} /> : null}#{t.id}</td>
-                    <td style={{ padding: '11px 14px', fontWeight: unread[t.id] ? 800 : 600, color: NAVY }}>{t.priorite === 'urgente' && <span style={URGENT_STYLE}>URGENT</span>}<span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: p.col, marginRight: 8 }} />{t.titre}</td>
+                    <td style={{ padding: '11px 14px', fontWeight: unread[t.id] ? 800 : 600, color: NAVY }}>{t.priorite === 'urgente' && <span style={URGENT_STYLE}>URGENT</span>}{t.ticket_echeance && !['cloture', 'resolu'].includes(t.ticket_statut) && new Date(t.ticket_echeance) < new Date(new Date().toDateString()) && <span style={{ display: 'inline-block', background: '#E74C3C', color: '#fff', fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 5, marginRight: 6 }}>⏱ RETARD</span>}<span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: p.col, marginRight: 8 }} />{t.titre}</td>
                     <td style={{ padding: '11px 14px', fontSize: 12, color: C.textM }}>{socLabel(t.entite)}</td>
                     <td style={{ padding: '11px 14px', color: C.textL, fontSize: 12 }}>{t.ticket_categorie || '—'}</td>
                     <td style={{ padding: '11px 14px' }}><span style={{ fontSize: 11, fontWeight: 700, color: p.col }}>{p.label}</span></td>
@@ -502,11 +504,14 @@ function CreateModal({ collabs, cats = CATEGORIES, catType = {}, lockedSociete =
     setSaving(true); setErr('')
     try {
       const now = new Date().toISOString()
+      const asgUp = f.gestionnaire ? f.gestionnaire.toUpperCase() : null
+      const partsUp = [...new Set((f.participants || []).map(x => (x || '').toUpperCase()).filter(Boolean))].filter(c => c !== asgUp)
+      if (myCode && myCode !== asgUp && !partsUp.includes(myCode)) partsUp.push(myCode)
       const payload = {
         titre: f.titre.trim(), description: f.description || null,
         is_ticket: true, entite: f.entite || null, ticket_categorie: f.ticket_categorie, ticket_statut: 'nouveau', ticket_origine: 'interne',
-        priorite: f.priorite, gestionnaire: f.gestionnaire ? f.gestionnaire.toUpperCase() : null,
-        participants: f.participants, cree_par: myCode, statut: 'todo', source: 'ticket', derniere_activite: now,
+        priorite: f.priorite, gestionnaire: asgUp,
+        participants: partsUp, cree_par: myCode, statut: 'todo', source: 'ticket', derniere_activite: now,
         dossier_client: (f.dossier_client || '').trim() || prefill?.dossier_client || null, client_id: f.client_id || prefill?.client_id || null,
       }
       const { data, error } = await supabase.from('taches').insert(payload).select().single()
@@ -518,8 +523,7 @@ function CreateModal({ collabs, cats = CATEGORIES, catType = {}, lockedSociete =
       })
       for (const file of files) { try { await uploadPiece(data.id, file, { code: myCode, nom: myNom, email: myEmail }) } catch (e) { /* une PJ ne doit pas faire échouer la création */ } }
       // Alerte aux concernés (assigné + participants), sauf le créateur
-      const asg = f.gestionnaire ? f.gestionnaire.toUpperCase() : null
-      const dest = [...new Set([asg, ...f.participants].filter(cc => cc && cc !== myCode))]
+      const dest = [...new Set([asgUp, ...partsUp].filter(cc => cc && cc !== myCode))]
       const emails = dest.map(code => collabs.find(x => (x.code || '').toUpperCase() === code)?.email).filter(Boolean)
       if (emails.length) envoyerAlerte(emails, `Nouveau ticket [#${data.id}]`, mailTicket({ ...data }, `Un nouveau ticket a été créé par <b>${myCode}</b>${data.dossier_client ? ` (dossier #${data.dossier_client})` : ''}.<br>Vous y êtes associé. Cliquez ci-dessous pour le consulter.`))
       onCreated()
@@ -711,6 +715,11 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
     const txt = reply.trim()
     await supabase.from('tickets_messages').insert({ tache_id: t.id, auteur_code: myCode, auteur_nom: myNom, auteur_email: myEmail, message: txt, type: 'message' })
     await supabase.from('taches').update({ derniere_activite: new Date().toISOString() }).eq('id', t.id)
+    if ((t.ticket_statut || 'nouveau') === 'nouveau') {
+      await supabase.from('taches').update({ ticket_statut: 'en_cours' }).eq('id', t.id)
+      await supabase.from('tickets_messages').insert({ tache_id: t.id, auteur_code: myCode, type: 'systeme', message: `Statut : Nouveau → En cours (1re réponse de ${myCode})` })
+      setT(x => ({ ...x, ticket_statut: 'en_cours' }))
+    }
     // Alerte : concernés sauf auteur
     const concernes = [...new Set([(t.gestionnaire||'').toUpperCase(), (t.cree_par||'').toUpperCase(), ...parts].filter(c => c && c !== myCode))]
     const emails = emailsOf(concernes)
@@ -741,7 +750,9 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
   }
   const assigner = async (code) => {
     const c = code ? code.toUpperCase() : null
-    await touch({ gestionnaire: c }, c ? `Assigné à ${c} (par ${myCode})` : `Attribution retirée (par ${myCode})`)
+    const patch = { gestionnaire: c }
+    if (c && parts.includes(c)) patch.participants = parts.filter(p => p !== c)
+    await touch(patch, c ? `Assigné à ${c} (par ${myCode})` : `Attribution retirée (par ${myCode})`)
   }
   const changerSociete = async (v) => {
     await touch({ entite: v || null }, v ? `Société → ${socLabel(v)} (par ${myCode})` : `Société retirée (par ${myCode})`)
@@ -767,10 +778,14 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
   const resoudre = async () => {
     await touch({ ticket_statut: 'resolu', cloture_par: myCode, statut: 'terminee', date_cloture: new Date().toISOString() }, `Ticket marqué Résolu (clôturé) par ${myCode}`)
   }
+  const setEcheance = async (v) => {
+    await touch({ ticket_echeance: v || null }, v ? `Échéance fixée au ${fmtD(v)} (par ${myCode})` : `Échéance retirée (par ${myCode})`)
+  }
 
   const s = st(t.ticket_statut), p = pr(t.priorite)
   const canManage = isAdmin || (t.gestionnaire || '').toUpperCase() === myCode
   const estClos = t.ticket_statut === 'resolu' || t.ticket_statut === 'cloture'
+  const enRetard = !estClos && t.ticket_echeance && new Date(t.ticket_echeance) < new Date(new Date().toDateString())
   useEffect(() => {
     const q = new URLSearchParams(window.location.search)
     if (q.get('do') === 'resolve' && String(q.get('ticket')) === String(t.id)) {
@@ -790,7 +805,19 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
           <button onClick={onClose} style={{ marginLeft: 'auto', border: 'none', background: C.bg, borderRadius: 8, padding: '6px 10px', cursor: 'pointer' }}>✕</button>
         </div>
         <div style={{ fontSize: 17, fontWeight: 800, color: NAVY }}>{t.priorite === 'urgente' && <span style={URGENT_STYLE}>URGENT</span>}{t.titre}</div>
-        <div style={{ fontSize: 12, color: C.textL, marginTop: 4 }}>{t.ticket_categorie} · ouvert par {t.cree_par} · {fmtDT(t.date_creation || t.created_at)}</div>
+        <div style={{ fontSize: 12, color: C.textL, marginTop: 4 }}>{t.ticket_categorie} · ouvert par {codeLabel(t.cree_par)}</div>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center', fontSize: 12, color: C.textM, marginTop: 8 }}>
+          <span>📅 Créé le <b>{fmtD(t.date_creation || t.created_at)}</b></span>
+          {estClos
+            ? <span>✅ Résolu le <b>{fmtD(t.date_cloture)}</b>{joursEntre(t.date_creation || t.created_at, t.date_cloture) != null ? <> · traité en <b>{joursEntre(t.date_creation || t.created_at, t.date_cloture)} j</b></> : null}</span>
+            : <span>⏳ Ouvert depuis <b>{joursEntre(t.date_creation || t.created_at, new Date()) ?? 0} j</b></span>}
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>🎯 Échéance&nbsp;:
+            {canManage && !estClos
+              ? <input type="date" value={t.ticket_echeance || ''} onChange={e => setEcheance(e.target.value)} style={{ ...S.input, width: 'auto', padding: '3px 6px', fontSize: 12 }} />
+              : <b>{t.ticket_echeance ? fmtD(t.ticket_echeance) : '—'}</b>}
+            {enRetard && <span style={{ background: C.danger, color: '#fff', fontWeight: 800, fontSize: 10, padding: '2px 7px', borderRadius: 6 }}>EN RETARD</span>}
+          </span>
+        </div>
       </div>
 
       {/* Statut — pleine largeur, coloré (Résolu = clôture auto) */}
@@ -850,7 +877,7 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
       {/* Barre historique */}
       <div style={{ display: 'flex', gap: 6, padding: '8px 20px', background: '#fff', borderBottom: `1px solid #EEF1F6`, alignItems: 'center' }}>
         <span style={{ fontSize: 11, textTransform: 'uppercase', color: C.textL, fontWeight: 700, marginRight: 4 }}>Historique</span>
-        {[['tout', 'Tout'], ['conversation', 'Conversation'], ['historique', 'Événements']].map(([k, lbl]) => (
+        {[['tout', 'Tout'], ['conversation', 'Conversation'], ['historique', 'Journal']].map(([k, lbl]) => (
           <button key={k} onClick={() => setFilFiltre(k)} style={{ border: `1px solid ${filFiltre === k ? MID : C.border}`, background: filFiltre === k ? MID : '#fff', color: filFiltre === k ? '#fff' : C.textM, borderRadius: 14, padding: '3px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{lbl}</button>
         ))}
       </div>
