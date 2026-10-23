@@ -519,12 +519,12 @@ function Editeur({ type, doc, onClose, onSaved }) {
         <div style={{ display: 'grid', gridTemplateColumns: mobE ? '1fr' : (isDevis ? '1fr' : '1fr 1fr'), gap: 10, marginBottom: 16 }}>
           {!isDevis && (
             <div><label style={lbl}>Type de facture</label>
-              <select style={inp} value={f.type || 'facture'} onChange={e => set('type', e.target.value)}>
-                <option value="facture">Facture</option>
-                <option value="acompte">Acompte</option>
-                <option value="solde">Solde</option>
-                <option value="note_credit">Note de crédit</option>
-              </select>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {[['facture', 'Facture'], ['acompte', 'Acompte'], ['solde', 'Solde'], ['note_credit', 'Note de crédit']].map(([v, lab]) => {
+                  const on = (f.type || 'facture') === v
+                  return (<button key={v} type="button" onClick={() => set('type', v)} style={{ flex: mobE ? '1 1 45%' : 1, padding: '9px 10px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 700, border: on ? '1.5px solid #ea580c' : '1.5px solid #e2e8f0', background: on ? '#fff7ed' : '#fff', color: on ? '#ea580c' : '#64748b', transition: 'all .12s' }}>{lab}</button>)
+                })}
+              </div>
             </div>
           )}
           <div><label style={lbl}>Responsable</label>
