@@ -2,9 +2,7 @@ import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 're
 import { supabase } from '../lib/supabase'
 
 const NAVY = '#0D2F5E'
-const N8N_API = 'https://n8n.srv1082740.hstgr.cloud/api/v1'
 const N8N_WH  = 'https://n8n.srv1082740.hstgr.cloud/webhook'
-const N8N_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxNzZlZWRiMy03ZjJlLTQ0NWYtOGIyOC1lNTc0MDcwMDdjNWIiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiZTFiYjQwODUtYzIwNy00Yjk0LWJjNzMtMGZmYTBmZGZmNzAwIiwiaWF0IjoxNzgxNDI2NTY2fQ.ipavXrAn3C8mguWlkFrL1BFiIogYy807JoXH19BVrxM'
 
 export const SYNCS = [
   {
@@ -49,13 +47,6 @@ export async function triggerWorkflow(webhook, workflowId) {
   try {
     const res = await fetch(`${N8N_WH}/${webhook}`, { method: 'POST' })
     if (res.ok) return { ok: true, method: 'webhook' }
-  } catch {}
-  try {
-    const h = { 'X-N8N-API-KEY': N8N_KEY, 'Content-Type': 'application/json' }
-    await fetch(`${N8N_API}/workflows/${workflowId}/deactivate`, { method: 'POST', headers: h })
-    await new Promise(r => setTimeout(r, 1500))
-    const r2 = await fetch(`${N8N_API}/workflows/${workflowId}/activate`, { method: 'POST', headers: h })
-    if (r2.ok) return { ok: true, method: 'api-toggle' }
   } catch {}
   return { ok: false }
 }
@@ -243,12 +234,9 @@ export function SyncButtonsRow({ only, style, onDark, compact }) {
 export function WebhookStatus() {
   const [status, setStatus] = useState('checking')
   useEffect(() => {
-    fetch(`${N8N_API}/workflows?limit=1`, { headers: { 'X-N8N-API-KEY': N8N_KEY } })
-      .then(r => setStatus(r.ok ? 'api-ok' : 'down'))
-      .catch(() => setStatus('down'))
     fetch(`${N8N_WH}/iban-sync`, { method: 'POST' })
       .then(r => setStatus(r.ok || r.status < 500 ? 'ok' : 'webhook-down'))
-      .catch(() => {})
+      .catch(() => setStatus('down'))
   }, [])
   const cfg = {
     checking:      { col:'#64748b', bg:'#f1f5f9', icon:'ti-loader-2',      txt:'Vérification…' },
@@ -288,16 +276,8 @@ export function SyncCard({ sync }) {
   }
 
   const loadLastExec = async () => {
-    try {
-      const res = await fetch(`${N8N_API}/executions?workflowId=${sync.workflowId}&limit=1`, {
-        headers: { 'X-N8N-API-KEY': N8N_KEY }
-      })
-      if (res.ok) {
-        const data = await res.json()
-        const e = data.data?.[0]
-        if (e) setLastExec({ status: e.status, at: e.startedAt })
-      }
-    } catch {}
+    // Dernière exécution indisponible côté client : l'API n8n exige une clé,
+    // qui ne doit pas être embarquée dans le bundle. À réintroduire via un proxy serverless.
   }
 
   useEffect(() => { loadCounts(); loadLastExec() }, [])
