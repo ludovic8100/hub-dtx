@@ -423,7 +423,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
         photos: l.photos || [], optionnelle: !!l.optionnelle,
         quantite: Number(l.quantite) || 0, prix_unitaire: Number(l.prix_unitaire) || 0,
         remise_pct: Number(l.remise_pct) || 0, tva_pct: Number(l.tva_pct) || 0,
-        tva_categorie: (Number(l.tva_pct) || 0) > 0 ? 'S' : (l.tva_categorie || 'AE'),
+        ...(isDevis ? {} : { tva_categorie: (Number(l.tva_pct) || 0) > 0 ? 'S' : (l.tva_categorie || 'AE') }),
         total_ht: (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * (1 - (Number(l.remise_pct) || 0) / 100),
       }))
       if (lignesPayload.length) {
