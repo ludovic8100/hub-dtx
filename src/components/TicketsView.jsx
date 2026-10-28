@@ -523,7 +523,7 @@ function CreateModal({ collabs, cats = CATEGORIES, catType = {}, lockedSociete =
       // Alerte aux concernés (assigné + participants), sauf le créateur
       const dest = [...new Set([asgUp, ...partsUp].filter(cc => cc && cc !== myCode))]
       const emails = dest.map(code => collabs.find(x => (x.code || '').toUpperCase() === code)?.email).filter(Boolean)
-      if (emails.length) envoyerAlerte(emails, `Nouveau ticket [#${data.id}]`, mailTicket({ ...data }, `Un nouveau ticket a été créé par <b>${myCode}</b>${data.dossier_client ? ` (dossier #${data.dossier_client})` : ''}.<br>Vous y êtes associé. Cliquez ci-dessous pour le consulter.`))
+      if (emails.length) envoyerAlerte(emails, `[#${data.id}] 🆕 Nouveau${data.titre ? ' — ' + (data.titre || '').slice(0, 60) : ''}`, mailTicket({ ...data }, `Un nouveau ticket a été créé par <b>${myCode}</b>${data.dossier_client ? ` (dossier #${data.dossier_client})` : ''}.<br>Vous y êtes associé. Cliquez ci-dessous pour le consulter.`))
       onCreated()
     } catch (e) { setErr('Erreur : ' + (e.message || '')) }
     setSaving(false)
@@ -702,7 +702,13 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
       const p2 = Array.isArray(merged.participants) ? merged.participants.map(x => (x || '').toUpperCase()) : []
       const dest = [...new Set([(merged.gestionnaire || '').toUpperCase(), (merged.cree_par || '').toUpperCase(), ...p2].filter(cc => cc && cc !== myCode))]
       const emails = emailsOf(dest)
-      if (emails.length) envoyerAlerte(emails, `Ticket [#${t.id}] — mise à jour`, mailTicket(merged, `Une adaptation a été apportée à ce ticket par <b>${myCode}</b>.<br><i>${sysMsg}</i>`, filRecentHtml(), true))
+      const _tc = (merged.titre || '').slice(0, 60)
+      let _tag = 'Mise à jour'
+      if (patch.ticket_statut) {
+        const _emo = (patch.ticket_statut === 'resolu' || patch.ticket_statut === 'cloture') ? '✅' : patch.ticket_statut === 'en_cours' ? '🟠' : patch.ticket_statut === 'nouveau' ? '🔵' : '•'
+        _tag = `${_emo} ${st(patch.ticket_statut).label}`
+      }
+      if (emails.length) envoyerAlerte(emails, `[#${t.id}] ${_tag}${_tc ? ' — ' + _tc : ''}`, mailTicket(merged, `Une adaptation a été apportée à ce ticket par <b>${myCode}</b>.<br><i>${sysMsg}</i>`, filRecentHtml(), true))
     }
     await loadMsgs(); onChanged()
   }
@@ -721,7 +727,7 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
     // Alerte : concernés sauf auteur
     const concernes = [...new Set([(t.gestionnaire||'').toUpperCase(), (t.cree_par||'').toUpperCase(), ...parts].filter(c => c && c !== myCode))]
     const emails = emailsOf(concernes)
-    if (emails.length) envoyerAlerte(emails, `Nouveau message sur le ticket [#${t.id}]`, mailTicket(t, `Bonjour,<br>${myCode} a écrit un message sur ce ticket :<br><i>"${txt.slice(0,200)}"</i>`, filRecentHtml(), true))
+    if (emails.length) envoyerAlerte(emails, `[#${t.id}] 💬 Suivi${t.titre ? ' — ' + (t.titre || '').slice(0, 60) : ''}`, mailTicket(t, `Bonjour,<br>${myCode} a écrit un message sur ce ticket :<br><i>"${txt.slice(0,200)}"</i>`, filRecentHtml(), true))
     if (auClient && cli?.email) { const nomCli = [cli.prenom, cli.nom].filter(Boolean).join(' '); envoyerAlerte([cli.email], `Ticket [#${t.id}] — ${t.titre}`, mailClient(nomCli, txt)) }
     setReply(''); setAuClient(false); setSending(false); await loadMsgs(); onChanged()
   }
@@ -735,7 +741,7 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
       await supabase.from('taches').update({ derniere_activite: new Date().toISOString() }).eq('id', t.id)
       const concernes = [...new Set([(t.gestionnaire || '').toUpperCase(), (t.cree_par || '').toUpperCase(), ...parts].filter(c => c && c !== myCode))]
       const emails = emailsOf(concernes)
-      if (emails.length) envoyerAlerte(emails, `Pièce jointe ajoutée au ticket [#${t.id}]`, mailTicket(t, `Bonjour,<br>${myCode} a ajouté ${arr.length > 1 ? arr.length + ' pièces jointes' : 'une pièce jointe'} au ticket.`, filRecentHtml(), true))
+      if (emails.length) envoyerAlerte(emails, `[#${t.id}] 📎 Pièce jointe${t.titre ? ' — ' + (t.titre || '').slice(0, 60) : ''}`, mailTicket(t, `Bonjour,<br>${myCode} a ajouté ${arr.length > 1 ? arr.length + ' pièces jointes' : 'une pièce jointe'} au ticket.`, filRecentHtml(), true))
     } catch (e) { alert("Échec de l'envoi de la pièce jointe : " + (e.message || '')) }
     setUpBusy(false); await loadMsgs(); onChanged()
   }
