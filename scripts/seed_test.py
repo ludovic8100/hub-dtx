@@ -148,9 +148,9 @@ def main():
     print(f"Source : {SRC_URL}  →  Cible : {DST_URL or '(DRY_RUN)'}  — échantillon : {N_CLIENTS} dossiers")
 
     # 1) Référentiel
-    for t in ["compagnies", "categories", "categories_regles", "activites", "ticket_categories", "parametres_frais",
-              "taux_reference", "hex_cotisations_config", "sinistre_workflow_definitions", "rdv_categories",
-              "ref_bureaux", "ref_portefeuilles", "ref_gestionnaires", "ref_sous_agents", "ref_apporteurs"]:
+    for t in ["societes", "ref_bureaux", "ref_portefeuilles", "ref_gestionnaires", "ref_sous_agents", "ref_apporteurs",
+              "compagnies", "categories", "categories_regles", "activites", "ticket_categories", "parametres_frais",
+              "taux_reference", "hex_cotisations_config", "sinistre_workflow_definitions", "rdv_categories"]:
         ecrire(t, lire(t))
     ecrire("comptes_bancaires", [dict(r, ponto_account_id=None) for r in lire("comptes_bancaires")])
     ecrire("collaborateurs", [dict(r, iban=None, bic=None, telephone=None, adresse=None) for r in lire("collaborateurs")])
