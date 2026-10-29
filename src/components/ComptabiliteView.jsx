@@ -1,3 +1,4 @@
+import { sharepointUrl, n8nWebhook } from '../config/env'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import VueFactures from './VueFactures'
@@ -13,11 +14,11 @@ const fmtSync = d => d ? new Date(d).toLocaleString('fr-BE', { day:'2-digit', mo
 
 // Dossiers SharePoint des factures par société
 const SHAREPOINT_FACTURES = {
-  DYNASSUR: 'https://dynassur.sharepoint.com/sites/ADMINISTRATION/Documents%20partages/COMPTA/FACTURES/_DYNASSUR',
-  DTX:      'https://dynassur.sharepoint.com/sites/ADMINISTRATION/Documents%20partages/COMPTA/FACTURES/_DTX',
-  LODE:     'https://dynassur.sharepoint.com/sites/ADMINISTRATION/Documents%20partages/COMPTA/FACTURES/_LODE',
-  HEXAGROUP:'https://dynassur.sharepoint.com/sites/ADMINISTRATION/Documents%20partages/COMPTA/FACTURES/_HEXAGROUP',
-  PRIVE:    'https://dynassur.sharepoint.com/sites/ADMINISTRATION/Documents%20partages/COMPTA/FACTURES/_PRIVE',
+  DYNASSUR:  sharepointUrl('COMPTA/FACTURES/_DYNASSUR'),
+  DTX:       sharepointUrl('COMPTA/FACTURES/_DTX'),
+  LODE:      sharepointUrl('COMPTA/FACTURES/_LODE'),
+  HEXAGROUP: sharepointUrl('COMPTA/FACTURES/_HEXAGROUP'),
+  PRIVE:     sharepointUrl('COMPTA/FACTURES/_PRIVE'),
 }
 
 // Sociétés dont les factures d'achat sont intégralement rangées en _<SOC>/ACHATS/<année>.
@@ -416,7 +417,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
     setFacturesParTx(prev => ({ ...prev, [ids[0]]: (prev[ids[0]] || 0) + factures.length }))
     setSelecteurFacture(null)
     if (sel.ids) viderSelection()
-    fetch('https://n8n.srv1082740.hstgr.cloud/webhook/backfill-thumbs2', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' }).catch(()=>{})
+    fetch(n8nWebhook('backfill-thumbs2'), { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' }).catch(()=>{})
   }
 
   // Retirer le lien facture (repasse en croix rouge)

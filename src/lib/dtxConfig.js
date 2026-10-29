@@ -1,3 +1,4 @@
+import { LOGOS_URL } from '../config/env'
 // Coordonnées et paramètres de DTX SRL — utilisés sur devis et factures.
 export const DTX = {
   entite: 'dtx',
@@ -14,7 +15,7 @@ export const DTX = {
   email: 'info@dtx-group.be',
   telephone: '',              // Aucun pour l'instant
   couleur: '#94a3b8',         // gris DTX
-  logo_url: 'https://tndwonqdbeszkcztkzqe.supabase.co/storage/v1/object/public/logos/dtx.png',
+  logo_url: LOGOS_URL + 'dtx.png',
 }
 
 export const TVA_TAUX = [

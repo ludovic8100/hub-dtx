@@ -65,3 +65,17 @@ Les exports dans `n8n_workflows/` ne couvrent qu'une partie ; la référence est
 - Déploiement = merge dans `main` (Vercel suit). Travailler sur une branche, PR, merge.
 - Ne jamais committer de secret (clé API, service_role). Le repo est public.
 - Toute écriture en base de prod (Supabase MCP) : lecture d'abord, écriture ciblée, jamais de delete massif sans validation humaine.
+
+## Environnements & configuration (depuis le 29/10/2026)
+
+- **Aucune URL/clé en dur** dans le code : tout passe par `src/config/env.js` (front, variables `VITE_*`),
+  `api/_lib/env.js` (fonctions Vercel, `process.env`) et `scripts/_env.py` (Python, `os.environ`).
+  Liste des variables : `.env.example`. Sans variable → production. Avec `APP_ENV=test`, l'URL et la
+  clé Supabase sont obligatoires (le démarrage échoue plutôt que de retomber sur la prod) et le
+  bandeau `BandeauEnv` s'affiche.
+- Helpers à utiliser : `n8nWebhook('iban-sync')`, `sharepointUrl('COMPTA/FACTURES/_LODE')`, `LOGOS_URL`, `HUB_URL`.
+- Branches : `main` = production (`hub-dtx.vercel.app`), `staging` = test (projet Vercel `hub-dtx-test`,
+  à créer en phase 2). Feature → PR → `staging` → `main`.
+- Plan complet (test/prod, couche applicative, migrations, CI) : `docs/ARCHITECTURE-ENVIRONNEMENTS.md`.
+- Sécurité phase 0 appliquée : `execute_raw_sql` et `tickets_rappels_echeance` ne sont plus exécutables
+  par `anon` (`sql/security_phase0_revoke_rpc_anon.sql`).

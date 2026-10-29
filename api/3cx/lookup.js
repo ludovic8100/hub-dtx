@@ -6,8 +6,7 @@
 // Aucune donnée n'est renvoyée sans le bon secret.
 // Clé publishable Supabase (publique, identique au front src/lib/supabase.js).
 // On n'utilise plus SUPABASE_ANON_KEY : les clés JWT legacy ont été désactivées (migration sécurité).
-const SB_URL = 'https://tndwonqdbeszkcztkzqe.supabase.co'
-const SB_KEY = 'sb_publishable_xBt6ZaZGh5trEloyMCNRuA_MN-jesVJ'
+import { SUPABASE_URL as SB_URL, SUPABASE_ANON_KEY as SB_KEY } from '../_lib/env.js'
 
 function getSecret(req) {
   if (req.query && req.query.key) return String(req.query.key)

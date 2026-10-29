@@ -1,3 +1,4 @@
+import { n8nWebhook } from '../../config/env'
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
@@ -810,7 +811,7 @@ export default function DynDevisFactures() {
   }
 
   // Envoi de la facture sur le réseau Peppol via le proxy Billit (n8n)
-  const PEPPOL_WEBHOOK = 'https://n8n.srv1082740.hstgr.cloud/webhook/lode-peppol-send'
+  const PEPPOL_WEBHOOK = n8nWebhook('lode-peppol-send')
   const envoyerPeppol = async (doc) => {
     if (!confirm(`Envoyer la facture ${doc.numero} sur le réseau Peppol via Billit ?`)) return
     setBusy(doc.id + 'peppol')

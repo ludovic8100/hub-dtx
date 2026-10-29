@@ -1,3 +1,4 @@
+import { SUPABASE_PROJECT_REF } from '../../config/env'
 import { useEffect, useRef, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
@@ -1925,7 +1926,7 @@ async function prefillFromClient(client) {
   const safeDossier = (client.dossier+'').replace(/'/g,"''");
   const safeNom = (client.nom||'').replace(/'/g,"''");
   const safePrenom = (client.prenom||'').replace(/'/g,"''");
-  const PID = 'tndwonqdbeszkcztkzqe';
+  const PID = '${SUPABASE_PROJECT_REF}';
   const sql = (q) => mcpNs.callTool('Supabase', 'execute_sql', { project_id: PID, query: q }).then(r => {
     // Extract text from various possible response shapes
     let raw = r?.payload;

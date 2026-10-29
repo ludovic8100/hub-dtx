@@ -1,3 +1,4 @@
+import { N8N_WEBHOOK_URL, n8nWebhook } from '../../config/env'
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { PEPPOL_ACTIF } from '../../lib/peppol'
@@ -1501,7 +1502,7 @@ function ChampL({ label, children }) {
 function ApercuFacture({ fid, nom }) {
   const [etat, setEtat] = useState('load')
   useEffect(() => { setEtat('load') }, [fid])
-  const src = `https://n8n.srv1082740.hstgr.cloud/webhook/apercu-facture?fid=${encodeURIComponent(fid)}`
+  const src = `${N8N_WEBHOOK_URL}/apercu-facture?fid=${encodeURIComponent(fid)}`
   return (
     <div style={{ position: 'fixed', top: '50%', right: 24, transform: 'translateY(-50%)', zIndex: 2100, width: 520, maxWidth: '48vw', maxHeight: '88vh', background: '#fff', borderRadius: 14, boxShadow: '0 20px 60px rgba(0,0,0,0.35)', border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', pointerEvents: 'none' }}>
       <div style={{ padding: '10px 14px', background: '#0f172a', color: '#fff', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>📄 {nom}</div>
@@ -1539,7 +1540,7 @@ function EnvoiFactureModal({ doc, b64, fileName, onClose, onSent }) {
       if (!r.ok || !j.ok) throw new Error(j.error || j.detail || ('HTTP ' + r.status))
       try {
         const annee = (doc.date_facture || doc.numero || '').toString().slice(0, 4) || String(new Date().getFullYear())
-        const ar = await fetch('https://n8n.srv1082740.hstgr.cloud/webhook/lode-facture-archive', {
+        const ar = await fetch(n8nWebhook('lode-facture-archive'), {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ fileName, annee, pdfBase64: b64 }),
         })
@@ -1623,7 +1624,7 @@ export default function LodeDevisFactures() {
   }
 
   // Envoi de la facture sur le réseau Peppol via le proxy Billit (n8n)
-  const PEPPOL_WEBHOOK = 'https://n8n.srv1082740.hstgr.cloud/webhook/lode-peppol-send'
+  const PEPPOL_WEBHOOK = n8nWebhook('lode-peppol-send')
   const envoyerPeppol = async (doc) => {
     if (!PEPPOL_ACTIF) { alert('Le lien Peppol est désactivé pour le moment.'); return }
     if (!confirm(`Envoyer la facture ${doc.numero} sur le réseau Peppol via Billit ?`)) return
@@ -1648,7 +1649,7 @@ export default function LodeDevisFactures() {
     } finally { setBusy(null) }
   }
 
-  const ARCHIVE_WEBHOOK = 'https://n8n.srv1082740.hstgr.cloud/webhook/lode-facture-archive'
+  const ARCHIVE_WEBHOOK = n8nWebhook('lode-facture-archive')
 
   // Facture : genere le PDF, l'archive dans SharePoint _LODE/VENTES, stocke pdf_fid/pdf_url, puis OUVRE le PDF dans SharePoint (aucun telechargement).
   const genererFacturePDF = async (doc) => {

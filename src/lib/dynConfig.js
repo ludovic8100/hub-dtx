@@ -1,3 +1,4 @@
+import { LOGOS_URL } from '../config/env'
 // Coordonnées et paramètres de Dynassur SRL — utilisés sur devis et factures.
 export const DYN = {
   entite: 'dyn',
@@ -14,7 +15,7 @@ export const DYN = {
   email: 'info@dynassur.be',
   telephone: '',              // Aucun pour l'instant
   couleur: '#0080BD',         // bleu Dynassur
-  logo_url: 'https://tndwonqdbeszkcztkzqe.supabase.co/storage/v1/object/public/logos/Dynassur_logo.png',
+  logo_url: LOGOS_URL + 'Dynassur_logo.png',
 }
 
 export const TVA_TAUX = [

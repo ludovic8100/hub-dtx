@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from './lib/auth'
 import Login              from './pages/Login'
 import AuthCallback       from './pages/AuthCallback'
 import AccessDenied       from './pages/AccessDenied'
+import BandeauEnv         from './components/BandeauEnv'
 
 // Tout le reste : code-splitting — chaque page devient un chunk chargé à la demande
 const SyncCenter          = lazy(() => import('./pages/admin/SyncCenter'))
@@ -123,6 +124,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <BandeauEnv />
         <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/login"         element={<Login />} />

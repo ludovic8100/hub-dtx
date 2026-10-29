@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
-const STORAGE_BASE = 'https://tndwonqdbeszkcztkzqe.supabase.co/storage/v1/object/public/logos/'
+import { LOGOS_URL as STORAGE_BASE } from '../config/env'
 
 // Liste des fichiers présents dans le bucket logos (fallback si le listing Storage est bloqué)
 const LOGOS_CONNUS = [

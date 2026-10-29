@@ -18,7 +18,7 @@ import os, json, sys, urllib.request, urllib.parse
 TENANT = os.environ.get("GRAPH_TENANT_ID", "29a87d83-130a-42d9-82c9-29c930952c76")
 CLIENT = os.environ.get("GRAPH_CLIENT_ID", "d38526f5-527b-44f6-9586-0d5bb10acc26")
 SECRET = os.environ.get("GRAPH_CLIENT_SECRET", "")
-SUPA_URL = os.environ.get("SUPABASE_URL", "https://tndwonqdbeszkcztkzqe.supabase.co")
+from _env import SUPABASE_URL as SUPA_URL  # voir scripts/_env.py
 SUPA_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
 
 

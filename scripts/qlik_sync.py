@@ -12,7 +12,7 @@ Variables d'environnement (GitHub Secrets) :
   SUPABASE_SERVICE_KEY  service_role key Supabase       [requis sauf DRY_RUN]
   QLIK_HOST    (def: h6las9b8umw8ppb.eu.qlikcloud.com)
   QLIK_APP_ID  (def: 111414a5-e645-4397-8311-9bed88033407)
-  SUPABASE_URL (def: https://tndwonqdbeszkcztkzqe.supabase.co)
+  SUPABASE_URL (def: production — voir scripts/_env.py, APP_ENV=test l'exige)
   DRY_RUN      "1" => extrait et affiche, n'écrit pas
 """
 import os, json, ssl, sys, urllib.request, datetime
@@ -21,7 +21,7 @@ from websocket import create_connection
 QLIK_HOST   = os.environ.get("QLIK_HOST",  "h6las9b8umw8ppb.eu.qlikcloud.com")
 QLIK_APP_ID = os.environ.get("QLIK_APP_ID","111414a5-e645-4397-8311-9bed88033407")
 QLIK_KEY    = os.environ.get("QLIK_API_KEY", "")
-SUPA_URL    = os.environ.get("SUPABASE_URL","https://tndwonqdbeszkcztkzqe.supabase.co")
+from _env import SUPABASE_URL as SUPA_URL  # voir scripts/_env.py
 SUPA_KEY    = os.environ.get("SUPABASE_SERVICE_KEY", "")
 DRY_RUN     = os.environ.get("DRY_RUN") == "1"
 

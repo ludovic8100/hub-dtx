@@ -16,7 +16,8 @@ sys.path.insert(0, os.path.dirname(__file__))
 from qlik_clients import dossier_from_numero, parse_date, qnum_to_date, split_nom
 
 QLIK_HOST="h6las9b8umw8ppb.eu.qlikcloud.com"; QLIK_APP_ID="111414a5-e645-4397-8311-9bed88033407"
-QLIK_KEY=os.environ.get("QLIK_API_KEY",""); SUPA_URL=os.environ.get("SUPABASE_URL","https://tndwonqdbeszkcztkzqe.supabase.co")
+QLIK_KEY=os.environ.get("QLIK_API_KEY","")
+from _env import SUPABASE_URL as SUPA_URL  # voir scripts/_env.py
 SUPA_KEY=os.environ.get("SUPABASE_SERVICE_KEY",""); DRY_RUN=os.environ.get("DRY_RUN")=="1"
 YEARS=[y.strip() for y in os.environ.get("QUITTANCE_YEARS","2025,2026").split(",") if y.strip()]
 

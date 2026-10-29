@@ -3,8 +3,7 @@
 // Expéditeur : info@hexagroup.be. QR de paiement inline (au montant réellement dû).
 // Sécurité : n'accepte que les appels d'un utilisateur connecté au Hub (JWT Supabase vérifié).
 
-const SB_URL = 'https://tndwonqdbeszkcztkzqe.supabase.co'
-const SB_KEY = 'sb_publishable_xBt6ZaZGh5trEloyMCNRuA_MN-jesVJ'
+import { SUPABASE_URL as SB_URL, SUPABASE_ANON_KEY as SB_KEY } from './_lib/env.js'
 
 const HEX = {
   from: 'info@hexagroup.be', nom: 'Hexagroup',

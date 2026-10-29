@@ -1,3 +1,4 @@
+import { N8N_WEBHOOK_URL } from '../../config/env'
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
@@ -35,7 +36,7 @@ const CAN_HOVER = typeof window !== 'undefined' && !!window.matchMedia && window
 function ApercuFacture({ fid, nom, pin, onClose }) {
   const [etat, setEtat] = useState('load')
   useEffect(() => { setEtat('load') }, [fid])
-  const src = `https://n8n.srv1082740.hstgr.cloud/webhook/apercu-facture?fid=${encodeURIComponent(fid)}`
+  const src = `${N8N_WEBHOOK_URL}/apercu-facture?fid=${encodeURIComponent(fid)}`
   return (
     <div style={{ position: 'fixed', top: '50%', right: 24, transform: 'translateY(-50%)', zIndex: 2100, width: 520, maxWidth: '48vw', maxHeight: '88vh', background: '#fff', borderRadius: 14, boxShadow: '0 20px 60px rgba(0,0,0,0.35)', border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', pointerEvents: pin ? 'auto' : 'none' }}>
       <div style={{ padding: '10px 14px', background: '#0f172a', color: '#fff', fontSize: 12, fontWeight: 600, fontFamily: FONT, display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>📄 {nom}</span>{pin && <button onClick={onClose} style={{ border: 'none', background: 'rgba(255,255,255,0.15)', color: '#fff', borderRadius: 6, padding: '2px 9px', cursor: 'pointer', fontSize: 14, lineHeight: 1.3 }}>✕</button>}</div>

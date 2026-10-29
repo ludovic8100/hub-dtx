@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
-// URL du webhook n8n qui déclenche le workflow IBAN SYNC (à remplacer par l'URL de production)
-const SYNC_WEBHOOK_URL = 'https://n8n.srv1082740.hstgr.cloud/webhook/iban-sync'
+import { n8nWebhook } from '../config/env'
+
+// Webhook n8n qui déclenche le workflow IBAN SYNC
+const SYNC_WEBHOOK_URL = n8nWebhook('iban-sync')
 
 const fmt = v => v==null?'—':new Intl.NumberFormat('fr-BE',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(v)
 const fmtDate = v => v ? new Date(v).toLocaleDateString('fr-BE',{day:'2-digit',month:'2-digit',year:'2-digit'}) : '—'

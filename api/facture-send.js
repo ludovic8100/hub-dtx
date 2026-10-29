@@ -2,8 +2,7 @@
 // Expediteur / CC choisis selon `entite` (lode | dtx | dyn). Securite : session Supabase verifiee (JWT).
 // Variables d'env (Vercel) : AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET
 
-const SB_URL = 'https://tndwonqdbeszkcztkzqe.supabase.co'
-const SB_KEY = 'sb_publishable_xBt6ZaZGh5trEloyMCNRuA_MN-jesVJ'  // publique (identique au front)
+import { SUPABASE_URL as SB_URL, SUPABASE_ANON_KEY as SB_KEY } from './_lib/env.js'
 
 const ENTITES = {
   lode: { from: 'info@lode-group.be', cc: 'contact@lode-group.be', nom: 'LODE' },

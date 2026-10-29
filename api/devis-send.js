@@ -3,8 +3,7 @@
 // Sécurité : n'accepte que les appels d'un utilisateur connecté au Hub (JWT Supabase vérifié).
 // Variables d'env (Vercel) : AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, SUPABASE_URL, SUPABASE_ANON_KEY
 
-const SB_URL = 'https://tndwonqdbeszkcztkzqe.supabase.co'
-const SB_KEY = 'sb_publishable_xBt6ZaZGh5trEloyMCNRuA_MN-jesVJ'  // publique, identique au front (clés JWT legacy désactivées)
+import { SUPABASE_URL as SB_URL, SUPABASE_ANON_KEY as SB_KEY } from './_lib/env.js'
 
 const ENTITES = {
   lode: { from: 'info@lode-group.be', cc: 'contact@lode-group.be', nom: 'LODE',     couleur: '#ea580c', dark: '#7c2d12' },

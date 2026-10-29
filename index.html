@@ -9,6 +9,16 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Garde-fou configuration : une erreur [Hub] levée par src/config/env.js (ex. build de test
+         sans VITE_SUPABASE_URL) s'affiche en clair au lieu d'une page blanche. -->
+    <script>
+      window.addEventListener('error', function (e) {
+        var m = (e && e.message) || ''
+        if (m.indexOf('[Hub]') === -1) return
+        var r = document.getElementById('root')
+        if (r) r.innerHTML = '<div style="font-family:sans-serif;max-width:640px;margin:15vh auto;padding:24px;border:2px solid #dc2626;border-radius:12px;background:#fef2f2;color:#7f1d1d"><h2 style="margin:0 0 8px">Configuration incomplète</h2><p style="margin:0">' + m.replace(/^.*?\[Hub\]\s*/, '') + '</p><p style="margin:12px 0 0;font-size:13px;color:#991b1b">Voir <code>.env.example</code> et les variables d'environnement du projet Vercel.</p></div>'
+      })
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

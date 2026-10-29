@@ -1,3 +1,4 @@
+import { N8N_WEBHOOK_URL } from '../config/env'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { sansExtraits } from '../lib/factures'
@@ -50,7 +51,7 @@ function scoreCorrespondance(f, cible, dateCible, contrepartieCible) {
 function ApercuFacture({ fid, nom }) {
   const [etat, setEtat] = useState('load')
   useEffect(() => { setEtat('load') }, [fid])
-  const src = `https://n8n.srv1082740.hstgr.cloud/webhook/apercu-facture?fid=${encodeURIComponent(fid)}`
+  const src = `${N8N_WEBHOOK_URL}/apercu-facture?fid=${encodeURIComponent(fid)}`
   return (
     <div style={{ position: 'fixed', top: '50%', right: '24px', transform: 'translateY(-50%)', zIndex: 2100, width: '570px', maxWidth: '50vw', maxHeight: '90vh', background: '#fff', borderRadius: '14px', boxShadow: '0 20px 60px rgba(0,0,0,0.35)', border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', pointerEvents: 'none' }}>
       <div style={{ padding: '10px 14px', background: '#0f172a', color: '#fff', fontSize: '12px', fontWeight: '600', fontFamily: FONT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>📄 {nom}</div>
