@@ -3,6 +3,11 @@ name: Qlik — Contrats seuls
 on:
   workflow_dispatch:
     inputs:
+      target:
+        description: "Environnement cible (base Supabase)"
+        type: choice
+        options: [test, production]
+        default: test
       dry_run:
         description: "Test sans écriture"
         type: boolean
@@ -15,7 +20,10 @@ concurrency:
 jobs:
   contrats:
     runs-on: ubuntu-latest
+    environment: ${{ inputs.target }}
     env:
+      APP_ENV: ${{ inputs.target }}
+      SUPABASE_URL: ${{ vars.SUPABASE_URL }}
       QLIK_API_KEY: ${{ secrets.QLIK_API_KEY }}
       SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
       DRY_RUN: ${{ inputs.dry_run && '1' || '' }}

@@ -45,7 +45,9 @@ export const SUPABASE_SERVICE_KEY = env.SUPABASE_SERVICE_KEY || ''
 
 // ── n8n / SharePoint / Hub ────────────────────────────────────────────────────
 export const N8N_URL = lire('N8N_URL')
-export const n8nWebhook = chemin => `${N8N_URL}/webhook/${String(chemin).replace(/^\/+/, '')}`
+/** Hors production, les webhooks n8n reçoivent un suffixe (-test) : jamais de workflow prod déclenché depuis le test. */
+export const N8N_TEST_SUFFIX = IS_TEST ? (env.N8N_TEST_SUFFIX ?? '-test') : ''
+export const n8nWebhook = chemin => `${N8N_URL}/webhook/${String(chemin).replace(/^\/+/, '')}${N8N_TEST_SUFFIX}`
 export const SHAREPOINT_SITE = lire('SHAREPOINT_SITE')
 export const SHAREPOINT_ROOT = lire('SHAREPOINT_ROOT', { defautTest: 'Documents partages/_TEST' })
 export const HUB_URL = lire('HUB_URL')
@@ -68,7 +70,7 @@ export const GITHUB_SYNC_REF = env.GITHUB_SYNC_REF || (IS_TEST ? 'staging' : 'ma
 export default {
   APP_ENV, IS_PROD, IS_TEST,
   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY,
-  N8N_URL, n8nWebhook, SHAREPOINT_SITE, SHAREPOINT_ROOT, HUB_URL,
+  N8N_URL, N8N_TEST_SUFFIX, n8nWebhook, SHAREPOINT_SITE, SHAREPOINT_ROOT, HUB_URL,
   AZURE, MAIL_REDIRECT_TO,
   GITHUB_DISPATCH_TOKEN, GITHUB_REPO, GITHUB_SYNC_REF,
 }

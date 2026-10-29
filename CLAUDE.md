@@ -79,3 +79,8 @@ Les exports dans `n8n_workflows/` ne couvrent qu'une partie ; la référence est
 - Plan complet (test/prod, couche applicative, migrations, CI) : `docs/ARCHITECTURE-ENVIRONNEMENTS.md`.
 - Sécurité phase 0 appliquée : `execute_raw_sql` et `tickets_rappels_echeance` ne sont plus exécutables
   par `anon` (`sql/security_phase0_revoke_rpc_anon.sql`).
+- **Environnement TEST (phase 2, 29/10/2026)** : projet Supabase `lvdnzbhplnzuwdqtitdb` (schéma =
+  `supabase/migrations/20261029120000_baseline_prod.sql`, données anonymisées via `scripts/seed_test.py`),
+  projet Vercel `hub-dtx-test` sur `staging`. Checklist et variables : `docs/ENVIRONNEMENT-TEST.md`.
+  En test : mails redirigés (`api/_lib/mail.js`), webhooks n8n suffixés `-test`, SharePoint sous `_TEST`.
+- Workflows Qlik : entrée `target` (test/production) = environnement GitHub ; le cron vise la prod.

@@ -48,8 +48,14 @@ export const LOGOS_URL = `${STORAGE_PUBLIC_URL}/logos/`
 // ── n8n ───────────────────────────────────────────────────────────────────────
 export const N8N_URL = lire('N8N_URL')
 export const N8N_WEBHOOK_URL = `${N8N_URL}/webhook`
-/** URL complète d'un webhook n8n : n8nWebhook('iban-sync') */
-export const n8nWebhook = chemin => `${N8N_WEBHOOK_URL}/${String(chemin).replace(/^\/+/, '')}`
+/**
+ * Suffixe ajouté au chemin des webhooks n8n hors production ('' pour le désactiver).
+ * Un Hub de test appelle donc `…/webhook/iban-sync-test` : tant que le workflow jumeau n'existe
+ * pas dans n8n, l'appel tombe en 404 et aucun workflow de PRODUCTION n'est déclenché.
+ */
+export const N8N_TEST_SUFFIX = IS_TEST ? (E.VITE_N8N_TEST_SUFFIX ?? '-test') : ''
+/** URL complète d'un webhook n8n qui DÉCLENCHE un traitement : n8nWebhook('iban-sync') */
+export const n8nWebhook = chemin => `${N8N_WEBHOOK_URL}/${String(chemin).replace(/^\/+/, '')}${N8N_TEST_SUFFIX}`
 /** URL de l'éditeur d'un workflow n8n */
 export const n8nWorkflowUrl = id => `${N8N_URL}/workflow/${id}`
 
@@ -73,7 +79,7 @@ export const GITHUB_REPO_URL = 'https://github.com/ludovic8100/hub-dtx'
 export default {
   APP_ENV, IS_PROD, IS_TEST, ENV_LABEL,
   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_PROJECT_REF, STORAGE_PUBLIC_URL, LOGOS_URL,
-  N8N_URL, N8N_WEBHOOK_URL, n8nWebhook, n8nWorkflowUrl,
+  N8N_URL, N8N_WEBHOOK_URL, N8N_TEST_SUFFIX, n8nWebhook, n8nWorkflowUrl,
   SHAREPOINT_SITE, SHAREPOINT_ROOT, sharepointUrl,
   HUB_URL, GITHUB_REPO_URL,
 }

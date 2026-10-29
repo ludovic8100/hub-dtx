@@ -1,0 +1,50 @@
+name: Seed TEST depuis la production (anonymisé)
+
+# Alimente la base Supabase de TEST avec le référentiel complet + un échantillon anonymisé
+# de la production (voir scripts/seed_test.py). Lancement manuel uniquement.
+#
+# Environnement GitHub `test` :
+#   variable SUPABASE_URL              → URL du projet TEST
+#   secret   SUPABASE_SERVICE_KEY      → service_role du projet TEST (écriture)
+#   secret   PROD_SUPABASE_SERVICE_KEY → service_role de la PRODUCTION (lecture seule ici)
+
+on:
+  workflow_dispatch:
+    inputs:
+      sample_clients:
+        description: "Nombre de dossiers clients Dynassur copiés (anonymisés)"
+        type: number
+        default: 300
+      dry_run:
+        description: "Simulation : lit la prod, n'écrit rien dans TEST"
+        type: boolean
+        default: false
+
+concurrency:
+  group: seed-test
+  cancel-in-progress: false
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    environment: test
+    env:
+      SOURCE_SUPABASE_URL: https://tndwonqdbeszkcztkzqe.supabase.co
+      SOURCE_SERVICE_KEY: ${{ secrets.PROD_SUPABASE_SERVICE_KEY }}
+      TARGET_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+      TARGET_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      SAMPLE_CLIENTS: ${{ inputs.sample_clients }}
+      DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Vérifier la configuration
+        run: |
+          if [ -z "$SOURCE_SERVICE_KEY" ]; then echo "::error::Secret PROD_SUPABASE_SERVICE_KEY manquant dans l'environnement test"; exit 1; fi
+          if [ -z "$TARGET_SUPABASE_URL" ]; then echo "::error::Variable SUPABASE_URL manquante dans l'environnement test"; exit 1; fi
+          if [ -z "$TARGET_SERVICE_KEY" ] && [ -z "$DRY_RUN" ]; then echo "::error::Secret SUPABASE_SERVICE_KEY (test) manquant"; exit 1; fi
+          echo "Cible : $TARGET_SUPABASE_URL — échantillon : $SAMPLE_CLIENTS — ${DRY_RUN:+DRY_RUN}${DRY_RUN:-ÉCRITURE}"
+      - name: Seed
+        run: python scripts/seed_test.py

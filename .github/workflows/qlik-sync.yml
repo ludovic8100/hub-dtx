@@ -10,6 +10,11 @@ on:
     - cron: '30 6 * * *'
   workflow_dispatch:
     inputs:
+      target:
+        description: "Environnement cible (base Supabase)"
+        type: choice
+        options: [test, production]
+        default: test
       dry_run:
         description: "Test sans écriture (extrait et affiche seulement)"
         type: boolean
@@ -22,7 +27,13 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    # Environnement GitHub = cible : le cron quotidien vise toujours la PRODUCTION ; un lancement
+    # manuel vise l'environnement choisi (test par défaut). Chaque environnement GitHub porte ses
+    # propres secrets (SUPABASE_SERVICE_KEY) et variables (SUPABASE_URL) : voir docs/ENVIRONNEMENT-TEST.md.
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'production' }}
     env:
+      APP_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'production' }}
+      SUPABASE_URL: ${{ vars.SUPABASE_URL }}
       QLIK_API_KEY: ${{ secrets.QLIK_API_KEY }}
       SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
       # DRY_RUN=1 uniquement lors d'un lancement manuel avec la case cochée ;
@@ -42,7 +53,8 @@ jobs:
         run: |
           if [ -z "$QLIK_API_KEY" ]; then echo "::error::Secret QLIK_API_KEY manquant"; exit 1; fi
           if [ -z "$SUPABASE_SERVICE_KEY" ] && [ -z "$DRY_RUN" ]; then echo "::error::Secret SUPABASE_SERVICE_KEY manquant (requis hors DRY_RUN)"; exit 1; fi
-          echo "Mode: ${DRY_RUN:+DRY_RUN}${DRY_RUN:-ECRITURE REELLE}"
+          if [ "$APP_ENV" = "test" ] && [ -z "$SUPABASE_URL" ]; then echo "::error::Variable SUPABASE_URL manquante dans l'environnement GitHub 'test'"; exit 1; fi
+          echo "Cible: $APP_ENV (${SUPABASE_URL:-production par défaut}) — Mode: ${DRY_RUN:+DRY_RUN}${DRY_RUN:-ECRITURE REELLE}"
 
       # Ordre : clients (base) -> contrats -> production -> quittances,
       # puis enrichissements -> sinistres en dernier.

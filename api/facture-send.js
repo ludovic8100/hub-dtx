@@ -3,6 +3,7 @@
 // Variables d'env (Vercel) : AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET
 
 import { SUPABASE_URL as SB_URL, SUPABASE_ANON_KEY as SB_KEY } from './_lib/env.js'
+import { redirigerEnTest } from './_lib/mail.js'
 
 const ENTITES = {
   lode: { from: 'info@lode-group.be', cc: 'contact@lode-group.be', nom: 'LODE' },
@@ -52,6 +53,8 @@ export default async function handler(req, res) {
     }
     const ccAddr = (cc && String(cc).trim()) ? String(cc).trim() : (cc === undefined ? E.cc : null)
     if (ccAddr) message.ccRecipients = [{ emailAddress: { address: ccAddr } }]
+
+    redirigerEnTest(message)  // en TEST : tout mail part vers MAIL_REDIRECT_TO
 
     const mr = await fetch(`https://graph.microsoft.com/v1.0/users/${E.from}/sendMail`, {
       method: 'POST', headers: { Authorization: `Bearer ${tj.access_token}`, 'Content-Type': 'application/json' },

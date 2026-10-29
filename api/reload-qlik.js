@@ -6,7 +6,7 @@
 // Le token GitHub reste côté serveur — jamais exposé au navigateur.
 // Variables d'env (Vercel) : voir api/_lib/env.js (SUPABASE_URL, GITHUB_DISPATCH_TOKEN, GITHUB_SYNC_REF…)
 
-import { SUPABASE_URL as SB_URL, SUPABASE_ANON_KEY as SB_KEY, GITHUB_DISPATCH_TOKEN, GITHUB_REPO as REPO, GITHUB_SYNC_REF } from './_lib/env.js'
+import { SUPABASE_URL as SB_URL, SUPABASE_ANON_KEY as SB_KEY, GITHUB_DISPATCH_TOKEN, GITHUB_REPO as REPO, GITHUB_SYNC_REF, IS_TEST } from './_lib/env.js'
 const WORKFLOW = 'qlik-sync.yml'
 
 export default async function handler(req, res) {
@@ -36,7 +36,7 @@ export default async function handler(req, res) {
         'Content-Type': 'application/json',
         'User-Agent': 'hub-dtx',
       },
-      body: JSON.stringify({ ref: GITHUB_SYNC_REF, inputs: { dry_run: 'false' } }),
+      body: JSON.stringify({ ref: GITHUB_SYNC_REF, inputs: { dry_run: 'false', target: IS_TEST ? 'test' : 'production' } }),
     })
     if (gh.status === 204) return res.status(200).json({ ok: true, launched: true })
     const detail = await gh.text().catch(() => '')
