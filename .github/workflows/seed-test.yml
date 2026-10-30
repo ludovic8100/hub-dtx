@@ -4,7 +4,7 @@ name: Seed TEST depuis la production (anonymisé)
 # de la production (voir scripts/seed_test.py). Lancement manuel uniquement.
 #
 # Environnement GitHub `test` :
-#   variable SUPABASE_URL              → URL du projet TEST
+#   variable SUPABASE_URL              → URL du projet TEST (facultative : valeur par défaut ci-dessous)
 #   secret   SUPABASE_SERVICE_KEY      → service_role du projet TEST (écriture)
 #   secret   PROD_SUPABASE_SERVICE_KEY → service_role de la PRODUCTION (lecture seule ici)
 
@@ -31,7 +31,7 @@ jobs:
     env:
       SOURCE_SUPABASE_URL: https://tndwonqdbeszkcztkzqe.supabase.co
       SOURCE_SERVICE_KEY: ${{ secrets.PROD_SUPABASE_SERVICE_KEY }}
-      TARGET_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+      TARGET_SUPABASE_URL: ${{ vars.SUPABASE_URL || 'https://lvdnzbhplnzuwdqtitdb.supabase.co' }}
       TARGET_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
       SAMPLE_CLIENTS: ${{ inputs.sample_clients }}
       DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
