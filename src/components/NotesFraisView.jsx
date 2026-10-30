@@ -99,7 +99,7 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
   useEffect(() => {
     if (!isAdmin) return
     let ok = true
-    supabase.from('user_permissions').select('user_email, collab_code, nom').order('nom')
+    supabase.from('collaborateurs').select('email, code, nom_complet').order('nom_complet')
       .then(({ data }) => { if (ok) setCollabList(data || []) })
     return () => { ok = false }
   }, [isAdmin])
@@ -131,7 +131,7 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
     setLignes([])
   }
   function changeBenef(email) {
-    const c = collabList.find(x => x.user_email === email)
+    const c = collabList.find(x => x.email === email)
     if (!c) return
     const code = (c.collab_code || email.split('@')[0] || '').toUpperCase()
     const nom = c.nom || ''
@@ -196,7 +196,7 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
     const email = sel?.auteur_email
     if (!email) return
     let ok = true
-    supabase.from('user_permissions').select('iban').ilike('user_email', email).maybeSingle()
+    supabase.from('collaborateurs').select('iban').ilike('email', email).maybeSingle()
       .then(({ data }) => { if (ok) setBenefIban((data?.iban || '').trim()) })
     return () => { ok = false }
   }, [sel?.id, sel?.auteur_email])
@@ -423,8 +423,8 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
                   <div><div style={infoLbl}>Bénéficiaire</div>
                     {isAdmin && sel.statut === 'brouillon' && collabList.length > 0
                       ? <select value={sel.auteur_email || myEmail} onChange={e => changeBenef(e.target.value)} style={{ ...sheetInp, fontWeight: 700, color: '#1e293b' }}>
-                          {!collabList.find(c => c.user_email === (sel.auteur_email || myEmail)) && <option value={sel.auteur_email || myEmail}>{sel.auteur_nom || myNom || myEmail}</option>}
-                          {collabList.map(c => <option key={c.user_email} value={c.user_email}>{c.nom || c.user_email}{c.collab_code ? ` (${c.collab_code})` : ''}</option>)}
+                          {!collabList.find(c => c.email === (sel.auteur_email || myEmail)) && <option value={sel.auteur_email || myEmail}>{sel.auteur_nom || myNom || myEmail}</option>}
+                          {collabList.map(c => <option key={c.email} value={c.email}>{c.nom_complet || c.email}{c.code ? ` (${c.code})` : ''}</option>)}
                         </select>
                       : <div style={infoVal}>{sel.auteur_nom || myNom || myEmail}</div>}
                   </div>

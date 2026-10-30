@@ -9,7 +9,7 @@ import GestionCategories from './GestionCategories'
 import { RdvCategoriesPanel } from '../admin/RdvCategories'
 import ActeursMetierPanel from './ActeursMetierPanel'
 
-// ─── Définition des accès par société (colonnes réelles de user_permissions) ───
+// ─── Définition des accès par société (colonnes réelles de collaborateurs) ───
 const ACCES = [
   { acc: 'acc_dynassur', label: 'Dynassur', pfx: 'dyn',  couleur: '#0080BD',
     pages: [['dashboard', 'Tableau de bord'], ['taches', 'Tâches'], ['clients', 'Clients'], ['production', 'Production'], ['bordereaux', 'Bordereaux'], ['credits', 'Crédits'], ['chiffres', 'Chiffres'], ['objectifs', 'Objectifs'], ['compagnies', 'Compagnies'], ['sinistres', 'Sinistres'], ['rdv', 'RDV / Agenda'], ['appels', 'Appels'], ['rentabilite', 'Rentabilité'], ['banque', 'Banque'], ['comptabilite', 'Comptabilité'], ['devis', 'Devis & Factures'], ['notesfrais', 'Notes de frais']] },
@@ -59,10 +59,10 @@ export default function ConfigModule() {
     if (!isAdmin) { setLoading(false); return }
     ;(async () => {
       const { data: socs } = await supabase.from('societes').select('*').order('code')
-      const { data: us } = await supabase.from('user_permissions').select('*').order('nom', { nullsFirst: false })
+      const { data: us } = await supabase.from('collaborateurs').select('*').order('nom_complet', { nullsFirst: false })
       setSocietes(socs || []); setUsers(us || [])
       const { data: brx } = await supabase.from('ref_bureaux').select('id,libelle,actif').eq('actif', true).order('libelle')
-      const { data: cbs } = await supabase.from('collaborateurs').select('code,bureau_id')
+      const cbs = us
       setBureaux(brx || [])
       const mB = {}; (cbs || []).forEach(c => { if (c.code) mB[c.code.toUpperCase()] = c.bureau_id }); setCollabBureau(mB)
       if (socs?.length) setSelSoc({ ...socs.find(s => s.entite_key) || socs[0] })
@@ -97,7 +97,7 @@ export default function ConfigModule() {
     notify('✓ Logo chargé — clique « Enregistrer » pour valider')
   }
 
-  const userCodeOf = u => (u?.collab_code || (u?.user_email || '').split('@')[0] || '').toUpperCase()
+  const userCodeOf = u => (u?.code || (u?.email || '').split('@')[0] || '').toUpperCase()
   const bureauLabelOf = u => { const b = bureaux.find(x => x.id === collabBureau[userCodeOf(u)]); return b ? b.libelle : null }
   async function setBureau(bureauId) {
     if (!selUser) return
@@ -130,28 +130,28 @@ export default function ConfigModule() {
   async function saveUser() {
     if (!selUser) return
     const estNouveau = !selUser.id
-    const email = (selUser.user_email || '').trim().toLowerCase()
+    const email = (selUser.email || '').trim().toLowerCase()
     if (!email) { notify('❌ L\'email est obligatoire'); return }
-    const nom = (selUser.nom || '').trim() || email
+    const nom = (selUser.nom_complet || '').trim() || email
     setSaving(true)
     if (estNouveau) {
       const { _nouveau, id, created_at, updated_at, ...rest } = selUser
-      const { data, error } = await supabase.from('user_permissions')
-        .insert({ ...rest, user_email: email, nom, actif: rest.actif ?? true, role: rest.role || 'user' })
+      const { data, error } = await supabase.from('collaborateurs')
+        .insert({ ...rest, email, nom_complet: nom, compte_hub_actif: rest.compte_hub_actif ?? true, est_admin: rest.est_admin || false, type: rest.type || 'physique' })
         .select().single()
       setSaving(false)
       if (error) { notify('❌ ' + (error.code === '23505' ? 'Un compte existe déjà avec cet email' : error.message)); return }
-      setUsers(prev => [...prev, data].sort((a, b) => (a.nom || a.user_email || '').localeCompare(b.nom || b.user_email || '', 'fr', { sensitivity: 'base' })))
+      setUsers(prev => [...prev, data].sort((a, b) => (a.nom_complet || a.email || '').localeCompare(b.nom_complet || b.email || '', 'fr', { sensitivity: 'base' })))
       setSelUser({ ...data })
       notify('✓ Utilisateur créé')
       return
     }
     const { id, created_at, updated_at, _nouveau, ...payload } = selUser
-    payload.user_email = email; payload.nom = nom
-    const { error } = await supabase.from('user_permissions').update(payload).eq('id', id)
+    payload.email = email; payload.nom_complet = nom
+    const { error } = await supabase.from('collaborateurs').update(payload).eq('id', id)
     setSaving(false)
     if (error) { notify('❌ ' + error.message); return }
-    setUsers(prev => prev.map(u => u.id === id ? { ...selUser, user_email: email, nom } : u))
+    setUsers(prev => prev.map(u => u.id === id ? { ...selUser, email, nom_complet: nom } : u))
     notify('✓ Utilisateur enregistré')
   }
 
@@ -161,13 +161,13 @@ export default function ConfigModule() {
     if (!grp) return
     const pageLabel = grp.pages.find(([pg]) => `${grp.pfx}_${pg}` === bulkAcces)?.[1] || bulkAcces
     // Admins exclus : ils ont déjà l'accès total, un flag par page n'a aucun effet pour eux
-    const ids = usersFiltres.filter(u => sel.has(u.id) && u.role !== 'admin').map(u => u.id)
+    const ids = usersFiltres.filter(u => sel.has(u.id) && !u.est_admin).map(u => u.id)
     if (!ids.length) { notify('❌ Aucun utilisateur coché (hors admins)'); return }
     if (!window.confirm(`${grant ? 'Donner' : 'Retirer'} l'accès « ${grp.label} · ${pageLabel} » à ${ids.length} utilisateur(s) ?`)) return
     setSaving(true)
     // Donner : on active aussi la société parente, sinon la page reste inaccessible
     const patch = grant ? { [bulkAcces]: true, [grp.acc]: true } : { [bulkAcces]: false }
-    const { error } = await supabase.from('user_permissions').update(patch).in('id', ids)
+    const { error } = await supabase.from('collaborateurs').update(patch).in('id', ids)
     setSaving(false)
     if (error) { notify('❌ ' + error.message); return }
     setUsers(prev => prev.map(u => ids.includes(u.id) ? { ...u, ...patch } : u))
@@ -176,38 +176,51 @@ export default function ConfigModule() {
 
   async function deleteUser() {
     if (!selUser?.id) { setSelUser(null); return }
-    if (!window.confirm(`Supprimer définitivement le compte « ${selUser.nom || selUser.user_email} » ?\n\nSon accès au hub sera retiré. Action irréversible.`)) return
+    // La fiche collaborateur porte aussi les données métier (code, commissions, portefeuille...) :
+    // si elle est liée à un vrai collaborateur, on coupe l'accès au Hub sans supprimer la fiche.
+    if (selUser.code) {
+      if (!window.confirm(`Retirer l'accès au Hub de « ${selUser.nom_complet || selUser.email} » ?\n\nLa fiche collaborateur (code ${selUser.code}) est conservée ; seule la connexion au Hub est coupée.`)) return
+      setSaving(true)
+      const { error } = await supabase.from('collaborateurs').update({ compte_hub_actif: false }).eq('id', selUser.id)
+      setSaving(false)
+      if (error) { notify('❌ ' + error.message); return }
+      setUsers(prev => prev.map(u => u.id === selUser.id ? { ...u, compte_hub_actif: false } : u))
+      setSelUser(null)
+      notify('✓ Accès Hub retiré')
+      return
+    }
+    if (!window.confirm(`Supprimer définitivement le compte « ${selUser.nom_complet || selUser.email} » ?\n\nAction irréversible.`)) return
     setSaving(true)
     const delId = selUser.id
-    const { error } = await supabase.from('user_permissions').delete().eq('id', delId)
+    const { error } = await supabase.from('collaborateurs').delete().eq('id', delId)
     setSaving(false)
     if (error) { notify('❌ ' + error.message); return }
     setUsers(prev => prev.filter(u => u.id !== delId))
     setSel(s => { const n = new Set(s); n.delete(delId); return n })
     setSelUser(null)
-    notify('✓ Utilisateur supprimé')
+    notify('✓ Compte supprimé')
   }
 
   async function renvoyerAcces() {
     if (!selUser) return
     setSaving(true)
     const now = new Date().toISOString()
-    const email = selUser.user_email
-    const nom = selUser.nom || email
-    await supabase.from('user_permissions').update({ date_envoi_acces: now }).eq('id', selUser.id)
+    const email = selUser.email
+    const nom = selUser.nom_complet || email
+    await supabase.from('collaborateurs').update({ date_envoi_acces: now }).eq('id', selUser.id)
     await supabase.from('taches').insert({
       titre: `Suivi 1ère connexion — ${nom}`,
       description: `Accès au Hub envoyés à ${email}. Cette tâche se clôture automatiquement à sa première connexion.`,
       statut: 'todo', priorite: 'moyenne', categorie: 'Onboarding', source: 'acces',
       user_email: email, echeance: new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10),
-      gestionnaire: (perms?.code || (perms?.user_email || '').split('@')[0] || '').toUpperCase(),
+      gestionnaire: (perms?.code || (perms?.email || '').split('@')[0] || '').toUpperCase(),
     })
     setSelUser(u => ({ ...u, date_envoi_acces: now }))
     setUsers(prev => prev.map(u => u.id === selUser.id ? { ...u, date_envoi_acces: now } : u))
     setSaving(false)
     notify('✓ Accès envoyés — tâche de suivi créée')
     const sujet = encodeURIComponent('Vos accès au Hub DTX')
-    const corps = encodeURIComponent(`Bonjour ${selUser.nom || ''},\n\nVotre accès au Hub DTX est activé.\nConnectez-vous ici : ${HUB_URL}\n\nUtilisez le bouton « Se connecter avec Microsoft » avec votre compte professionnel (${email}).\n\nÀ bientôt.`)
+    const corps = encodeURIComponent(`Bonjour ${selUser.nom_complet || ''},\n\nVotre accès au Hub DTX est activé.\nConnectez-vous ici : ${HUB_URL}\n\nUtilisez le bouton « Se connecter avec Microsoft » avec votre compte professionnel (${email}).\n\nÀ bientôt.`)
     window.open(`mailto:${email}?subject=${sujet}&body=${corps}`)
   }
 
@@ -222,22 +235,22 @@ export default function ConfigModule() {
 
   const DOMAINES_INTERNES = ['dynassur.be', 'dtx-group.be']
   const usersFiltres = users.filter(u => {
-    const dom = (u.user_email || '').split('@')[1]?.toLowerCase()
+    const dom = (u.email || '').split('@')[1]?.toLowerCase()
     if (!dom || !DOMAINES_INTERNES.includes(dom)) return false  // externes (gmail, etc.) : jamais d'accès au hub
     const q = uSearch.trim().toLowerCase()
-    if (q && !((u.nom || '').toLowerCase().includes(q) || (u.user_email || '').toLowerCase().includes(q) || (u.collab_code || '').toLowerCase().includes(q))) return false
-    if (uStatut === 'actifs' && !u.actif) return false
-    if (uStatut === 'inactifs' && u.actif) return false
-    if (uRole !== 'tous' && (u.role || 'user') !== uRole) return false
+    if (q && !((u.nom_complet || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q) || (u.code || '').toLowerCase().includes(q))) return false
+    if (uStatut === 'actifs' && !u.compte_hub_actif) return false
+    if (uStatut === 'inactifs' && u.compte_hub_actif) return false
+    if (uRole !== 'tous' && (u.est_admin ? 'admin' : 'user') !== uRole) return false
     if (uBureau !== 'tous') {
       const bid = collabBureau[userCodeOf(u)]
       if (uBureau === 'sans') { if (bid != null) return false }
       else if (String(bid) !== uBureau) return false
     }
-    if (uSoc !== 'toutes' && !(u.role === 'admin' || u[uSoc])) return false
-    if (uModule !== 'tous' && !(u.role === 'admin' || u[uModule])) return false
+    if (uSoc !== 'toutes' && !(u.est_admin || u[uSoc])) return false
+    if (uModule !== 'tous' && !(u.est_admin || u[uModule])) return false
     return true
-  }).sort((a, b) => (a.nom || a.user_email || '').localeCompare(b.nom || b.user_email || '', 'fr', { sensitivity: 'base' }))
+  }).sort((a, b) => (a.nom_complet || a.email || '').localeCompare(b.nom_complet || b.email || '', 'fr', { sensitivity: 'base' }))
 
   const TABS = [['societes', '🏢 Sociétés'], ['documents', '📄 Documents'], ['users', '👥 Utilisateurs & accès'], ['acteurs', '🧑‍💼 Acteurs métier'], ['categories', '🏷️ Catégories compta'], ['categoriesrdv', '📅 Catégories RDV']]
 
@@ -359,7 +372,7 @@ export default function ConfigModule() {
               {(uSearch || uRole !== 'tous' || uStatut !== 'tous' || uSoc !== 'toutes' || uBureau !== 'tous' || uModule !== 'tous') && (
                 <button onClick={() => { setUSearch(''); setURole('tous'); setUStatut('tous'); setUSoc('toutes'); setUBureau('tous'); setUModule('tous') }} style={{ ...btnGhost }}>✕ Réinitialiser</button>
               )}
-              <button onClick={() => setSelUser({ _nouveau: true, nom: '', user_email: '', role: 'user', actif: true })} style={{ ...btn('#16a34a'), padding: '8px 14px', fontSize: 13 }}>➕ Nouvel utilisateur</button>
+              <button onClick={() => setSelUser({ _nouveau: true, nom_complet: '', email: '', est_admin: false, compte_hub_actif: true })} style={{ ...btn('#16a34a'), padding: '8px 14px', fontSize: 13 }}>➕ Nouvel utilisateur</button>
               <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 'auto' }}>{usersFiltres.length} / {users.length}</span>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 14, alignItems: 'center', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 10, padding: '8px 12px' }}>
@@ -370,7 +383,7 @@ export default function ConfigModule() {
               </select>
               {bulkAcces && (() => {
                 const holders = usersFiltres.filter(u => u[bulkAcces]).length
-                const admins = usersFiltres.filter(u => u.role === 'admin').length
+                const admins = usersFiltres.filter(u => u.est_admin).length
                 return <span style={{ fontSize: 12, color: '#0369a1' }}>{holders} ont l'accès{admins ? ` · ${admins} admin(s) accès total` : ''}</span>
               })()}
               <button onClick={() => { if (!bulkAcces) { notify('❌ Choisis d\'abord une page'); return } setSel(new Set(usersFiltres.filter(u => u[bulkAcces]).map(u => u.id))) }} style={{ ...btnGhost }}>Pré-cocher les détenteurs</button>
@@ -398,16 +411,16 @@ export default function ConfigModule() {
                     background: selUser?.id === u.id ? '#f8fafc' : '#fff',
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 700, color: '#1e293b', fontSize: 14 }}>{u.nom || u.user_email}</span>
-                      {u.role === 'admin' && <span style={{ fontSize: 10, fontWeight: 800, color: '#7c3aed', background: '#f5f3ff', borderRadius: 5, padding: '1px 6px' }}>ADMIN</span>}
-                      {!u.actif && <span style={{ fontSize: 10, fontWeight: 800, color: '#dc2626', background: '#fef2f2', borderRadius: 5, padding: '1px 6px' }}>INACTIF</span>}
+                      <span style={{ fontWeight: 700, color: '#1e293b', fontSize: 14 }}>{u.nom_complet || u.email}</span>
+                      {u.est_admin && <span style={{ fontSize: 10, fontWeight: 800, color: '#7c3aed', background: '#f5f3ff', borderRadius: 5, padding: '1px 6px' }}>ADMIN</span>}
+                      {!u.compte_hub_actif && <span style={{ fontSize: 10, fontWeight: 800, color: '#dc2626', background: '#fef2f2', borderRadius: 5, padding: '1px 6px' }}>INACTIF</span>}
                     </div>
-                    <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{u.user_email}</div>
+                    <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{u.email}</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', marginTop: 5 }}>
-                      {u.role === 'admin'
+                      {u.est_admin
                         ? <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: '#7c3aed', borderRadius: 5, padding: '2px 7px' }}>Toutes sociétés</span>
                         : ACCES.filter(g => u[g.acc]).map(g => <span key={g.acc} style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: g.couleur, borderRadius: 5, padding: '2px 7px' }}>{g.label}</span>)}
-                      {u.role !== 'admin' && !ACCES.some(g => u[g.acc]) && <span style={{ fontSize: 10, color: '#cbd5e1', fontStyle: 'italic' }}>aucune société</span>}
+                      {!u.est_admin && !ACCES.some(g => u[g.acc]) && <span style={{ fontSize: 10, color: '#cbd5e1', fontStyle: 'italic' }}>aucune société</span>}
                       {(() => { const bl = bureauLabelOf(u); return bl ? <span style={{ fontSize: 10, color: '#64748b', background: '#f1f5f9', borderRadius: 5, padding: '2px 7px' }}>🏢 {bl}</span> : null })()}
                     </div>
                   </button>
@@ -419,14 +432,14 @@ export default function ConfigModule() {
               <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 20 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 250 }}>
-                    <input value={selUser.nom || ''} onChange={e => setSelUser(u => ({ ...u, nom: e.target.value }))} placeholder="Nom complet" style={{ ...inp, fontWeight: 700, fontSize: 16 }} />
-                    <input value={selUser.user_email || ''} onChange={e => setSelUser(u => ({ ...u, user_email: e.target.value }))} placeholder="email@societe.be" style={{ ...inp, fontSize: 12 }} />
+                    <input value={selUser.nom_complet || ''} onChange={e => setSelUser(u => ({ ...u, nom_complet: e.target.value }))} placeholder="Nom complet" style={{ ...inp, fontWeight: 700, fontSize: 16 }} />
+                    <input value={selUser.email || ''} onChange={e => setSelUser(u => ({ ...u, email: e.target.value }))} placeholder="email@societe.be" style={{ ...inp, fontSize: 12 }} />
                     {!selUser.id && <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 600 }}>Nouveau compte — reconnu au 1ᵉʳ login Microsoft avec cet email</span>}
                   </div>
                   <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
                     <label style={{ fontSize: 13, fontWeight: 600, color: '#475569', display: 'flex', gap: 6, alignItems: 'center' }}>
                       Rôle
-                      <select value={selUser.role || 'user'} onChange={e => setSelUser(u => ({ ...u, role: e.target.value }))} style={{ ...inp, padding: '6px 8px' }}>
+                      <select value={selUser.est_admin ? 'admin' : 'user'} onChange={e => setSelUser(u => ({ ...u, est_admin: e.target.value === 'admin' }))} style={{ ...inp, padding: '6px 8px' }}>
                         <option value="user">Utilisateur</option>
                         <option value="admin">Administrateur</option>
                       </select>
@@ -443,7 +456,7 @@ export default function ConfigModule() {
                           : <span style={{ fontSize: 12, color: '#94a3b8' }}>aucun collaborateur (code {code || '?'})</span>
                       })()}
                     </label>
-                    <Toggle label="Actif" on={!!selUser.actif} onClick={() => setSelUser(u => ({ ...u, actif: !u.actif }))} />
+                    <Toggle label="Actif" on={!!selUser.compte_hub_actif} onClick={() => setSelUser(u => ({ ...u, compte_hub_actif: !u.compte_hub_actif }))} />
                     <Toggle label="Employé" on={!!selUser.est_employe} onClick={() => setSelUser(u => ({ ...u, est_employe: !u.est_employe }))} />
                   </div>
                 </div>
@@ -458,7 +471,7 @@ export default function ConfigModule() {
                   <button onClick={selUser.id ? deleteUser : () => setSelUser(null)} disabled={saving} style={{ marginLeft: 'auto', padding: '9px 16px', fontSize: 14, fontWeight: 700, borderRadius: 8, cursor: 'pointer', border: '1px solid #fecaca', background: '#fff', color: '#dc2626' }}>{selUser.id ? '🗑 Supprimer' : '✕ Annuler'}</button>
                 </div>
 
-                {selUser.role === 'admin' && (
+                {selUser.est_admin && (
                   <div style={{ marginTop: 14, background: '#f5f3ff', color: '#6d28d9', borderRadius: 8, padding: '8px 12px', fontSize: 12 }}>
                     Les administrateurs ont accès à toutes les sociétés et toutes les pages — les cases ci-dessous sont alors sans effet.
                   </div>
