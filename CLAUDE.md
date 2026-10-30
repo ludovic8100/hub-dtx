@@ -34,6 +34,12 @@ Application interne de gestion pour un groupe de 6 entités belges :
 
 Conventions : montants en `numeric`, dates ISO, colonne `societe` = code entité en MAJUSCULES.
 
+## Droits d'accès (refonte en cours, 30/10/2026)
+
+Chantier en trois blocs pour remplacer les droits `USING (true)` ouverts à tous par de vraies
+règles : portefeuille par bureau, un seul modèle de modules, espace client séparé. Détail complet,
+état d'avancement et points ouverts : `docs/DROITS-ACCES.md`.
+
 ## Rapprochement bancaire (cœur du module compta)
 
 - Lien bidirectionnel : `transactions.facture_url` + `rapproche` ⟷ `factures_achat.transaction_id`.
