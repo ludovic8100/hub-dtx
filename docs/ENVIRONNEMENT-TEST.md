@@ -62,9 +62,9 @@ workflows connaissent l'URL du projet test par défaut. Il ne reste que les secr
 - Rappel : `QLIK_API_KEY` est un secret de dépôt, visible des deux environnements.
 
 ### 2.5 SharePoint
-- ⚠️ Un clone du dépôt existe dans `Documents partages/GITHUB/hub-dtx/` **avec `node_modules` et `dist-test`**
-  synchronisés (constaté le 30/10/2026). À supprimer de SharePoint : un dépôt Git ne doit pas vivre dans un dossier
-  synchronisé (verrous, conflits, dizaines de milliers de fichiers inutiles). GitHub est la copie de référence.
+- Un clone du dépôt (avec `node_modules`) a vécu dans `Documents partages/GITHUB/hub-dtx/` jusqu'au 30/10/2026 ;
+  il a été supprimé. Règle : un dépôt Git ne doit pas vivre dans un dossier synchronisé OneDrive/SharePoint
+  (verrous, conflits, dizaines de milliers de fichiers inutiles). GitHub est la copie de référence.
 - Créer `Documents partages/_TEST/` avec la même arborescence que la racine pour ce que vous testerez (`COMPTA/FACTURES/_LODE`, `_DYNASSUR`, … ; `VENTES` LODE). Rien n'y est écrit tant que n8n n'est pas dupliqué.
 
 ### 2.6 n8n — jumeaux de test (optionnel, par workflow)
