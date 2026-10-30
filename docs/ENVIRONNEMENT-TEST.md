@@ -1,6 +1,6 @@
 # Environnement de TEST — état et checklist
 
-Mis à jour le 29 octobre 2026. Complète `docs/ARCHITECTURE-ENVIRONNEMENTS.md` (phase 2).
+Mis à jour le 30 octobre 2026. Complète `docs/ARCHITECTURE-ENVIRONNEMENTS.md` (phase 2).
 
 ## 1. Ce qui est en place
 
@@ -8,7 +8,7 @@ Mis à jour le 29 octobre 2026. Complète `docs/ARCHITECTURE-ENVIRONNEMENTS.md` 
 |---|---|---|
 | Supabase | **`lvdnzbhplnzuwdqtitdb`** — `https://lvdnzbhplnzuwdqtitdb.supabase.co` (plan Free, eu-west-3, créé le 29/10/2026). Schéma complet appliqué depuis `supabase/migrations/20261029120000_baseline_prod.sql` : 100 tables, 226 contraintes, 275 index, 43 fonctions, 17 vues, 14 triggers, 147 policies, 7 buckets + 16 policies storage. Clé publishable : `sb_publishable_DSKvPVSTr-RjyQBkkX60eA_3FBM3RZT`. Cron `tickets_rappels_echeance` **non planifié** (pas de mails depuis le test). | `tndwonqdbeszkcztkzqe` |
 | Données | Référentiel copié et anonymisé (compagnies, catégories, comptes, collaborateurs, producteurs, utilisateurs actifs, LODE devis/factures, Hexagroup). Secrets `config_secrets` factices. Échantillon Dynassur : via l'Action `seed-test.yml` (voir § 3). | données réelles |
-| Branche Git | `staging` | `main` |
+| Branche Git | `staging` (alignée sur `main` le 30/10/2026, PR #5) | `main` (PR #5 fusionnée le 30/10/2026, déploiement vérifié : aucun bandeau, aucune erreur) |
 | Vercel | **à créer** (§ 2.1) : `hub-dtx-test` | `hub-dtx` |
 | Mails | redirigés vers `MAIL_REDIRECT_TO` avec objet `[TEST]` (`api/_lib/mail.js`) ; sans cette variable, envoi refusé | envoi réel |
 | n8n | les webhooks déclencheurs reçoivent le suffixe `-test` (`n8nWebhook()`), donc 404 tant que le workflow jumeau n'existe pas : **aucun workflow de prod ne peut être déclenché depuis le test**. Les aperçus en lecture seule (`apercu-facture`) restent partagés. | — |
@@ -16,6 +16,17 @@ Mis à jour le 29 octobre 2026. Complète `docs/ARCHITECTURE-ENVIRONNEMENTS.md` 
 | GitHub Actions | `qlik-sync`, `qlik-contrats`, `qlik-objets-risque` : entrée `target` (test/production) → environnement GitHub du même nom. Le cron quotidien vise toujours la production. `seed-test.yml` : copie anonymisée prod → test. | — |
 
 ## 2. Actions manuelles restantes (vous)
+
+> **Pourquoi ces étapes restent manuelles.** Depuis la session Claude Code : le connecteur Vercel refuse la création
+> de projet et la lecture des variables (403), le connecteur Microsoft 365 est en lecture seule (`Files.Read`,
+> `Sites.Read.All`), le connecteur n8n ne sait que lister/exécuter (pas de duplication) et aucun outil ne pilote
+> Azure AD ni la configuration Auth de Supabase. Le réseau de l'environnement bloque en outre `api.vercel.com`,
+> `api.supabase.com`, `graph.microsoft.com`, `n8n.srv1082740.hstgr.cloud` et `*.vercel.app` ; seuls GitHub et le
+> connecteur Supabase (SQL) passent. Pour déléguer ces étapes à Claude il faudrait (a) autoriser ces domaines dans
+> le réseau de l'environnement Claude Code et (b) fournir des jetons via les secrets de l'environnement : jeton
+> Vercel (portée équipe), *personal access token* Supabase, clé API n8n, et les identifiants d'application Azure
+> (ceux du projet Vercel `hub-dtx`) pour créer le dossier SharePoint via Graph. Les environnements GitHub, eux,
+> restent hors de portée : le proxy GitHub de Claude Code interdit ces chemins d'API.
 
 ### 2.1 Vercel — projet `hub-dtx-test` (le jeton du connecteur n'a pas le droit de créer un projet)
 1. https://vercel.com/dynassur-s-projects → **Add New… → Project** → importer `ludovic8100/hub-dtx`, nom **`hub-dtx-test`**, framework Vite, build `npm run build`, output `dist`.
@@ -43,10 +54,17 @@ Mis à jour le 29 octobre 2026. Complète `docs/ARCHITECTURE-ENVIRONNEMENTS.md` 
 3. Première connexion : votre ligne `user_permissions` (admin, actif) est déjà copiée ; les autres utilisateurs actifs aussi.
 
 ### 2.4 GitHub — Environments (Settings → Environments)
-- **`production`** : secret `SUPABASE_SERVICE_KEY` (service_role prod — peut rester le secret de dépôt existant), *Required reviewers* : vous.
-- **`test`** : variable `SUPABASE_URL` = `https://lvdnzbhplnzuwdqtitdb.supabase.co` ; secrets `SUPABASE_SERVICE_KEY` (service_role du projet **test**, Settings → API) et `PROD_SUPABASE_SERVICE_KEY` (service_role prod, utilisé en lecture seule par `seed-test.yml`).
+Les environnements `test` et `production` sont créés automatiquement par GitHub au premier lancement d'un workflow qui
+les référence ; vous pouvez aussi les créer à la main. La variable `SUPABASE_URL` n'est **plus nécessaire** : les
+workflows connaissent l'URL du projet test par défaut. Il ne reste que les secrets (impossibles à poser depuis Claude) :
+- **`production`** : secret `SUPABASE_SERVICE_KEY` (service_role prod — le secret de dépôt existant suffit tant qu'aucun secret d'environnement ne le masque), *Required reviewers* : vous.
+- **`test`** : secrets `SUPABASE_SERVICE_KEY` (service_role du projet **test**, dashboard Supabase → Settings → API Keys) et `PROD_SUPABASE_SERVICE_KEY` (service_role prod, lecture seule pour `seed-test.yml`).
+- Rappel : `QLIK_API_KEY` est un secret de dépôt, visible des deux environnements.
 
 ### 2.5 SharePoint
+- ⚠️ Un clone du dépôt existe dans `Documents partages/GITHUB/hub-dtx/` **avec `node_modules` et `dist-test`**
+  synchronisés (constaté le 30/10/2026). À supprimer de SharePoint : un dépôt Git ne doit pas vivre dans un dossier
+  synchronisé (verrous, conflits, dizaines de milliers de fichiers inutiles). GitHub est la copie de référence.
 - Créer `Documents partages/_TEST/` avec la même arborescence que la racine pour ce que vous testerez (`COMPTA/FACTURES/_LODE`, `_DYNASSUR`, … ; `VENTES` LODE). Rien n'y est écrit tant que n8n n'est pas dupliqué.
 
 ### 2.6 n8n — jumeaux de test (optionnel, par workflow)

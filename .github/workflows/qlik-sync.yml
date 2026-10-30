@@ -29,11 +29,13 @@ jobs:
     runs-on: ubuntu-latest
     # Environnement GitHub = cible : le cron quotidien vise toujours la PRODUCTION ; un lancement
     # manuel vise l'environnement choisi (test par défaut). Chaque environnement GitHub porte ses
-    # propres secrets (SUPABASE_SERVICE_KEY) et variables (SUPABASE_URL) : voir docs/ENVIRONNEMENT-TEST.md.
+    # propres secrets (SUPABASE_SERVICE_KEY) ; l'URL du projet test est connue par défaut : voir docs/ENVIRONNEMENT-TEST.md.
     environment: ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'production' }}
     env:
       APP_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'production' }}
-      SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+      # Variable d'environnement GitHub si définie, sinon l'URL du projet TEST pour la cible test
+      # (la production n'a pas besoin d'URL : valeur par défaut des scripts).
+      SUPABASE_URL: ${{ vars.SUPABASE_URL || ((github.event_name == 'workflow_dispatch' && inputs.target || 'production') == 'test' && 'https://lvdnzbhplnzuwdqtitdb.supabase.co' || '') }}
       QLIK_API_KEY: ${{ secrets.QLIK_API_KEY }}
       SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
       # DRY_RUN=1 uniquement lors d'un lancement manuel avec la case cochée ;

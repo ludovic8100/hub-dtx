@@ -23,7 +23,7 @@ jobs:
       - name: Reimport objets_risque
         env:
           APP_ENV: ${{ inputs.target }}
-          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_URL: ${{ vars.SUPABASE_URL || (inputs.target == 'test' && 'https://lvdnzbhplnzuwdqtitdb.supabase.co' || '') }}
           QLIK_API_KEY: ${{ secrets.QLIK_API_KEY }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           DRY_RUN: ${{ github.event.inputs.dry_run }}
