@@ -199,13 +199,13 @@ export default function TicketsView() {
     setTickets(all)
     let c = []
     try {
-      const r = await supabase.from('user_permissions').select('collab_code,nom,o365_display_name,user_email,actif,est_employe').eq('actif', true)
+      const r = await supabase.from('collaborateurs').select('code,nom_complet,o365_display_name,email,compte_hub_actif,est_employe').eq('compte_hub_actif', true)
       const EXCLUS = new Set(['INF', 'SIN', 'SEC', 'CON', 'GH', 'TES'])   // boîtes partagées / génériques / test
       const vus = new Set()
       c = (r.data || [])
-        .filter(u => u.collab_code && u.user_email && !EXCLUS.has((u.collab_code || '').toUpperCase()))
-        .filter(u => { const k = u.collab_code.toUpperCase(); if (vus.has(k)) return false; vus.add(k); return true })
-        .map(u => ({ code: u.collab_code.toUpperCase(), nom_complet: u.nom || u.o365_display_name || u.collab_code, email: u.user_email, actif: u.actif }))
+        .filter(u => u.code && u.email && !EXCLUS.has((u.code || '').toUpperCase()))
+        .filter(u => { const k = u.code.toUpperCase(); if (vus.has(k)) return false; vus.add(k); return true })
+        .map(u => ({ code: u.code.toUpperCase(), nom_complet: u.nom_complet || u.o365_display_name || u.code, email: u.email, actif: u.compte_hub_actif }))
         .sort((a, b) => (a.nom_complet || '').localeCompare(b.nom_complet || ''))
     } catch (e) { c = [] }
     setCollabs(c)

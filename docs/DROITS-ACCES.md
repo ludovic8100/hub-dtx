@@ -22,10 +22,57 @@ sécurité `USING (true)` : tout utilisateur connecté voyait tous les clients, 
 - 8 050 / 10 298 clients rattachés automatiquement à un bureau.
 - 2 248 clients sans bureau déterminé (ni gestionnaire ni sous-agent rattaché à un bureau),
   invisibles pour tout le monde sauf les administrateurs en attendant correction.
-- À corriger dans `collaborateurs` : code `ICA` absent (gestionnaire cité par l'admin, à créer),
-  `jfs@dynassur.be` non relié à la fiche `JFS` existante (`user_permissions.collab_code` à
-  renseigner), code `FMZ` en double (deux personnes, un seul code).
+- Corrigé : code `ICA` créé dans `collaborateurs`, `jfs@dynassur.be` relié à la fiche `JFS`
+  existante, code `FMZ` dédoublonné (une fiche inactive recodée, index unique partiel ajouté
+  sur `collaborateurs(code) where actif`).
 - À construire : rapport hebdomadaire par mail de la liste des clients sans bureau.
+
+## Fusion `collaborateurs` / `user_permissions` (livré, 30/10/2026)
+
+Les deux tables portaient la même information (qui a accès au Hub) dans deux endroits
+différents, sans lien fiable entre elles (18 personnes existaient en double, reliées par rien
+d'autre qu'un email identique par coïncidence). Fusion dans `collaborateurs`, seule source
+désormais pour l'identité et les droits d'un collaborateur :
+
+- `collaborateurs.compte_hub_actif` (nouveau) = peut se connecter au Hub — distinct de
+  `collaborateurs.actif`, qui reste le statut métier de la personne (ex. un collaborateur parti
+  peut rester `actif` côté compta le temps de clôturer ses dossiers, sans accès Hub).
+- `collaborateurs.est_admin` = seul indicateur d'administrateur Hub (remplace
+  `user_permissions.role`). 3 administrateurs : LDE, NGI, Gael Minon — vérifié, préexistant.
+- `collaborateurs.email` = identité de connexion (remplace `user_permissions.user_email`).
+- Les ~45 colonnes d'accès par société/page (`dyn_*`, `dtx_*`, `lode_*`, `hex_*`, `prive_*`,
+  `grp_*`, `acc_*`) sont reprises telles quelles sur `collaborateurs` — pas encore normalisées
+  (c'est l'objet du Bloc 2 ci-dessous).
+- 9 fonctions SQL et le RLS de `collaborateurs` (déjà équivalent à l'ancien RLS de
+  `user_permissions` : lecture ouverte aux connectés, écriture admin) pointent maintenant sur
+  cette table unique. 6 fichiers front mis à jour en conséquence (`auth.jsx`,
+  `ComptabiliteView.jsx`, `NotesFraisView.jsx`, `TachesView.jsx`, `TicketsView.jsx`,
+  `ConfigModule.jsx`).
+- `ConfigModule.jsx` (onglet « users ») : « Supprimer le compte » ne supprime plus la fiche
+  collaborateur si elle porte un code métier (commissions, portefeuille…) — elle coupe
+  seulement `compte_hub_actif`. Seul un compte Hub sans code métier (ex. créé uniquement pour
+  un accès) est réellement supprimé.
+- `user_permissions` est conservée mais n'est plus lue ni écrite par l'application ni les
+  fonctions. **Point ouvert, à traiter par l'utilisateur** : le workflow n8n
+  `UnuI7LdT7RHfow8n` (HUB_DTX_USER_PERMISSION, sync Entra → Hub, cron horaire) écrit encore dans
+  `user_permissions` — à repointer manuellement vers `collaborateurs` (colonnes renommées :
+  `user_email`→`email`, `nom`→`nom_complet`, `collab_code`→`code`, `actif`→`compte_hub_actif`,
+  `role='admin'`→`est_admin=true`), sans quoi les nouveaux comptes Entra n'apparaîtront plus
+  dans le Hub.
+
+## Problème identité plus large (noté le 30/10/2026, pas encore traité)
+
+Une même personne physique peut être à la fois client, collaborateur, sous-agent, assuré et
+membre d'une famille (conjoint, enfant…) sans qu'aucune colonne ne relie ces rôles entre eux.
+Constat : `clients` est organisé par dossier (pas par personne, pas de clé d'identité fiable),
+et `parentes` n'est qu'un regroupement par texte (`membre_nom`), pas une relation entre ID.
+18 personnes existent déjà en double entre `clients` et `collaborateurs` (email identique, pas
+de lien). Modèle cible envisagé : une table `personnes` (identité physique unique), avec
+`clients.personne_id` et `collaborateurs.personne_id` pointant vers elle, et une vraie table
+`relations_personnes` (conjoint/enfant/parent…) à la place de `parentes`. Risque identifié :
+le rapprocher pour `collaborateurs` (49 lignes) est trivial, mais pour `clients` (10 298 lignes)
+c'est un exercice de déduplication qui demande une revue humaine des correspondances proposées
+avant toute fusion réelle — pas une migration automatique. Non commencé.
 
 ## Bloc 2 — Un seul modèle de modules (à venir)
 

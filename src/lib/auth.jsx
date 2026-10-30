@@ -44,8 +44,8 @@ export function AuthProvider({ children }) {
 
   async function loadPerms(email) {
     const { data, error } = await supabase
-      .from('user_permissions').select('*')
-      .eq('user_email', email).eq('actif', true).single()
+      .from('collaborateurs').select('*')
+      .eq('email', email).eq('compte_hub_actif', true).single()
     if (error || !data) return null
     return data
   }
@@ -55,12 +55,12 @@ export function AuthProvider({ children }) {
     try {
       const now = new Date().toISOString()
       await supabase.from('connexions_log').insert({ user_email: email })
-      const { data: up } = await supabase.from('user_permissions').select('premiere_connexion').eq('user_email', email).single()
-      if (up && !up.premiere_connexion) {
-        await supabase.from('user_permissions').update({ premiere_connexion: now, derniere_connexion: now }).eq('user_email', email)
+      const { data: co } = await supabase.from('collaborateurs').select('premiere_connexion').eq('email', email).single()
+      if (co && !co.premiere_connexion) {
+        await supabase.from('collaborateurs').update({ premiere_connexion: now, derniere_connexion: now }).eq('email', email)
         await supabase.from('taches').update({ statut: 'terminee', date_cloture: now }).eq('user_email', email).eq('source', 'acces').neq('statut', 'terminee')
       } else {
-        await supabase.from('user_permissions').update({ derniere_connexion: now }).eq('user_email', email)
+        await supabase.from('collaborateurs').update({ derniere_connexion: now }).eq('email', email)
       }
     } catch (e) { /* silencieux : ne jamais bloquer la connexion */ }
   }
@@ -85,7 +85,7 @@ export function AuthProvider({ children }) {
         const p = await loadPerms(session.user.email)
         if (cancelled) return
         setPerms(p)
-        setActiveSociete(getDefaultSociete(p, p?.role === 'admin'))
+        setActiveSociete(getDefaultSociete(p, p?.est_admin === true))
         if (track) trackConnexion(session.user.email)
       } else {
         setUser(null); setPerms(null); setActiveSociete(null)
@@ -118,7 +118,7 @@ export function AuthProvider({ children }) {
   }
   async function signOut() { await supabase.auth.signOut(); setUser(null); setPerms(null); setActiveSociete(null) }
 
-  const isAdmin = perms?.role === 'admin'
+  const isAdmin = perms?.est_admin === true
 
   const societesDispo = perms ? [
     (isAdmin || perms.acc_holding)   && SOCIETES_CONFIG.groupe,

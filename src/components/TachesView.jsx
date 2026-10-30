@@ -189,7 +189,7 @@ export default function TachesView({ entiteKey = 'dynassur' }) {
       let c = []; try { c = await loadAll('collaborateurs', 'code,nom_sa_data') } catch (e) { c = [] }
       let rc = []; try { rc = await loadAll('rdv_categories', 'code,libelle,actif,ordre', q => q.eq('actif', true).order('ordre')) } catch (e) { rc = [] }
       let u = []
-      if (isAdmin && entiteKey === 'dynassur') u = await loadAll('user_permissions', 'nom,user_email,actif,date_envoi_acces,premiere_connexion,derniere_connexion', q => q.order('nom', { nullsFirst: false }))
+      if (isAdmin && entiteKey === 'dynassur') u = await loadAll('collaborateurs', 'nom_complet,email,compte_hub_actif,date_envoi_acces,premiere_connexion,derniere_connexion', q => q.order('nom_complet', { nullsFirst: false }))
       if (alive) { setTaches(t); setRdvs(r); setCollabs(c); setRdvCats(rc); setUsers(u); setLoading(false) }
     })()
     return () => { alive = false }
@@ -396,7 +396,7 @@ export default function TachesView({ entiteKey = 'dynassur' }) {
               <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead><tr><th style={{ padding: '8px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Utilisateur</th><th style={{ padding: '8px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Accès</th><th style={{ padding: '8px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>1ʳᵉ cnx</th><th style={{ padding: '8px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Dernière</th></tr></thead>
                 <tbody>
-                  {usersAcces.map(u => <tr key={u.user_email}><td style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9', fontSize: 13 }}><b style={{ color: NAVY }}>{u.nom || u.user_email}</b><div style={{ fontSize: 11, color: '#94a3b8' }}>{u.user_email}</div></td><td style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9', fontSize: 13 }}>{fmtD(u.date_envoi_acces)}</td><td style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9', fontSize: 13 }}>{fmtD(u.premiere_connexion)}</td><td style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9', fontSize: 13 }}>{fmtD(u.derniere_connexion)}</td></tr>)}
+                  {usersAcces.map(u => <tr key={u.email}><td style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9', fontSize: 13 }}><b style={{ color: NAVY }}>{u.nom_complet || u.email}</b><div style={{ fontSize: 11, color: '#94a3b8' }}>{u.email}</div></td><td style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9', fontSize: 13 }}>{fmtD(u.date_envoi_acces)}</td><td style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9', fontSize: 13 }}>{fmtD(u.premiere_connexion)}</td><td style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9', fontSize: 13 }}>{fmtD(u.derniere_connexion)}</td></tr>)}
                   {!usersAcces.length && <tr><td style={{ padding: 12, fontSize: 13, color: '#94a3b8' }} colSpan={4}>Aucun accès envoyé.</td></tr>}
                 </tbody>
               </table></div>

@@ -228,17 +228,17 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   useEffect(() => {
     let annule = false
     // Bénéficiaires = comptes hub marqués « Employé », cloisonnés par domaine e-mail (dynassur / dtx…)
-    supabase.from('user_permissions').select('id, nom, user_email, est_employe')
+    supabase.from('collaborateurs').select('id, nom_complet, email, est_employe')
       .eq('est_employe', true)
       .then(({ data }) => {
         if (annule) return
         const tokens = (societeCodes || []).map(c => String(c).toLowerCase())
         const filtres = (data || []).filter(u => {
-          const dom = ((u.user_email || '').toLowerCase().split('@')[1]) || ''
+          const dom = ((u.email || '').toLowerCase().split('@')[1]) || ''
           return tokens.length === 0 || tokens.some(t => dom.includes(t))
         })
         setEmployes(filtres
-          .map(u => ({ id: u.id, nom: u.nom || u.user_email, nom_complet: u.nom || u.user_email }))
+          .map(u => ({ id: u.id, nom: u.nom_complet || u.email, nom_complet: u.nom_complet || u.email }))
           .sort((a, b) => (a.nom || '').localeCompare(b.nom || '', 'fr', { sensitivity: 'base' })))
       })
     return () => { annule = true }
