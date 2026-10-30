@@ -68,7 +68,9 @@ workflows connaissent l'URL du projet test par défaut. Il ne reste que les secr
 - Créer `Documents partages/_TEST/` avec la même arborescence que la racine pour ce que vous testerez (`COMPTA/FACTURES/_LODE`, `_DYNASSUR`, … ; `VENTES` LODE). Rien n'y est écrit tant que n8n n'est pas dupliqué.
 
 ### 2.6 n8n — jumeaux de test (optionnel, par workflow)
-Dupliquer un workflow, changer le chemin du webhook en `<chemin>-test` et ses credentials Supabase vers le projet test. Chemins appelés par le Hub : `iban-sync`, `run-bordereaux`, `rapprochement-factures`, `backfill-thumbs2`, `nf-notify`, `ticket-alerte`, `nettoyer-liens-casses`, `lode-peppol-send`, `lode-facture-archive`. Tant qu'un jumeau n'existe pas, le bouton correspondant répond « n8n inactif » en test — c'est voulu.
+Voir `docs/N8N-INVENTAIRE.md` § 4 : la duplication ne suffit pas, l'URL et la clé Supabase de prod sont écrites
+dans chaque nœud. À faire après la phase 3 (credential service_role) pour ne pas le faire deux fois. Tant qu'un
+jumeau n'existe pas, le bouton correspondant répond « n8n inactif » en test — c'est voulu.
 
 ## 3. Rafraîchir les données de test
 - **Référentiel + échantillon anonymisé** : Actions → *Seed TEST depuis la production* → `sample_clients` (300 par défaut). Idempotent.

@@ -43,19 +43,34 @@ Conventions : montants en `numeric`, dates ISO, colonne `societe` = code entité
   sont filtrés côté app via `src/lib/factures.js` (`sansExtraits`). Idéalement ils devraient aussi être exclus
   à la source dans le nœud « Compiler Factures » du workflow n8n de rapprochement.
 
-## Workflows n8n (inventaire)
+## Workflows n8n (inventaire, vérifié le 30/10/2026 via le connecteur n8n)
 
-| ID | Nom | Rôle | Webhook |
+Détail complet (nœuds, écritures Supabase, credentials, implications test) : `docs/N8N-INVENTAIRE.md`.
+
+| ID | Nom | Rôle | Déclencheur |
 |---|---|---|---|
-| `XveWrHrBybFWp2B0` | Import Brio | clients/contrats/production/quittances depuis CSV SharePoint | `run-import-dynassur` |
-| `hf6G2dE1ZcfXDO4W` | Sync Ponto | soldes + transactions bancaires | `iban-sync` |
-| `9mVOQPAN2fI5z9um` | Bordereaux BQT/RCP | import bordereaux SharePoint | `run-bordereaux` |
-| `hmL5WFBknLUfDwGw` | Rapprochement Factures ↔ Transactions | scan SharePoint FACTURES → `factures_achat` + auto-liaison (tous les jours 4h) | `rapprochement-factures` |
-| `slxHb4qy0VvvZsz2` | Miniatures Factures v2 | vignettes PDF des factures liées | `backfill-thumbs2` |
-| `M9QvKGMBz6WA0N7M` | BCE Search | proxy recherche Banque-Carrefour des Entreprises | — |
-| `mGJGzrRNLw1ZAfOZ` | LODE Peppol Send (Billit) | envoi factures LODE vers Peppol | `lode-peppol-send` |
+| `hf6G2dE1ZcfXDO4W` | IBAN SYNC | soldes + transactions Ponto → `transactions`, RPC `maj_solde_compte` | cron 00:00 + webhook `iban-sync` |
+| `hmL5WFBknLUfDwGw` | Rapprochement Factures ↔ Transactions | scan SharePoint `COMPTA/FACTURES/_*` → `factures_achat`, purge des orphelins, puis appelle `backfill-thumbs2` | cron quotidien + webhook `rapprochement-factures` |
+| `slxHb4qy0VvvZsz2` | Miniatures Factures v2 | vignettes PDF → bucket `factures-thumbs`, `transactions.facture_thumb_url` | webhook `backfill-thumbs2` |
+| `9mVOQPAN2fI5z9um` | Bordereaux BQT/RCP → Supabase | fichiers `AAAA.MM - BQT/RCP - Cie - n°.pdf` → `bordereaux` (sans montants, extraction Claude désactivée) | cron 01:00 + webhook `run-bordereaux` |
+| `c680QZUbZkFpwMEh` | Nettoyage liens cassés | délie les transactions dont la facture a disparu, log `liens_casses_log` | cron 02:00 + webhook `nettoyer-liens-casses` |
+| `3HDF690T2XJeaSWY` | Notes de frais - Notifications | mails Outlook soumission / acceptation | webhook `nf-notify` |
+| `i9dZDnCbZRhiDVI7` | NF - Liste _NOTE_DE_FRAIS | liste Graph du dossier `COMPTA/_NOTE_DE_FRAIS` | webhook GET `nf-list` |
+| `xgkgnuSSkoQXlXlp` | Tickets - Alertes mail | envoi mail via Graph `sendMail` | webhook `ticket-alerte` |
+| `szxoCijzm3wJ55Jd` | Tickets - Réponses mail → fil | lit la boîte hub, RPC ticket, archive | cron 2 min |
+| `Rted8kqbayA30OaJ` | Mails HUB → Tâches | mails → `taches` | cron 15 min |
+| `EH3JHKrmbzv6rItv` | Agenda → RDV | calendriers O365 → `rdv` | cron horaire |
+| `UnuI7LdT7RHfow8n` | HUB_DTX_USER_PERMISSION | users Entra ↔ `user_permissions` (insert / désactivation) | cron horaire |
+| `mGJGzrRNLw1ZAfOZ` | LODE - Peppol Send (Billit) | facture LODE → Billit → Peppol | webhook `lode-peppol-send` |
+| `EiB9oTn9MPJjELKW` | LODE - Facture Archive | PDF → SharePoint `COMPTA/FACTURES/_LODE/VENTES/<année>` | webhook `lode-facture-archive` |
+| `M9QvKGMBz6WA0N7M` | BCE Search (proxy CBEAPI) | recherche Banque-Carrefour des Entreprises | webhook |
+| `mQQnOMKccXmmWc3s` | Invoice - List | classement factures SharePoint avec Claude | cron 5 min |
+| `dGPwTdmWtzKu2mPi` | Invoice/BQT - Rename | renommage factures/bordereaux avec Claude | cron 1 min |
+| `JF04qGomUN2kubuo` / `driebSzUwKy5SeW4` | SINISTRES / IARD _GESTION_DYNASSUR | agents IA (hors Hub) | webhook |
 
-Les exports dans `n8n_workflows/` ne couvrent qu'une partie ; la référence est l'instance n8n elle-même.
+L'ancien « Import Brio » (`XveWrHrBybFWp2B0`, webhook `run-import-dynassur`) n'existe plus : remplacé par les
+workflows Qlik (`.github/workflows/qlik-*.yml`). Les exports dans `n8n_workflows/` sont partiels ; la référence
+est l'instance n8n, lisible via le connecteur (option « Available in MCP » cochée sur chaque workflow).
 
 ## Règles pour Claude
 
