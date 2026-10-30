@@ -82,8 +82,8 @@ function StatCard({ label, count, tickets, color }) {
   )
 }
 
-const ALERTE_WEBHOOK = 'https://n8n.srv1082740.hstgr.cloud/webhook/ticket-alerte'
-const HUB_URL = 'https://hub-dtx.vercel.app'
+import { n8nWebhook, HUB_URL } from '../config/env'
+const ALERTE_WEBHOOK = n8nWebhook('ticket-alerte')
 
 // Envoie une alerte mail via le webhook n8n (ne bloque jamais l'UI)
 async function envoyerAlerte(destEmails, subject, htmlBody) {

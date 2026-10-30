@@ -2,6 +2,11 @@ name: Qlik - Reimport objets_risque (grain objet)
 on:
   workflow_dispatch:
     inputs:
+      target:
+        description: "Environnement cible (base Supabase)"
+        type: choice
+        options: [test, production]
+        default: test
       dry_run:
         description: "1 = simulation (aucune ecriture), 0 = recharge reelle"
         required: false
@@ -9,6 +14,7 @@ on:
 jobs:
   reimport:
     runs-on: ubuntu-latest
+    environment: ${{ inputs.target }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -16,6 +22,8 @@ jobs:
       - run: pip install -r scripts/requirements.txt
       - name: Reimport objets_risque
         env:
+          APP_ENV: ${{ inputs.target }}
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           QLIK_API_KEY: ${{ secrets.QLIK_API_KEY }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           DRY_RUN: ${{ github.event.inputs.dry_run }}

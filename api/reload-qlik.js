@@ -4,14 +4,10 @@
 // objets de risque, famille, segmentation et sinistres.
 // Sécurité : n'accepte que les appels d'un utilisateur connecté au Hub (JWT Supabase vérifié).
 // Le token GitHub reste côté serveur — jamais exposé au navigateur.
-// Variables d'env (Vercel) : SUPABASE_URL, SUPABASE_ANON_KEY, GITHUB_DISPATCH_TOKEN
+// Variables d'env (Vercel) : voir api/_lib/env.js (SUPABASE_URL, GITHUB_DISPATCH_TOKEN, GITHUB_SYNC_REF…)
 
-const REPO = 'ludovic8100/hub-dtx'
+import { SUPABASE_URL as SB_URL, SUPABASE_ANON_KEY as SB_KEY, GITHUB_DISPATCH_TOKEN, GITHUB_REPO as REPO, GITHUB_SYNC_REF, IS_TEST } from './_lib/env.js'
 const WORKFLOW = 'qlik-sync.yml'
-// Clé publishable Supabase (publique, identique au front src/lib/supabase.js).
-// On n'utilise plus SUPABASE_ANON_KEY : les clés JWT legacy ont été désactivées (migration sécurité).
-const SB_URL = 'https://tndwonqdbeszkcztkzqe.supabase.co'
-const SB_KEY = 'sb_publishable_xBt6ZaZGh5trEloyMCNRuA_MN-jesVJ'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'method' })
@@ -27,20 +23,20 @@ export default async function handler(req, res) {
   } catch (e) { return res.status(401).json({ ok: false, error: 'auth failed' }) }
 
   // 2) Déclenche la GitHub Action (écriture réelle)
-  if (!process.env.GITHUB_DISPATCH_TOKEN) {
+  if (!GITHUB_DISPATCH_TOKEN) {
     return res.status(500).json({ ok: false, error: 'GITHUB_DISPATCH_TOKEN manquant (variable Vercel)' })
   }
   try {
     const gh = await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/${WORKFLOW}/dispatches`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${process.env.GITHUB_DISPATCH_TOKEN}`,
+        Authorization: `Bearer ${GITHUB_DISPATCH_TOKEN}`,
         Accept: 'application/vnd.github+json',
         'X-GitHub-Api-Version': '2022-11-28',
         'Content-Type': 'application/json',
         'User-Agent': 'hub-dtx',
       },
-      body: JSON.stringify({ ref: 'main', inputs: { dry_run: 'false' } }),
+      body: JSON.stringify({ ref: GITHUB_SYNC_REF, inputs: { dry_run: 'false', target: IS_TEST ? 'test' : 'production' } }),
     })
     if (gh.status === 204) return res.status(200).json({ ok: true, launched: true })
     const detail = await gh.text().catch(() => '')

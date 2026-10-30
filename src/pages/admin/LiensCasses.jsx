@@ -1,3 +1,4 @@
+import { n8nWebhook } from '../../config/env'
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
@@ -5,7 +6,7 @@ import { StatBanner } from '../../components/ui/AccountableUI'
 
 const C = '#7c3aed'
 const CDARK = '#6d28d9'
-const WEBHOOK = 'https://n8n.srv1082740.hstgr.cloud/webhook/nettoyer-liens-casses'
+const WEBHOOK = n8nWebhook('nettoyer-liens-casses')
 
 const fmtEur = (n) => (n == null || isNaN(n)) ? '—' : new Intl.NumberFormat('fr-BE', { style: 'currency', currency: 'EUR' }).format(n)
 const fmtDT = (s) => { try { return new Date(s).toLocaleString('fr-BE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) } catch { return s || '—' } }

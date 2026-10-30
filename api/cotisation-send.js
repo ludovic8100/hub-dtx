@@ -3,8 +3,8 @@
 // Sécurité : n'accepte que les appels d'un utilisateur connecté au Hub (JWT Supabase vérifié).
 // Variables d'env (Vercel) : AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET
 
-const SB_URL = 'https://tndwonqdbeszkcztkzqe.supabase.co'
-const SB_KEY = 'sb_publishable_xBt6ZaZGh5trEloyMCNRuA_MN-jesVJ'
+import { SUPABASE_URL as SB_URL, SUPABASE_ANON_KEY as SB_KEY } from './_lib/env.js'
+import { redirigerEnTest } from './_lib/mail.js'
 
 const HEX = {
   from: 'info@hexagroup.be', nom: 'Hexagroup',
@@ -76,6 +76,8 @@ export default async function handler(req, res) {
         ...(qr_base64 ? [{ '@odata.type': '#microsoft.graph.fileAttachment', name: 'qr-paiement.png', contentType: 'image/png', contentBytes: qr_base64, isInline: true, contentId: 'qrpay' }] : []),
       ],
     }
+
+    redirigerEnTest(message)  // en TEST : tout mail part vers MAIL_REDIRECT_TO
 
     const mr = await fetch(`https://graph.microsoft.com/v1.0/users/${HEX.from}/sendMail`, {
       method: 'POST', headers: { Authorization: `Bearer ${tj.access_token}`, 'Content-Type': 'application/json' },

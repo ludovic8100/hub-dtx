@@ -1,3 +1,4 @@
+import { n8nWebhook, N8N_WEBHOOK_URL } from '../config/env'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { sansExtraits } from '../lib/factures'
@@ -61,7 +62,7 @@ function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, s
     await supabase.from('factures_achat').update({ transaction_id: ids[0] }).eq('fichier_id', facture.fichier_id)
     setFactures(prev => prev.map(f => f.fichier_id === facture.fichier_id ? { ...f, transaction_id: ids[0] } : f))
     setLierPaiement(null)
-    fetch('https://n8n.srv1082740.hstgr.cloud/webhook/backfill-thumbs2', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(() => {})
+    fetch(n8nWebhook('backfill-thumbs2'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(() => {})
   }
   // Délier un paiement (remet la facture en « à vérifier » et libère le mouvement)
   async function delierPaiement(facture) {
@@ -521,7 +522,7 @@ function PanneauLierPaiement({ facture, color, onClose, onLier, tousComptes = fa
       <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: '14px', width: 'min(620px, 94vw)', maxHeight: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: '12px' }}>
           {facture.fichier_id && (
-            <img src={`https://n8n.srv1082740.hstgr.cloud/webhook/apercu-facture?fid=${facture.fichier_id}`} alt=""
+            <img src={`${N8N_WEBHOOK_URL}/apercu-facture?fid=${facture.fichier_id}`} alt=""
               onClick={() => facture.url && window.open(facture.url, '_blank', 'noopener,noreferrer')}
               onError={e => { e.currentTarget.style.display = 'none' }}
               title="Ouvrir la facture"

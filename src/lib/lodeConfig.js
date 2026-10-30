@@ -1,3 +1,4 @@
+import { LOGOS_URL } from '../config/env'
 // Coordonnées et paramètres de LODE SRL — utilisés sur devis et factures.
 // ⚠️ Modifier ici met à jour automatiquement tous les documents générés.
 
@@ -16,7 +17,7 @@ export const LODE = {
   email: 'info@lode-group.be',
   telephone: '0494 24 69 32',
   couleur: '#ea580c',         // orange LODE
-  logo_url: 'https://tndwonqdbeszkcztkzqe.supabase.co/storage/v1/object/public/logos/lode.png',
+  logo_url: LOGOS_URL + 'lode.png',
 }
 
 // Taux de TVA proposés (LODE)

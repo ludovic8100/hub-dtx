@@ -13,7 +13,7 @@ Env requis : SUPABASE_SERVICE_KEY. Optionnels : SUPABASE_URL, MAX_H, THRESH_BYTE
 import os, sys, io, requests
 from PIL import Image
 
-SUPA_URL = os.environ.get("SUPABASE_URL", "https://tndwonqdbeszkcztkzqe.supabase.co")
+from _env import SUPABASE_URL as SUPA_URL  # voir scripts/_env.py
 KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
 if not KEY:
     sys.exit("::error::SUPABASE_SERVICE_KEY manquant")

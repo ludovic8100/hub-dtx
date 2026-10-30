@@ -1,7 +1,8 @@
 import { supabase } from './supabase'
 
 // Bucket public des logos (identique à CompagniesView / entites.js)
-export const STORAGE_BASE = 'https://tndwonqdbeszkcztkzqe.supabase.co/storage/v1/object/public/logos/'
+import { LOGOS_URL } from '../config/env'
+export const STORAGE_BASE = LOGOS_URL
 
 // URL d'un logo à partir d'un logo_url (nom de fichier du bucket OU URL complète)
 export function logoUrlOf(logo_url) {

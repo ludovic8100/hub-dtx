@@ -3,3 +3,8 @@ dist
 .env
 .env.local
 .vercel
+dist-*
+.env*.local
+.env.test
+.env.production
+scripts/__pycache__

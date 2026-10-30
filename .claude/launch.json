@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "hub-dtx-prod-preview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "preview", "--outDir", "dist", "--port", "4173", "--strictPort"],
+      "port": 4173
+    },
+    {
+      "name": "hub-dtx-test-preview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "preview", "--outDir", "dist-test", "--port", "4174", "--strictPort"],
+      "port": 4174
+    },
+    {
+      "name": "hub-dtx-test-ko-preview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "preview", "--outDir", "dist-test-ko", "--port", "4175", "--strictPort"],
+      "port": 4175
+    }
+  ]
+}

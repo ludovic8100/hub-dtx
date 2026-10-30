@@ -2,7 +2,7 @@
 // Couleurs alignées sur SOCIETES_CONFIG (auth.jsx) + logos Supabase Storage.
 // Sert à alimenter le StatBanner et les composants AccountableUI partout dans le Hub.
 
-const LOGO_BASE = 'https://tndwonqdbeszkcztkzqe.supabase.co/storage/v1/object/public/logos/'
+import { LOGOS_URL as LOGO_BASE } from '../config/env'
 
 export const ENTITES = {
   groupe:    { key: 'groupe',    label: 'Groupe',         color: '#7c3aed', colorDark: '#3b1f6e', logo: null },

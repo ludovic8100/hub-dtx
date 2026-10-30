@@ -1,3 +1,4 @@
+import { HUB_URL } from '../../config/env'
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import Layout from '../../components/Layout'
@@ -206,7 +207,7 @@ export default function ConfigModule() {
     setSaving(false)
     notify('✓ Accès envoyés — tâche de suivi créée')
     const sujet = encodeURIComponent('Vos accès au Hub DTX')
-    const corps = encodeURIComponent(`Bonjour ${selUser.nom || ''},\n\nVotre accès au Hub DTX est activé.\nConnectez-vous ici : https://hub-dtx.vercel.app\n\nUtilisez le bouton « Se connecter avec Microsoft » avec votre compte professionnel (${email}).\n\nÀ bientôt.`)
+    const corps = encodeURIComponent(`Bonjour ${selUser.nom || ''},\n\nVotre accès au Hub DTX est activé.\nConnectez-vous ici : ${HUB_URL}\n\nUtilisez le bouton « Se connecter avec Microsoft » avec votre compte professionnel (${email}).\n\nÀ bientôt.`)
     window.open(`mailto:${email}?subject=${sujet}&body=${corps}`)
   }
 
