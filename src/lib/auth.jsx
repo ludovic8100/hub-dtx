@@ -3,6 +3,16 @@ import { supabase } from './supabase'
 
 const AuthContext = createContext(null)
 
+// ⚠️ ACCÈS LIBRE TEMPORAIRE, SANS CONNEXION — décidé le 31/10/2026 pendant la
+// reconstruction du login Microsoft (bascule infinie non résolue entre
+// Supabase et l'app). Quiconque ouvre le Hub entre directement, avec les
+// droits admin. Pour revenir au login normal : repasser ce drapeau à false
+// (le code de connexion Microsoft est conservé plus bas, inchangé) ET
+// exécuter sql/retirer_acces_libre_temporaire.sql pour retirer les règles
+// d'accès ouvertes côté base. Voir docs/DROITS-ACCES.md.
+const ACCES_LIBRE_TEMPORAIRE = true
+const EMAIL_ACCES_LIBRE = 'lde@dynassur.be'
+
 export const SOCIETES_CONFIG = {
   groupe: {
     key: 'groupe', label: 'Tableau de bord général', short: 'GRP',
@@ -75,6 +85,17 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     let cancelled = false
+
+    if (ACCES_LIBRE_TEMPORAIRE) {
+      loadPerms(EMAIL_ACCES_LIBRE).then(p => {
+        if (cancelled) return
+        setUser({ email: EMAIL_ACCES_LIBRE, id: 'acces-libre-temporaire' })
+        setPerms(p)
+        setActiveSociete(getDefaultSociete(p, true))
+        setLoading(false)
+      })
+      return () => { cancelled = true }
+    }
 
     // Applique une session : le chargement des permissions (requête Supabase) se fait
     // ICI, hors du callback onAuthStateChange, pour ne pas tenir le verrou d'auth.

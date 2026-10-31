@@ -80,6 +80,33 @@ un jeton d'accès personnel Supabase collé par erreur à la place d'une clé AP
 - **À faire par l'utilisateur** : désactiver (ou supprimer) le workflow n8n `UnuI7LdT7RHfow8n`
   une fois les secrets renseignés et la synchro Edge Function vérifiée.
 
+## ⚠️ Accès libre temporaire, sans connexion (31/10/2026)
+
+Le login Microsoft restait bloqué (bascule infinie entre Supabase et l'app, cause
+jamais confirmée malgré plusieurs correctifs successifs — course de timing,
+verrou concurrent, flux PKCE). Décision : retirer complètement le login le temps
+de reconstruire, plutôt que de continuer à deviner en production.
+
+- `src/lib/auth.jsx` : `ACCES_LIBRE_TEMPORAIRE = true` court-circuite tout le
+  flux de connexion. Quiconque ouvre `hub-dtx.vercel.app` entre directement avec
+  les droits de `lde@dynassur.be` (admin) — aucun écran de login, aucune
+  authentification. Le code de connexion Microsoft d'origine est conservé
+  intact plus bas dans le fichier, juste court-circuité par ce drapeau.
+- Base de données : policy `temp_acces_libre_sans_login` ajoutée sur chaque
+  table avec RLS (sauf `config_secrets` et l'obsolète
+  `user_permissions_obsolete_20261030`), donnant un accès complet au rôle
+  `anon`. Les policies existantes (admin/bureau/authenticated) ne sont pas
+  modifiées, seulement complétées — retrait propre possible à tout moment.
+- **Le Hub est donc totalement public tant que c'est actif** : n'importe qui
+  avec le lien voit et peut modifier tous les clients, IBAN, contrats,
+  commissions. Fenêtre à refermer dès que possible.
+
+**Pour revenir en arrière :**
+1. `ACCES_LIBRE_TEMPORAIRE = false` dans `src/lib/auth.jsx`, redéployer.
+2. Exécuter `sql/retirer_acces_libre_temporaire.sql` (retire les policies
+   `temp_acces_libre_sans_login`, dans l'ordre : jamais avant l'étape 1).
+3. Reconstruire un vrai login (Microsoft ou autre) avant de rouvrir l'accès.
+
 ## Problème identité plus large (noté le 30/10/2026, pas encore traité)
 
 Une même personne physique peut être à la fois client, collaborateur, sous-agent, assuré et
