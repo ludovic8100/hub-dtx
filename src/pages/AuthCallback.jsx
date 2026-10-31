@@ -1,19 +1,34 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 export default function AuthCallback() {
   const navigate = useNavigate()
+  const done = useRef(false)
 
   useEffect(() => {
-    // Supabase récupère le token depuis l'URL automatiquement
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        navigate('/', { replace: true })
-      } else {
-        navigate('/login', { replace: true })
-      }
+    function finish(ok) {
+      if (done.current) return
+      done.current = true
+      navigate(ok ? '/' : '/login', { replace: true })
+    }
+
+    // Supabase traite le jeton présent dans l'URL (#access_token=...) de façon
+    // asynchrone après le retour de Microsoft : un getSession() immédiat peut
+    // s'exécuter avant la fin de ce traitement et renvoyer "pas de session" à
+    // tort, ce qui renvoyait systématiquement vers /login. On écoute donc
+    // l'événement de connexion plutôt qu'un sondage unique, avec un filet de
+    // sécurité (timeout + vérification finale) si l'événement a déjà eu lieu
+    // avant la pose de l'écouteur.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) finish(true)
     })
+
+    const timeout = setTimeout(() => {
+      supabase.auth.getSession().then(({ data: { session } }) => finish(!!session))
+    }, 3000)
+
+    return () => { subscription.unsubscribe(); clearTimeout(timeout) }
   }, [navigate])
 
   return (
