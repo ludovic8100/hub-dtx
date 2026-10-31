@@ -12,7 +12,7 @@ const E = (typeof import.meta !== 'undefined' && import.meta.env) || {}
 
 const PROD = {
   SUPABASE_URL:      'https://tndwonqdbeszkcztkzqe.supabase.co',
-  SUPABASE_ANON_KEY: 'sb_publishable_xBt6ZaZGh5trEloyMCNRuA_MN-jesVJ', // clé publishable (publique)
+  SUPABASE_ANON_KEY: 'sb_publishable_LrEXAIusF3VxlBPmJnwddg_fk_wdCzw', // clé publishable (publique) — régénérée le 31/10/2026, l'ancienne avait été supprimée
   N8N_URL:           'https://n8n.srv1082740.hstgr.cloud',
   SHAREPOINT_SITE:   'https://dynassur.sharepoint.com/sites/ADMINISTRATION',
   SHAREPOINT_ROOT:   'Documents partages',
