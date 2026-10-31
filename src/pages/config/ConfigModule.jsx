@@ -35,6 +35,9 @@ const FIELDS_SOC = [
 
 const TYPES_TRAVAIL = ['Non-Vie', 'Vie', 'Santé', 'Crédit', 'SRDU', 'PJ']
 
+// Champs obligatoires dès qu'un rôle métier (commercial, gestionnaire, sous-agent) est coché.
+const CHAMPS_METIER_REQUIS = [['code', 'Code'], ['numero', 'N° producteur'], ['bce', 'N° BCE'], ['iban', 'IBAN'], ['bic', 'BIC']]
+
 export default function ConfigModule() {
   const { isAdmin, perms } = useAuth()
   const [tab, setTab] = useState('societes')
@@ -166,6 +169,10 @@ export default function ConfigModule() {
     const email = (selUser.email || '').trim().toLowerCase()
     const nom = (selUser.nom_complet || '').trim() || email || '(sans nom)'
     if (!email && !nom) { notify('❌ Le nom ou l\'email est obligatoire'); return }
+    if (selUser.est_commercial || selUser.est_gestionnaire || selUser.est_sous_agent) {
+      const manquants = CHAMPS_METIER_REQUIS.filter(([k]) => !String(selUser[k] ?? '').trim()).map(([, l]) => l)
+      if (manquants.length) { notify(`❌ Champs obligatoires (rôle métier) : ${manquants.join(', ')}`); return }
+    }
     setSaving(true)
 
     const { id, created_at, updated_at, _nouveau, noms_repris_str, personne_id, ...rest } = selUser
@@ -523,7 +530,9 @@ export default function ConfigModule() {
               ))}
             </div>
 
-            {selUser ? (
+            {selUser ? (() => {
+              const roleMetier = !!(selUser.est_commercial || selUser.est_gestionnaire || selUser.est_sous_agent)
+              return (
               <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 20 }}>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
@@ -583,11 +592,11 @@ export default function ConfigModule() {
                     ))}
                   </div>
                   <Grid>
-                    <F label="Code" value={selUser.code} onChange={v => setSelUser(s => ({ ...s, code: (v || '').toUpperCase() }))} />
-                    <F label="N° producteur" type="number" value={selUser.numero} onChange={v => setSelUser(s => ({ ...s, numero: v }))} />
-                    <F label="N° BCE" value={selUser.bce} onChange={v => setSelUser(s => ({ ...s, bce: v }))} />
-                    <F label="IBAN" value={selUser.iban} onChange={v => setSelUser(s => ({ ...s, iban: v }))} />
-                    <F label="BIC" value={selUser.bic} onChange={v => setSelUser(s => ({ ...s, bic: v }))} />
+                    <F label="Code" requis={roleMetier} value={selUser.code} onChange={v => setSelUser(s => ({ ...s, code: (v || '').toUpperCase() }))} />
+                    <F label="N° producteur" requis={roleMetier} type="number" value={selUser.numero} onChange={v => setSelUser(s => ({ ...s, numero: v }))} />
+                    <F label="N° BCE" requis={roleMetier} value={selUser.bce} onChange={v => setSelUser(s => ({ ...s, bce: v }))} />
+                    <F label="IBAN" requis={roleMetier} value={selUser.iban} onChange={v => setSelUser(s => ({ ...s, iban: v }))} />
+                    <F label="BIC" requis={roleMetier} value={selUser.bic} onChange={v => setSelUser(s => ({ ...s, bic: v }))} />
                   </Grid>
                   <div style={{ marginTop: 10 }}>
                     <Grid>
@@ -698,7 +707,8 @@ export default function ConfigModule() {
                   <button onClick={saveUser} disabled={saving} style={{ ...btn('#1e293b'), padding: '10px 20px', fontSize: 14, opacity: saving ? .6 : 1 }}>{saving ? '…' : (selUser.id ? '💾 Enregistrer' : '➕ Créer')}</button>
                 </div>
               </div>
-            ) : <div style={{ color: '#94a3b8', padding: 20 }}>Sélectionne un utilisateur.</div>}
+              )
+            })() : <div style={{ color: '#94a3b8', padding: 20 }}>Sélectionne un utilisateur.</div>}
             </div>
           </div>
         )}
@@ -722,7 +732,10 @@ function Section({ titre, children }) {
 }
 function Grid({ children }) { return <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 12 }}>{children}</div> }
 function Lbl({ children }) { return <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 4 }}>{children}</div> }
-function F({ label, value, onChange, type = 'text' }) { return <div><Lbl>{label}</Lbl><input type={type} value={value ?? ''} onChange={e => onChange(e.target.value)} style={inp} /></div> }
+function F({ label, value, onChange, type = 'text', requis = false }) {
+  const vide = requis && !String(value ?? '').trim()
+  return <div><Lbl>{label}{requis && <span style={{ color: vide ? '#dc2626' : '#16a34a' }}> *</span>}</Lbl><input type={type} value={value ?? ''} onChange={e => onChange(e.target.value)} style={vide ? { ...inp, border: '1px solid #fca5a5', background: '#fef2f2' } : inp} /></div>
+}
 function Field({ label, value, onChange, type = 'text' }) {
   return <div><Lbl>{label}</Lbl><input type={type} value={value} onChange={e => onChange(e.target.value)} style={inp} /></div>
 }
