@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { useAuth } from '../lib/auth'
 
 // Lit une éventuelle erreur renvoyée par Supabase/Microsoft dans l'URL de
 // retour (#error=...&error_description=...), pour l'afficher directement à
@@ -16,42 +16,32 @@ function erreurDansUrl() {
 
 export default function AuthCallback() {
   const navigate = useNavigate()
-  const done = useRef(false)
-  const [erreur, setErreur] = useState(null)
+  const { user, loading } = useAuth()
+  const [erreur] = useState(erreurDansUrl)
 
+  // IMPORTANT : ce composant n'appelle plus jamais le client Supabase
+  // lui-même (ni getSession(), ni onAuthStateChange()). AuthProvider
+  // (src/lib/auth.jsx) le fait déjà, une seule fois, pour toute
+  // l'application — et le fait proprement (il documente lui-même pourquoi
+  // un deuxième appel concurrent au client peut provoquer un verrou
+  // (Web Lock) qui ne se libère jamais : getSession() ne se résout alors
+  // plus jamais, ce qui expliquait le blocage persistant). On se contente
+  // donc d'observer l'état déjà calculé par AuthProvider via useAuth().
+  //
+  // Course possible : le premier getSession() d'AuthProvider peut se
+  // résoudre (loading=false, user=null) avant que le jeton présent dans
+  // l'URL de cette page ait fini d'être traité par supabase-js — un
+  // SIGNED_IN plus tardif mettra alors user à jour. On laisse donc une
+  // marge avant d'abandonner vers /login plutôt que de trancher dès que
+  // loading passe à false.
   useEffect(() => {
-    const urlErreur = erreurDansUrl()
-    if (urlErreur) { setErreur(urlErreur); return }
-
-    function finish(ok) {
-      if (done.current) return
-      done.current = true
-      navigate(ok ? '/' : '/login', { replace: true })
+    if (erreur) return
+    if (user) { navigate('/', { replace: true }); return }
+    if (!loading) {
+      const t = setTimeout(() => { if (!user) navigate('/login', { replace: true }) }, 4000)
+      return () => clearTimeout(t)
     }
-
-    // Supabase traite le jeton présent dans l'URL (#access_token=...) de façon
-    // asynchrone après le retour de Microsoft : une vérification immédiate de
-    // la session peut s'exécuter avant la fin de ce traitement et renvoyer
-    // "pas de session" à tort. On écoute donc l'événement de connexion, ET on
-    // vérifie la session par sondage répété (toutes les 300ms, 8 secondes max)
-    // pour couvrir le cas où l'événement aurait déjà eu lieu avant la pose de
-    // l'écouteur (course possible entre l'initialisation du client Supabase,
-    // au chargement du module, et le montage de ce composant).
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session) finish(true)
-    })
-
-    let tentatives = 0
-    const poll = setInterval(() => {
-      tentatives += 1
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session) { clearInterval(poll); finish(true) }
-        else if (tentatives >= 26) { clearInterval(poll); finish(false) } // ~8s
-      })
-    }, 300)
-
-    return () => { subscription.unsubscribe(); clearInterval(poll) }
-  }, [navigate])
+  }, [erreur, loading, user, navigate])
 
   if (erreur) {
     return (
