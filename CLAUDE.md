@@ -55,7 +55,7 @@ Détail complet (nœuds, écritures Supabase, credentials, implications test) : 
 
 | ID | Nom | Rôle | Déclencheur |
 |---|---|---|---|
-| `hf6G2dE1ZcfXDO4W` | IBAN SYNC | soldes + transactions Ponto → `transactions`, RPC `maj_solde_compte` | cron 00:00 + webhook `iban-sync` |
+| ~~`hf6G2dE1ZcfXDO4W`~~ | ~~IBAN SYNC~~ | Remplacé le 31/10/2026 par la fonction Edge `sync-ponto-comptes` + `pg_cron` (`sync_ponto_comptes_daily`, 00:11) — la synchro n8n utilisait une clé Supabase invalide, 11 jours de retard découverts au passage. À désactiver dans n8n une fois les secrets Ponto renseignés. | — |
 | `hmL5WFBknLUfDwGw` | Rapprochement Factures ↔ Transactions | scan SharePoint `COMPTA/FACTURES/_*` → `factures_achat`, purge des orphelins, puis appelle `backfill-thumbs2` | cron quotidien + webhook `rapprochement-factures` |
 | `slxHb4qy0VvvZsz2` | Miniatures Factures v2 | vignettes PDF → bucket `factures-thumbs`, `transactions.facture_thumb_url` | webhook `backfill-thumbs2` |
 | `9mVOQPAN2fI5z9um` | Bordereaux BQT/RCP → Supabase | fichiers `AAAA.MM - BQT/RCP - Cie - n°.pdf` → `bordereaux` (sans montants, extraction Claude désactivée) | cron 01:00 + webhook `run-bordereaux` |
