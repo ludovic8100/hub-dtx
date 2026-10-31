@@ -15,52 +15,50 @@ function erreurDansUrl() {
   return [code, desc].filter(Boolean).join(' — ').replace(/\+/g, ' ')
 }
 
+// Masque la partie secrète d'un jeton/code pour un affichage de diagnostic
+// sans l'exposer en entier (on garde juste de quoi savoir quelle forme il a).
+function tronque(v) { return v ? `${v.slice(0, 12)}…(${v.length} car.)` : '(absent)' }
+
 export default function AuthCallback() {
   const navigate = useNavigate()
   const { user, loading } = useAuth()
   const [erreur, setErreur] = useState(erreurDansUrl)
   const echangeTente = useRef(false)
+  const [diag, setDiag] = useState(null)
 
-  // Flux PKCE : les versions récentes de supabase-js échangent un ?code=...
-  // présent dans l'URL contre une session, plutôt que de lire un jeton déjà
-  // prêt dans le hash (#access_token=...). Cet échange est explicite — rien
-  // ne le déclenche tout seul. Sans lui, Microsoft/Supabase authentifiaient
-  // bien la personne à chaque tentative (confirmé par auth.users.
-  // last_sign_in_at mis à jour côté serveur), mais aucune session n'était
-  // jamais créée côté navigateur : le blocage observé.
-  // Appel ponctuel, hors de tout callback onAuthStateChange — donc sans le
-  // risque de verrou (Web Lock) documenté dans auth.jsx pour les appels
-  // faits DEPUIS un tel callback.
+  // Diagnostic — capturé une seule fois, à l'arrivée sur cette page, avant
+  // toute redirection : la forme exacte de l'URL de retour nous dit quel
+  // flux Supabase utilise réellement (PKCE avec ?code=..., implicite avec
+  // #access_token=..., ou une erreur), ce qu'on ne pouvait pas observer
+  // depuis la base de données (qui ne voit que l'authentification côté
+  // serveur, toujours réussie jusqu'ici).
+  useEffect(() => {
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    const query = new URLSearchParams(window.location.search)
+    setDiag({
+      code: tronque(query.get('code')),
+      accessToken: tronque(hash.get('access_token')),
+      hashComplet: window.location.hash ? tronque(window.location.hash) : '(absent)',
+      queryComplet: window.location.search || '(absent)',
+    })
+  }, [])
+
   useEffect(() => {
     if (erreur || echangeTente.current) return
     const code = new URLSearchParams(window.location.search).get('code')
     if (!code) return
     echangeTente.current = true
     supabase.auth.exchangeCodeForSession(window.location.href).then(({ error }) => {
-      if (error) setErreur(error.message)
+      setDiag(d => ({ ...d, echange: error ? `erreur : ${error.message}` : 'réussi' }))
     })
   }, [erreur])
 
-  // IMPORTANT : en dehors de l'échange ponctuel ci-dessus, ce composant
-  // n'appelle plus le client Supabase lui-même (ni getSession() en boucle,
-  // ni onAuthStateChange()). AuthProvider (src/lib/auth.jsx) le fait déjà
-  // pour toute l'application ; on se contente d'observer l'état qu'il
-  // calcule via useAuth().
-  //
-  // Course possible : le premier getSession() d'AuthProvider peut se
-  // résoudre (loading=false, user=null) avant que l'échange ci-dessus (ou
-  // la détection automatique du hash, selon le flux) ait fini — un
-  // SIGNED_IN plus tardif mettra alors user à jour. On laisse donc une
-  // marge avant d'abandonner vers /login plutôt que de trancher dès que
-  // loading passe à false.
+  // Redirection automatique UNIQUEMENT en cas de succès — en cas d'échec on
+  // reste affiché avec le diagnostic au lieu de rebasculer vers /login en
+  // silence, le temps de comprendre la cause exacte du blocage.
   useEffect(() => {
-    if (erreur) return
-    if (user) { navigate('/', { replace: true }); return }
-    if (!loading) {
-      const t = setTimeout(() => { if (!user) navigate('/login', { replace: true }) }, 6000)
-      return () => clearTimeout(t)
-    }
-  }, [erreur, loading, user, navigate])
+    if (!erreur && user) navigate('/', { replace: true })
+  }, [erreur, user, navigate])
 
   if (erreur) {
     return (
@@ -86,17 +84,33 @@ export default function AuthCallback() {
       fontFamily: "'Source Sans Pro', sans-serif",
       color: '#fff',
       flexDirection: 'column',
-      gap: '16px'
+      gap: '16px',
+      padding: '24px',
+      textAlign: 'center',
     }}>
-      <div style={{
-        width: '40px', height: '40px',
-        border: '3px solid rgba(255,255,255,0.3)',
-        borderTopColor: '#fff',
-        borderRadius: '50%',
-        animation: 'spin 0.8s linear infinite'
-      }} />
-      <p style={{ fontSize: '15px', opacity: 0.8 }}>Connexion en cours...</p>
+      {!user && (
+        <div style={{
+          width: '40px', height: '40px',
+          border: '3px solid rgba(255,255,255,0.3)',
+          borderTopColor: '#fff',
+          borderRadius: '50%',
+          animation: 'spin 0.8s linear infinite'
+        }} />
+      )}
+      <p style={{ fontSize: '15px', opacity: 0.8 }}>{user ? 'Connecté — redirection...' : 'Connexion en cours...'}</p>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+
+      {!user && diag && (
+        <div style={{ marginTop: 24, fontSize: '12px', opacity: 0.85, background: 'rgba(255,255,255,0.08)', padding: '14px 18px', borderRadius: 10, maxWidth: 520, textAlign: 'left', fontFamily: 'monospace' }}>
+          <div>code (?code=...) : {diag.code}</div>
+          <div>access_token (#access_token=...) : {diag.accessToken}</div>
+          <div>hash complet : {diag.hashComplet}</div>
+          <div>query complet : {diag.queryComplet}</div>
+          <div>échange de code : {diag.echange || 'non applicable / en attente'}</div>
+          <div>session (useAuth) : {loading ? 'chargement...' : (user ? 'oui' : 'absente')}</div>
+          <button onClick={() => navigate('/login', { replace: true })} style={{ marginTop: 12, padding: '6px 12px', borderRadius: 6, border: 'none', background: '#fff', color: '#0D2F5E', fontWeight: 700, cursor: 'pointer', fontFamily: "'Source Sans Pro', sans-serif" }}>Retour au login</button>
+        </div>
+      )}
     </div>
   )
 }
