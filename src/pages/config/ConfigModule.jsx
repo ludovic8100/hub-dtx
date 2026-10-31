@@ -35,6 +35,9 @@ const FIELDS_SOC = [
 
 const TYPES_TRAVAIL = ['Non-Vie', 'Vie', 'Santé', 'Crédit', 'SRDU', 'PJ']
 
+// Champs obligatoires dès qu'un rôle métier (commercial, gestionnaire, sous-agent) est coché.
+const CHAMPS_METIER_REQUIS = [['code', 'Code'], ['numero', 'N° producteur'], ['bce', 'N° BCE'], ['iban', 'IBAN'], ['bic', 'BIC']]
+
 export default function ConfigModule() {
   const { isAdmin, perms } = useAuth()
   const [tab, setTab] = useState('societes')
@@ -53,6 +56,7 @@ export default function ConfigModule() {
   const [uModule, setUModule] = useState('tous')
   const [uRole, setURole] = useState('tous')
   const [uBureau, setUBureau] = useState('tous')
+  const [triBureau, setTriBureau] = useState(false) // trier la liste par bureau au lieu de par nom
   const [bureaux, setBureaux] = useState([])            // ref_bureaux (adresse complète)
   const [showBureaux, setShowBureaux] = useState(false) // panneau "Gérer les bureaux"
   const [showFrais, setShowFrais] = useState(false)     // coûts internes (confidentiel)
@@ -166,6 +170,10 @@ export default function ConfigModule() {
     const email = (selUser.email || '').trim().toLowerCase()
     const nom = (selUser.nom_complet || '').trim() || email || '(sans nom)'
     if (!email && !nom) { notify('❌ Le nom ou l\'email est obligatoire'); return }
+    if (selUser.est_commercial || selUser.est_gestionnaire || selUser.est_sous_agent) {
+      const manquants = CHAMPS_METIER_REQUIS.filter(([k]) => !String(selUser[k] ?? '').trim()).map(([, l]) => l)
+      if (manquants.length) { notify(`❌ Champs obligatoires (rôle métier) : ${manquants.join(', ')}`); return }
+    }
     setSaving(true)
 
     const { id, created_at, updated_at, _nouveau, noms_repris_str, personne_id, ...rest } = selUser
@@ -319,7 +327,15 @@ export default function ConfigModule() {
     if (uSoc !== 'toutes' && !(u.est_admin || u[uSoc])) return false
     if (uModule !== 'tous' && !(u.est_admin || u[uModule])) return false
     return true
-  }).sort((a, b) => (a.nom_complet || a.email || '').localeCompare(b.nom_complet || b.email || '', 'fr', { sensitivity: 'base' }))
+  }).sort((a, b) => {
+    const nomA = a.nom_complet || a.email || '', nomB = b.nom_complet || b.email || ''
+    if (triBureau) {
+      const blA = bureauLabelOf(a) || 'zzz', blB = bureauLabelOf(b) || 'zzz'
+      const cmp = blA.localeCompare(blB, 'fr', { sensitivity: 'base' })
+      if (cmp) return cmp
+    }
+    return nomA.localeCompare(nomB, 'fr', { sensitivity: 'base' })
+  })
 
   const TABS = [['societes', '🏢 Sociétés'], ['documents', '📄 Documents'], ['users', '👥 Utilisateurs & acteurs métier'], ['categories', '🏷️ Catégories compta'], ['categoriesrdv', '📅 Catégories RDV']]
 
@@ -441,6 +457,7 @@ export default function ConfigModule() {
               )}
               <button onClick={() => { setSelUser({ _nouveau: true, nom_complet: '', email: '', est_admin: false, compte_hub_actif: false, actif: true, type: 'physique' }); setSelTaux({}) }} style={{ ...btn('#16a34a'), padding: '8px 14px', fontSize: 13 }}>➕ Nouvel utilisateur</button>
               <button onClick={() => setShowBureaux(v => !v)} style={{ ...btnGhost }}>🏢 Gérer les bureaux</button>
+              <button onClick={() => setTriBureau(v => !v)} style={{ ...btnGhost, ...(triBureau ? { background: '#1e293b', color: '#fff', borderColor: '#1e293b' } : {}) }}>🏢 Trier par bureau</button>
               <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 'auto' }}>{usersFiltres.length} / {users.length}</span>
             </div>
 
@@ -504,6 +521,7 @@ export default function ConfigModule() {
                     background: selUser?.id === u.id ? '#f8fafc' : '#fff',
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      {u.user_id && <span style={{ fontSize: 9.5, fontWeight: 800, color: '#64748b', background: '#f1f5f9', borderRadius: 5, padding: '1px 5px', fontVariantNumeric: 'tabular-nums' }}>{u.user_id}</span>}
                       <span style={{ fontWeight: 700, color: '#1e293b', fontSize: 14 }}>{u.nom_complet || u.email || u.code || '(sans nom)'}</span>
                       {u.est_admin && <span style={{ fontSize: 10, fontWeight: 800, color: '#7c3aed', background: '#f5f3ff', borderRadius: 5, padding: '1px 6px' }}>ADMIN</span>}
                       {!u.compte_hub_actif && <span style={{ fontSize: 10, fontWeight: 800, color: '#94a3b8', background: '#f1f5f9', borderRadius: 5, padding: '1px 6px' }}>SANS ACCÈS HUB</span>}
@@ -523,7 +541,9 @@ export default function ConfigModule() {
               ))}
             </div>
 
-            {selUser ? (
+            {selUser ? (() => {
+              const roleMetier = !!(selUser.est_commercial || selUser.est_gestionnaire || selUser.est_sous_agent)
+              return (
               <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 20 }}>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
@@ -583,11 +603,11 @@ export default function ConfigModule() {
                     ))}
                   </div>
                   <Grid>
-                    <F label="Code" value={selUser.code} onChange={v => setSelUser(s => ({ ...s, code: (v || '').toUpperCase() }))} />
-                    <F label="N° producteur" type="number" value={selUser.numero} onChange={v => setSelUser(s => ({ ...s, numero: v }))} />
-                    <F label="N° BCE" value={selUser.bce} onChange={v => setSelUser(s => ({ ...s, bce: v }))} />
-                    <F label="IBAN" value={selUser.iban} onChange={v => setSelUser(s => ({ ...s, iban: v }))} />
-                    <F label="BIC" value={selUser.bic} onChange={v => setSelUser(s => ({ ...s, bic: v }))} />
+                    <F label="Code" requis={roleMetier} value={selUser.code} onChange={v => setSelUser(s => ({ ...s, code: (v || '').toUpperCase() }))} />
+                    <F label="N° producteur" requis={roleMetier} type="number" value={selUser.numero} onChange={v => setSelUser(s => ({ ...s, numero: v }))} />
+                    <F label="N° BCE" requis={roleMetier} value={selUser.bce} onChange={v => setSelUser(s => ({ ...s, bce: v }))} />
+                    <F label="IBAN" requis={roleMetier} value={selUser.iban} onChange={v => setSelUser(s => ({ ...s, iban: v }))} />
+                    <F label="BIC" requis={roleMetier} value={selUser.bic} onChange={v => setSelUser(s => ({ ...s, bic: v }))} />
                   </Grid>
                   <div style={{ marginTop: 10 }}>
                     <Grid>
@@ -698,7 +718,8 @@ export default function ConfigModule() {
                   <button onClick={saveUser} disabled={saving} style={{ ...btn('#1e293b'), padding: '10px 20px', fontSize: 14, opacity: saving ? .6 : 1 }}>{saving ? '…' : (selUser.id ? '💾 Enregistrer' : '➕ Créer')}</button>
                 </div>
               </div>
-            ) : <div style={{ color: '#94a3b8', padding: 20 }}>Sélectionne un utilisateur.</div>}
+              )
+            })() : <div style={{ color: '#94a3b8', padding: 20 }}>Sélectionne un utilisateur.</div>}
             </div>
           </div>
         )}
@@ -722,7 +743,10 @@ function Section({ titre, children }) {
 }
 function Grid({ children }) { return <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 12 }}>{children}</div> }
 function Lbl({ children }) { return <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 4 }}>{children}</div> }
-function F({ label, value, onChange, type = 'text' }) { return <div><Lbl>{label}</Lbl><input type={type} value={value ?? ''} onChange={e => onChange(e.target.value)} style={inp} /></div> }
+function F({ label, value, onChange, type = 'text', requis = false }) {
+  const vide = requis && !String(value ?? '').trim()
+  return <div><Lbl>{label}{requis && <span style={{ color: vide ? '#dc2626' : '#16a34a' }}> *</span>}</Lbl><input type={type} value={value ?? ''} onChange={e => onChange(e.target.value)} style={vide ? { ...inp, border: '1px solid #fca5a5', background: '#fef2f2' } : inp} /></div>
+}
 function Field({ label, value, onChange, type = 'text' }) {
   return <div><Lbl>{label}</Lbl><input type={type} value={value} onChange={e => onChange(e.target.value)} style={inp} /></div>
 }
