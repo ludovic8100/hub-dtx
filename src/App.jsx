@@ -86,8 +86,8 @@ function ProtectedRoute({ children, requireAdmin = false, need = null }) {
   )
   if (!user) return <Navigate to="/login" replace />
   if (!perms) return <Navigate to="/access-denied" replace />
-  if (requireAdmin && perms.role !== 'admin') return <Navigate to="/" replace />
-  if (need && perms.role !== 'admin') {
+  if (requireAdmin && !perms.est_admin) return <Navigate to="/" replace />
+  if (need && !perms.est_admin) {
     const ACC = { dyn:'acc_dynassur', dtx:'acc_dtx', lode:'acc_lode', hex:'acc_hexagroup', prive:'acc_prive', grp:'acc_holding' }
     const needs = Array.isArray(need) ? need : [need]
     const ok = needs.some(n => {

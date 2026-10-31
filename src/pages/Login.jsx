@@ -1,7 +1,12 @@
+import { Navigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 
 export default function Login() {
-  const { signInWithMicrosoft } = useAuth()
+  const { user, loading, signInWithMicrosoft } = useAuth()
+
+  // Évite d'afficher à nouveau l'écran de login si une session existe déjà
+  // (sinon un simple retour sur /login masque une connexion pourtant réussie).
+  if (!loading && user) return <Navigate to="/" replace />
 
   return (
     <div style={{
