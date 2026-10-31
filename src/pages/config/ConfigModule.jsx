@@ -7,7 +7,7 @@ import { useAuth } from '../../lib/auth'
 import { bootstrapConfigs } from '../../lib/bootstrapConfigs'
 import GestionCategories from './GestionCategories'
 import { RdvCategoriesPanel } from '../admin/RdvCategories'
-import ActeursMetierPanel from './ActeursMetierPanel'
+import BceSearch from '../../components/BceSearch'
 
 // ─── Définition des accès par société (colonnes réelles de collaborateurs) ───
 const ACCES = [
@@ -33,11 +33,15 @@ const FIELDS_SOC = [
   ['email_expediteur', 'Email expéditeur (devis)'], ['email_cc', 'Email en copie (CC)'],
 ]
 
+const TYPES_TRAVAIL = ['Non-Vie', 'Vie', 'Santé', 'Crédit', 'SRDU', 'PJ']
+
 export default function ConfigModule() {
   const { isAdmin, perms } = useAuth()
   const [tab, setTab] = useState('societes')
   const [societes, setSocietes] = useState([])
   const [users, setUsers] = useState([])
+  const [taux, setTaux] = useState({})          // collaborateur_id -> { type_travail: valeur }
+  const [selTaux, setSelTaux] = useState({})    // taux de la fiche ouverte
   const [selSoc, setSelSoc] = useState(null)   // form société courant
   const [selUser, setSelUser] = useState(null) // form user courant
   const [saving, setSaving] = useState(false)
@@ -49,8 +53,9 @@ export default function ConfigModule() {
   const [uModule, setUModule] = useState('tous')
   const [uRole, setURole] = useState('tous')
   const [uBureau, setUBureau] = useState('tous')
-  const [bureaux, setBureaux] = useState([])            // ref_bureaux (adresses)
-  const [collabBureau, setCollabBureau] = useState({})  // code collaborateur -> bureau_id
+  const [bureaux, setBureaux] = useState([])            // ref_bureaux (adresse complète)
+  const [showBureaux, setShowBureaux] = useState(false) // panneau "Gérer les bureaux"
+  const [showFrais, setShowFrais] = useState(false)     // coûts internes (confidentiel)
   const [sel, setSel] = useState(() => new Set())       // ids user cochés (attribution groupée)
   const [bulkBureau, setBulkBureau] = useState('')      // bureau cible de l'attribution groupée
   const [bulkAcces, setBulkAcces] = useState('')        // page cible de l'attribution groupée d'accès
@@ -60,11 +65,11 @@ export default function ConfigModule() {
     ;(async () => {
       const { data: socs } = await supabase.from('societes').select('*').order('code')
       const { data: us } = await supabase.from('collaborateurs').select('*').order('nom_complet', { nullsFirst: false })
-      setSocietes(socs || []); setUsers(us || [])
-      const { data: brx } = await supabase.from('ref_bureaux').select('id,libelle,actif').eq('actif', true).order('libelle')
-      const cbs = us
-      setBureaux(brx || [])
-      const mB = {}; (cbs || []).forEach(c => { if (c.code) mB[c.code.toUpperCase()] = c.bureau_id }); setCollabBureau(mB)
+      const { data: ts } = await supabase.from('collaborateur_taux').select('*')
+      const { data: brx } = await supabase.from('ref_bureaux').select('id,libelle,rue,numero,boite,code_postal,ville,actif').order('libelle')
+      const mt = {}
+      ;(ts || []).forEach(t => { (mt[t.collaborateur_id] || (mt[t.collaborateur_id] = {}))[t.type_travail] = t.taux })
+      setSocietes(socs || []); setUsers(us || []); setTaux(mt); setBureaux(brx || [])
       if (socs?.length) setSelSoc({ ...socs.find(s => s.entite_key) || socs[0] })
       setLoading(false)
     })()
@@ -97,18 +102,41 @@ export default function ConfigModule() {
     notify('✓ Logo chargé — clique « Enregistrer » pour valider')
   }
 
-  const userCodeOf = u => (u?.code || (u?.email || '').split('@')[0] || '').toUpperCase()
-  const bureauLabelOf = u => { const b = bureaux.find(x => x.id === collabBureau[userCodeOf(u)]); return b ? b.libelle : null }
+  // ── Bureaux (adresse complète — devoirs d'information, courriers clients) ──
+  async function majBureauChamp(id, champ, val) {
+    setBureaux(list => list.map(b => b.id === id ? { ...b, [champ]: val } : b))
+  }
+  async function saveBureauRow(id) {
+    const row = bureaux.find(b => b.id === id)
+    if (!row) return
+    const { id: _id, ...payload } = row
+    const { error } = await supabase.from('ref_bureaux').update(payload).eq('id', id)
+    if (error) notify('❌ ' + error.message)
+    // Pas besoin de resynchroniser `users` : bureauLabelOf() relit `bureaux` à chaque rendu.
+  }
+  async function ajouterBureau() {
+    const { data, error } = await supabase.from('ref_bureaux').insert({ libelle: 'Nouveau bureau', actif: true }).select().single()
+    if (error) { notify('❌ ' + error.message); return }
+    setBureaux(list => [...list, data])
+  }
+  async function supprimerBureau(id) {
+    const utilise = users.some(u => u.bureau_id === id)
+    if (utilise) { notify('❌ Bureau encore attribué à au moins un utilisateur'); return }
+    if (!window.confirm('Retirer ce bureau ?')) return
+    const { error } = await supabase.from('ref_bureaux').delete().eq('id', id)
+    if (error) { notify('❌ ' + error.message); return }
+    setBureaux(list => list.filter(b => b.id !== id))
+  }
+
   async function setBureau(bureauId) {
-    if (!selUser) return
-    const code = userCodeOf(selUser)
-    if (!code || !(code in collabBureau)) { notify('❌ Aucun collaborateur lié au code ' + (code || '?')); return }
+    if (!selUser?.id) return
     setSaving(true)
     const val = bureauId === '' ? null : Number(bureauId)
-    const { error } = await supabase.from('collaborateurs').update({ bureau_id: val }).eq('code', code)
+    const { error } = await supabase.from('collaborateurs').update({ bureau_id: val }).eq('id', selUser.id)
     setSaving(false)
     if (error) { notify('❌ ' + error.message); return }
-    setCollabBureau(m => ({ ...m, [code]: val }))
+    setSelUser(u => ({ ...u, bureau_id: val }))
+    setUsers(prev => prev.map(u => u.id === selUser.id ? { ...u, bureau_id: val } : u))
     notify('✓ Bureau attribué')
   }
 
@@ -116,43 +144,86 @@ export default function ConfigModule() {
   async function assignBulk() {
     if (!bulkBureau || !sel.size) return
     const val = Number(bulkBureau)
-    const codes = [...new Set(users.filter(u => sel.has(u.id)).map(u => userCodeOf(u)).filter(c => c && (c in collabBureau)))]
-    if (!codes.length) { notify('❌ Aucun collaborateur lié aux utilisateurs cochés'); return }
+    const ids = [...sel]
     setSaving(true)
-    const { error } = await supabase.from('collaborateurs').update({ bureau_id: val }).in('code', codes)
+    const { error } = await supabase.from('collaborateurs').update({ bureau_id: val }).in('id', ids)
     setSaving(false)
     if (error) { notify('❌ ' + error.message); return }
-    setCollabBureau(m => { const n = { ...m }; codes.forEach(c => { n[c] = val }); return n })
+    setUsers(prev => prev.map(u => ids.includes(u.id) ? { ...u, bureau_id: val } : u))
     setSel(new Set()); setBulkBureau('')
-    notify(`✓ ${codes.length} collaborateur(s) rattaché(s) au bureau`)
+    notify(`✓ ${ids.length} collaborateur(s) rattaché(s) au bureau`)
+  }
+
+  function pick(u) {
+    setSelUser({ ...u, noms_repris_str: (u.noms_repris || []).join(', ') })
+    setSelTaux({ ...(taux[u.id] || {}) })
+    setShowFrais(false)
   }
 
   async function saveUser() {
     if (!selUser) return
     const estNouveau = !selUser.id
     const email = (selUser.email || '').trim().toLowerCase()
-    if (!email) { notify('❌ L\'email est obligatoire'); return }
-    const nom = (selUser.nom_complet || '').trim() || email
+    const nom = (selUser.nom_complet || '').trim() || email || '(sans nom)'
+    if (!email && !nom) { notify('❌ Le nom ou l\'email est obligatoire'); return }
     setSaving(true)
-    if (estNouveau) {
-      const { _nouveau, id, created_at, updated_at, ...rest } = selUser
-      const { data, error } = await supabase.from('collaborateurs')
-        .insert({ ...rest, email, nom_complet: nom, compte_hub_actif: rest.compte_hub_actif ?? true, est_admin: rest.est_admin || false, type: rest.type || 'physique' })
-        .select().single()
-      setSaving(false)
-      if (error) { notify('❌ ' + (error.code === '23505' ? 'Un compte existe déjà avec cet email' : error.message)); return }
-      setUsers(prev => [...prev, data].sort((a, b) => (a.nom_complet || a.email || '').localeCompare(b.nom_complet || b.email || '', 'fr', { sensitivity: 'base' })))
-      setSelUser({ ...data })
-      notify('✓ Utilisateur créé')
-      return
+
+    const { id, created_at, updated_at, _nouveau, noms_repris_str, personne_id, ...rest } = selUser
+    const payload = {
+      ...rest,
+      email: email || null,
+      nom_complet: nom,
+      numero: (rest.numero === '' || rest.numero == null) ? null : Number(rest.numero),
+      frais_annuels: (rest.frais_annuels === '' || rest.frais_annuels == null) ? null : Number(rest.frais_annuels),
+      noms_repris: noms_repris_str ? noms_repris_str.split(',').map(s => s.trim()).filter(Boolean) : null,
     }
-    const { id, created_at, updated_at, _nouveau, ...payload } = selUser
-    payload.email = email; payload.nom_complet = nom
-    const { error } = await supabase.from('collaborateurs').update(payload).eq('id', id)
+
+    // Coordonnées personnelles → table personnes (identité unique, voir docs/DROITS-ACCES.md),
+    // dupliquées sur collaborateurs pour ne pas casser les écrans qui les lisent encore directement.
+    const champsPersonne = {
+      nom_complet: nom, date_naissance: payload.date_naissance || null,
+      gsm: payload.gsm || null, gsm_e164: payload.gsm_e164 || null,
+      email: email || null, adresse: payload.adresse || null,
+      code_postal: payload.code_postal || null, ville: payload.ville || null,
+    }
+
+    let cid = id, pid = personne_id
+    if (estNouveau) {
+      payload.compte_hub_actif = payload.compte_hub_actif ?? false
+      payload.est_admin = payload.est_admin || false
+      payload.type = payload.type || 'physique'
+      payload.actif = payload.actif ?? true
+      const { data, error } = await supabase.from('collaborateurs').insert(payload).select().single()
+      if (error) { setSaving(false); notify('❌ ' + (error.code === '23505' ? 'Un compte existe déjà avec cet email' : error.message)); return }
+      cid = data.id
+    } else {
+      const { error } = await supabase.from('collaborateurs').update(payload).eq('id', id)
+      if (error) { setSaving(false); notify('❌ ' + error.message); return }
+    }
+
+    if (pid) {
+      await supabase.from('personnes').update(champsPersonne).eq('id', pid)
+    } else {
+      const { data: np } = await supabase.from('personnes').insert(champsPersonne).select('id').single()
+      if (np) { pid = np.id; await supabase.from('collaborateurs').update({ personne_id: pid }).eq('id', cid) }
+    }
+
+    // Taux de commission par type de travail
+    const trows = TYPES_TRAVAIL.map(t => ({
+      collaborateur_id: cid, type_travail: t,
+      taux: (selTaux[t] === '' || selTaux[t] == null) ? null : Number(selTaux[t]),
+      actif: true,
+    }))
+    await supabase.from('collaborateur_taux').upsert(trows, { onConflict: 'collaborateur_id,type_travail' })
+    setTaux(m => ({ ...m, [cid]: { ...selTaux } }))
+
     setSaving(false)
-    if (error) { notify('❌ ' + error.message); return }
-    setUsers(prev => prev.map(u => u.id === id ? { ...selUser, email, nom_complet: nom } : u))
-    notify('✓ Utilisateur enregistré')
+    notify('✓ Enregistré')
+    const { data: fresh } = await supabase.from('collaborateurs').select('*').eq('id', cid).single()
+    if (fresh) {
+      setUsers(prev => estNouveau ? [...prev, fresh] : prev.map(u => u.id === cid ? fresh : u))
+      pick(fresh)
+    }
   }
 
   async function bulkAccesApply(grant) {
@@ -177,9 +248,10 @@ export default function ConfigModule() {
   async function deleteUser() {
     if (!selUser?.id) { setSelUser(null); return }
     // La fiche collaborateur porte aussi les données métier (code, commissions, portefeuille...) :
-    // si elle est liée à un vrai collaborateur, on coupe l'accès au Hub sans supprimer la fiche.
-    if (selUser.code) {
-      if (!window.confirm(`Retirer l'accès au Hub de « ${selUser.nom_complet || selUser.email} » ?\n\nLa fiche collaborateur (code ${selUser.code}) est conservée ; seule la connexion au Hub est coupée.`)) return
+    // si elle a un rôle métier ou un code, on coupe seulement l'accès Hub sans supprimer la fiche.
+    const aUnRoleMetier = selUser.code || selUser.est_commercial || selUser.est_gestionnaire || selUser.est_sous_agent || selUser.est_apporteur
+    if (aUnRoleMetier) {
+      if (!window.confirm(`Retirer l'accès au Hub de « ${selUser.nom_complet || selUser.email} » ?\n\nLa fiche (rôle métier, commissions) est conservée ; seule la connexion au Hub est coupée.`)) return
       setSaving(true)
       const { error } = await supabase.from('collaborateurs').update({ compte_hub_actif: false }).eq('id', selUser.id)
       setSaving(false)
@@ -233,26 +305,23 @@ export default function ConfigModule() {
     </Layout>
   )
 
-  const DOMAINES_INTERNES = ['dynassur.be', 'dtx-group.be']
+  const bureauLabelOf = u => bureaux.find(b => b.id === u.bureau_id)?.libelle || null
   const usersFiltres = users.filter(u => {
-    const dom = (u.email || '').split('@')[1]?.toLowerCase()
-    if (!dom || !DOMAINES_INTERNES.includes(dom)) return false  // externes (gmail, etc.) : jamais d'accès au hub
     const q = uSearch.trim().toLowerCase()
     if (q && !((u.nom_complet || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q) || (u.code || '').toLowerCase().includes(q))) return false
     if (uStatut === 'actifs' && !u.compte_hub_actif) return false
     if (uStatut === 'inactifs' && u.compte_hub_actif) return false
     if (uRole !== 'tous' && (u.est_admin ? 'admin' : 'user') !== uRole) return false
     if (uBureau !== 'tous') {
-      const bid = collabBureau[userCodeOf(u)]
-      if (uBureau === 'sans') { if (bid != null) return false }
-      else if (String(bid) !== uBureau) return false
+      if (uBureau === 'sans') { if (u.bureau_id != null) return false }
+      else if (String(u.bureau_id) !== uBureau) return false
     }
     if (uSoc !== 'toutes' && !(u.est_admin || u[uSoc])) return false
     if (uModule !== 'tous' && !(u.est_admin || u[uModule])) return false
     return true
   }).sort((a, b) => (a.nom_complet || a.email || '').localeCompare(b.nom_complet || b.email || '', 'fr', { sensitivity: 'base' }))
 
-  const TABS = [['societes', '🏢 Sociétés'], ['documents', '📄 Documents'], ['users', '👥 Utilisateurs & accès'], ['acteurs', '🧑‍💼 Acteurs métier'], ['categories', '🏷️ Catégories compta'], ['categoriesrdv', '📅 Catégories RDV']]
+  const TABS = [['societes', '🏢 Sociétés'], ['documents', '📄 Documents'], ['users', '👥 Utilisateurs & acteurs métier'], ['categories', '🏷️ Catégories compta'], ['categoriesrdv', '📅 Catégories RDV']]
 
   return (
     <Layout currentPage="Configuration">
@@ -272,8 +341,6 @@ export default function ConfigModule() {
         {tab === 'categories' && <GestionCategories />}
 
         {tab === 'categoriesrdv' && <RdvCategoriesPanel />}
-
-        {tab === 'acteurs' && <ActeursMetierPanel />}
 
         {/* ─────────── SOCIÉTÉS & DOCUMENTS ─────────── */}
         {(tab === 'societes' || tab === 'documents') && !loading && (
@@ -341,7 +408,7 @@ export default function ConfigModule() {
           </div>
         )}
 
-        {/* ─────────── UTILISATEURS & ACCÈS ─────────── */}
+        {/* ─────────── UTILISATEURS & ACTEURS MÉTIER ─────────── */}
         {tab === 'users' && !loading && (
           <div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 14, alignItems: 'center' }}>
@@ -352,9 +419,9 @@ export default function ConfigModule() {
                 <option value="user">Utilisateurs</option>
               </select>
               <select value={uStatut} onChange={e => setUStatut(e.target.value)} style={{ ...inp, width: 'auto' }}>
-                <option value="tous">Statut : tous</option>
+                <option value="tous">Accès Hub : tous</option>
                 <option value="actifs">Actifs</option>
-                <option value="inactifs">Inactifs</option>
+                <option value="inactifs">Inactifs / sans accès</option>
               </select>
               <select value={uSoc} onChange={e => setUSoc(e.target.value)} style={{ ...inp, width: 'auto' }}>
                 <option value="toutes">Société : toutes</option>
@@ -372,9 +439,34 @@ export default function ConfigModule() {
               {(uSearch || uRole !== 'tous' || uStatut !== 'tous' || uSoc !== 'toutes' || uBureau !== 'tous' || uModule !== 'tous') && (
                 <button onClick={() => { setUSearch(''); setURole('tous'); setUStatut('tous'); setUSoc('toutes'); setUBureau('tous'); setUModule('tous') }} style={{ ...btnGhost }}>✕ Réinitialiser</button>
               )}
-              <button onClick={() => setSelUser({ _nouveau: true, nom_complet: '', email: '', est_admin: false, compte_hub_actif: true })} style={{ ...btn('#16a34a'), padding: '8px 14px', fontSize: 13 }}>➕ Nouvel utilisateur</button>
+              <button onClick={() => { setSelUser({ _nouveau: true, nom_complet: '', email: '', est_admin: false, compte_hub_actif: false, actif: true, type: 'physique' }); setSelTaux({}) }} style={{ ...btn('#16a34a'), padding: '8px 14px', fontSize: 13 }}>➕ Nouvel utilisateur</button>
+              <button onClick={() => setShowBureaux(v => !v)} style={{ ...btnGhost }}>🏢 Gérer les bureaux</button>
               <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 'auto' }}>{usersFiltres.length} / {users.length}</span>
             </div>
+
+            {showBureaux && (
+              <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 16, marginBottom: 14 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 10 }}>
+                  Bureaux — adresse complète (devoirs d'information, courriers clients)
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr 60px 70px 90px 1fr 32px', gap: 8, fontSize: 10.5, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>
+                  <span>Nom</span><span>Rue</span><span>N°</span><span>Bte</span><span>CP</span><span>Ville</span><span></span>
+                </div>
+                {bureaux.map(b => (
+                  <div key={b.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr 60px 70px 90px 1fr 32px', gap: 8, marginBottom: 6 }}>
+                    <input style={inp} value={b.libelle || ''} onChange={e => majBureauChamp(b.id, 'libelle', e.target.value)} onBlur={() => saveBureauRow(b.id)} placeholder="Nom du bureau" />
+                    <input style={inp} value={b.rue || ''} onChange={e => majBureauChamp(b.id, 'rue', e.target.value)} onBlur={() => saveBureauRow(b.id)} placeholder="Rue" />
+                    <input style={inp} value={b.numero || ''} onChange={e => majBureauChamp(b.id, 'numero', e.target.value)} onBlur={() => saveBureauRow(b.id)} placeholder="N°" />
+                    <input style={inp} value={b.boite || ''} onChange={e => majBureauChamp(b.id, 'boite', e.target.value)} onBlur={() => saveBureauRow(b.id)} placeholder="Bte" />
+                    <input style={inp} value={b.code_postal || ''} onChange={e => majBureauChamp(b.id, 'code_postal', e.target.value)} onBlur={() => saveBureauRow(b.id)} placeholder="CP" />
+                    <input style={inp} value={b.ville || ''} onChange={e => majBureauChamp(b.id, 'ville', e.target.value)} onBlur={() => saveBureauRow(b.id)} placeholder="Ville" />
+                    <button onClick={() => supprimerBureau(b.id)} title="Retirer" style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 16 }}>✕</button>
+                  </div>
+                ))}
+                <button onClick={ajouterBureau} style={{ ...btn('#1e293b'), marginTop: 6, padding: '7px 14px', fontSize: 13 }}>➕ Ajouter un bureau</button>
+              </div>
+            )}
+
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 14, alignItems: 'center', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 10, padding: '8px 12px' }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: '#0369a1' }}>Attribution groupée d'un accès page</span>
               <select value={bulkAcces} onChange={e => setBulkAcces(e.target.value)} style={{ ...inp, width: 'auto' }}>
@@ -400,27 +492,30 @@ export default function ConfigModule() {
               </select>
               <button onClick={assignBulk} disabled={!bulkBureau || !sel.size || saving} style={{ ...btn('#1e293b'), padding: '8px 16px', fontSize: 14, opacity: (!bulkBureau || !sel.size || saving) ? .5 : 1 }}>Attribuer ({sel.size})</button>
             </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,280px) 1fr', gap: 18, alignItems: 'start' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: '70vh', overflowY: 'auto' }}>
               {usersFiltres.map(u => (
                 <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input type="checkbox" checked={sel.has(u.id)} onChange={() => toggleSel(u.id)} style={{ width: 16, height: 16, cursor: 'pointer', flexShrink: 0 }} />
-                  <button onClick={() => setSelUser({ ...u })} style={{
+                  <button onClick={() => pick(u)} style={{
                     flex: 1, minWidth: 0, textAlign: 'left', padding: '9px 12px', borderRadius: 9, cursor: 'pointer',
                     border: selUser?.id === u.id ? '2px solid #1e293b' : '1px solid #e2e8f0',
                     background: selUser?.id === u.id ? '#f8fafc' : '#fff',
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 700, color: '#1e293b', fontSize: 14 }}>{u.nom_complet || u.email}</span>
+                      <span style={{ fontWeight: 700, color: '#1e293b', fontSize: 14 }}>{u.nom_complet || u.email || u.code || '(sans nom)'}</span>
                       {u.est_admin && <span style={{ fontSize: 10, fontWeight: 800, color: '#7c3aed', background: '#f5f3ff', borderRadius: 5, padding: '1px 6px' }}>ADMIN</span>}
-                      {!u.compte_hub_actif && <span style={{ fontSize: 10, fontWeight: 800, color: '#dc2626', background: '#fef2f2', borderRadius: 5, padding: '1px 6px' }}>INACTIF</span>}
+                      {!u.compte_hub_actif && <span style={{ fontSize: 10, fontWeight: 800, color: '#94a3b8', background: '#f1f5f9', borderRadius: 5, padding: '1px 6px' }}>SANS ACCÈS HUB</span>}
                     </div>
-                    <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{u.email}</div>
+                    {u.email && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{u.email}</div>}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', marginTop: 5 }}>
                       {u.est_admin
                         ? <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: '#7c3aed', borderRadius: 5, padding: '2px 7px' }}>Toutes sociétés</span>
                         : ACCES.filter(g => u[g.acc]).map(g => <span key={g.acc} style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: g.couleur, borderRadius: 5, padding: '2px 7px' }}>{g.label}</span>)}
-                      {!u.est_admin && !ACCES.some(g => u[g.acc]) && <span style={{ fontSize: 10, color: '#cbd5e1', fontStyle: 'italic' }}>aucune société</span>}
+                      {[['est_commercial','Commercial'],['est_gestionnaire','Gestionnaire'],['est_sous_agent','Sous-agent'],['est_apporteur','Apporteur']].filter(([k]) => u[k]).map(([k,l]) => (
+                        <span key={k} style={{ fontSize: 10, fontWeight: 700, color: '#475569', background: '#f1f5f9', borderRadius: 5, padding: '2px 7px' }}>{l}</span>
+                      ))}
                       {(() => { const bl = bureauLabelOf(u); return bl ? <span style={{ fontSize: 10, color: '#64748b', background: '#f1f5f9', borderRadius: 5, padding: '2px 7px' }}>🏢 {bl}</span> : null })()}
                     </div>
                   </button>
@@ -430,78 +525,178 @@ export default function ConfigModule() {
 
             {selUser ? (
               <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 20 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 250 }}>
-                    <input value={selUser.nom_complet || ''} onChange={e => setSelUser(u => ({ ...u, nom_complet: e.target.value }))} placeholder="Nom complet" style={{ ...inp, fontWeight: 700, fontSize: 16 }} />
-                    <input value={selUser.email || ''} onChange={e => setSelUser(u => ({ ...u, email: e.target.value }))} placeholder="email@societe.be" style={{ ...inp, fontSize: 12 }} />
-                    {!selUser.id && <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 600 }}>Nouveau compte — reconnu au 1ᵉʳ login Microsoft avec cet email</span>}
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+                  <span style={{ flex: 1 }} />
+                  <button onClick={deleteUser} disabled={saving} style={{ padding: '6px 12px', fontSize: 12, fontWeight: 700, borderRadius: 8, cursor: 'pointer', border: '1px solid #fecaca', background: '#fff', color: '#dc2626' }}>
+                    {selUser.id ? (selUser.code || selUser.est_commercial || selUser.est_gestionnaire || selUser.est_sous_agent || selUser.est_apporteur ? '🗑 Retirer l\'accès Hub' : '🗑 Supprimer le compte') : '✕ Annuler'}
+                  </button>
+                </div>
+
+                {/* ── Coordonnées ── */}
+                <Section titre="Coordonnées">
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+                    <div style={{ flex: 1, minWidth: 220 }}><Lbl>Nom complet</Lbl><input value={selUser.nom_complet || ''} onChange={e => setSelUser(u => ({ ...u, nom_complet: e.target.value }))} placeholder="Prénom Nom" style={{ ...inp, fontWeight: 700 }} /></div>
+                    <div style={{ minWidth: 220 }}><Lbl>Email</Lbl><input value={selUser.email || ''} onChange={e => setSelUser(u => ({ ...u, email: e.target.value }))} placeholder="prenom@dynassur.be" style={inp} /></div>
                   </div>
-                  <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <Grid>
+                    <F label="Titre / fonction" value={selUser.titre} onChange={v => setSelUser(u => ({ ...u, titre: v }))} />
+                    <F label="GSM" value={selUser.gsm} onChange={v => setSelUser(u => ({ ...u, gsm: v }))} />
+                    <F label="Adresse" value={selUser.adresse} onChange={v => setSelUser(u => ({ ...u, adresse: v }))} />
+                    <F label="Code postal" value={selUser.code_postal} onChange={v => setSelUser(u => ({ ...u, code_postal: v }))} />
+                    <F label="Ville" value={selUser.ville} onChange={v => setSelUser(u => ({ ...u, ville: v }))} />
+                    <F label="Date de naissance" type="date" value={selUser.date_naissance} onChange={v => setSelUser(u => ({ ...u, date_naissance: v }))} />
+                  </Grid>
+                  {!selUser.id && <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 600, marginTop: 8 }}>Nouveau compte — reconnu au 1ᵉʳ login Microsoft si un email est renseigné</div>}
+                </Section>
+
+                {/* ── Rôle métier & commissions ── */}
+                <Section titre="Rôle métier & commissions">
+                  <BceSearch onSelect={c => {
+                    const a = c.address || {}
+                    setSelUser(s => ({
+                      ...s, type: 'morale',
+                      nom_complet: c.denomination_with_legal_form || c.denomination || s.nom_complet,
+                      bce: c.cbe_number_formatted || c.cbe_number || s.bce,
+                      adresse: a.street ? `${a.street} ${a.street_number || ''}`.trim() : s.adresse,
+                      code_postal: a.post_code || s.code_postal, ville: a.city || s.ville,
+                    }))
+                  }} />
+                  <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', margin: '12px 0' }}>
+                    <Chk label="Commercial" on={!!selUser.est_commercial} onClick={() => setSelUser(s => ({ ...s, est_commercial: !s.est_commercial }))} />
+                    <Chk label="Gestionnaire" on={!!selUser.est_gestionnaire} onClick={() => setSelUser(s => ({ ...s, est_gestionnaire: !s.est_gestionnaire }))} />
+                    <Chk label="Sous-agent" on={!!selUser.est_sous_agent} onClick={() => setSelUser(s => ({ ...s, est_sous_agent: !s.est_sous_agent }))} />
+                    <Chk label="Apporteur" on={!!selUser.est_apporteur} onClick={() => setSelUser(s => ({ ...s, est_apporteur: !s.est_apporteur }))} />
+                    <Chk label="Actif (statut métier)" on={selUser.actif !== false} onClick={() => setSelUser(s => ({ ...s, actif: !(s.actif !== false) }))} />
+                  </div>
+                  {!selUser.est_commercial && !selUser.est_gestionnaire && !selUser.est_sous_agent && !selUser.est_apporteur && (
+                    <div style={{ fontSize: 11.5, color: '#94a3b8', fontStyle: 'italic', marginBottom: 10 }}>Aucun rôle métier coché — employé sans commission, c'est un état normal.</div>
+                  )}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(120px,1fr))', gap: 10, marginBottom: 12 }}>
+                    {TYPES_TRAVAIL.map(t => (
+                      <div key={t}><Lbl>{t}</Lbl>
+                        <div style={{ position: 'relative' }}>
+                          <input type="number" step="0.01" value={selTaux[t] ?? ''} onChange={e => setSelTaux(m => ({ ...m, [t]: e.target.value }))} style={{ ...inp, paddingRight: 24 }} />
+                          <span style={{ position: 'absolute', right: 9, top: 9, color: '#94a3b8', fontSize: 12 }}>%</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <Grid>
+                    <F label="Code" value={selUser.code} onChange={v => setSelUser(s => ({ ...s, code: (v || '').toUpperCase() }))} />
+                    <F label="N° producteur" type="number" value={selUser.numero} onChange={v => setSelUser(s => ({ ...s, numero: v }))} />
+                    <F label="N° BCE" value={selUser.bce} onChange={v => setSelUser(s => ({ ...s, bce: v }))} />
+                    <F label="IBAN" value={selUser.iban} onChange={v => setSelUser(s => ({ ...s, iban: v }))} />
+                    <F label="BIC" value={selUser.bic} onChange={v => setSelUser(s => ({ ...s, bic: v }))} />
+                  </Grid>
+                  <div style={{ marginTop: 10 }}>
+                    <Grid>
+                      <F label="Nom en donnée SOUS-AGENT (quittances)" value={selUser.nom_sa_data} onChange={v => setSelUser(s => ({ ...s, nom_sa_data: v }))} />
+                      <F label="Nom en donnée GESTIONNAIRE (quittances)" value={selUser.nom_gestionnaire_data} onChange={v => setSelUser(s => ({ ...s, nom_gestionnaire_data: v }))} />
+                      <F label="Alias / noms repris (séparés par ,)" value={selUser.noms_repris_str} onChange={v => setSelUser(s => ({ ...s, noms_repris_str: v }))} />
+                    </Grid>
+                  </div>
+                  <div style={{ marginTop: 12 }}>
+                    {showFrais ? (
+                      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                        <div style={{ maxWidth: 220 }}>
+                          <Lbl>Frais annuels (confidentiel)</Lbl>
+                          <input type="number" step="0.01" value={selUser.frais_annuels ?? ''} onChange={e => setSelUser(s => ({ ...s, frais_annuels: e.target.value }))} style={inp} />
+                        </div>
+                        <button onClick={() => setShowFrais(false)} style={btnGhost}>🙈 Masquer</button>
+                      </div>
+                    ) : (
+                      <button onClick={() => setShowFrais(true)} style={{ ...btnGhost, borderStyle: 'dashed' }}>👁 Afficher les coûts internes</button>
+                    )}
+                  </div>
+                </Section>
+
+                {/* ── Accès au Hub ── */}
+                <Section titre="Accès au Hub">
+                  <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
                     <label style={{ fontSize: 13, fontWeight: 600, color: '#475569', display: 'flex', gap: 6, alignItems: 'center' }}>
                       Rôle
                       <select value={selUser.est_admin ? 'admin' : 'user'} onChange={e => setSelUser(u => ({ ...u, est_admin: e.target.value === 'admin' }))} style={{ ...inp, padding: '6px 8px' }}>
                         <option value="user">Utilisateur</option>
-                        <option value="admin">Administrateur</option>
+                        <option value="admin">Administrateur du Hub (toutes sociétés)</option>
                       </select>
                     </label>
-                    <label style={{ fontSize: 13, fontWeight: 600, color: '#475569', display: 'flex', gap: 6, alignItems: 'center' }}>
-                      Bureau
-                      {(() => {
-                        const code = userCodeOf(selUser)
-                        return (code in collabBureau)
-                          ? <select value={collabBureau[code] ?? ''} onChange={e => setBureau(e.target.value)} style={{ ...inp, padding: '6px 8px', minWidth: 210 }}>
-                              <option value="">— Aucun —</option>
-                              {bureaux.map(b => <option key={b.id} value={b.id}>{b.libelle}</option>)}
-                            </select>
-                          : <span style={{ fontSize: 12, color: '#94a3b8' }}>aucun collaborateur (code {code || '?'})</span>
-                      })()}
-                    </label>
-                    <Toggle label="Actif" on={!!selUser.compte_hub_actif} onClick={() => setSelUser(u => ({ ...u, compte_hub_actif: !u.compte_hub_actif }))} />
+                    <Toggle label="Connexion au Hub active" on={!!selUser.compte_hub_actif} onClick={() => setSelUser(u => ({ ...u, compte_hub_actif: !u.compte_hub_actif }))} />
                     <Toggle label="Employé" on={!!selUser.est_employe} onClick={() => setSelUser(u => ({ ...u, est_employe: !u.est_employe }))} />
                   </div>
-                </div>
 
-                <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                  <button onClick={saveUser} disabled={saving} style={{ ...btn('#1e293b'), padding: '9px 18px', fontSize: 14, opacity: saving ? .6 : 1 }}>{saving ? '…' : (selUser.id ? '💾 Enregistrer' : '➕ Créer le compte')}</button>
-                  {selUser.id && <button onClick={renvoyerAcces} disabled={saving} style={{ ...btn('#0080BD'), padding: '9px 16px', fontSize: 14, opacity: saving ? .6 : 1 }}>📧 {selUser.date_envoi_acces ? 'Renvoyer' : 'Envoyer'} les accès</button>}
-                  {selUser.id && <span style={{ fontSize: 12, color: '#94a3b8' }}>
-                    {selUser.date_envoi_acces ? `Accès envoyés le ${new Date(selUser.date_envoi_acces).toLocaleDateString('fr-BE')}` : 'Accès jamais envoyés'}
-                    {selUser.premiere_connexion ? ` · 1ʳᵉ connexion le ${new Date(selUser.premiere_connexion).toLocaleDateString('fr-BE')}` : ' · pas encore connecté'}
-                  </span>}
-                  <button onClick={selUser.id ? deleteUser : () => setSelUser(null)} disabled={saving} style={{ marginLeft: 'auto', padding: '9px 16px', fontSize: 14, fontWeight: 700, borderRadius: 8, cursor: 'pointer', border: '1px solid #fecaca', background: '#fff', color: '#dc2626' }}>{selUser.id ? '🗑 Supprimer' : '✕ Annuler'}</button>
-                </div>
+                  {selUser.id && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
+                      <button onClick={renvoyerAcces} disabled={saving} style={{ ...btn('#0080BD'), padding: '8px 14px', fontSize: 13 }}>📧 {selUser.date_envoi_acces ? 'Renvoyer' : 'Envoyer'} les accès</button>
+                      <span style={{ fontSize: 12, color: '#94a3b8' }}>
+                        {selUser.date_envoi_acces ? `Accès envoyés le ${new Date(selUser.date_envoi_acces).toLocaleDateString('fr-BE')}` : 'Accès jamais envoyés'}
+                        {selUser.premiere_connexion ? ` · 1ʳᵉ connexion le ${new Date(selUser.premiere_connexion).toLocaleDateString('fr-BE')}` : ' · pas encore connecté'}
+                      </span>
+                    </div>
+                  )}
 
-                {selUser.est_admin && (
-                  <div style={{ marginTop: 14, background: '#f5f3ff', color: '#6d28d9', borderRadius: 8, padding: '8px 12px', fontSize: 12 }}>
-                    Les administrateurs ont accès à toutes les sociétés et toutes les pages — les cases ci-dessous sont alors sans effet.
-                  </div>
-                )}
-
-                <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(260px,1fr))', gap: 14 }}>
-                  {ACCES.map(grp => (
-                    <div key={grp.acc} style={{ border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
-                      <div style={{ background: grp.couleur, color: '#fff', padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontWeight: 700 }}>{grp.label}</span>
-                        <Toggle label="" on={!!selUser[grp.acc]} light onClick={() => setSelUser(u => ({ ...u, [grp.acc]: !u[grp.acc] }))} />
-                      </div>
-                      {grp.pages.length > 0 && (
-                        <div style={{ padding: '6px 10px', opacity: selUser[grp.acc] ? 1 : .45, pointerEvents: selUser[grp.acc] ? 'auto' : 'none' }}>
-                          {[...grp.pages].sort((a, b) => (a[0] === 'dashboard') !== (b[0] === 'dashboard') ? (a[0] === 'dashboard' ? -1 : 1) : a[1].localeCompare(b[1], 'fr', { sensitivity: 'base' })).map(([pg, plabel]) => {
-                            const col = `${grp.pfx}_${pg}`
-                            return <Toggle key={col} label={plabel} on={!!selUser[col]} small onClick={() => setSelUser(u => ({ ...u, [col]: !u[col] }))} />
-                          })}
-                          {grp.acc === 'acc_dynassur' && (
-                            <div style={{ borderTop: '1px dashed #e2e8f0', marginTop: 6, paddingTop: 6 }}>
-                              <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 2 }}>Permissions</div>
-                              <Toggle label="Voir les commissions" on={!!selUser.voir_commissions} small onClick={() => setSelUser(u => ({ ...u, voir_commissions: !u.voir_commissions }))} />
+                  {selUser.est_admin ? (
+                    <div style={{ background: '#f5f3ff', color: '#6d28d9', borderRadius: 8, padding: '8px 12px', fontSize: 12 }}>
+                      Administrateur du Hub : accès à toutes les sociétés, tous les modules. La grille ci-dessous est sans effet.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(260px,1fr))', gap: 14 }}>
+                      {ACCES.map(grp => {
+                        const estAdminSoc = grp.pages.length > 0 && grp.pages.every(([pg]) => selUser[`${grp.pfx}_${pg}`])
+                        return (
+                        <div key={grp.acc} style={{ border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
+                          <div style={{ background: grp.couleur, color: '#fff', padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontWeight: 700 }}>{grp.label}{estAdminSoc ? ' — Admin' : ''}</span>
+                            <Toggle label="" on={!!selUser[grp.acc]} light onClick={() => setSelUser(u => ({ ...u, [grp.acc]: !u[grp.acc] }))} />
+                          </div>
+                          {grp.pages.length > 0 && (
+                            <div style={{ padding: '6px 10px', opacity: selUser[grp.acc] ? 1 : .45, pointerEvents: selUser[grp.acc] ? 'auto' : 'none' }}>
+                              <button
+                                onClick={() => {
+                                  const toutCoche = grp.pages.every(([pg]) => selUser[`${grp.pfx}_${pg}`])
+                                  setSelUser(u => {
+                                    const n = { ...u }
+                                    grp.pages.forEach(([pg]) => { n[`${grp.pfx}_${pg}`] = !toutCoche })
+                                    return n
+                                  })
+                                }}
+                                style={{ fontSize: 10.5, color: grp.couleur, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, padding: '2px 0 6px', textAlign: 'left' }}
+                                title="Tout cocher = administrateur de cette société"
+                              >{estAdminSoc ? '✕ Décocher tout' : '✓ Tout cocher (admin société)'}</button>
+                              {[...grp.pages].sort((a, b) => (a[0] === 'dashboard') !== (b[0] === 'dashboard') ? (a[0] === 'dashboard' ? -1 : 1) : a[1].localeCompare(b[1], 'fr', { sensitivity: 'base' })).map(([pg, plabel]) => {
+                                const col = `${grp.pfx}_${pg}`
+                                return <Toggle key={col} label={plabel} on={!!selUser[col]} small onClick={() => setSelUser(u => ({ ...u, [col]: !u[col] }))} />
+                              })}
+                              {grp.acc === 'acc_dynassur' && (
+                                <div style={{ borderTop: '1px dashed #e2e8f0', marginTop: 6, paddingTop: 6 }}>
+                                  <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Portefeuille clients</div>
+                                  <label style={{ display: 'block', marginBottom: 6 }}>
+                                    <Lbl>Bureau</Lbl>
+                                    <select value={selUser.bureau_id ?? ''} onChange={e => setBureau(e.target.value)} style={{ ...inp, padding: '6px 8px' }} disabled={!selUser.id}>
+                                      <option value="">— Aucun —</option>
+                                      {bureaux.map(b => <option key={b.id} value={b.id}>{b.libelle}</option>)}
+                                    </select>
+                                  </label>
+                                  <Toggle label="Voir tout le portefeuille (ignore le bureau)" on={!!selUser.voit_tout_portefeuille} small onClick={() => setSelUser(u => ({ ...u, voit_tout_portefeuille: !u.voit_tout_portefeuille }))} />
+                                  <div style={{ borderTop: '1px dashed #e2e8f0', marginTop: 6, paddingTop: 6 }}>
+                                    <Toggle label="Voir les commissions" on={!!selUser.voir_commissions} small onClick={() => setSelUser(u => ({ ...u, voir_commissions: !u.voir_commissions }))} />
+                                  </div>
+                                </div>
+                              )}
+                              {(grp.acc === 'acc_lode' || grp.acc === 'acc_dtx' || grp.acc === 'acc_hexagroup') && (
+                                <div style={{ borderTop: '1px dashed #e2e8f0', marginTop: 6, paddingTop: 6, fontSize: 10.5, color: '#94a3b8' }}>Pas de portefeuille par bureau — un seul portefeuille pour {grp.label}.</div>
+                              )}
                             </div>
                           )}
                         </div>
-                      )}
+                      )})}
                     </div>
-                  ))}
-                </div>
+                  )}
+                </Section>
 
+                <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 12, borderTop: '1px solid #f1f5f9', paddingTop: 14 }}>
+                  <button onClick={saveUser} disabled={saving} style={{ ...btn('#1e293b'), padding: '10px 20px', fontSize: 14, opacity: saving ? .6 : 1 }}>{saving ? '…' : (selUser.id ? '💾 Enregistrer' : '➕ Créer')}</button>
+                </div>
               </div>
             ) : <div style={{ color: '#94a3b8', padding: 20 }}>Sélectionne un utilisateur.</div>}
             </div>
@@ -516,16 +711,34 @@ export default function ConfigModule() {
 
 // ─────────── petits composants ───────────
 const inp = { padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 14, color: '#1e293b', width: '100%', boxSizing: 'border-box' }
-const btnGhost = { padding: '8px 14px', border: '1px solid #e2e8f0', borderRadius: 8, background: '#fff', fontSize: 13, fontWeight: 600, color: '#475569' }
+const btnGhost = { padding: '8px 14px', border: '1px solid #e2e8f0', borderRadius: 8, background: '#fff', fontSize: 13, fontWeight: 600, color: '#475569', cursor: 'pointer' }
 const btn = c => ({ padding: '11px 22px', border: 'none', borderRadius: 10, background: c || '#1e293b', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' })
 
+function Section({ titre, children }) {
+  return <div style={{ marginBottom: 20 }}>
+    <div style={{ fontSize: 13, fontWeight: 800, color: '#1e293b', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '.03em' }}>{titre}</div>
+    {children}
+  </div>
+}
+function Grid({ children }) { return <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 12 }}>{children}</div> }
 function Lbl({ children }) { return <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 4 }}>{children}</div> }
+function F({ label, value, onChange, type = 'text' }) { return <div><Lbl>{label}</Lbl><input type={type} value={value ?? ''} onChange={e => onChange(e.target.value)} style={inp} /></div> }
 function Field({ label, value, onChange, type = 'text' }) {
   return <div><Lbl>{label}</Lbl><input type={type} value={value} onChange={e => onChange(e.target.value)} style={inp} /></div>
 }
+function Chk({ label, on, onClick }) {
+  return (
+    <button onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+      <span style={{ width: 34, height: 20, borderRadius: 999, background: on ? '#16a34a' : '#cbd5e1', position: 'relative', flexShrink: 0 }}>
+        <span style={{ position: 'absolute', top: 2, left: on ? 16 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left .15s' }} />
+      </span>
+      <span style={{ fontSize: 14, fontWeight: 600, color: '#475569' }}>{label}</span>
+    </button>
+  )
+}
 function Toggle({ label, on, onClick, small, light }) {
   return (
-    <button onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: small ? '4px 0' : 0, textAlign: 'left' }}>
+    <button onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: 8, width: label ? '100%' : 'auto', background: 'none', border: 'none', cursor: 'pointer', padding: small ? '4px 0' : 0, textAlign: 'left' }}>
       <span style={{ width: 34, height: 20, borderRadius: 999, background: on ? (light ? 'rgba(255,255,255,.9)' : '#16a34a') : (light ? 'rgba(255,255,255,.35)' : '#cbd5e1'), position: 'relative', flexShrink: 0, transition: 'background .15s' }}>
         <span style={{ position: 'absolute', top: 2, left: on ? 16 : 2, width: 16, height: 16, borderRadius: '50%', background: light && on ? '#16a34a' : '#fff', transition: 'left .15s' }} />
       </span>

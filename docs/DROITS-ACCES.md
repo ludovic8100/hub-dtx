@@ -107,6 +107,39 @@ de reconstruire, plutôt que de continuer à deviner en production.
    `temp_acces_libre_sans_login`, dans l'ordre : jamais avant l'étape 1).
 3. Reconstruire un vrai login (Microsoft ou autre) avant de rouvrir l'accès.
 
+## Table `personnes` et fusion Utilisateurs/Acteurs métier (31/10/2026)
+
+Suite au point précédent, première étape du modèle d'identité unique : table `personnes`
+(nom complet, date de naissance, GSM, email, adresse, CP, ville), `collaborateurs.personne_id`
+et `clients.personne_id` (vide pour l'instant). Les 49 collaborateurs existants sont tous reliés
+à une `personne` (1 pour 1, sans ambiguïté). Le rapprochement des 10 298 clients reste un
+chantier séparé, non commencé.
+
+- `collaborateurs` garde ses propres colonnes d'identité (adresse, gsm, email, nom_complet,
+  date_naissance) en parallèle de `personnes`, pour ne pas casser les écrans qui les lisent
+  encore directement (`auth.jsx`, `NotesFraisView`, `TachesView`, `TicketsView`,
+  `ComptabiliteView`). `ConfigModule` écrit désormais sur les deux à chaque enregistrement.
+  Une vraie bascule (lire/écrire uniquement via `personnes`, retirer les colonnes dupliquées
+  de `collaborateurs`) est une phase 2 distincte, plus tard.
+- `collaborateurs.titre` (nouveau) : titre/fonction affiché, distinct du rôle métier
+  (Commercial/Gestionnaire/Sous-agent/Apporteur) qui sert au calcul des commissions et aux droits.
+- `ref_bureaux` a maintenant une adresse structurée (`rue`, `numero`, `boite`, `code_postal`,
+  `ville`), utilisée pour les devoirs d'information et les courriers clients.
+- Écrans **Utilisateurs & accès** et **Acteurs métier** fusionnés en une seule fiche par
+  collaborateur dans `ConfigModule.jsx` (onglet « Utilisateurs & acteurs métier ») :
+  Coordonnées, Rôle métier & commissions, Accès au Hub. `ActeursMetierPanel.jsx` supprimé.
+  « Admin d'une société » n'est plus un champ séparé : cocher tous les modules d'une société
+  équivaut à en être administrateur (bouton dédié dans chaque carte société). `est_admin` reste
+  réservé au seul administrateur du Hub entier (accès à tout, toutes sociétés).
+- Nouvelle table : mêmes précautions RLS/droits que lors de la fusion précédente (une table
+  neuve n'hérite d'aucun droit par défaut) — voir `sql/creation_table_personnes.sql`.
+
+Point noté, pas traité ici : Renaud Desclez (sous-agent indépendant) emploie Bénédicte De Roocker
+(gestionnaire) — relation qui se lit côté client/contrat (police accident du travail souscrite par
+Renaud pour ses employés), pas dans les droits du Hub. Le bureau commun (Eghezée) suffit pour le
+portefeuille clients partagé ; pas de champ « responsable »/hiérarchie ajouté, aucun besoin
+fonctionnel identifié à ce jour.
+
 ## Problème identité plus large (noté le 30/10/2026, pas encore traité)
 
 Une même personne physique peut être à la fois client, collaborateur, sous-agent, assuré et
