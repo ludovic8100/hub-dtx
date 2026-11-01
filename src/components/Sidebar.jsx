@@ -167,17 +167,20 @@ export default function Sidebar() {
     const active = location.pathname === item.path ||
       (item.path.length > 1 && location.pathname.startsWith(item.path + '/'))
     return (
+      // L'entrée sélectionnée s'inverse : fond blanc et texte bleu nuit, elle « sort »
+      // du panneau sombre. Les icônes métal, qui gardent leurs couleurs en permanence,
+      // ressortent mieux sur ce fond clair. Le survol reste un gris translucide discret :
+      // la sélection doit toujours être plus marquée que le survol.
       <div onClick={() => navigate(item.path)} style={{
         display:'flex', alignItems:'center', gap:'10px',
         padding:'8px 12px', borderRadius:'7px', cursor:'pointer',
-        background: active ? `${accentColor}20` : 'transparent',
+        background: active ? '#fff' : 'transparent',
         borderLeft: active ? `3px solid ${accentColor}` : '3px solid transparent',
+        boxShadow: active ? '0 1px 4px rgba(0,0,0,0.18)' : 'none',
         transition:'all 0.15s', marginBottom:'1px'
       }}
         onMouseEnter={e => {
-          // Gris clair franc au survol : les icônes gardent leurs couleurs métalliques,
-          // elles ne peuvent plus signaler le survol en changeant de teinte comme avant.
-          if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.22)'
+          if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.12)'
           const img = e.currentTarget.querySelector('img')
           if (img) img.style.opacity = '1'
         }}
@@ -190,8 +193,8 @@ export default function Sidebar() {
         {iconePng(item.key)
           ? <img src={`/icons/hub-dtx-metal/${iconePng(item.key)}.png`} alt="" width={24} height={24}
               style={{ width:'20px', height:'20px', flexShrink:0, opacity: active ? 1 : 0.6, transition:'opacity 0.15s' }} />
-          : <i className={`ti ${item.icon}`} style={{ fontSize:'16px', color: active ? accentLight : 'rgba(255,255,255,0.45)', width:'20px', flexShrink:0 }} />}
-        <span style={{ fontSize:'13.5px', fontFamily:"'Source Sans Pro', sans-serif", color: active ? '#fff' : 'rgba(255,255,255,0.65)', fontWeight: active ? '600' : '400', flex:1 }}>
+          : <i className={`ti ${item.icon}`} style={{ fontSize:'16px', color: active ? accentColor : 'rgba(255,255,255,0.45)', width:'20px', flexShrink:0 }} />}
+        <span style={{ fontSize:'13.5px', fontFamily:"'Source Sans Pro', sans-serif", color: active ? '#0D2F5E' : 'rgba(255,255,255,0.65)', fontWeight: active ? '700' : '400', flex:1 }}>
           {item.label}
         </span>
         {item.badge > 0 && <span style={{ background:'#E74C3C', color:'#fff', borderRadius:'10px', fontSize:'11px', fontWeight:700, padding:'1px 7px', minWidth:'18px', textAlign:'center' }}>{item.badge}</span>}
