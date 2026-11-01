@@ -46,15 +46,13 @@ export default function DashboardDynassur() {
   const { perms, user, isAdmin } = useAuth()
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState(null)
-  const [data, setData] = useState({ stats:{clients:0,taches:0,sinistres:0,naAnnee:0,naMois:0,renonAnnee:0}, taches:[], bordereaux:[], objectifs:[], prodMois:[] })
+  const [data, setData] = useState({ stats:{clients:0,sinistres:0,naAnnee:0,naMois:0,renonAnnee:0}, bordereaux:[], objectifs:[], prodMois:[] })
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
   const [recents, setRecents] = useState([])
   useEffect(()=>{ try{ setRecents(JSON.parse(localStorage.getItem('dyn_recent_clients')||'[]')) }catch(e){} },[])
 
   const firstName = (perms?.nom || user?.user_metadata?.full_name || '').split(' ')[0]
-  const myCode = (perms?.code || (perms?.user_email || '').split('@')[0] || '').toUpperCase()
-  const mineF = q => isAdmin ? q : q.or(`gestionnaire.eq.${myCode},cree_par.eq.${myCode}`)
   const now = new Date()
   const mois = String(now.getMonth()+1).padStart(2,'0')
   const annee = now.getFullYear()
@@ -63,17 +61,13 @@ export default function DashboardDynassur() {
     async function load() {
       const [
         { count: nbClients },
-        { count: nbTaches },
         { count: nbSinistres },
-        { data: tachesData },
         { data: prod },
         { data: bord },
         { data: obj },
       ] = await Promise.all([
         supabase.from('clients').select('*',{count:'exact',head:true}).eq('actif',true),
-        mineF(supabase.from('taches').select('*',{count:'exact',head:true}).in('statut',['todo','en_cours','en_attente']).or('entite.eq.dynassur,entite.is.null')),
         supabase.from('sinistres').select('*',{count:'exact',head:true}).neq('statut','clos'),
-        mineF(supabase.from('taches').select('id,titre,gestionnaire,echeance,statut,code_type').in('statut',['todo','en_cours','en_attente','retard']).or('entite.eq.dynassur,entite.is.null').order('echeance',{ascending:true}).limit(10)),
         supabase.from('mouvements_production').select('type_prod,mois,agent_code').eq('annee',annee),
         supabase.from('v_bordereaux_reconciliation').select('annee,mois,type,compagnie,statut_reconciliation').in('statut_reconciliation',['fichier_ok_non_encaisse','fichier_sans_chiffres','commission_sans_fichier','manquant']).eq('annee',annee),
         supabase.from('objectives_global').select('*').eq('year',annee).eq('period_type','year').eq('scope','global'),
@@ -88,13 +82,13 @@ export default function DashboardDynassur() {
       ;(prod||[]).filter(p=>p.type_prod==='N.A.'&&p.mois===mois).forEach(p=>{agMap[p.agent_code]=(agMap[p.agent_code]||0)+1})
       const prodMois = Object.entries(agMap).sort((a,b)=>b[1]-a[1]).slice(0,5)
 
-      setData({ stats:{clients:nbClients||0,taches:nbTaches||0,sinistres:nbSinistres||0,naAnnee,naMois,renonAnnee}, taches:tachesData||[], bordereaux:bord||[], objectifs:obj||[], prodMois })
+      setData({ stats:{clients:nbClients||0,sinistres:nbSinistres||0,naAnnee,naMois,renonAnnee}, bordereaux:bord||[], objectifs:obj||[], prodMois })
       setLoading(false)
     }
     load()
   }, [perms, isAdmin])
 
-  const { stats, taches, bordereaux, objectifs, prodMois } = data
+  const { stats, bordereaux, objectifs, prodMois } = data
 
   async function handleSync() {
     setSyncing(true)
@@ -103,12 +97,11 @@ export default function DashboardDynassur() {
       const { data: nb, error } = await supabase.rpc('sync_taches_bordereaux_manquants')
       if (error) throw error
       setSyncResult({ ok: true, nb })
-      // Recharger les bordereaux et tâches
-      const [{ data: bord }, { data: tsk }] = await Promise.all([
-        supabase.from('v_bordereaux_reconciliation').select('annee,mois,type,compagnie,statut_reconciliation').in('statut_reconciliation',['fichier_ok_non_encaisse','fichier_sans_chiffres','commission_sans_fichier','manquant']).eq('annee',annee),
-        mineF(supabase.from('taches').select('id,titre,gestionnaire,echeance,statut,code_type').in('statut',['todo','en_cours','en_attente','retard']).or('entite.eq.dynassur,entite.is.null').order('echeance',{ascending:true}).limit(10)),
-      ])
-      setData(d => ({ ...d, bordereaux: bord||[], taches: tsk||[] }))
+      // Recharger les bordereaux
+      const { data: bord } = await supabase.from('v_bordereaux_reconciliation')
+        .select('annee,mois,type,compagnie,statut_reconciliation')
+        .in('statut_reconciliation',['fichier_ok_non_encaisse','fichier_sans_chiffres','commission_sans_fichier','manquant']).eq('annee',annee)
+      setData(d => ({ ...d, bordereaux: bord||[] }))
     } catch(e) {
       setSyncResult({ ok: false, msg: e.message })
     }
@@ -137,7 +130,6 @@ export default function DashboardDynassur() {
           <KpiCard label="Clients actifs"   value={loading?'…':fmtN(stats.clients)}  icon="ti-users"          color={C.blue} />
           <KpiCard label="NA ce mois"       value={loading?'…':stats.naMois}         icon="ti-trending-up"    color={C.ok}   sub={`${fmtN(stats.naAnnee)} sur l'année`} />
           <KpiCard label="Solde net"        value={loading?'…':`${soldeNet>0?'+':''}${fmtN(soldeNet)}`} icon="ti-calculator" color={soldeNet>=0?C.ok:C.danger} sub={`NA − résiliations`} />
-          <KpiCard label="Tâches en cours"  value={loading?'…':stats.taches}         icon="ti-checkbox"       color={C.warn} />
           <KpiCard label="Sinistres ouverts"value={loading?'…':stats.sinistres}       icon="ti-alert-triangle" color={C.danger} />
           {bordereaux.length > 0 && <KpiCard label="Bordereaux ⚠" value={bordereaux.length} icon="ti-file-alert" color={C.danger} sub="non réconciliés" />}
         </div>
@@ -169,7 +161,7 @@ export default function DashboardDynassur() {
         )}
 
         {/* Grille 3 colonnes */}
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:18 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:18 }}>
 
           {/* COL 1 — Production */}
           <div style={{ display:'flex', flexDirection:'column', gap:18 }}>
@@ -225,42 +217,7 @@ export default function DashboardDynassur() {
             </div>
           </div>
 
-          {/* COL 2 — Tâches */}
-          <div style={{ background:'#fff', borderRadius:12, border:`1px solid ${C.border}`, overflow:'hidden' }}>
-            <div style={{ padding:'14px 18px', borderBottom:`1px solid ${C.border}`, display:'flex', alignItems:'center', gap:8 }}>
-              <i className="ti ti-checkbox" style={{ fontSize:15, color:C.warn }} />
-              <span style={{ fontSize:13, fontWeight:700, color:'#0f172a' }}>Tâches en cours</span>
-              <span style={{ fontSize:11, background:'#fef3c7', color:'#92400e', padding:'2px 7px', borderRadius:10, fontWeight:700 }}>
-                {taches.filter(t=>t.echeance&&new Date(t.echeance)<now).length} en retard
-              </span>
-            </div>
-            {loading ? <div style={{ padding:30, textAlign:'center', color:C.muted }}>Chargement…</div>
-            : taches.length === 0 ? <div style={{ padding:30, textAlign:'center', color:C.ok, fontSize:13 }}>✓ Aucune tâche en cours</div>
-            : (
-              <div style={{ maxHeight:380, overflowY:'auto' }}>
-                {taches.map((t,i) => {
-                  const retard = t.echeance && new Date(t.echeance) < now
-                  return (
-                    <div key={t.id} onClick={()=>navigate(`/dynassur/taches?tache=${t.id}`)} style={{ display:'grid', gridTemplateColumns:'1fr auto auto', alignItems:'center', gap:8, cursor:'pointer',
-                      padding:'9px 18px', borderBottom:i<taches.length-1?`1px solid ${C.bg}`:'none',
-                      background:retard?'#fff5f5':i%2===0?'#fff':C.bg }}>
-                      <div>
-                        <div style={{ fontSize:13, fontWeight:retard?700:500, color:C.text }}>{t.titre||'—'}</div>
-                        <div style={{ fontSize:11, color:C.muted }}>{t.gestionnaire||'—'}{t.code_type?` · ${t.code_type}`:''}</div>
-                      </div>
-                      <span style={{ fontSize:11, color:retard?C.danger:C.muted, fontWeight:retard?700:400 }}>{fmtDate(t.echeance)}</span>
-                      <span style={{ fontSize:10, fontWeight:700, padding:'2px 6px', borderRadius:4,
-                        background:retard?'#fee2e2':'#dbeafe', color:retard?C.danger:'#1d4ed8' }}>
-                        {retard?'⚠ Retard':'En cours'}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* COL 3 — Bordereaux */}
+          {/* COL 2 — Bordereaux */}
           <div style={{ background:'#fff', borderRadius:12, border:`1px solid ${C.border}`, overflow:'hidden' }}>
             <div style={{ padding:'14px 18px', borderBottom:`1px solid ${C.border}`, display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
               <i className="ti ti-file-alert" style={{ fontSize:15, color:C.danger }} />

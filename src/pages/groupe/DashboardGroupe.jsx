@@ -233,86 +233,6 @@ function BlocBanque({ comptes, loading }) {
 }
 
 
-function BlocTaches({ taches, bordereaux, loading }) {
-  const navigate = useNavigate()
-  const now = new Date()
-  const STATUT_STYLE = {
-    en_retard:  { bg:'#fee2e2', color:'#dc2626', label:'⚠ Retard' },
-    urgent:     { bg:'#fff7ed', color:'#ea580c', label:'🔥 Urgent' },
-    en_cours:   { bg:'#dbeafe', color:'#1d4ed8', label:'En cours' },
-    en_attente: { bg:'#f1f5f9', color:'#64748b', label:'En attente' },
-  }
-
-  const enriched = taches.map(t => ({
-    ...t,
-    isRetard: t.echeance && new Date(t.echeance) < now && t.statut !== 'terminee'
-  })).sort((a,b) => (b.isRetard?1:0)-(a.isRetard?1:0))
-
-  return (
-    <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
-      <BlocHeader icon="ti-checkbox" title="Tâches & Alertes"
-        right={<VoirTout label="Toutes les tâches" to="/dynassur/taches" col="rgba(255,255,255,0.7)" />}
-      />
-      {loading ? (
-        <div style={{ padding:30, textAlign:'center', color:'#94a3b8' }}>Chargement…</div>
-      ) : taches.length === 0 ? (
-        <div style={{ padding:30, textAlign:'center', color:'#16a34a', fontSize:13 }}>
-          <i className="ti ti-circle-check" style={{ fontSize:28, display:'block', marginBottom:8 }} />
-          Aucune tâche en cours — tout est à jour ✓
-        </div>
-      ) : (
-        <div style={{ maxHeight:320, overflowY:'auto' }}>
-          {enriched.slice(0,20).map((t, i) => {
-            const s = t.isRetard ? STATUT_STYLE.en_retard : (STATUT_STYLE[t.statut] || STATUT_STYLE.en_cours)
-            const socCfg = t.societe ? SOCIETES[t.societe.toLowerCase()] : null
-            return (
-              <div
-                key={t.id}
-                onClick={() => navigate('/dynassur/taches?tache=' + t.id)}
-                style={{
-                  display:'grid', gridTemplateColumns:'1fr auto auto',
-                  alignItems:'center', gap:10,
-                  padding:'9px 18px',
-                  borderBottom: i < Math.min(enriched.length,20)-1 ? '1px solid #f8fafc' : 'none',
-                  background: t.isRetard ? '#fff5f5' : i%2===0?'#fff':'#fafafa',
-                  cursor:'pointer', transition:'background 0.12s',
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = t.isRetard ? '#fee2e2' : '#f0f9ff'}
-                onMouseLeave={e => e.currentTarget.style.background = t.isRetard ? '#fff5f5' : i%2===0?'#fff':'#fafafa'}
-                title="Ouvrir les tâches"
-              >
-                <div>
-                  <div style={{ fontSize:13, fontWeight:t.isRetard?700:500, color:'#1e293b' }}>
-                    {t.titre || '—'}
-                  </div>
-                  <div style={{ fontSize:11, color:'#94a3b8', marginTop:2, display:'flex', gap:8 }}>
-                    {socCfg && <span style={{ background:socCfg.color+'18', color:socCfg.color, fontWeight:700, padding:'1px 5px', borderRadius:3, fontSize:10 }}>{socCfg.short}</span>}
-                    {t.gestionnaire && <span>{t.gestionnaire}</span>}
-                    {t.code_type && <span>• {t.code_type}</span>}
-                  </div>
-                </div>
-                <div style={{ fontSize:11, color: t.isRetard?'#dc2626':'#64748b', fontWeight:t.isRetard?700:400, textAlign:'right' }}>
-                  {fmtDate(t.echeance)}
-                </div>
-                <span style={{ fontSize:10, fontWeight:700, padding:'3px 7px', borderRadius:4, background:s.bg, color:s.color, whiteSpace:'nowrap' }}>
-                  {s.label}
-                </span>
-              </div>
-            )
-          })}
-          {enriched.length > 20 && (
-            <div
-              onClick={() => navigate('/dynassur/taches')}
-              style={{ padding:'10px 18px', textAlign:'center', fontSize:12, color:'#0080BD', fontWeight:600, cursor:'pointer', background:'#f8fafc' }}>
-              + {enriched.length-20} tâches supplémentaires — voir tout →
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ══════════════════════════
 // BLOC 3 — Trésorerie consolidée
 // ══════════════════════════
@@ -591,7 +511,6 @@ export default function DashboardGroupe() {
   const [comptes, setComptes]           = useState([])
   const [bordereaux, setBordereaux]     = useState([])
   const [transactions, setTransactions] = useState([])
-  const [taches, setTaches]             = useState([])
   const [drawer, setDrawer]             = useState(null)
   const [loading, setLoading]           = useState(true)
 
@@ -603,17 +522,14 @@ export default function DashboardGroupe() {
           { data: cpts },
           { data: bord },
           { data: txs },
-          { data: tsk },
         ] = await Promise.all([
           supabase.from('comptes_bancaires').select('*, societes(code,nom)').eq('actif', true).order('banque'),
           supabase.from('v_bordereaux_reconciliation').select('annee,mois,type,compagnie,statut_reconciliation').in('statut_reconciliation',['fichier_ok_non_encaisse','fichier_sans_chiffres','commission_sans_fichier','manquant']),
           supabase.from('transactions').select('id,date,date_valeur,montant,societe_id').gte('date', new Date(new Date().setMonth(new Date().getMonth()-6)).toISOString().slice(0,10)).limit(2000),
-          supabase.from('taches').select('*').in('statut',['todo','en_cours','en_attente','retard','urgent']).order('echeance',{ascending:true}).limit(100),
         ])
         setComptes(cpts || [])
         setBordereaux(bord || [])
         setTransactions(txs || [])
-        setTaches(tsk || [])
       } catch(e) { console.error('DashboardGroupe load error:', e) }
       setLoading(false)
     }
@@ -627,12 +543,6 @@ export default function DashboardGroupe() {
   }, [])
 
   const now = new Date()
-  const estRetard = t => t.echeance && new Date(t.echeance) < now && t.statut !== 'terminee'
-  const tachesRetard = taches.filter(estRetard)
-  const nbRetard  = tachesRetard.length
-  const nbEnCours = taches.length
-  const drawerList = (drawer === 'retard' ? tachesRetard : taches).slice()
-    .sort((a,b) => { const ra=estRetard(a)?0:1, rb=estRetard(b)?0:1; return ra!==rb ? ra-rb : (a.echeance||'').localeCompare(b.echeance||'') })
 
   return (
     <Layout currentPage="Tableau de bord général">
@@ -651,9 +561,7 @@ export default function DashboardGroupe() {
         </div>
 
         {/* 2 — KPIs */}
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:24 }}>
-          <KpiCard label="Tâches en cours"   value={nbEnCours} col="#f59e0b" icon="ti-checkbox"       sub={`dont ${nbRetard} en retard`}             onClick={() => setDrawer('cours')} />
-          <KpiCard label="Tâches en retard"  value={nbRetard}  col={nbRetard>0?"#dc2626":"#16a34a"} icon="ti-alert-triangle" sub={nbRetard>0?'⚠ action requise':'✓ aucun retard'} onClick={() => setDrawer('retard')} />
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:14, marginBottom:24 }}>
           <KpiCard label="Comptes connectés" value={comptes.length} col="#7c3aed" icon="ti-credit-card" sub="via Ponto / ING" onClick={() => navigate('/dynassur')} />
           <KpiCard label="Objectifs 2026"    value={nbObjectifs != null ? nbObjectifs : '…'} col="#0080BD" icon="ti-target" sub={nbObjectifs ? `${nbObjectifs} objectif${nbObjectifs>1?'s':''} configuré${nbObjectifs>1?'s':''}` : 'Aucun objectif — configurer'} onClick={() => navigate('/dynassur/objectifs')} />
         </div>
@@ -669,11 +577,6 @@ export default function DashboardGroupe() {
           <div style={{ padding:16 }}>
             <VueFactures societeCodes={['DYNASSUR','DTX','LODE','HEXAGROUP','PRIVE']} color={ENTITES.groupe.color} tousComptes statutDefaut="nonpayees" masquerMontant />
           </div>
-        </div>
-
-        {/* 4 — Tâches pleine largeur */}
-        <div style={{ marginBottom:24 }}>
-          <BlocTaches taches={taches} bordereaux={bordereaux} loading={loading} />
         </div>
 
         {/* 5 — Production */}
