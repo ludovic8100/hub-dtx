@@ -87,6 +87,13 @@ pour les GitHub Actions, `job_tickets_rappels()` pour les crons purement SQL.
 
 **Un nouveau job sans entrée dans `jobs_attendus` est un job qu'on ne verra pas tomber.**
 
+Premier effet mesuré : la synchronisation Entra échouait depuis sa création (secrets jamais
+saisis, `Token Entra 404`). Révélée dès la mise en service du garde-fou, elle a été retirée
+le 01/11/2026 — **les accès du Hub se gèrent désormais à la main** dans Paramètres, et rien
+ne coupe plus automatiquement l'accès d'un collaborateur parti. Elle sera remise en place avec
+le chantier sécurité (bloc 2 bis de `docs/DROITS-ACCES.md`), en même temps que le suivi d'accès
+et la traçabilité des modifications — les trois dépendent du retour du login.
+
 **Règle** : ne pas rajouter de dépendance n8n. Ce qui doit tourner côté serveur passe par une
 fonction Edge Supabase + `pg_cron`, ou une fonction serverless Vercel.
 
@@ -103,7 +110,6 @@ Détail complet (nœuds, écritures Supabase, credentials, implications test) : 
 | `i9dZDnCbZRhiDVI7` | NF - Liste _NOTE_DE_FRAIS | liste Graph du dossier `COMPTA/_NOTE_DE_FRAIS` | webhook GET `nf-list` |
 | `xgkgnuSSkoQXlXlp` | Tickets - Alertes mail | envoi mail via Graph `sendMail` | webhook `ticket-alerte` |
 | `szxoCijzm3wJ55Jd` | Tickets - Réponses mail → fil | lit la boîte hub, RPC ticket, archive | cron 2 min |
-| `UnuI7LdT7RHfow8n` | HUB_DTX_USER_PERMISSION | users Entra ↔ `user_permissions` (insert / désactivation) | cron horaire |
 | `mGJGzrRNLw1ZAfOZ` | LODE - Peppol Send (Billit) | facture LODE → Billit → Peppol | webhook `lode-peppol-send` |
 | `EiB9oTn9MPJjELKW` | LODE - Facture Archive | PDF → SharePoint `COMPTA/FACTURES/_LODE/VENTES/<année>` | webhook `lode-facture-archive` |
 | `M9QvKGMBz6WA0N7M` | BCE Search (proxy CBEAPI) | recherche Banque-Carrefour des Entreprises | webhook |
