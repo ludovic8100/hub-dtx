@@ -26,6 +26,41 @@ function bankInitial(name) {
   return name.trim().slice(0,2).toUpperCase()
 }
 
+
+// Pastille de synchronisation aux couleurs de Ponto. Dessinée à la main plutôt
+// que d'embarquer leur logo : le relief vient d'un dégradé diagonal, d'un reflet
+// en haut et d'une ombre portée douce.
+const IconeSyncPonto = ({ taille = 18, anime = false }) => (
+  <svg width={taille} height={taille} viewBox="0 0 48 48" aria-hidden
+       style={{ flexShrink: 0, animation: anime ? 'spin 1.1s linear infinite' : 'none' }}>
+    <defs>
+      <linearGradient id="pontoCorps" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%"   stopColor="#FFE873" />
+        <stop offset="45%"  stopColor="#FFCE1F" />
+        <stop offset="100%" stopColor="#E09B00" />
+      </linearGradient>
+      <linearGradient id="pontoReflet" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%"   stopColor="#fff" stopOpacity="0.75" />
+        <stop offset="100%" stopColor="#fff" stopOpacity="0" />
+      </linearGradient>
+      <filter id="pontoOmbre" x="-30%" y="-30%" width="160%" height="170%">
+        <feDropShadow dx="0" dy="1.6" stdDeviation="1.6" floodColor="#8A5B00" floodOpacity="0.38" />
+      </filter>
+    </defs>
+
+    <g filter="url(#pontoOmbre)">
+      <circle cx="24" cy="23" r="20" fill="url(#pontoCorps)" />
+      {/* reflet : moitié haute seulement, c'est lui qui donne le volume */}
+      <ellipse cx="24" cy="14" rx="15" ry="9" fill="url(#pontoReflet)" />
+      {/* deux flèches de synchronisation, creusées dans la pastille */}
+      <path d="M15 21a9 9 0 0 1 15.2-4.4l2.6-2.6v8.2h-8.2l3.1-3.1A6 6 0 0 0 18 21z"
+            fill="#6B4300" fillOpacity="0.92" />
+      <path d="M33 25a9 9 0 0 1-15.2 4.4l-2.6 2.6v-8.2h8.2l-3.1 3.1A6 6 0 0 0 30 25z"
+            fill="#6B4300" fillOpacity="0.92" />
+    </g>
+  </svg>
+)
+
 export default function BlocComptes({ societeCode, color }) {
   const [comptes, setComptes] = useState([])
   const [loading, setLoading] = useState(true)
@@ -131,12 +166,15 @@ export default function BlocComptes({ societeCode, color }) {
             <button
               onClick={lancerSynchro}
               disabled={syncEtat === 'running'}
-              title="Relancer la synchronisation Ponto maintenant (sinon automatique chaque nuit à 00h11)"
-              style={{ fontSize:11, color:'#fff', background: syncEtat==='running' ? '#94a3b8' : color, border:'none',
-                borderRadius:6, padding:'4px 12px', cursor: syncEtat==='running' ? 'default' : 'pointer', fontWeight:600,
-                display:'flex', alignItems:'center', gap:5 }}>
-              <i className="ti ti-refresh" style={{ fontSize:12, animation: syncEtat==='running' ? 'spin 1s linear infinite' : 'none' }} />
-              {syncEtat === 'running' ? 'Synchronisation…' : 'Synchroniser'}
+              title="Relancer la synchronisation Ponto maintenant (sinon automatique à 3h, 9h, 15h et 21h)"
+              style={{ fontSize:11.5, color:'#334155', background: syncEtat==='running' ? '#f8fafc' : '#fff',
+                border:'1px solid #e2e8f0', borderRadius:7, padding:'4px 11px 4px 7px',
+                cursor: syncEtat==='running' ? 'default' : 'pointer', fontWeight:700,
+                fontFamily:'inherit', letterSpacing:'.01em',
+                display:'flex', alignItems:'center', gap:6,
+                boxShadow: syncEtat==='running' ? 'none' : '0 1px 2px rgba(15,23,42,0.06)' }}>
+              <IconeSyncPonto anime={syncEtat === 'running'} />
+              <span>Sync <span style={{ fontWeight:800 }}>PONTO</span></span>
             </button>
             <button
               onClick={() => { const all={}; comptes.forEach(c=>{all[c.id]=!allRevealed}); setRevealed(all) }}
