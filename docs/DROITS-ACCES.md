@@ -56,29 +56,30 @@ désormais pour l'identité et les droits d'un collaborateur :
   renommée `user_permissions_obsolete_20261030` (conservée, pas supprimée) le temps de
   confirmer que plus rien n'en dépend.
 
-## Remplacement du workflow n8n de sync Entra (30/10/2026)
+## Synchronisation Entra : retirée (01/11/2026)
 
-Le workflow n8n `UnuI7LdT7RHfow8n` (HUB_DTX_USER_PERMISSION, sync Entra → Hub horaire) écrivait
-dans `user_permissions` avec une clé codée en clair dans le nœud (et, pire, une clé invalide —
-un jeton d'accès personnel Supabase collé par erreur à la place d'une clé API). Remplacé par :
+Les comptes du Hub ne sont plus synchronisés depuis Entra. **Les accès se gèrent à la main
+dans Paramètres.**
 
-- **Fonction Edge Supabase `sync-entra-collaborateurs`** (`supabase/functions/sync-entra-collaborateurs/`) :
-  même logique (nouveaux comptes Entra actifs → fiche `collaborateurs` avec `compte_hub_actif=false` ;
-  comptes Entra désactivés → `compte_hub_actif=false`), mais écrit directement sur `collaborateurs`
-  avec la clé `service_role` (secret de fonction, jamais exposée), et notifie par mail via Graph.
-- **Job `pg_cron`** `sync_entra_collaborateurs_hourly` (toutes les heures à :07) qui appelle cette
-  fonction via `pg_net`, authentifié par un secret partagé (`config_secrets.sync_entra_secret`
-  ↔ secret de fonction `SYNC_SHARED_SECRET`) plutôt que par JWT Supabase — script dans
-  `sql/sync_entra_cron.sql`.
-- **Secrets à saisir dans le Dashboard Supabase** (Edge Functions > `sync-entra-collaborateurs` >
-  Secrets — jamais via Claude, la valeur ne transite pas par l'assistant) :
-  `MS_TENANT_ID`, `MS_CLIENT_ID`, `MS_CLIENT_SECRET` (app registration Entra existante — celle
-  utilisée par n8n — avec la permission d'application `User.Read.All`, et `Mail.Send` pour la
-  notification ; un nouveau secret client doit être généré pour cette app), et
-  `SYNC_SHARED_SECRET` (valeur déjà déposée côté base dans `config_secrets.sync_entra_secret`,
-  à recopier telle quelle — voir `sql/sync_entra_cron.sql`).
-- **À faire par l'utilisateur** : désactiver (ou supprimer) le workflow n8n `UnuI7LdT7RHfow8n`
-  une fois les secrets renseignés et la synchro Edge Function vérifiée.
+Historique court, parce qu'il explique la décision :
+
+- Le workflow n8n `UnuI7LdT7RHfow8n` (HUB_DTX_USER_PERMISSION) écrivait dans `user_permissions`
+  avec une clé codée en clair — et invalide : un jeton d'accès personnel Supabase collé par
+  erreur à la place d'une clé API. Il ne synchronisait donc rien. Archivé le 01/11/2026.
+- Il avait été remplacé le 30/10 par une Edge Function `sync-entra-collaborateurs` + un cron
+  `sync_entra_collaborateurs_hourly`. Ses secrets Entra (`MS_TENANT_ID`, `MS_CLIENT_ID`,
+  `MS_CLIENT_SECRET`) n'ont jamais été saisis : elle échouait sur `Token Entra 404` à chaque
+  passage, en silence.
+- Le garde-fou `jobs_log`, mis en service le 01/11, l'a révélé dès sa première exécution.
+  Décision prise dans la foulée : retirer la synchro plutôt que d'entretenir un mécanisme que
+  personne n'a configuré en deux jours.
+
+**Conséquence à connaître** : plus rien ne coupe automatiquement l'accès Hub d'un collaborateur
+dont le compte Entra est désactivé. Au départ d'un collaborateur, il faut passer `compte_hub_actif`
+à `false` dans Paramètres. C'est le premier point à traiter quand le suivi d'accès sera construit.
+
+Ce qui reste en place : `config_secrets.sync_entra_secret` — le nom est trompeur, mais le cron
+`sync_ponto_comptes_daily` s'en sert aussi comme `x-sync-secret`. Ne pas le supprimer.
 
 ## ⚠️ Accès libre temporaire, sans connexion (31/10/2026)
 
