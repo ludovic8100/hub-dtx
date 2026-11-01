@@ -20,6 +20,7 @@ const ToolBce             = lazy(() => import('./pages/tools/ToolBce'))
 const ToolQuestionnaire   = lazy(() => import('./pages/tools/ToolQuestionnaire'))
 const ToolDevoirInfo      = lazy(() => import('./pages/tools/ToolDevoirInfo'))
 const ToolSuccession     = lazy(() => import('./pages/tools/ToolSuccession'))
+const ToolJobs           = lazy(() => import('./pages/tools/ToolJobs'))
 const DynassurClients     = lazy(() => import('./pages/dynassur/DynassurClients'))
 const DynassurPerformance = lazy(() => import('./pages/dynassur/DynassurPerformance'))
 const DynassurCompagnies  = lazy(() => import('./pages/dynassur/DynassurCompagnies'))
@@ -178,6 +179,7 @@ export default function App() {
           <Route path="/tools/questionnaire" element={<P need="acc_tools"><ToolQuestionnaire /></P>} />
           <Route path="/tools/devoir-information" element={<P need="acc_tools"><ToolDevoirInfo /></P>} />
           <Route path="/tools/succession" element={<P need="prive_succession"><ToolSuccession /></P>} />
+          <Route path="/tools/jobs" element={<P need="acc_tools"><ToolJobs /></P>} />
           <Route path="/admin/notes-frais" element={<A><AdminNotesFrais /></A>} />
 
           <Route path="/" element={<P><RootRedirect /></P>} />

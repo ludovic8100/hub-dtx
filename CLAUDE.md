@@ -73,6 +73,20 @@ faudra sortir les tickets dans leur propre table plutôt que de prolonger ce par
 → `api/reload-qlik.js`). Tout ce qui est **financier** (comptes, quittances, commissions,
 objectifs) ne vient plus de Qlik mais des comptes bancaires (Ponto) et des bordereaux.
 
+### Garde-fou des synchronisations
+
+Toute synchronisation automatique doit se déclarer dans `jobs_attendus` (ce qui doit tourner,
+à quelle fréquence) et journaliser chaque passage dans `jobs_log` via `job_debut()` / `job_fin()`
+(écriture réservée au `service_role`). La vue `v_jobs_sante` en déduit un état, affiché dans
+**Outils → Synchronisations** (`/tools/jobs`) : un job sans succès depuis plus que sa fréquence
+attendue + sa tolérance passe en **en_retard**.
+
+Côté code : helper dupliqué `jobDebut` / `jobFin` dans chaque Edge Function (try/catch
+silencieux — le journal ne doit jamais faire échouer la synchro), `scripts/job_journal.py`
+pour les GitHub Actions, `job_tickets_rappels()` pour les crons purement SQL.
+
+**Un nouveau job sans entrée dans `jobs_attendus` est un job qu'on ne verra pas tomber.**
+
 **Règle** : ne pas rajouter de dépendance n8n. Ce qui doit tourner côté serveur passe par une
 fonction Edge Supabase + `pg_cron`, ou une fonction serverless Vercel.
 

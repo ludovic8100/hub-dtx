@@ -36,6 +36,14 @@ const TOOLS = [
     ready: true,
   },
   {
+    key: 'jobs',
+    title: 'Synchronisations',
+    desc: "État des synchronisations automatiques : ce qui doit tourner, ce qui a réellement tourné, et ce qui est en retard ou en échec.",
+    img: '/assets/tools/icon-ai.png',
+    path: '/tools/jobs',
+    ready: true,
+  },
+  {
     key: 'dev',
     title: 'En cours de développement',
     desc: "De nouveaux outils arrivent bientôt. Restez connectés !",

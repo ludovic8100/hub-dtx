@@ -101,12 +101,42 @@ async function getTransactions(token: string, pontoAccountId: string, compteId: 
     })
 }
 
+
+// --- Journal d'exécution (garde-fou v_jobs_sante) -----------------------------
+// Volontairement silencieux : un journal qui tombe ne doit jamais faire échouer
+// la synchro qu'il observe.
+const JOB = 'sync-ponto-comptes'
+
+async function jobDebut(sb: any, declencheur: string): Promise<number | null> {
+  try {
+    const { data, error } = await sb.rpc('job_debut', { p_job: JOB, p_declencheur: declencheur })
+    return error ? null : (data as number)
+  } catch { return null }
+}
+
+async function jobFin(
+  sb: any, id: number | null, statut: 'succes' | 'echec',
+  lignesEcrites: number | null, lignesLues: number | null,
+  message: string | null, detail: unknown = null,
+): Promise<void> {
+  if (id === null) return
+  try {
+    await sb.rpc('job_fin', {
+      p_id: id, p_statut: statut,
+      p_lignes_ecrites: lignesEcrites, p_lignes_lues: lignesLues,
+      p_message: message, p_detail: detail,
+    })
+  } catch { /* le journal ne bloque jamais */ }
+}
+
 Deno.serve(async (req) => {
   if (req.headers.get('x-sync-secret') !== SYNC_SECRET || !SYNC_SECRET) {
     return new Response('unauthorized', { status: 401 })
   }
 
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+  const declencheur = new URL(req.url).searchParams.get('declencheur') === 'manuel' ? 'manuel' : 'cron'
+  const jobId = await jobDebut(supabase, declencheur)
 
   try {
     const token = await getPontoToken()
@@ -133,12 +163,23 @@ Deno.serve(async (req) => {
       }
     }
 
+    await jobFin(
+      supabase, jobId,
+      erreurs.length ? 'echec' : 'succes',
+      transactionsMaj, comptes.length,
+      erreurs.length
+        ? `${erreurs.length} compte(s) en erreur sur ${comptes.length}`
+        : `${comptes.length} comptes, ${soldesMaj} soldes, ${transactionsMaj} transactions`,
+      erreurs.length ? { erreurs } : null,
+    )
+
     return new Response(JSON.stringify({ ok: erreurs.length === 0, comptes: comptes.length, soldesMaj, transactionsMaj, erreurs }), {
       status: erreurs.length ? 207 : 200,
       headers: { 'Content-Type': 'application/json' },
     })
   } catch (e) {
     console.error(e)
+    await jobFin(supabase, jobId, 'echec', null, null, String(e))
     return new Response(JSON.stringify({ ok: false, error: String(e) }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
