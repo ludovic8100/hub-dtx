@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
-import Layout from '../../components/Layout'
 import { ENTITES } from '../../lib/entites'
 import { StatBanner } from '../../components/ui/AccountableUI'
 
@@ -121,7 +120,7 @@ function DetailModal({ titre, rows, onClose }) {
   )
 }
 
-export default function DynassurChiffres() {
+export function ChiffresContent() {
   const E = ENTITES.dynassur
   const [rows, setRows] = useState(null)
   const [annee, setAnnee] = useState(2026)
@@ -169,7 +168,7 @@ export default function DynassurChiffres() {
   const byDim = (dim, key) => stats.f.filter(r=>(r[dim]||'—')===key)
 
   return (
-    <Layout currentPage="Chiffres">
+    <>
       <div style={{ fontFamily:"'Source Sans Pro',sans-serif", width:'100%' }}>
         <StatBanner color={E.color} colorDark={E.colorDark} logoUrl={E.logo}
           title="Chiffres" subtitle="Dynassur SRL — primes, commissions & rentabilité"
@@ -230,6 +229,6 @@ export default function DynassurChiffres() {
         )}
       </div>
       {detail && <DetailModal titre={detail.titre} rows={detail.rows} onClose={()=>setDetail(null)} />}
-    </Layout>
+    </>
   )
 }

@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import Layout from '../../components/Layout'
 import { ENTITES } from '../../lib/entites'
 import { StatBanner } from '../../components/ui/AccountableUI'
 
@@ -63,7 +62,7 @@ function Row({ label, value, color, bold }) {
   )
 }
 
-export default function DynassurRentabilite() {
+export function RentabiliteContent() {
   const E = ENTITES.dynassur
   const mobile = useIsMobile()
   const [annee, setAnnee] = useState(2025)
@@ -94,7 +93,7 @@ export default function DynassurRentabilite() {
   const ecartCol = r => { const p = pctDe(r); return ecartDe(r) == null ? '#cbd5e1' : (p != null && Math.abs(p) >= 20) ? '#dc2626' : '#16a34a' }
 
   return (
-    <Layout currentPage="Rentabilité">
+    <>
       <div style={{ fontFamily: "'Source Sans Pro', sans-serif", width: '100%' }}>
         <StatBanner color={E.color} colorDark={E.colorDark} logoUrl={E.logo}
           title="Rentabilité / P&L par producteur" subtitle="Dynassur SRL — base quittances, théorique vs réel payé" />
@@ -191,6 +190,6 @@ export default function DynassurRentabilite() {
           </div>
         </>}
       </div>
-    </Layout>
+    </>
   )
 }

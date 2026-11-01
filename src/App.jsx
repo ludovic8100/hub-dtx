@@ -30,15 +30,13 @@ const HexagroupTaches     = lazy(() => import('./pages/hexagroup/HexagroupTaches
 const PriveTaches         = lazy(() => import('./pages/prive/PriveTaches'))
 const GroupeTaches        = lazy(() => import('./pages/groupe/GroupeTaches'))
 const DynassurClients     = lazy(() => import('./pages/dynassur/DynassurClients'))
-const DynassurProduction  = lazy(() => import('./pages/dynassur/DynassurProduction'))
+const DynassurPerformance = lazy(() => import('./pages/dynassur/DynassurPerformance'))
 const DynassurBordereaux  = lazy(() => import('./pages/dynassur/DynassurBordereaux'))
-const DynassurChiffres    = lazy(() => import('./pages/dynassur/DynassurChiffres'))
 const DynassurObjectifs   = lazy(() => import('./pages/dynassur/DynassurObjectifs'))
 const DynassurCompagnies  = lazy(() => import('./pages/dynassur/DynassurCompagnies'))
 const DynassurSinistres   = lazy(() => import('./pages/dynassur/DynassurSinistres'))
 const DynassurBanque      = lazy(() => import('./pages/dynassur/DynassurBanque'))
 const DynassurComptabilite= lazy(() => import('./pages/dynassur/DynassurComptabilite'))
-const DynassurRentabilite = lazy(() => import('./pages/dynassur/DynassurRentabilite'))
 const DynassurCredits     = lazy(() => import('./pages/dynassur/DynassurCredits'))
 const DynassurRdv         = lazy(() => import('./pages/dynassur/DynassurRdv'))
 const DynassurAppels      = lazy(() => import('./pages/dynassur/DynassurAppels'))
@@ -151,10 +149,11 @@ export default function App() {
           <Route path="/prive/notes-frais"     element={<P need="prive_notesfrais"><PriveNotesFrais /></P>} />
           <Route path="/groupe/notes-frais"    element={<P need="grp_notesfrais"><GroupeNotesFrais /></P>} />
           <Route path="/dynassur/clients"      element={<P need="dyn_clients"><DynassurClients /></P>} />
-          <Route path="/dynassur/production"   element={<P need="dyn_production"><DynassurProduction /></P>} />
+          <Route path="/dynassur/production"   element={<P need={["dyn_production","dyn_chiffres","dyn_rentabilite"]}><DynassurPerformance /></P>} />
+          <Route path="/dynassur/chiffres"     element={<Navigate to="/dynassur/production" replace />} />
+          <Route path="/dynassur/rentabilite"  element={<Navigate to="/dynassur/production" replace />} />
           <Route path="/dynassur/bordereaux"   element={<Navigate to="/dynassur/compagnies" replace />} />
           <Route path="/dynassur/credits"      element={<P need="dyn_credits"><DynassurCredits /></P>} />
-          <Route path="/dynassur/chiffres"     element={<P need="dyn_chiffres"><DynassurChiffres /></P>} />
           <Route path="/dynassur/objectifs"    element={<P need="dyn_objectifs"><DynassurObjectifs /></P>} />
           <Route path="/dynassur/compagnies"   element={<P need={["dyn_compagnies","dyn_bordereaux"]}><DynassurCompagnies /></P>} />
           <Route path="/dynassur/sinistres"    element={<P need="dyn_sinistres"><DynassurSinistres /></P>} />
@@ -162,7 +161,6 @@ export default function App() {
           <Route path="/dynassur/appels"       element={<P need="dyn_appels"><DynassurAppels /></P>} />
           <Route path="/dynassur/banque"       element={<A><DynassurBanque /></A>} />
           <Route path="/dynassur/comptabilite" element={<P need="dyn_comptabilite"><DynassurComptabilite /></P>} />
-          <Route path="/dynassur/rentabilite" element={<P need="dyn_rentabilite"><DynassurRentabilite /></P>} />
 
           {/* DTX */}
           <Route path="/dtx"              element={<P need="dtx_dashboard"><DashboardDtx /></P>} />
