@@ -30,6 +30,10 @@ class Ligne:
     sous_agent_code: str | None = None
     debit: float | None = None
     credit: float | None = None
+    # Texte d'origine : utile pour enquêter, mais PAS destiné à être stocké ligne
+    # à ligne — la table dépassera les centaines de milliers de lignes. Il n'est
+    # conservé en base que pour les documents dont le contrôle échoue
+    # (releves_producteur_rejets).
     ligne_brute: str | None = None
 
 
