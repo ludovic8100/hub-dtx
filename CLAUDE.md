@@ -94,6 +94,21 @@ ne coupe plus automatiquement l'accès d'un collaborateur parti. Elle sera remis
 le chantier sécurité (bloc 2 bis de `docs/DROITS-ACCES.md`), en même temps que le suivi d'accès
 et la traçabilité des modifications — les trois dépendent du retour du login.
 
+### Banque : Ponto lit les banques 4 fois par jour, pas en continu
+
+Ponto ne consulte pas les banques en temps réel : il se synchronise **4 fois par jour** en
+arrière-plan (vers 2h, 8h, 14h et 20h heure belge). Lire l'API Ponto plus souvent ne sert donc
+à rien — on relit le même cache.
+
+Le cron `sync_ponto_comptes_4x` lit à **03:15, 09:15, 15:15 et 21:15 UTC**, soit au moins deux
+heures après chaque synchro Ponto, été comme hiver.
+
+⚠️ **Un cron ne doit jamais déclencher de synchronisation Ponto → banque.** Ces synchronisations
+(`POST /synchronizations`) sont réservées aux cas « client présent » par les normes techniques
+PSD2, exigent l'adresse IP réelle du client et sont limitées à une par compte toutes les
+30 minutes. C'est le rôle du bouton **Synchroniser**, déclenché par un humain — jamais d'un
+traitement automatique.
+
 ### Attribution de la production : la base fait foi, pas le bordereau
 
 Les lignes de bordereau portent un code sous-agent ou commercial (ex. `BLA` chez AG), **qui ne
