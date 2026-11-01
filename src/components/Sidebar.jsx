@@ -17,7 +17,7 @@ const MODULES = {
     { key: 'dyn_notesfrais', label: 'Notes de frais', icon: 'ti-receipt', path: '/dynassur/notes-frais' },
     { key: 'dyn_clients',      label: 'Clients',           icon: 'ti-users',            path: '/dynassur/clients' },
     { key: 'dyn_production',   label: 'Performance',       icon: 'ti-chart-line',       path: '/dynassur/production', anyKeys: ['dyn_production','dyn_chiffres','dyn_rentabilite','dyn_objectifs'] },
-    { key: 'dyn_compagnies',   label: 'Compagnies & Bordereaux', icon: 'ti-building',    path: '/dynassur/compagnies', anyKeys: ['dyn_compagnies','dyn_bordereaux'] },
+    { key: 'dyn_compagnies',   label: 'Compagnies',        icon: 'ti-building',         path: '/dynassur/compagnies' },
     { key: 'dyn_credits',      label: 'Crédits',           icon: 'ti-cash-banknote',    path: '/dynassur/credits' },
     { key: 'dyn_sinistres',    label: 'Sinistres',         icon: 'ti-alert-triangle',   path: '/dynassur/sinistres' },
     { key: 'dyn_rdv',          label: 'RDV / Agenda',      icon: 'ti-calendar',         path: '/dynassur/rdv' },
