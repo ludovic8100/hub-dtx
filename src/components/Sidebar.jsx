@@ -24,7 +24,6 @@ const MODULES = {
     { key: 'dyn_rdv',          label: 'RDV / Agenda',      icon: 'ti-calendar',         path: '/dynassur/rdv' },
     { key: 'dyn_appels',       label: 'Appels',            icon: 'ti-phone',            path: '/dynassur/appels' },
     { key: 'dyn_comptabilite', label: 'Comptabilité',      icon: 'ti-calculator',       path: '/dynassur/comptabilite' },
-    { key: 'dyn_devis',        label: 'Devis & Factures',  icon: 'ti-file-invoice',     path: '/dynassur/devis-factures' },
   ],
   dtx: [
     { key: 'dtx_dashboard',    label: 'Tableau de bord', icon: 'ti-layout-dashboard', path: '/dtx' },
