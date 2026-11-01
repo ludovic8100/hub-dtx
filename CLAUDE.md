@@ -94,6 +94,17 @@ ne coupe plus automatiquement l'accès d'un collaborateur parti. Elle sera remis
 le chantier sécurité (bloc 2 bis de `docs/DROITS-ACCES.md`), en même temps que le suivi d'accès
 et la traçabilité des modifications — les trois dépendent du retour du login.
 
+### Attribution de la production : la base fait foi, pas le bordereau
+
+Les lignes de bordereau portent un code sous-agent ou commercial (ex. `BLA` chez AG), **qui ne
+doit jamais servir à attribuer la production**. Ce code est figé au moment où la compagnie édite
+le document : il peut désigner un commercial parti depuis, et un contrat change de gestionnaire,
+de commercial ou de sous-agent au fil de sa vie.
+
+**Seuls `clients.gestionnaire_code` et `clients.sa_code` (et les mouvements de production) font
+foi.** Le code lu dans le bordereau n'est conservé qu'à titre d'information, jamais comme clé
+d'attribution — ni pour les chiffres, ni pour les objectifs, ni pour les commissions.
+
 **Règle** : ne pas rajouter de dépendance n8n. Ce qui doit tourner côté serveur passe par une
 fonction Edge Supabase + `pg_cron`, ou une fonction serverless Vercel.
 
