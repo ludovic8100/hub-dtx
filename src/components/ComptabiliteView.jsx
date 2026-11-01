@@ -25,6 +25,34 @@ const SHAREPOINT_FACTURES = {
 // PRIVE et HEXAGROUP en sont exclus (pas de dossier ACHATS complet) : pour eux on ouvre la racine.
 const SOCIETES_ACHATS = ['DYNASSUR', 'DTX', 'LODE']
 
+// Pastille « relevé de compte producteur » pour les rentrées de compagnies.
+// Même grammaire visuelle que la pastille facture : vert = rattaché, orange = manquant.
+function PastilleReleve({ releve }) {
+  if (releve) {
+    const titre = [
+      'Relevé rattaché :',
+      releve.nom_fichier,
+      releve.date_cloture ? `Clôture au ${new Date(releve.date_cloture).toLocaleDateString('fr-BE')}` : null,
+      '', 'Cliquer pour ouvrir',
+    ].filter(Boolean).join('\n')
+    return (
+      <a href={releve.url_sharepoint} target="_blank" rel="noreferrer" title={titre}
+        onClick={e => e.stopPropagation()}
+        style={{ display:'flex', alignItems:'center', justifyContent:'center', width:'30px', height:'30px',
+          borderRadius:'7px', background:'#16a34a', color:'#fff', fontSize:'15px', textDecoration:'none' }}>
+        <i className="ti ti-file-description" />
+      </a>
+    )
+  }
+  return (
+    <span title="Relevé de compte producteur manquant — à réclamer à la compagnie"
+      style={{ display:'flex', alignItems:'center', justifyContent:'center', width:'30px', height:'30px',
+        borderRadius:'7px', border:'1px solid #fde68a', background:'#fffbeb', color:'#b45309', fontSize:'15px' }}>
+      <i className="ti ti-file-alert" />
+    </span>
+  )
+}
+
 // ── VUE CONSOLIDÉE GROUPE ──
 function VueConsolidee({ comptes }) {
   const COLORS = { DYNASSUR:'#0080BD', DTX:'#94a3b8', LODE:'#ea580c', HEXAGROUP:'#dc2626', PRIVE:'#0d9488' }
@@ -94,6 +122,32 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const [loadingTx, setLoadingTx] = useState(false)
   const [filtre, setFiltre] = useState({ compte: 'tous', type: 'tous', libelle: '', periodes: [], categorie: 'toutes', facture: 'toutes', employe: 'tous', activite: 'toutes' })
   const [onglet, setOnglet] = useState('mouvements') // 'mouvements' | 'factures'
+
+  // Rentrées de compagnies : ce n'est pas une facture qu'on attend, c'est le relevé
+  // de compte producteur. On charge les libellés sous lesquels les compagnies virent
+  // (111 alias) et les relevés déjà rattachés, pour afficher le bon état sur la ligne.
+  const [aliasCompagnies, setAliasCompagnies] = useState([])
+  const [relevesParTx, setRelevesParTx] = useState({})
+  useEffect(() => {
+    supabase.from('compagnies_alias').select('libelle,compagnie_id')
+      .then(({ data }) => setAliasCompagnies((data || []).map(a => (a.libelle || '').toUpperCase())))
+    supabase.from('bordereaux')
+      .select('id,nom_fichier,url_sharepoint,date_cloture,solde_releve,transaction_id')
+      .not('transaction_id', 'is', null)
+      .then(({ data }) => {
+        const parTx = {}
+        ;(data || []).forEach(b => { parTx[b.transaction_id] = b })
+        setRelevesParTx(parTx)
+      })
+  }, [])
+
+  // Une rentrée dont la contrepartie porte le nom d'une compagnie : c'est une
+  // commission, et elle doit avoir son relevé.
+  const estRentreeCompagnie = (t) => {
+    if (!(Number(t.montant) > 0)) return false
+    const nom = (t.contrepartie_nom || '').toUpperCase()
+    return !!nom && aliasCompagnies.some(a => a && nom.startsWith(a))
+  }
   const [montantsMasques, setMontantsMasques] = useState(true) // masquer soldes/entrées/sorties par défaut
   const [periodeOuverte, setPeriodeOuverte] = useState(false)
   const [periodePos, setPeriodePos] = useState({ top:0, left:0 })
@@ -961,7 +1015,9 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                         <span style={{ fontSize:'11px', color:'#cbd5e1' }}>Sans catégorie</span>
                       )}
                       <div style={{ display:'flex', alignItems:'center', gap:'8px' }} onClick={e=>e.stopPropagation()}>
-                        {t.facture_url ? (
+                        {estRentreeCompagnie(t) ? (
+                          <PastilleReleve releve={relevesParTx[t.id]} />
+                        ) : t.facture_url ? (
 <span style={{ position:'relative', display:'inline-flex' }}>
                           <button onClick={()=>ouvrirFactureLiee(t)} title={`Facture liée :\n${cheminFacture(t.facture_url)}\n\nCliquer pour ouvrir`} style={{
                             display:'flex', alignItems:'center', justifyContent:'center', width:'30px', height:'30px',
@@ -1005,7 +1061,9 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                       title="Sélectionner pour justifier plusieurs mouvements avec une seule facture"
                       style={{ width:'15px', height:'15px', cursor:'pointer', accentColor:color, flexShrink:0 }} />
                   )}
-                  {t.facture_url ? (
+                  {estRentreeCompagnie(t) ? (
+                    <PastilleReleve releve={relevesParTx[t.id]} />
+                  ) : t.facture_url ? (
 <span style={{ position:'relative', display:'inline-flex' }}>
                     <button onClick={()=>ouvrirFactureLiee(t)} title={`Facture liée :\n${cheminFacture(t.facture_url)}\n\nCliquer pour ouvrir dans SharePoint`} style={{
                       display:'flex', alignItems:'center', justifyContent:'center', width:'26px', height:'26px',
