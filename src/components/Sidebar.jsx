@@ -5,6 +5,25 @@ import { useNotesFraisBadge } from '../lib/useNotesFraisBadge'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
+// Icônes métal du menu (public/icons/hub-dtx-metal/, 24 px, PNG transparents).
+// La correspondance se fait sur le suffixe de la clé, donc une même icône sert
+// à toutes les sociétés : dyn_taches, lode_taches et hex_taches partagent « taches ».
+// Une entrée sans correspondance garde son icône Tabler d'origine.
+const ICONES = {
+  dashboard: 'tableau-de-bord', taches: 'taches', notesfrais: 'notes-de-frais',
+  notes_frais: 'notes-de-frais', clients: 'clients', production: 'production',
+  compagnies: 'compagnies-bordereaux', credits: 'credits', sinistres: 'sinistres',
+  rdv: 'rdv-agenda', appels: 'appels', comptabilite: 'comptabilite',
+  devis: 'devis-factures', rentabilite: 'rentabilite', config: 'parametres',
+  sync: 'synchronisation', tools: 'outils', tickets: 'tickets',
+}
+const iconePng = (key) => {
+  if (!key) return null
+  if (ICONES[key]) return ICONES[key]
+  const suffixe = key.slice(key.indexOf('_') + 1)   // dyn_clients -> clients
+  return ICONES[suffixe] || null
+}
+
 const MODULES = {
   groupe: [
     { key: 'acc_holding', label: 'Tableau de bord général', icon: 'ti-layout-grid', path: '/groupe' },
@@ -99,7 +118,7 @@ function ClientSearch({ accentLight }) {
         border: '1.5px solid rgba(255,255,255,0.55)', background: 'rgba(255,255,255,0.07)' }}>
       <style>{`.dyn-cs-input::placeholder{color:rgba(255,255,255,0.65);}`}</style>
       <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 9 }}>
-        <i className="ti ti-search" style={{ fontSize: 15, color: '#fff' }} />
+        <img src="/icons/hub-dtx-metal/recherche-client.png" alt="" width={24} height={24} style={{ width: 18, height: 18 }} />
         <span style={{ fontSize: 12.5, fontWeight: 700, color: '#fff', letterSpacing: '0.02em' }}>Recherche client</span>
       </div>
       <div style={{ position: 'relative' }}>
@@ -158,7 +177,10 @@ export default function Sidebar() {
         onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
         onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}
       >
-        <i className={`ti ${item.icon}`} style={{ fontSize:'16px', color: active ? accentLight : 'rgba(255,255,255,0.45)', width:'18px', flexShrink:0 }} />
+        {iconePng(item.key)
+          ? <img src={`/icons/hub-dtx-metal/${iconePng(item.key)}.png`} alt="" width={24} height={24}
+              style={{ width:'20px', height:'20px', flexShrink:0, opacity: active ? 1 : 0.6, transition:'opacity 0.15s' }} />
+          : <i className={`ti ${item.icon}`} style={{ fontSize:'16px', color: active ? accentLight : 'rgba(255,255,255,0.45)', width:'20px', flexShrink:0 }} />}
         <span style={{ fontSize:'13.5px', fontFamily:"'Source Sans Pro', sans-serif", color: active ? '#fff' : 'rgba(255,255,255,0.65)', fontWeight: active ? '600' : '400', flex:1 }}>
           {item.label}
         </span>
