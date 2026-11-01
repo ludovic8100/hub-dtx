@@ -66,8 +66,12 @@ jobs:
         run: python scripts/qlik_contrats.py
       - name: Production         
         run: python scripts/qlik_production.py
-      - name: Quittances         
-        run: python scripts/qlik_quittances.py
+      # Quittances : étape arrêtée le 01/11/2026. La table quittances a été vidée —
+      # la production sera reconstruite à partir des bordereaux (BQT + RCP), pas de Qlik,
+      # qui disparaît en janvier. Sans cet arrêt, le cron quotidien la remplissait à nouveau.
+      # Pour la relancer ponctuellement : python scripts/qlik_quittances.py
+      # - name: Quittances
+      #   run: python scripts/qlik_quittances.py
       - name: Objets de risque   
         run: python scripts/qlik_objets_risque.py
       - name: Parentes           
