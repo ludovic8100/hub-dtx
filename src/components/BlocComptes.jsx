@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
-// Les soldes et transactions Ponto sont rafraîchis automatiquement par la fonction Edge
-// `sync-ponto-comptes` (pg_cron, tous les jours à 00:11). Aucun déclenchement manuel ici.
+// Les soldes et transactions Ponto sont rafraîchis automatiquement chaque nuit à 00:11
+// (fonction Edge `sync-ponto-comptes` + pg_cron). Le bouton ci-dessous relance la même
+// synchro à la demande, via la fonction `lancer_sync_ponto()` : le secret reste en base,
+// jamais dans le navigateur. Une synchro toutes les 5 minutes au plus.
 
 const fmt = v => v==null?'—':new Intl.NumberFormat('fr-BE',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(v)
 const fmtDate = v => v ? new Date(v).toLocaleDateString('fr-BE',{day:'2-digit',month:'2-digit',year:'2-digit'}) : '—'
@@ -28,6 +30,8 @@ export default function BlocComptes({ societeCode, color }) {
   const [comptes, setComptes] = useState([])
   const [loading, setLoading] = useState(true)
   const [revealed, setRevealed] = useState({})
+  const [syncEtat, setSyncEtat] = useState('idle')   // idle | running | ok | error
+  const [syncMsg, setSyncMsg] = useState(null)
 
   async function chargerComptes() {
     const { data: soc } = await supabase.from('societes').select('id').eq('code', societeCode).single()
@@ -38,6 +42,67 @@ export default function BlocComptes({ societeCode, color }) {
   }
 
   useEffect(() => { chargerComptes() }, [societeCode])
+
+  // Le déclenchement est asynchrone (pg_net n'attend pas la réponse) : on suit donc le
+  // résultat dans jobs_log, le journal du garde-fou. Le bouton ne dit pas « lancée » puis
+  // se tait — il annonce combien d'opérations sont réellement arrivées, ou qu'il n'y en a
+  // aucune, sans que personne ait à rafraîchir la page.
+  async function lancerSynchro() {
+    if (syncEtat === 'running') return
+    setSyncEtat('running'); setSyncMsg('Lancement…')
+    const debut = new Date(Date.now() - 2000).toISOString()   // petite marge d'horloge
+
+    try {
+      const { data, error } = await supabase.rpc('lancer_sync_ponto')
+      if (error) throw error
+      if (!data?.ok) {
+        setSyncEtat('error')
+        setSyncMsg(data?.message || 'Synchronisation refusée.')
+        setTimeout(() => { setSyncEtat('idle'); setSyncMsg(null) }, 7000)
+        return
+      }
+
+      setSyncMsg('Synchronisation en cours…')
+      // Jusqu'à ~60 s d'attente : une synchro complète des 13 comptes prend ~7 s,
+      // davantage si Ponto remonte plusieurs pages d'historique.
+      for (let essai = 0; essai < 30; essai++) {
+        await new Promise(r => setTimeout(r, 2000))
+        const { data: journal } = await supabase
+          .from('jobs_log')
+          .select('statut,message,lignes_ecrites')
+          .eq('job', 'sync-ponto-comptes')
+          .gte('demarre_a', debut)
+          .order('demarre_a', { ascending: false })
+          .limit(1)
+
+        const execution = journal?.[0]
+        if (!execution || execution.statut === 'en_cours') continue
+
+        await chargerComptes()
+        if (execution.statut === 'echec') {
+          setSyncEtat('error')
+          setSyncMsg(execution.message || 'La synchronisation a échoué.')
+          setTimeout(() => { setSyncEtat('idle'); setSyncMsg(null) }, 10000)
+        } else {
+          const n = execution.lignes_ecrites ?? 0
+          setSyncEtat('ok')
+          setSyncMsg(n > 0
+            ? `${n} nouvelle${n > 1 ? 's' : ''} opération${n > 1 ? 's' : ''}`
+            : 'Aucune nouvelle opération')
+          setTimeout(() => { setSyncEtat('idle'); setSyncMsg(null) }, 10000)
+        }
+        return
+      }
+
+      // Le journal n'a rien conclu : on ne prétend pas que c'est fini.
+      setSyncEtat('error')
+      setSyncMsg("Toujours en cours — regarde Outils → Synchronisations.")
+      setTimeout(() => { setSyncEtat('idle'); setSyncMsg(null) }, 10000)
+    } catch (e) {
+      setSyncEtat('error'); setSyncMsg('Échec : ' + (e.message || e))
+      setTimeout(() => { setSyncEtat('idle'); setSyncMsg(null) }, 7000)
+    }
+  }
 
   const totalSolde = comptes.reduce((s,c) => s + parseFloat(c.solde_actuel||0), 0)
   const allRevealed = comptes.length > 0 && comptes.every(c => revealed[c.id])
@@ -60,6 +125,19 @@ export default function BlocComptes({ societeCode, color }) {
         </div>
         {comptes.length > 0 && (
           <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            {syncMsg && (
+              <span style={{ fontSize:11, fontWeight:600, color: syncEtat==='error' ? '#dc2626' : '#16a34a' }}>{syncMsg}</span>
+            )}
+            <button
+              onClick={lancerSynchro}
+              disabled={syncEtat === 'running'}
+              title="Relancer la synchronisation Ponto maintenant (sinon automatique chaque nuit à 00h11)"
+              style={{ fontSize:11, color:'#fff', background: syncEtat==='running' ? '#94a3b8' : color, border:'none',
+                borderRadius:6, padding:'4px 12px', cursor: syncEtat==='running' ? 'default' : 'pointer', fontWeight:600,
+                display:'flex', alignItems:'center', gap:5 }}>
+              <i className="ti ti-refresh" style={{ fontSize:12, animation: syncEtat==='running' ? 'spin 1s linear infinite' : 'none' }} />
+              {syncEtat === 'running' ? 'Synchronisation…' : 'Synchroniser'}
+            </button>
             <button
               onClick={() => { const all={}; comptes.forEach(c=>{all[c.id]=!allRevealed}); setRevealed(all) }}
               style={{ fontSize:11, color, background:color+'15', border:`1px solid ${color}40`,
