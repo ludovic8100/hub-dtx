@@ -27,9 +27,8 @@ const parseDate = v => {
 const fmtDate = v => { const d=parseDate(v); return d?d.toLocaleDateString('fr-BE',{day:'2-digit',month:'2-digit',year:'numeric'}):'—' }
 const fmtDateLong = v => { const d=parseDate(v); return d?d.toLocaleDateString('fr-BE',{day:'numeric',month:'long',year:'numeric'}):'—' }
 const fmtMois = v => { const d=parseDate(v); return d?d.toLocaleDateString('fr-BE',{month:'short',year:'numeric'}):'—' }
-// RDV : le debut Graph peut être sans offset → on force UTC
-const tsRdv = iso => { if(!iso) return 0; const d=new Date(String(iso).length<=19?iso+'Z':iso); return isNaN(d)?0:d.getTime() }
-const fmtRdv = iso => { const t=tsRdv(iso); return t?new Date(t).toLocaleDateString('fr-BE',{day:'2-digit',month:'2-digit',year:'numeric'}):'—' }
+// Horodatage d'un contact : certaines sources envoient la date sans offset → on force UTC
+const tsContact = iso => { if(!iso) return 0; const d=new Date(String(iso).length<=19?iso+'Z':iso); return isNaN(d)?0:d.getTime() }
 const fmtAppel = iso => { if(!iso) return '—'; const d=new Date(String(iso).replace(' ','T')); return isNaN(d)?'—':d.toLocaleString('fr-BE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) }
 const ilYa = jours => {
   if(jours==null) return ''
@@ -1039,7 +1038,7 @@ function Foyer({ client, onOpenDossier }) {
 }
 
 function Fiche({ client, onClose, onOpenDossier }) {
-  const [contrats,setContrats]=useState([]); const [taches,setTaches]=useState([]); const [rdvs,setRdvs]=useState([]); const [groupe,setGroupe]=useState([]); const [objets,setObjets]=useState([]); const [appels,setAppels]=useState([]); const [loadF,setLoadF]=useState(true)
+  const [contrats,setContrats]=useState([]); const [groupe,setGroupe]=useState([]); const [objets,setObjets]=useState([]); const [appels,setAppels]=useState([]); const [loadF,setLoadF]=useState(true)
   const [sinistres,setSinistres]=useState([])
   const [dPlus,setDPlus]=useState(null)
   const { perms, isAdmin }=useAuth()
@@ -1056,15 +1055,11 @@ function Fiche({ client, onClose, onOpenDossier }) {
     setLoadF(true)
     Promise.all([
       supabase.from('contrats').select('police,compagnie,nom_client,situation,date_creation,domaine,type_production,garantie_valeur,version,nom_sa,sa_code').eq('dossier',client.dossier).order('date_creation',{ascending:false}),
-      supabase.from('taches').select('*').eq('dossier_client',client.dossier).order('echeance',{ascending:true}).limit(20),
-      client.id
-        ? supabase.from('rdv').select('id,objet,debut,categorie,user_email,web_link,journee_entiere,lieu').eq('client_id',client.id).order('debut',{ascending:false})
-        : Promise.resolve({data:[]}),
       supabase.from('parentes').select('groupe_nom,groupe_type,membre_nom,nb_polices,prime_totale').eq('dossier_principal',client.dossier),
       supabase.from('objets_risque').select('police,type_risque,garantie,situation,compagnie,domaine,description,date_effet').eq('dossier',client.dossier),
       (()=>{ const nums=[client.gsm_e164,client.telfixe_e164].filter(Boolean); return (canAppel&&nums.length) ? supabase.from('appels').select('id,direction,numero_externe,numero_e164,agent,duree,debut,nom_3cx').in('numero_e164',nums).order('debut',{ascending:false}).limit(50) : Promise.resolve({data:[]}) })(),
       client.nom ? supabase.from('sinistres').select('reference_sinistre,garantie,domaine,etat,etat_code,responsabilite,date_ouverture,date_etat,sinistre_nom').ilike('sinistre_nom','%'+client.nom+'%').limit(200) : Promise.resolve({data:[]}),
-    ]).then(([{data:c},{data:t},{data:rv},{data:gr},{data:ob},{data:ap},{data:si}])=>{
+    ]).then(([{data:c},{data:gr},{data:ob},{data:ap},{data:si}])=>{
       // Dédoublonnage par police (les imports créent des lignes identiques) — on garde la plus récente
       const seen=new Set(); const uniq=[]
       ;(c||[]).forEach(r=>{ const k=r.police||JSON.stringify(r); if(!seen.has(k)){ seen.add(k); uniq.push(r) } })
@@ -1077,7 +1072,7 @@ function Fiche({ client, onClose, onOpenDossier }) {
           const best=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0]; setCommercial(best?best[0]:'')
         })
       } else setCommercial('')
-      setContrats(uniq); setTaches(t||[]); setRdvs(rv||[]); setGroupe(gr||[]); setObjets(ob||[]); setAppels(ap||[]); setSinistres(sinF); setLoadF(false)
+      setContrats(uniq); setGroupe(gr||[]); setObjets(ob||[]); setAppels(ap||[]); setSinistres(sinF); setLoadF(false)
     })
   },[client.dossier,client.id,canAppel])
 
@@ -1106,19 +1101,11 @@ function Fiche({ client, onClose, onOpenDossier }) {
   const age=calcAge(client.date_naissance)
   const gsm=cleanTel(client.gsm); const fixe=cleanTel(client.tel_fixe)
 
-  // RDV : dernier contact (passé) + prochain (à venir)
+  // Contacts = appels 3CX (seule source de contact du Hub)
   const nowTs=Date.now()
-  const rdvPasses=rdvs.filter(r=>tsRdv(r.debut)<=nowTs)          // déjà triés desc
-  const rdvFuturs=rdvs.filter(r=>tsRdv(r.debut)>nowTs).sort((a,b)=>tsRdv(a.debut)-tsRdv(b.debut))
-  const dernier=rdvPasses[0]||null
-  const joursDernier=dernier?Math.floor((nowTs-tsRdv(dernier.debut))/86400000):null
-  const prochain=rdvFuturs[0]||null
-  // Contacts unifiés = RDV + appels (une seule notion de « contact »)
-  const appelTs=a=>{ const t=new Date(a.debut).getTime(); return isNaN(t)?0:t }
-  const contactsUnifies=[
-    ...rdvs.map(r=>({kind:'rdv',ts:tsRdv(r.debut),data:r})),
-    ...appels.map(a=>({kind:'appel',ts:appelTs(a),data:a})),
-  ].sort((a,b)=>b.ts-a.ts)
+  const contactsUnifies=appels
+    .map(a=>({ts:tsContact(a.debut),data:a}))
+    .sort((a,b)=>b.ts-a.ts)
   const dernierContact=contactsUnifies.find(c=>c.ts<=nowTs)||null
   const joursDernierC=dernierContact?Math.floor((nowTs-dernierContact.ts)/86400000):null
 
@@ -1147,43 +1134,21 @@ function Fiche({ client, onClose, onOpenDossier }) {
   const SECTIONS=[
     { key:'contacts', icon:'ti-address-book', title:'Contacts', col:'#0d9488', count:contactsUnifies.length, body:(
       loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:!contactsUnifies.length?
-        <p style={{color:'#94a3b8',fontSize:12}}>Aucun contact enregistré (ni RDV, ni appel).</p>:(
+        <p style={{color:'#94a3b8',fontSize:12}}>Aucun appel enregistré pour ce client.</p>:(
         <div>
-          <div style={{display:'flex',gap:12,flexWrap:'wrap',marginBottom:12}}>
-            {dernierContact&&(
+          {dernierContact&&(
+            <div style={{display:'flex',gap:12,flexWrap:'wrap',marginBottom:12}}>
               <div style={{flex:'1 1 220px',background:'#f0fdfa',border:'1px solid #99f6e4',borderRadius:10,padding:'12px 16px'}}>
                 <div style={{fontSize:10,fontWeight:800,color:'#0d9488',textTransform:'uppercase',letterSpacing:'.05em'}}>Dernier contact</div>
-                <div style={{fontSize:20,fontWeight:800,color:NAVY,lineHeight:1.1,marginTop:3}}>{dernierContact.kind==='rdv'?fmtRdv(dernierContact.data.debut):fmtAppel(dernierContact.data.debut)}</div>
+                <div style={{fontSize:20,fontWeight:800,color:NAVY,lineHeight:1.1,marginTop:3}}>{fmtAppel(dernierContact.data.debut)}</div>
                 <div style={{fontSize:12,color:'#0d9488',fontWeight:600}}>{ilYa(joursDernierC)}</div>
-                <div style={{fontSize:12,color:'#64748b',marginTop:4}}>{dernierContact.kind==='rdv'?(dernierContact.data.objet||'RDV'):`${String(dernierContact.data.direction||'').toLowerCase().startsWith('in')?'Appel entrant':'Appel sortant'}${dernierContact.data.nom_3cx?` · ${dernierContact.data.nom_3cx}`:''}`}</div>
+                <div style={{fontSize:12,color:'#64748b',marginTop:4}}>{`${String(dernierContact.data.direction||'').toLowerCase().startsWith('in')?'Appel entrant':'Appel sortant'}${dernierContact.data.nom_3cx?` · ${dernierContact.data.nom_3cx}`:''}`}</div>
               </div>
-            )}
-            {prochain&&(
-              <div style={{flex:'1 1 220px',background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:10,padding:'12px 16px'}}>
-                <div style={{fontSize:10,fontWeight:800,color:'#2563eb',textTransform:'uppercase',letterSpacing:'.05em'}}>Prochain RDV</div>
-                <div style={{fontSize:20,fontWeight:800,color:NAVY,lineHeight:1.1,marginTop:3}}>{fmtRdv(prochain.debut)}</div>
-                <div style={{fontSize:12,color:'#64748b',marginTop:4}}>{prochain.objet}</div>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
           <div style={{maxHeight:280,overflowY:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
             {contactsUnifies.map((c,i)=>{
               const last=i===contactsUnifies.length-1
-              if(c.kind==='rdv'){
-                const r=c.data; const futur=c.ts>nowTs
-                return(
-                  <div key={'r'+r.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',borderBottom:last?'none':'1px solid #f8fafc',background:futur?'#f8fbff':'#fff'}}>
-                    <span style={{fontSize:10,fontWeight:800,padding:'2px 7px',borderRadius:5,background:'#f0fdfa',color:'#0d9488',whiteSpace:'nowrap'}}><i className="ti ti-calendar" style={{marginRight:4}}/>RDV</span>
-                    <span style={{fontSize:12,fontWeight:700,color:NAVY,whiteSpace:'nowrap',minWidth:74}}>{fmtRdv(r.debut)}</span>
-                    <span style={{flex:1,fontSize:12,color:'#1e293b',minWidth:0}}>
-                      {r.web_link?<a href={r.web_link} target="_blank" rel="noreferrer" style={{color:'#1e293b',textDecoration:'none'}}>{r.objet||'—'}</a>:(r.objet||'—')}
-                      {r.lieu&&<span style={{fontSize:11,color:'#94a3b8'}}> · {r.lieu}</span>}
-                    </span>
-                    <span style={{fontSize:10,fontWeight:700,color:'#64748b'}}>{(r.user_email||'').replace('@dynassur.be','')}</span>
-                    {futur&&<span style={{fontSize:9,fontWeight:800,padding:'2px 6px',borderRadius:4,background:'#dbeafe',color:'#2563eb'}}>À VENIR</span>}
-                  </div>
-                )
-              }
               const a=c.data; const entrant=String(a.direction||'').toLowerCase().startsWith('in')
               return(
                 <div key={'a'+a.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',borderBottom:last?'none':'1px solid #f8fafc'}}>
@@ -1250,23 +1215,6 @@ function Fiche({ client, onClose, onOpenDossier }) {
     )},
     { key:'contrats', icon:'ti-file-text', title:'Contrats', col:BLUE, count:contrats.length, body:(<div><Analyse360 client={client} contrats={contrats}/><div style={{marginTop:14}}><VueContrats client={client} objets={objets} contratsClient={contrats} garantiesParPolice={garantiesParPolice} cies={cies} onOpenDossier={onOpenDossier} loadF={loadF} previewContrat={previewContrat} openContrat={openContrat} leaveContrat={leaveContrat}/></div></div>) },
     { key:'primes', icon:'ti-cash', title:'Primes & commissions', col:'#16a34a', count:null, body:(<Primes dossier={client.dossier}/>) },
-    { key:'taches', icon:'ti-checkbox', title:'Tâches', col:'#f59e0b', count:taches.length, body:(
-      loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:!taches.length?
-        <p style={{color:'#16a34a',fontSize:12}}>✓ Aucune tâche en cours</p>:
-        taches.map((t,i)=>{
-          const ret=t.echeance&&new Date(t.echeance)<new Date()
-          return(
-            <div key={t.id} style={{display:'flex',alignItems:'center',gap:10,padding:'7px 0',borderBottom:i<taches.length-1?'1px solid #f8fafc':'none'}}>
-              <div style={{flex:1}}>
-                <div style={{fontSize:13,color:'#1e293b'}}>{t.titre||'—'}</div>
-                <div style={{fontSize:11,color:'#94a3b8'}}>{t.gestionnaire}{t.code_type?` · ${t.code_type}`:''}</div>
-              </div>
-              <span style={{fontSize:11,color:ret?'#dc2626':'#64748b',fontWeight:ret?700:400}}>{fmtDate(t.echeance)}</span>
-              <span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:4,background:ret?'#fee2e2':'#dbeafe',color:ret?'#dc2626':'#1d4ed8'}}>{t.statut}</span>
-            </div>
-          )
-        })
-    )},
   ]
   const active = SECTIONS.find(s=>s.key===openSec) || SECTIONS.find(s=>s.key==='contrats') || SECTIONS[0]
   const coordItems=[
@@ -1553,21 +1501,38 @@ export default function DynassurClients() {
     setClients(uniq); setTotal(count||0); setLoading(false)
   },[myCode,myBureau,bureauCodes])
 
-  // Données de relance : dernier contact (RDV passé lié) par client
+  // Données de relance : dernier contact par client = dernier appel 3CX.
+  // Un appel porte soit un client_id (rapproché à la réception), soit seulement un numéro :
+  // on indexe les deux pour ne perdre aucun contact.
   const loadRelance = useCallback(async()=>{
-    // dernier contact = dernier RDV passé
-    const {data:rv}=await supabase.from('rdv').select('client_id,debut').not('client_id','is',null).range(0,9999)
-    const now=Date.now(); const last={}
-    ;(rv||[]).forEach(r=>{ const t=tsRdv(r.debut); if(t&&t<=now){ if(!last[r.client_id]||t>last[r.client_id]) last[r.client_id]=t } })
-    // TOUS les clients : ceux sans RDV passé tombent dans « jamais contacté »
+    const appels=[]; let a=0
+    while(true){
+      const {data}=await supabase.from('appels').select('client_id,numero_e164,debut').range(a,a+999)
+      if(!data||!data.length) break
+      appels.push(...data)
+      if(data.length<1000) break
+      a+=1000
+    }
+    const now=Date.now()
+    const parClient={}, parNumero={}
+    appels.forEach(ap=>{
+      const t=tsContact(ap.debut); if(!t||t>now) return
+      if(ap.client_id&&(!parClient[ap.client_id]||t>parClient[ap.client_id])) parClient[ap.client_id]=t
+      if(ap.numero_e164&&(!parNumero[ap.numero_e164]||t>parNumero[ap.numero_e164])) parNumero[ap.numero_e164]=t
+    })
+    // TOUS les clients : ceux sans appel tombent dans « jamais contacté »
     const rows=[]; let from=0
     while(true){
       const {data}=await supabase.from('clients')
-        .select('id,dossier,nom,prenom,cp,localite,gestionnaire_code,gestionnaire_nom,sa_code,sa_nom,bureau,gsm,tel_fixe,email,alerte')
+        .select('id,dossier,nom,prenom,cp,localite,gestionnaire_code,gestionnaire_nom,sa_code,sa_nom,bureau,gsm,tel_fixe,gsm_e164,telfixe_e164,email,alerte')
         .range(from,from+999)
       if(!data||!data.length) break
       data.forEach(c=>{
-        const t=last[c.id]
+        const t=Math.max(
+          parClient[c.id]||0,
+          (c.gsm_e164&&parNumero[c.gsm_e164])||0,
+          (c.telfixe_e164&&parNumero[c.telfixe_e164])||0,
+        )
         if(t){ const jours=Math.floor((now-t)/86400000); rows.push({...c,last:t,jours,tranche:trancheDe(jours)}) }
         else { rows.push({...c,last:null,jours:Infinity,tranche:'jamais'}) }
       })

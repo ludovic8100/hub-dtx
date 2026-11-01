@@ -5,7 +5,6 @@ import Layout from '../../components/Layout'
 import { ENTITES } from '../../lib/entites'
 import { StatBanner, PrimaryButton } from '../../components/ui/AccountableUI'
 import VueFactures from '../../components/VueFactures'
-import { SyncButtonsRow } from '../../components/SyncCards'
 
 // ── Constantes ──
 const SOCIETES = {
@@ -22,7 +21,6 @@ const SOC_ROUTES = {
 
 const fmt = v => v == null ? '—' : new Intl.NumberFormat('fr-BE',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(v)
 const fmtN = v => v == null ? '—' : new Intl.NumberFormat('fr-BE').format(v)
-const fmtDate = v => v ? new Date(v).toLocaleDateString('fr-BE',{day:'2-digit',month:'2-digit'}) : '—'
 
 // ── Barre de progression ──
 function Bar({ pct, col }) {
@@ -232,86 +230,6 @@ function BlocBanque({ comptes, loading }) {
   )
 }
 
-
-function BlocTaches({ taches, bordereaux, loading }) {
-  const navigate = useNavigate()
-  const now = new Date()
-  const STATUT_STYLE = {
-    en_retard:  { bg:'#fee2e2', color:'#dc2626', label:'⚠ Retard' },
-    urgent:     { bg:'#fff7ed', color:'#ea580c', label:'🔥 Urgent' },
-    en_cours:   { bg:'#dbeafe', color:'#1d4ed8', label:'En cours' },
-    en_attente: { bg:'#f1f5f9', color:'#64748b', label:'En attente' },
-  }
-
-  const enriched = taches.map(t => ({
-    ...t,
-    isRetard: t.echeance && new Date(t.echeance) < now && t.statut !== 'terminee'
-  })).sort((a,b) => (b.isRetard?1:0)-(a.isRetard?1:0))
-
-  return (
-    <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
-      <BlocHeader icon="ti-checkbox" title="Tâches & Alertes"
-        right={<VoirTout label="Toutes les tâches" to="/dynassur/taches" col="rgba(255,255,255,0.7)" />}
-      />
-      {loading ? (
-        <div style={{ padding:30, textAlign:'center', color:'#94a3b8' }}>Chargement…</div>
-      ) : taches.length === 0 ? (
-        <div style={{ padding:30, textAlign:'center', color:'#16a34a', fontSize:13 }}>
-          <i className="ti ti-circle-check" style={{ fontSize:28, display:'block', marginBottom:8 }} />
-          Aucune tâche en cours — tout est à jour ✓
-        </div>
-      ) : (
-        <div style={{ maxHeight:320, overflowY:'auto' }}>
-          {enriched.slice(0,20).map((t, i) => {
-            const s = t.isRetard ? STATUT_STYLE.en_retard : (STATUT_STYLE[t.statut] || STATUT_STYLE.en_cours)
-            const socCfg = t.societe ? SOCIETES[t.societe.toLowerCase()] : null
-            return (
-              <div
-                key={t.id}
-                onClick={() => navigate('/dynassur/taches?tache=' + t.id)}
-                style={{
-                  display:'grid', gridTemplateColumns:'1fr auto auto',
-                  alignItems:'center', gap:10,
-                  padding:'9px 18px',
-                  borderBottom: i < Math.min(enriched.length,20)-1 ? '1px solid #f8fafc' : 'none',
-                  background: t.isRetard ? '#fff5f5' : i%2===0?'#fff':'#fafafa',
-                  cursor:'pointer', transition:'background 0.12s',
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = t.isRetard ? '#fee2e2' : '#f0f9ff'}
-                onMouseLeave={e => e.currentTarget.style.background = t.isRetard ? '#fff5f5' : i%2===0?'#fff':'#fafafa'}
-                title="Ouvrir les tâches"
-              >
-                <div>
-                  <div style={{ fontSize:13, fontWeight:t.isRetard?700:500, color:'#1e293b' }}>
-                    {t.titre || '—'}
-                  </div>
-                  <div style={{ fontSize:11, color:'#94a3b8', marginTop:2, display:'flex', gap:8 }}>
-                    {socCfg && <span style={{ background:socCfg.color+'18', color:socCfg.color, fontWeight:700, padding:'1px 5px', borderRadius:3, fontSize:10 }}>{socCfg.short}</span>}
-                    {t.gestionnaire && <span>{t.gestionnaire}</span>}
-                    {t.code_type && <span>• {t.code_type}</span>}
-                  </div>
-                </div>
-                <div style={{ fontSize:11, color: t.isRetard?'#dc2626':'#64748b', fontWeight:t.isRetard?700:400, textAlign:'right' }}>
-                  {fmtDate(t.echeance)}
-                </div>
-                <span style={{ fontSize:10, fontWeight:700, padding:'3px 7px', borderRadius:4, background:s.bg, color:s.color, whiteSpace:'nowrap' }}>
-                  {s.label}
-                </span>
-              </div>
-            )
-          })}
-          {enriched.length > 20 && (
-            <div
-              onClick={() => navigate('/dynassur/taches')}
-              style={{ padding:'10px 18px', textAlign:'center', fontSize:12, color:'#0080BD', fontWeight:600, cursor:'pointer', background:'#f8fafc' }}>
-              + {enriched.length-20} tâches supplémentaires — voir tout →
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
 
 // ══════════════════════════
 // BLOC 3 — Trésorerie consolidée
@@ -589,10 +507,7 @@ function BlocProduction({ loading: loadingExt }) {
 export default function DashboardGroupe() {
   const navigate = useNavigate()
   const [comptes, setComptes]           = useState([])
-  const [bordereaux, setBordereaux]     = useState([])
   const [transactions, setTransactions] = useState([])
-  const [taches, setTaches]             = useState([])
-  const [drawer, setDrawer]             = useState(null)
   const [loading, setLoading]           = useState(true)
 
   useEffect(() => {
@@ -601,19 +516,13 @@ export default function DashboardGroupe() {
       try {
         const [
           { data: cpts },
-          { data: bord },
           { data: txs },
-          { data: tsk },
         ] = await Promise.all([
           supabase.from('comptes_bancaires').select('*, societes(code,nom)').eq('actif', true).order('banque'),
-          supabase.from('v_bordereaux_reconciliation').select('annee,mois,type,compagnie,statut_reconciliation').in('statut_reconciliation',['fichier_ok_non_encaisse','fichier_sans_chiffres','commission_sans_fichier','manquant']),
           supabase.from('transactions').select('id,date,date_valeur,montant,societe_id').gte('date', new Date(new Date().setMonth(new Date().getMonth()-6)).toISOString().slice(0,10)).limit(2000),
-          supabase.from('taches').select('*').in('statut',['todo','en_cours','en_attente','retard','urgent']).order('echeance',{ascending:true}).limit(100),
         ])
         setComptes(cpts || [])
-        setBordereaux(bord || [])
         setTransactions(txs || [])
-        setTaches(tsk || [])
       } catch(e) { console.error('DashboardGroupe load error:', e) }
       setLoading(false)
     }
@@ -625,14 +534,6 @@ export default function DashboardGroupe() {
     supabase.from('objectives_global').select('*', { count:'exact', head:true })
       .then(({ count }) => setNbObjectifs(count || 0))
   }, [])
-
-  const now = new Date()
-  const estRetard = t => t.echeance && new Date(t.echeance) < now && t.statut !== 'terminee'
-  const tachesRetard = taches.filter(estRetard)
-  const nbRetard  = tachesRetard.length
-  const nbEnCours = taches.length
-  const drawerList = (drawer === 'retard' ? tachesRetard : taches).slice()
-    .sort((a,b) => { const ra=estRetard(a)?0:1, rb=estRetard(b)?0:1; return ra!==rb ? ra-rb : (a.echeance||'').localeCompare(b.echeance||'') })
 
   return (
     <Layout currentPage="Tableau de bord général">
@@ -647,13 +548,10 @@ export default function DashboardGroupe() {
         />
 
         <div style={{ marginBottom:20 }}>
-          <SyncButtonsRow />
         </div>
 
         {/* 2 — KPIs */}
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:24 }}>
-          <KpiCard label="Tâches en cours"   value={nbEnCours} col="#f59e0b" icon="ti-checkbox"       sub={`dont ${nbRetard} en retard`}             onClick={() => setDrawer('cours')} />
-          <KpiCard label="Tâches en retard"  value={nbRetard}  col={nbRetard>0?"#dc2626":"#16a34a"} icon="ti-alert-triangle" sub={nbRetard>0?'⚠ action requise':'✓ aucun retard'} onClick={() => setDrawer('retard')} />
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:14, marginBottom:24 }}>
           <KpiCard label="Comptes connectés" value={comptes.length} col="#7c3aed" icon="ti-credit-card" sub="via Ponto / ING" onClick={() => navigate('/dynassur')} />
           <KpiCard label="Objectifs 2026"    value={nbObjectifs != null ? nbObjectifs : '…'} col="#0080BD" icon="ti-target" sub={nbObjectifs ? `${nbObjectifs} objectif${nbObjectifs>1?'s':''} configuré${nbObjectifs>1?'s':''}` : 'Aucun objectif — configurer'} onClick={() => navigate('/dynassur/objectifs')} />
         </div>
@@ -671,50 +569,9 @@ export default function DashboardGroupe() {
           </div>
         </div>
 
-        {/* 4 — Tâches pleine largeur */}
-        <div style={{ marginBottom:24 }}>
-          <BlocTaches taches={taches} bordereaux={bordereaux} loading={loading} />
-        </div>
-
         {/* 5 — Production */}
         <BlocProduction />
 
-      </div>
-
-      {/* Panneau lateral taches (style artefact) */}
-      <div onClick={() => setDrawer(null)} style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.4)', zIndex:60, opacity: drawer?1:0, pointerEvents: drawer?'auto':'none', transition:'opacity .25s' }} />
-      <div style={{ position:'fixed', top:0, right:0, height:'100vh', width:'min(460px,93vw)', background:'#fff', zIndex:61, boxShadow:'-8px 0 40px rgba(0,0,0,0.18)', transform: drawer?'translateX(0)':'translateX(100%)', transition:'transform .28s cubic-bezier(.4,0,.2,1)', display:'flex', flexDirection:'column' }}>
-        <div style={{ padding:'16px 20px', borderBottom:'1px solid #e2e8f0', display:'flex', alignItems:'center', justifyContent:'space-between', background: drawer==='retard'?'#fef2f2':'#fffbeb' }}>
-          <div>
-            <div style={{ fontSize:11, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'.05em' }}>{drawer==='retard'?'Tâches en retard':'Tâches en cours'}</div>
-            <div style={{ fontSize:24, fontWeight:800, color: drawer==='retard'?'#dc2626':'#0D2F5E', lineHeight:1.1 }}>{drawerList.length}</div>
-          </div>
-          <button onClick={() => setDrawer(null)} style={{ width:34, height:34, borderRadius:9, border:'1px solid #e2e8f0', background:'#fff', cursor:'pointer', fontSize:18, color:'#64748b', lineHeight:1 }}>✕</button>
-        </div>
-        <div style={{ flex:1, overflowY:'auto', padding:12 }}>
-          {drawerList.length===0 && <div style={{ padding:40, textAlign:'center', color:'#94a3b8', fontSize:13 }}>Aucune tâche.</div>}
-          {drawerList.map(t => {
-            const retard = estRetard(t)
-            const socCfg = SOCIETES[(t.entite||'').toLowerCase()]
-            return (
-              <div key={t.id} onClick={() => { setDrawer(null); navigate('/dynassur/taches?tache=' + t.id) }}
-                style={{ padding:'10px 12px', borderRadius:9, border:'1px solid #eef2f7', marginBottom:6, cursor:'pointer', background: retard?'#fff5f5':'#fff' }}
-                onMouseEnter={e=>e.currentTarget.style.background = retard?'#fee2e2':'#f0f9ff'}
-                onMouseLeave={e=>e.currentTarget.style.background = retard?'#fff5f5':'#fff'}>
-                <div style={{ fontSize:13.5, fontWeight: retard?700:600, color:'#1e293b' }}>{t.titre||'—'}</div>
-                <div style={{ fontSize:11, color:'#94a3b8', marginTop:3, display:'flex', gap:8, flexWrap:'wrap' }}>
-                  {socCfg && <span style={{ background:socCfg.color+'1e', color:socCfg.color, fontWeight:700, padding:'0 5px', borderRadius:3, fontSize:10 }}>{socCfg.short}</span>}
-                  {t.gestionnaire && <span>{t.gestionnaire}</span>}
-                  {t.echeance && <span style={{ color: retard?'#dc2626':'#94a3b8' }}>{fmtDate(t.echeance)}</span>}
-                  {t.categorie && <span>• {t.categorie}</span>}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-        <div style={{ padding:12, borderTop:'1px solid #e2e8f0' }}>
-          <button onClick={() => { setDrawer(null); navigate('/groupe/taches') }} style={{ width:'100%', padding:'10px', borderRadius:9, border:'none', background:'#0D2F5E', color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer' }}>Ouvrir la page Tâches</button>
-        </div>
       </div>
     </Layout>
   )

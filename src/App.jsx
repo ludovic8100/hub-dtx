@@ -9,9 +9,6 @@ import AccessDenied       from './pages/AccessDenied'
 import BandeauEnv         from './components/BandeauEnv'
 
 // Tout le reste : code-splitting — chaque page devient un chunk chargé à la demande
-const SyncCenter          = lazy(() => import('./pages/admin/SyncCenter'))
-const RdvCategories       = lazy(() => import('./pages/admin/RdvCategories'))
-const LiensCasses         = lazy(() => import('./pages/admin/LiensCasses'))
 const AdminNotesFrais     = lazy(() => import('./pages/admin/AdminNotesFrais'))
 
 const DashboardGroupe     = lazy(() => import('./pages/groupe/DashboardGroupe'))
@@ -23,12 +20,6 @@ const ToolBce             = lazy(() => import('./pages/tools/ToolBce'))
 const ToolQuestionnaire   = lazy(() => import('./pages/tools/ToolQuestionnaire'))
 const ToolDevoirInfo      = lazy(() => import('./pages/tools/ToolDevoirInfo'))
 const ToolSuccession     = lazy(() => import('./pages/tools/ToolSuccession'))
-const DynassurTaches      = lazy(() => import('./pages/dynassur/DynassurTaches'))
-const DtxTaches           = lazy(() => import('./pages/dtx/DtxTaches'))
-const LodeTaches          = lazy(() => import('./pages/lode/LodeTaches'))
-const HexagroupTaches     = lazy(() => import('./pages/hexagroup/HexagroupTaches'))
-const PriveTaches         = lazy(() => import('./pages/prive/PriveTaches'))
-const GroupeTaches        = lazy(() => import('./pages/groupe/GroupeTaches'))
 const DynassurClients     = lazy(() => import('./pages/dynassur/DynassurClients'))
 const DynassurPerformance = lazy(() => import('./pages/dynassur/DynassurPerformance'))
 const DynassurCompagnies  = lazy(() => import('./pages/dynassur/DynassurCompagnies'))
@@ -36,7 +27,6 @@ const DynassurSinistres   = lazy(() => import('./pages/dynassur/DynassurSinistre
 const DynassurBanque      = lazy(() => import('./pages/dynassur/DynassurBanque'))
 const DynassurComptabilite= lazy(() => import('./pages/dynassur/DynassurComptabilite'))
 const DynassurCredits     = lazy(() => import('./pages/dynassur/DynassurCredits'))
-const DynassurRdv         = lazy(() => import('./pages/dynassur/DynassurRdv'))
 const DynassurAppels      = lazy(() => import('./pages/dynassur/DynassurAppels'))
 
 const DashboardDtx        = lazy(() => import('./pages/dtx/DashboardDtx'))
@@ -133,12 +123,6 @@ export default function App() {
 
           {/* Dynassur */}
           <Route path="/dynassur"             element={<P need="dyn_dashboard"><DashboardDynassur /></P>} />
-          <Route path="/dynassur/taches"       element={<P need="dyn_taches"><DynassurTaches /></P>} />
-          <Route path="/dtx/taches"           element={<P need="dtx_taches"><DtxTaches /></P>} />
-          <Route path="/lode/taches"          element={<P need="lode_taches"><LodeTaches /></P>} />
-          <Route path="/hexagroup/taches"     element={<P need="hex_taches"><HexagroupTaches /></P>} />
-          <Route path="/prive/taches"         element={<P need="prive_taches"><PriveTaches /></P>} />
-          <Route path="/groupe/taches"        element={<P need="grp_taches"><GroupeTaches /></P>} />
           <Route path="/dynassur/notes-frais"  element={<P need="dyn_notesfrais"><DynassurNotesFrais /></P>} />
           <Route path="/dtx/notes-frais"       element={<P need="dtx_notesfrais"><DtxNotesFrais /></P>} />
           <Route path="/lode/notes-frais"      element={<P need="lode_notesfrais"><LodeNotesFrais /></P>} />
@@ -154,7 +138,6 @@ export default function App() {
           <Route path="/dynassur/objectifs"    element={<Navigate to="/dynassur/production" replace />} />
           <Route path="/dynassur/compagnies"   element={<P need="dyn_compagnies"><DynassurCompagnies /></P>} />
           <Route path="/dynassur/sinistres"    element={<P need="dyn_sinistres"><DynassurSinistres /></P>} />
-          <Route path="/dynassur/rdv"          element={<P need="dyn_rdv"><DynassurRdv /></P>} />
           <Route path="/dynassur/appels"       element={<P need="dyn_appels"><DynassurAppels /></P>} />
           <Route path="/dynassur/banque"       element={<A><DynassurBanque /></A>} />
           <Route path="/dynassur/comptabilite" element={<P need="dyn_comptabilite"><DynassurComptabilite /></P>} />
@@ -195,9 +178,6 @@ export default function App() {
           <Route path="/tools/questionnaire" element={<P need="acc_tools"><ToolQuestionnaire /></P>} />
           <Route path="/tools/devoir-information" element={<P need="acc_tools"><ToolDevoirInfo /></P>} />
           <Route path="/tools/succession" element={<P need="prive_succession"><ToolSuccession /></P>} />
-          <Route path="/admin/sync" element={<A><SyncCenter /></A>} />
-          <Route path="/admin/rdv-categories" element={<A><RdvCategories /></A>} />
-          <Route path="/admin/liens-casses" element={<A><LiensCasses /></A>} />
           <Route path="/admin/notes-frais" element={<A><AdminNotesFrais /></A>} />
 
           <Route path="/" element={<P><RootRedirect /></P>} />

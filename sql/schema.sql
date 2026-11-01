@@ -2,12 +2,14 @@
 -- HUB DTX — SCHÉMA CANONIQUE DE LA BASE SUPABASE
 -- Projet : tndwonqdbeszkcztkzqe
 -- Régénéré le 2026-10-27 depuis information_schema (base vivante)
+-- Mis à jour le 2026-11-01 : retrait des 7 tables des modules Tâches, RDV,
+-- Liens cassés et Synchronisation (voir supabase/migrations/20261101090000_*).
 --
 -- ⚠️  Script de RECRÉATION (disaster-recovery / documentation).
 --     Idempotent (CREATE TABLE IF NOT EXISTS) — ne touche pas aux tables existantes.
 --     Les contraintes (PK/FK/UNIQUE), index, vues, triggers et policies RLS
 --     ne sont PAS inclus ici.
--- Tables : 100
+-- Tables : 93
 -- =====================================================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -808,14 +810,6 @@ CREATE TABLE IF NOT EXISTS public.kb_articles (
   updated_at timestamp with time zone NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS public.liens_casses_log (
-  id bigint NOT NULL,
-  executed_at timestamp with time zone NOT NULL DEFAULT now(),
-  declencheur text NOT NULL DEFAULT 'auto'::text,
-  nb_supprimes integer NOT NULL DEFAULT 0,
-  details jsonb NOT NULL DEFAULT '[]'::jsonb
-);
-
 CREATE TABLE IF NOT EXISTS public.liens_preneurs (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   dossier_a text NOT NULL,
@@ -1233,47 +1227,6 @@ CREATE TABLE IF NOT EXISTS public.quittances (
   created_at timestamp with time zone DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS public.rdv (
-  id uuid NOT NULL DEFAULT gen_random_uuid(),
-  outlook_event_id text,
-  user_email text,
-  web_link text,
-  objet text NOT NULL,
-  description text,
-  lieu text,
-  debut timestamp with time zone NOT NULL,
-  fin timestamp with time zone,
-  journee_entiere boolean DEFAULT false,
-  is_recurring boolean DEFAULT false,
-  statut text DEFAULT 'planifie'::text,
-  categorie text,
-  dossier_client text,
-  client_id bigint,
-  commercial_code text,
-  gestionnaire_code text,
-  organisateur_email text,
-  participants jsonb,
-  tache_suivi_id bigint,
-  societe_id uuid,
-  source text DEFAULT 'outlook'::text,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS public.rdv_categories (
-  id uuid NOT NULL DEFAULT gen_random_uuid(),
-  code text NOT NULL,
-  libelle text NOT NULL,
-  entite text,
-  type text,
-  couleur text DEFAULT '#0080BD'::text,
-  sync_enabled boolean NOT NULL DEFAULT true,
-  actif boolean NOT NULL DEFAULT true,
-  ordre integer DEFAULT 0,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now()
-);
-
 CREATE TABLE IF NOT EXISTS public.ref_apporteurs (
   id bigint NOT NULL DEFAULT nextval('ref_apporteurs_id_seq'::regclass),
   code text,
@@ -1468,16 +1421,6 @@ CREATE TABLE IF NOT EXISTS public.succession_simulations (
   updated_at timestamp with time zone DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS public.sync_log (
-  id uuid NOT NULL DEFAULT gen_random_uuid(),
-  workflow text NOT NULL,
-  statut text NOT NULL,
-  comptes_synchro integer DEFAULT 0,
-  transactions_synchro integer DEFAULT 0,
-  message text,
-  created_at timestamp with time zone DEFAULT now()
-);
-
 CREATE TABLE IF NOT EXISTS public.taches (
   id bigint NOT NULL DEFAULT nextval('taches_id_seq'::regclass),
   titre text NOT NULL,
@@ -1519,37 +1462,6 @@ CREATE TABLE IF NOT EXISTS public.taches (
   participants jsonb DEFAULT '[]'::jsonb,
   checklist jsonb DEFAULT '[]'::jsonb,
   ticket_echeance date
-);
-
-CREATE TABLE IF NOT EXISTS public.taches_historique (
-  id bigint NOT NULL DEFAULT nextval('taches_historique_id_seq'::regclass),
-  tache_id bigint,
-  action text,
-  par text,
-  a timestamp with time zone DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS public.taches_rapprochement (
-  id uuid NOT NULL DEFAULT gen_random_uuid(),
-  type text NOT NULL,
-  societe text,
-  transaction_id uuid,
-  montant numeric,
-  date_operation date,
-  libelle text,
-  factures_candidates jsonb,
-  statut text DEFAULT 'ouvert'::text,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
-  categorie text
-);
-
-CREATE TABLE IF NOT EXISTS public.taches_suivi (
-  id bigint NOT NULL DEFAULT nextval('taches_suivi_id_seq'::regclass),
-  tache_id bigint,
-  auteur text,
-  note text,
-  cree_a timestamp with time zone DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS public.taux_reference (

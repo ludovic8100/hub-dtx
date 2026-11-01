@@ -6,22 +6,21 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { bootstrapConfigs } from '../../lib/bootstrapConfigs'
 import GestionCategories from './GestionCategories'
-import { RdvCategoriesPanel } from '../admin/RdvCategories'
 import BceSearch from '../../components/BceSearch'
 
 // ─── Définition des accès par société (colonnes réelles de collaborateurs) ───
 const ACCES = [
   { acc: 'acc_dynassur', label: 'Dynassur', pfx: 'dyn',  couleur: '#0080BD',
-    pages: [['dashboard', 'Tableau de bord'], ['taches', 'Tâches'], ['clients', 'Clients'], ['production', 'Production'], ['credits', 'Crédits'], ['chiffres', 'Chiffres'], ['objectifs', 'Objectifs'], ['compagnies', 'Compagnies'], ['sinistres', 'Sinistres'], ['rdv', 'RDV / Agenda'], ['appels', 'Appels'], ['rentabilite', 'Rentabilité'], ['banque', 'Banque'], ['comptabilite', 'Comptabilité'], ['notesfrais', 'Notes de frais']] },
+    pages: [['dashboard', 'Tableau de bord'], ['clients', 'Clients'], ['production', 'Production'], ['credits', 'Crédits'], ['chiffres', 'Chiffres'], ['objectifs', 'Objectifs'], ['compagnies', 'Compagnies'], ['sinistres', 'Sinistres'], ['appels', 'Appels'], ['rentabilite', 'Rentabilité'], ['banque', 'Banque'], ['comptabilite', 'Comptabilité'], ['notesfrais', 'Notes de frais']] },
   { acc: 'acc_dtx', label: 'DTX', pfx: 'dtx', couleur: '#1B3A6B',
-    pages: [['dashboard', 'Tableau de bord'], ['taches', 'Tâches'], ['immobilier', 'Immobilier'], ['vehicules', 'Véhicules'], ['trading', 'Trading'], ['comptabilite', 'Comptabilité'], ['devis', 'Devis & Factures'], ['notesfrais', 'Notes de frais']] },
+    pages: [['dashboard', 'Tableau de bord'], ['immobilier', 'Immobilier'], ['vehicules', 'Véhicules'], ['trading', 'Trading'], ['comptabilite', 'Comptabilité'], ['devis', 'Devis & Factures'], ['notesfrais', 'Notes de frais']] },
   { acc: 'acc_lode', label: 'LODE', pfx: 'lode', couleur: '#F97316',
-    pages: [['dashboard', 'Tableau de bord'], ['taches', 'Tâches'], ['clients', 'Clients'], ['banque', 'Banque'], ['comptabilite', 'Comptabilité'], ['devis', 'Devis & Factures'], ['notesfrais', 'Notes de frais']] },
+    pages: [['dashboard', 'Tableau de bord'], ['clients', 'Clients'], ['banque', 'Banque'], ['comptabilite', 'Comptabilité'], ['devis', 'Devis & Factures'], ['notesfrais', 'Notes de frais']] },
   { acc: 'acc_hexagroup', label: 'Hexagroup', pfx: 'hex', couleur: '#ec4899',
-    pages: [['dashboard', 'Tableau de bord'], ['taches', 'Tâches'], ['banque', 'Banque'], ['comptabilite', 'Comptabilité'], ['notesfrais', 'Notes de frais'], ['membres', 'Membres'], ['cotisations', 'Cotisations']] },
+    pages: [['dashboard', 'Tableau de bord'], ['banque', 'Banque'], ['comptabilite', 'Comptabilité'], ['notesfrais', 'Notes de frais'], ['membres', 'Membres'], ['cotisations', 'Cotisations']] },
   { acc: 'acc_prive', label: 'Privé', pfx: 'prive', couleur: '#22c55e',
-    pages: [['dashboard', 'Tableau de bord'], ['taches', 'Tâches'], ['banque', 'Banque'], ['comptabilite', 'Comptabilité'], ['notesfrais', 'Notes de frais']] },
-  { acc: 'acc_holding', label: 'Groupe (consolidé)', pfx: 'grp', couleur: '#7c3aed', pages: [['taches', 'Tâches'], ['notesfrais', 'Notes de frais']] },
+    pages: [['dashboard', 'Tableau de bord'], ['banque', 'Banque'], ['comptabilite', 'Comptabilité'], ['notesfrais', 'Notes de frais']] },
+  { acc: 'acc_holding', label: 'Groupe (consolidé)', pfx: 'grp', couleur: '#7c3aed', pages: [['notesfrais', 'Notes de frais']] },
   { acc: 'acc_tools', label: 'Outils', pfx: 'tools', couleur: '#0ea5e9', pages: [] },
 ]
 
@@ -287,14 +286,10 @@ export default function ConfigModule() {
     const now = new Date().toISOString()
     const email = selUser.email
     const nom = selUser.nom_complet || email
+    // La tâche de suivi « 1ère connexion » n'est plus créée : l'écran Tâches a été
+    // retiré, elle n'aurait été visible nulle part. La date d'envoi reste enregistrée
+    // sur la fiche, et la 1ère connexion s'y affiche aussi.
     await supabase.from('collaborateurs').update({ date_envoi_acces: now }).eq('id', selUser.id)
-    await supabase.from('taches').insert({
-      titre: `Suivi 1ère connexion — ${nom}`,
-      description: `Accès au Hub envoyés à ${email}. Cette tâche se clôture automatiquement à sa première connexion.`,
-      statut: 'todo', priorite: 'moyenne', categorie: 'Onboarding', source: 'acces',
-      user_email: email, echeance: new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10),
-      gestionnaire: (perms?.code || (perms?.email || '').split('@')[0] || '').toUpperCase(),
-    })
     setSelUser(u => ({ ...u, date_envoi_acces: now }))
     setUsers(prev => prev.map(u => u.id === selUser.id ? { ...u, date_envoi_acces: now } : u))
     setSaving(false)
@@ -337,7 +332,7 @@ export default function ConfigModule() {
     return nomA.localeCompare(nomB, 'fr', { sensitivity: 'base' })
   })
 
-  const TABS = [['societes', '🏢 Sociétés'], ['documents', '📄 Documents'], ['users', '👥 Utilisateurs & acteurs métier'], ['categories', '🏷️ Catégories compta'], ['categoriesrdv', '📅 Catégories RDV']]
+  const TABS = [['societes', '🏢 Sociétés'], ['documents', '📄 Documents'], ['users', '👥 Utilisateurs & acteurs métier'], ['categories', '🏷️ Catégories compta']]
 
   return (
     <Layout currentPage="Configuration">
@@ -356,7 +351,6 @@ export default function ConfigModule() {
 
         {tab === 'categories' && <GestionCategories />}
 
-        {tab === 'categoriesrdv' && <RdvCategoriesPanel />}
 
         {/* ─────────── SOCIÉTÉS & DOCUMENTS ─────────── */}
         {(tab === 'societes' || tab === 'documents') && !loading && (

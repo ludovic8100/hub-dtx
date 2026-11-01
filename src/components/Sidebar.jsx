@@ -7,15 +7,15 @@ import { supabase } from '../lib/supabase'
 
 // Icônes métal du menu (public/icons/hub-dtx-metal/, 24 px, PNG transparents).
 // La correspondance se fait sur le suffixe de la clé, donc une même icône sert
-// à toutes les sociétés : dyn_taches, lode_taches et hex_taches partagent « taches ».
+// à toutes les sociétés : dyn_notesfrais et lode_notesfrais partagent « notes-de-frais ».
 // Une entrée sans correspondance garde son icône Tabler d'origine.
 const ICONES = {
-  dashboard: 'tableau-de-bord', taches: 'taches', notesfrais: 'notes-de-frais',
+  dashboard: 'tableau-de-bord', notesfrais: 'notes-de-frais',
   notes_frais: 'notes-de-frais', clients: 'clients', production: 'production',
   compagnies: 'compagnies-bordereaux', credits: 'credits', sinistres: 'sinistres',
-  rdv: 'rdv-agenda', appels: 'appels', comptabilite: 'comptabilite',
+  appels: 'appels', comptabilite: 'comptabilite',
   devis: 'devis-factures', rentabilite: 'rentabilite', config: 'parametres',
-  sync: 'synchronisation', tools: 'outils', tickets: 'tickets',
+  tools: 'outils', tickets: 'tickets',
 }
 const iconePng = (key) => {
   if (!key) return null
@@ -27,25 +27,21 @@ const iconePng = (key) => {
 const MODULES = {
   groupe: [
     { key: 'acc_holding', label: 'Tableau de bord général', icon: 'ti-layout-grid', path: '/groupe' },
-    { key: 'grp_taches', label: 'Tâches', icon: 'ti-checkbox', path: '/groupe/taches' },
     { key: 'grp_notesfrais', label: 'Notes de frais', icon: 'ti-receipt', path: '/groupe/notes-frais' },
   ],
   dynassur: [
     { key: 'dyn_dashboard',    label: 'Tableau de bord', icon: 'ti-layout-dashboard', path: '/dynassur' },
-    { key: 'dyn_taches',       label: 'Tâches',           icon: 'ti-checkbox',         path: '/dynassur/taches' },
     { key: 'dyn_notesfrais', label: 'Notes de frais', icon: 'ti-receipt', path: '/dynassur/notes-frais' },
     { key: 'dyn_clients',      label: 'Clients',           icon: 'ti-users',            path: '/dynassur/clients' },
     { key: 'dyn_production',   label: 'Performance',       icon: 'ti-chart-line',       path: '/dynassur/production', anyKeys: ['dyn_production','dyn_chiffres','dyn_rentabilite','dyn_objectifs'] },
     { key: 'dyn_compagnies',   label: 'Compagnies',        icon: 'ti-building',         path: '/dynassur/compagnies' },
     { key: 'dyn_credits',      label: 'Crédits',           icon: 'ti-cash-banknote',    path: '/dynassur/credits' },
     { key: 'dyn_sinistres',    label: 'Sinistres',         icon: 'ti-alert-triangle',   path: '/dynassur/sinistres' },
-    { key: 'dyn_rdv',          label: 'RDV / Agenda',      icon: 'ti-calendar',         path: '/dynassur/rdv' },
     { key: 'dyn_appels',       label: 'Appels',            icon: 'ti-phone',            path: '/dynassur/appels' },
     { key: 'dyn_comptabilite', label: 'Comptabilité',      icon: 'ti-calculator',       path: '/dynassur/comptabilite' },
   ],
   dtx: [
     { key: 'dtx_dashboard',    label: 'Tableau de bord', icon: 'ti-layout-dashboard', path: '/dtx' },
-    { key: 'dtx_taches',       label: 'Tâches',          icon: 'ti-checkbox',         path: '/dtx/taches' },
     { key: 'dtx_notesfrais', label: 'Notes de frais', icon: 'ti-receipt', path: '/dtx/notes-frais' },
     { key: 'dtx_immobilier',   label: 'Immobilier',       icon: 'ti-home',             path: '/dtx/immobilier' },
     { key: 'dtx_vehicules',    label: 'Véhicules',        icon: 'ti-car',              path: '/dtx/vehicules' },
@@ -55,7 +51,6 @@ const MODULES = {
   ],
   lode: [
     { key: 'lode_dashboard',    label: 'Tableau de bord', icon: 'ti-layout-dashboard', path: '/lode' },
-    { key: 'lode_taches',       label: 'Tâches',          icon: 'ti-checkbox',         path: '/lode/taches' },
     { key: 'lode_notesfrais', label: 'Notes de frais', icon: 'ti-receipt', path: '/lode/notes-frais' },
     { key: 'lode_clients',      label: 'Clients',          icon: 'ti-users',            path: '/lode/clients' },
     { key: 'lode_devis',        label: 'Devis & Factures', icon: 'ti-file-invoice',     path: '/lode/devis-factures' },
@@ -64,7 +59,6 @@ const MODULES = {
   ],
   hexagroup: [
     { key: 'hex_dashboard',      label: 'Tableau de bord', icon: 'ti-layout-dashboard', path: '/hexagroup' },
-    { key: 'hex_taches',         label: 'Tâches',          icon: 'ti-checkbox',         path: '/hexagroup/taches' },
     { key: 'hex_notesfrais', label: 'Notes de frais', icon: 'ti-receipt', path: '/hexagroup/notes-frais' },
     { key: 'hex_comptabilite',   label: 'Comptabilité',     icon: 'ti-calculator',       path: '/hexagroup/comptabilite' },
     { key: 'hex_membres',        label: 'Membres',          icon: 'ti-users-group',      path: '/hexagroup/membres' },
@@ -72,7 +66,6 @@ const MODULES = {
   ],
   prive: [
     { key: 'prive_dashboard',    label: 'Tableau de bord', icon: 'ti-layout-dashboard', path: '/prive' },
-    { key: 'prive_taches',       label: 'Tâches',          icon: 'ti-checkbox',         path: '/prive/taches' },
     { key: 'prive_notesfrais', label: 'Notes de frais', icon: 'ti-receipt', path: '/prive/notes-frais' },
     { key: 'prive_comptabilite', label: 'Comptabilité',     icon: 'ti-calculator',       path: '/prive/comptabilite' },
   ],
@@ -81,8 +74,6 @@ const MODULES = {
 const MODULES_ADMIN = [
   { key: 'admin_config', label: 'Paramètres', icon: 'ti-settings', path: '/config' },
   { key: 'admin_notes_frais', label: 'Notes de frais', icon: 'ti-receipt', path: '/admin/notes-frais' },
-  { key: 'admin_sync', label: 'Synchronisation', icon: 'ti-refresh', path: '/admin/sync' },
-  { key: 'admin_liens', label: 'Liens cassés', icon: 'ti-unlink', path: '/admin/liens-casses' },
 ]
 
 // Tri des modules d'une société : Tableau de bord toujours en tête, le reste par ordre alphabétique
