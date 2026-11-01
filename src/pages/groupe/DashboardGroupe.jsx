@@ -261,7 +261,7 @@ function BlocTresorerie({ comptes, transactions, loading }) {
 
   const flowData = sixMois.map(m => {
     const txs = transactions.filter(t => {
-      const d = new Date(t.date || t.date_valeur)
+      const d = new Date(t.date_execution || t.date_valeur)
       return d.getMonth()===m.month && d.getFullYear()===m.year
     })
     const entrees = txs.filter(t=>t.montant>0).reduce((s,t)=>s+t.montant,0)
@@ -525,7 +525,7 @@ export default function DashboardGroupe() {
           { data: txs },
         ] = await Promise.all([
           supabase.from('comptes_bancaires').select('*, societes(code,nom)').eq('actif', true).order('banque'),
-          supabase.from('transactions').select('id,date,date_valeur,montant,societe_id').gte('date', new Date(new Date().setMonth(new Date().getMonth()-6)).toISOString().slice(0,10)).limit(2000),
+          supabase.from('transactions').select('id,date_execution,date_valeur,montant,compte_id').gte('date_execution', new Date(new Date().setMonth(new Date().getMonth()-6)).toISOString().slice(0,10)).limit(2000),
         ])
         setComptes(cpts || [])
         setTransactions(txs || [])

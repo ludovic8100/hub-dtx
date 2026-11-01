@@ -61,6 +61,7 @@ const LodeNotesFrais      = lazy(() => import('./pages/lode/LodeNotesFrais'))
 const HexagroupNotesFrais = lazy(() => import('./pages/hexagroup/HexagroupNotesFrais'))
 const PriveNotesFrais     = lazy(() => import('./pages/prive/PriveNotesFrais'))
 const GroupeNotesFrais    = lazy(() => import('./pages/groupe/GroupeNotesFrais'))
+const GroupeComptabilite  = lazy(() => import('./pages/groupe/GroupeComptabilite'))
 
 function ProtectedRoute({ children, requireAdmin = false, need = null }) {
   const { user, perms, loading } = useAuth()
@@ -130,6 +131,7 @@ export default function App() {
           <Route path="/hexagroup/notes-frais" element={<P need="hex_notesfrais"><HexagroupNotesFrais /></P>} />
           <Route path="/prive/notes-frais"     element={<P need="prive_notesfrais"><PriveNotesFrais /></P>} />
           <Route path="/groupe/notes-frais"    element={<P need="grp_notesfrais"><GroupeNotesFrais /></P>} />
+          <Route path="/groupe/comptabilite"   element={<P need="acc_holding"><GroupeComptabilite /></P>} />
           <Route path="/dynassur/clients"      element={<P need="dyn_clients"><DynassurClients /></P>} />
           <Route path="/dynassur/production"   element={<P need={["dyn_production","dyn_chiffres","dyn_rentabilite","dyn_objectifs"]}><DynassurPerformance /></P>} />
           <Route path="/dynassur/chiffres"     element={<Navigate to="/dynassur/production" replace />} />
