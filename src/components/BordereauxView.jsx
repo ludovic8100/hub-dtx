@@ -12,10 +12,8 @@ const D = {
   btn:(v="primary")=>({ padding:"8px 16px", borderRadius:7, cursor:"pointer", fontSize:12, fontWeight:600, transition:"all 0.15s", border:"none", ...(v==="primary"?{ background:`linear-gradient(135deg,${C.cyan},${C.navyMid})`, color:"#fff" }:v==="ghost"?{ background:"transparent", color:C.navy, border:`1px solid ${C.border}` }:{ background:C.bg, color:C.textM, border:`1px solid ${C.border}` }) }),
   badge:(c)=>({ display:"inline-block", fontSize:10, fontWeight:700, padding:"2px 8px", borderRadius:20, background:c+"18", color:c, textTransform:"uppercase" }),
   kpi:{ background:C.white, border:`1px solid ${C.border}`, borderRadius:10, padding:"18px 20px", boxShadow:"0 1px 4px rgba(26,58,107,0.06)" },
-  alertBox:(t="warn")=>({ background:t==="warn"?"#FEF3CD":t==="ok"?"#EAF7EC":"#FDECEA", border:`1px solid ${t==="warn"?"#F6D55C":t==="ok"?"#B2DFDB":"#F5C6CB"}`, borderRadius:8, padding:"10px 14px", marginBottom:8, display:"flex", alignItems:"center", gap:10, fontSize:13, color:t==="warn"?"#856404":t==="ok"?"#155724":"#721C24" }),
 }
 const MOIS_L = { "1":"Jan","2":"Fév","3":"Mar","4":"Avr","5":"Mai","6":"Jun","7":"Jul","8":"Aoû","9":"Sep","10":"Oct","11":"Nov","12":"Déc","01":"Jan","02":"Fév","03":"Mar","04":"Avr","05":"Mai","06":"Jun","07":"Jul","08":"Aoû","09":"Sep" }
-const MOIS = ["01","02","03","04","05","06","07","08","09","10","11","12"]
 const MOIS_FULL = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"]
 
 export default function BordereauxView({ view: viewProp, embedded } = {}) {
@@ -28,59 +26,6 @@ export default function BordereauxView({ view: viewProp, embedded } = {}) {
   const [filterMois, setFilterMois] = useState(String(new Date().getMonth()+1))
   const [filterAnnee, setFilterAnnee] = useState("2026")
   const [bordSearch, setBordSearch] = useState("")
-  const [matRows, setMatRows] = useState([])
-  const [matOpen, setMatOpen] = useState({})
-  const matByComp = useMemo(() => {
-    const m = {}
-    for (const r of matRows) {
-      if (!m[r.code_comp]) m[r.code_comp] = {}
-      if (!m[r.code_comp][r.producteur]) m[r.code_comp][r.producteur] = {}
-      m[r.code_comp][r.producteur][r.mois] = { paye:r.paye, rcp_doc:r.rcp_doc, bqt_doc:r.bqt_doc, montant_paye:r.montant_paye }
-    }
-    return m
-  }, [matRows])
-  const [brioSet, setBrioSet] = useState(new Set())
-  const brioKey = (code, prod, mois) => `${code}|${prod}|${mois}`
-  const toggleBrio = async (code, prod, mois) => {
-    const key = brioKey(code, prod, mois)
-    const next = new Set(brioSet)
-    if (next.has(key)) {
-      next.delete(key)
-      await supabase.from("bordereaux_brio").delete().match({ code_comp:code, producteur:prod, mois, annee:2026 })
-    } else {
-      next.add(key)
-      await supabase.from("bordereaux_brio").insert({ code_comp:code, producteur:prod, mois, annee:2026 })
-    }
-    setBrioSet(next)
-  }
-  const [cies, setCies] = useState([])
-  const [prodRef, setProdRef] = useState([])
-  const normProd = (s) => { s = String(s||"").trim(); if (s === "3145235") return "145235"; return /^0*\d+$/.test(s) ? s.replace(/^0+/, "") : s }
-  const compAff = useMemo(() => {
-    const byId = {}; cies.forEach(c => byId[c.id] = c)
-    const prodsByCode = {}
-    prodRef.forEach(p => {
-      const c = byId[p.compagnie_id]; if (!c) return
-      const num = normProd(p.numero_producteur); if (!num) return
-      ;(prodsByCode[c.code] = prodsByCode[c.code] || new Set()).add(num)
-    })
-    Object.keys(matByComp).forEach(code => Object.keys(matByComp[code]).forEach(pr => (prodsByCode[code] = prodsByCode[code] || new Set()).add(pr)))
-    return cies.filter(c => c.attend_bqt || c.attend_rcp)
-      .map(c => ({ code:c.code, nom:c.nom, bqt:!!c.attend_bqt, rcp:!!c.attend_rcp, prods:[...(prodsByCode[c.code] || [])].sort() }))
-      .sort((a,b) => (a.nom||a.code||"").localeCompare(b.nom||b.code||""))
-  }, [cies, prodRef, matByComp])
-  const compStatus = (comp, mi, kind) => {
-    const cells = comp.prods.map(pr => (matByComp[comp.code]||{})[pr]?.[mi]).filter(Boolean)
-    if (kind === "rcp") {
-      const sig = cells.filter(c => c.paye || c.rcp_doc)
-      if (!sig.length) return null
-      return sig.filter(c => c.rcp_doc).length === sig.length ? C.ok : C.warn
-    }
-    const doc = cells.filter(c => c.bqt_doc).length
-    if (!doc) return null
-    const concern = comp.prods.filter(pr => Object.values((matByComp[comp.code]||{})[pr] || {}).some(x => x.bqt_doc)).length
-    return doc >= concern ? C.ok : C.warn
-  }
 
   useEffect(() => {
     const load = async () => {
@@ -104,15 +49,6 @@ export default function BordereauxView({ view: viewProp, embedded } = {}) {
         setBRows(b)
         const qq = await fetchAll(() => supabase.from("quittances").select("compagnie,date_comptable,prime_totale,commission,commission_sa,sous_agent,compte_producteur"))
         setQRows(qq)
-        const mat = await fetchAll(() => supabase.from("v_matrice_rcp_2026").select("*"))
-        setMatRows(mat)
-        const brio = await fetchAll(() => supabase.from("bordereaux_brio").select("*"))
-        setBrioSet(new Set((brio||[]).map(b => `${b.code_comp}|${b.producteur}|${b.mois}`)))
-        const [cc, pp] = await Promise.all([
-          fetchAll(() => supabase.from("compagnies").select("id,code,nom,attend_bqt,attend_rcp,actif")),
-          fetchAll(() => supabase.from("producteurs").select("compagnie_id,numero_producteur,statut"))
-        ])
-        setCies(cc); setProdRef(pp)
         // Défaut : dernier mois de l'année sélectionnée ayant des quittances (évite l'onglet vide)
         const moisDispo = {}
         qq.forEach(r => { if (r.date_comptable) { const d = new Date(r.date_comptable); if (String(d.getFullYear()) === filterAnnee) moisDispo[d.getMonth()+1] = true } })
@@ -124,27 +60,28 @@ export default function BordereauxView({ view: viewProp, embedded } = {}) {
     load()
   }, [])
 
-  const qAgg = useMemo(() => {
+  // Agrégation unique des quittances du mois par compagnie : l'onglet « Quittances » et
+  // la réconciliation la calculaient séparément, à l'identique, avec un risque de divergence.
+  const parCompagnie = useMemo(() => {
     const agg = {}
     for (const r of qRows) {
       if (!r.date_comptable) continue
       const d = new Date(r.date_comptable)
-      const m = String(d.getMonth() + 1)
-      const y = String(d.getFullYear())
-      if (m !== filterMois || y !== filterAnnee) continue
+      if (String(d.getMonth() + 1) !== filterMois || String(d.getFullYear()) !== filterAnnee) continue
       const cie = r.compagnie || "Inconnu"
-      if (!agg[cie]) agg[cie] = { nb:0, primes:0, commission:0, commission_sa:0 }
+      if (!agg[cie]) agg[cie] = { cie, nb:0, primes:0, commission:0, commission_sa:0 }
       agg[cie].nb += 1
       agg[cie].primes += parseFloat(r.prime_totale) || 0
       agg[cie].commission += parseFloat(r.commission) || 0
       agg[cie].commission_sa += parseFloat(r.commission_sa) || 0
     }
-    return Object.entries(agg).sort((a, b) => b[1].primes - a[1].primes)
+    return agg
   }, [qRows, filterMois, filterAnnee])
+
+  const qAgg = useMemo(() => Object.entries(parCompagnie).sort((a, b) => b[1].primes - a[1].primes), [parCompagnie])
 
   const totQ = useMemo(() => qAgg.reduce((s, [, v]) => ({ primes:s.primes+v.primes, commission:s.commission+v.commission, commission_sa:s.commission_sa+v.commission_sa }), { primes:0, commission:0, commission_sa:0 }), [qAgg])
 
-  const CIE_TYPES = { AG:"BQT+RCP",AXA:"BQT+RCP",AEDES:"BQT+RCP",APRIL:"BQT+RCP",ASSUDIS:"BQT+RCP",BALOISE:"BQT+RCP",AMMA:"BQT+RCP",VIVIUM:"BQT+RCP",DKV:"BQT+RCP",DAS:"BQT+RCP",ATHORA:"BQT+RCP",TVM:"BQT",RECORD:"RCP",ALPHACREDIT:"RCP",BNP:"RCP",CARES:"RCP",DELA:"RCP",MONUMENT:"RCP" }
   // Normalise : majuscules, sans espaces ni accents (pour matcher "ALPHA CREDIT" -> "ALPHACREDIT")
   const norm = (s) => (s || "").toString().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9]/g, "")
   const normMois = (m) => String(parseInt(m, 10)).padStart(2, "0")
@@ -157,15 +94,6 @@ export default function BordereauxView({ view: viewProp, embedded } = {}) {
     })
     return m
   }, [bRows, filterAnnee])
-  const alertes = useMemo(() => {
-    const a = []
-    Object.entries(CIE_TYPES).forEach(([cie, type]) => {
-      if (type === "BQT+RCP" || type === "BQT") MOIS.slice(0,6).forEach(m => { if (!idx[`${norm(cie)}-${m}-BQT`]) a.push({ cie, mois:m, type:"BQT" }) })
-      if (type === "BQT+RCP" || type === "RCP") MOIS.slice(0,6).forEach(m => { if (idx[`${norm(cie)}-${m}-BQT`] && !idx[`${norm(cie)}-${m}-RCP`]) a.push({ cie, mois:m, type:"RCP" }) })
-    })
-    return a
-  }, [idx])
-
   const bordResults = useMemo(() => {
     const s = bordSearch.trim().toLowerCase()
     if (s.length < 2) return []
@@ -185,19 +113,7 @@ export default function BordereauxView({ view: viewProp, embedded } = {}) {
   }
   const reconcil = useMemo(() => {
     const mm = normMois(filterMois)
-    // 1) Agréger les quittances du mois par compagnie
-    const byCie = {}
-    for (const r of qRows) {
-      if (!r.date_comptable) continue
-      const d = new Date(r.date_comptable)
-      if (String(d.getMonth()+1) !== filterMois || String(d.getFullYear()) !== filterAnnee) continue
-      const cie = r.compagnie || "Inconnu"
-      if (!byCie[cie]) byCie[cie] = { cie, nb:0, primes:0, commission:0, commission_sa:0 }
-      byCie[cie].nb++
-      byCie[cie].primes += parseFloat(r.prime_totale)||0
-      byCie[cie].commission += parseFloat(r.commission)||0
-      byCie[cie].commission_sa += parseFloat(r.commission_sa)||0
-    }
+    const byCie = parCompagnie
     const rows = []
     const vus = new Set()
     for (const cie of Object.keys(byCie)) {
@@ -215,7 +131,7 @@ export default function BordereauxView({ view: viewProp, embedded } = {}) {
       rows.push({ cie:b.compagnie, nb:0, primes:0, commission:0, commission_sa:0, hasRcp:b.type==="RCP", hasBqt:b.type==="BQT", statut:"sans_quittance" })
     })
     return rows.sort((a,b) => b.commission - a.commission)
-  }, [qRows, bRows, idx, filterMois, filterAnnee])
+  }, [parCompagnie, bRows, idx, filterMois, filterAnnee])
 
   const reconKpi = useMemo(() => ({
     nbCie: reconcil.filter(r=>r.nb>0).length,
@@ -245,7 +161,7 @@ export default function BordereauxView({ view: viewProp, embedded } = {}) {
     <div style={{ fontFamily:"'Source Sans Pro', sans-serif" }}>
       {/* Onglets */}
       {!embedded && <div style={{ display:"flex", gap:8, marginBottom:16, alignItems:"center", flexWrap:"wrap" }}>
-        {[["quittances","💰 Quittances réelles"],["matrice","📊 Matrice BQT/RCP"],["reconciliation","🔗 Réconciliation"],["alertes",`⚠ Alertes (${alertes.length})`]].map(([k,l]) =>
+        {[["quittances","💰 Quittances réelles"],["reconciliation","🔗 Réconciliation"]].map(([k,l]) =>
           <button key={k} style={D.btn(view===k?"primary":"ghost")} onClick={() => setView(k)}>{l}</button>)}
       </div>}
       {/* Quittances réelles */}
@@ -309,96 +225,6 @@ export default function BordereauxView({ view: viewProp, embedded } = {}) {
         )}
       </div>}
 
-      {/* Matrice BQT/RCP */}
-      {view === "matrice" && <div>
-        <div style={{ ...D.card, marginBottom:8 }}>
-          <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap", marginBottom:10 }}>
-            <span style={{ fontSize:13, fontWeight:600, color:C.navy }}>Année :</span>
-            <select style={{ ...D.input, width:"auto" }} value={filterAnnee} onChange={e => setFilterAnnee(e.target.value)}>
-              {["2026","2025","2024","2023","2022","2021","2020"].map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
-            <input value={bordSearch} onChange={e => setBordSearch(e.target.value)} placeholder="Rechercher un bordereau (compagnie, fichier, compte…)"
-              style={{ ...D.input, flex:1, minWidth:240 }} />
-            <div style={{ fontSize:12, color:C.textL }}>{Object.keys(idx).length} bordereau(x) en {filterAnnee}</div>
-          </div>
-          <div style={{ fontSize:11, color:C.textL }}>
-            <span style={{ fontWeight:700, color:C.navy }}>Sous-lignes = producteurs. Lettre R : </span>
-            <span style={{ color:"#cbd5e1", fontWeight:800 }}>R</span> ni doc ni paiement&nbsp;·&nbsp;
-            <span style={{ color:"#111", fontWeight:800 }}>R</span> paiement, pas de PDF&nbsp;·&nbsp;
-            <span style={{ color:C.warn, fontWeight:800 }}>R</span> PDF, pas de paiement&nbsp;·&nbsp;
-            <span style={{ color:C.ok, fontWeight:800 }}>R</span> paiement + PDF&nbsp;·&nbsp;
-            <span style={{ background:C.ok, color:"#fff", fontWeight:700, padding:"1px 7px", borderRadius:4 }}>case verte = encodé dans Brio</span> (clique une case pour basculer)
-          </div>
-          {bordSearch.trim().length >= 2 && (
-            <div style={{ marginTop:10, border:`1px solid ${C.border}`, borderRadius:8, maxHeight:280, overflowY:"auto" }}>
-              {bordResults.length === 0
-                ? <div style={{ padding:12, fontSize:13, color:C.textL }}>Aucun bordereau ne correspond à « {bordSearch} ».</div>
-                : bordResults.map(b => {
-                    const lien = b.url_sharepoint || b.source
-                    return (
-                      <a key={b.id} href={lien||"#"} target="_blank" rel="noreferrer"
-                        style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 12px", borderBottom:`1px solid ${C.bg}`, textDecoration:"none", color:C.text, fontSize:13 }}>
-                        <span style={D.badge(b.type==="RCP"?C.navyMid:C.cyanB)}>{b.type}</span>
-                        <span style={{ fontWeight:700, color:C.navy, minWidth:90 }}>{b.compagnie}</span>
-                        <span style={{ color:C.textL }}>{MOIS_L[String(parseInt(b.mois,10))]||b.mois} {b.annee}</span>
-                        <span style={{ color:C.textL, fontSize:12 }}>{b.compte_producteur||""}</span>
-                        <span style={{ marginLeft:"auto", color:lien?C.ok:C.textL, fontSize:12 }}>{lien?"Ouvrir le PDF ↗":"— pas de fichier"}</span>
-                      </a>
-                    )
-                  })}
-              {bordResults.length === 60 && <div style={{ padding:8, fontSize:11, color:C.textL, textAlign:"center" }}>60 premiers résultats — affinez la recherche.</div>}
-            </div>
-          )}
-        </div>
-        <div style={D.card}><div style={{ overflowX:"auto" }}>
-          <table style={D.table}><thead><tr style={{ background:C.bg }}>
-            <th style={D.th}>Compagnie</th><th style={D.th}>Type attendu</th>
-            {MOIS.map(m => <th key={m} style={{ ...D.th, textAlign:"center" }}>{MOIS_L[m]}</th>)}
-          </tr></thead><tbody>
-            {compAff.map(comp => {
-              const open = matOpen[comp.code] !== false
-              return [(
-              <tr key={comp.code} style={{ cursor:"pointer" }} onClick={() => setMatOpen(o => ({ ...o, [comp.code]: o[comp.code] === false }))}>
-                <td style={{ ...D.td, fontWeight:700, color:C.navy }}>{open ? "▾ " : "▸ "}{comp.nom || comp.code}</td>
-                <td style={D.td}><span style={D.badge(C.navyMid)}>{[comp.bqt?"BQT":null, comp.rcp?"RCP":null].filter(Boolean).join("+") || "—"}</span></td>
-                {MOIS.map(m => {
-                  const mi = parseInt(m,10)
-                  const rst = comp.rcp ? compStatus(comp, mi, "rcp") : undefined
-                  const bst = comp.bqt ? compStatus(comp, mi, "bqt") : undefined
-                  return <td key={m} style={{ ...D.td, textAlign:"center", padding:"3px 4px" }}>
-                    <span style={{ fontSize:13, fontWeight:800, display:"inline-flex", gap:7, justifyContent:"center" }}>
-                      {comp.bqt && <span title="BQT — complétude" style={{ color: bst || "#cbd5e1" }}>B</span>}
-                      {comp.rcp && <span title="RCP — complétude" style={{ color: rst || "#cbd5e1" }}>R</span>}
-                    </span>
-                  </td>
-                })}
-              </tr>),
-              ...(open ? comp.prods.map(prod => (
-                <tr key={comp.code+"-"+prod} style={{ background:C.bg }}>
-                  <td style={{ ...D.td, paddingLeft:28, fontFamily:"monospace", fontSize:12, color:C.textM }}>{prod}</td>
-                  <td style={D.td}></td>
-                  {MOIS.map(m => {
-                    const mi = parseInt(m,10)
-                    const cell = (matByComp[comp.code]||{})[prod]?.[mi]
-                    const paye = !!(cell && cell.paye), rdoc = !!(cell && cell.rcp_doc), bdoc = !!(cell && cell.bqt_doc)
-                    const rcol = paye && rdoc ? C.ok : (paye && !rdoc ? "#111" : (!paye && rdoc ? C.warn : "#cbd5e1"))
-                    const enc = brioSet.has(brioKey(comp.code, prod, mi))
-                    return <td key={m} onClick={comp.rcp ? (e) => { e.stopPropagation(); toggleBrio(comp.code, prod, mi) } : undefined}
-                      title={comp.rcp ? ((cell ? ("payé: "+(paye?"oui":"non")+" · PDF: "+(rdoc?"oui":"non")+(cell.montant_paye?" · "+fmt(cell.montant_paye):"")) : "rien")+" — clic = encodé Brio") : undefined}
-                      style={{ ...D.td, textAlign:"center", padding:"2px 4px", cursor:comp.rcp?"pointer":"default", background: enc ? "#EAF7EC" : "transparent" }}>
-                      <span style={{ fontSize:12, fontWeight:800, display:"inline-flex", gap:7, justifyContent:"center" }}>
-                        {comp.bqt && <span title={bdoc?"BQT reçu":"BQT manquant"} style={{ color: bdoc?C.ok:"#cbd5e1" }}>B</span>}
-                        {comp.rcp && <span style={{ color: rcol }}>R</span>}
-                      </span>
-                    </td>
-                  })}
-                </tr>
-              )) : [])
-            ]})}
-          </tbody></table>
-        </div></div>
-      </div>}
-
       {/* Réconciliation quittances ↔ bordereaux */}
       {view === "reconciliation" && <div>
         <div style={{ ...D.card, padding:"12px 18px", marginBottom:12 }}>
@@ -412,6 +238,32 @@ export default function BordereauxView({ view: viewProp, embedded } = {}) {
             </select>
             <div style={{ marginLeft:"auto", fontSize:12, color:C.textL }}>{reconcil.length} compagnie(s)</div>
           </div>
+          {/* Recherche de bordereaux — récupérée de l'ancien onglet Matrice BQT/RCP */}
+          <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap", marginTop:10 }}>
+            <input value={bordSearch} onChange={e => setBordSearch(e.target.value)} placeholder="Rechercher un bordereau (compagnie, fichier, compte…)"
+              style={{ ...D.input, flex:1, minWidth:240 }} />
+            <div style={{ fontSize:12, color:C.textL }}>{Object.keys(idx).length} bordereau(x) en {filterAnnee}</div>
+          </div>
+          {bordSearch.trim().length >= 2 && (
+            <div style={{ marginTop:10, border:`1px solid ${C.border}`, borderRadius:8, maxHeight:280, overflowY:"auto" }}>
+              {bordResults.length === 0
+                ? <div style={{ padding:12, fontSize:13, color:C.textL }}>Aucun bordereau ne correspond à « {bordSearch} ».</div>
+                : bordResults.map(b => {
+                    const lien = b.url_sharepoint || b.source
+                    return (
+                      <a key={b.id} href={lien||"#"} target="_blank" rel="noreferrer"
+                        style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 12px", borderBottom:`1px solid ${C.bg}`, textDecoration:"none", color:C.textD, fontSize:13 }}>
+                        <span style={D.badge(b.type==="RCP"?C.navyMid:C.cyanB)}>{b.type}</span>
+                        <span style={{ fontWeight:700, color:C.navy, minWidth:90 }}>{b.compagnie}</span>
+                        <span style={{ color:C.textL }}>{MOIS_L[String(parseInt(b.mois,10))]||b.mois} {b.annee}</span>
+                        <span style={{ color:C.textL, fontSize:12 }}>{b.compte_producteur||""}</span>
+                        <span style={{ marginLeft:"auto", color:lien?C.ok:C.textL, fontSize:12 }}>{lien?"Ouvrir le PDF ↗":"— pas de fichier"}</span>
+                      </a>
+                    )
+                  })}
+              {bordResults.length === 60 && <div style={{ padding:8, fontSize:11, color:C.textL, textAlign:"center" }}>60 premiers résultats — affinez la recherche.</div>}
+            </div>
+          )}
         </div>
 
         <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))", gap:12, marginBottom:16 }}>
@@ -484,16 +336,6 @@ export default function BordereauxView({ view: viewProp, embedded } = {}) {
         )}
       </div>}
 
-      {/* Alertes */}
-      {view === "alertes" && <div style={D.card}>
-        <div style={{ marginBottom:12, fontSize:13, color:C.textM }}>{alertes.length} bordereau(x) manquant(s) sur les 6 premiers mois 2026</div>
-        {alertes.length === 0
-          ? <div style={{ padding:20, textAlign:"center", color:C.ok, fontWeight:600 }}>✅ Tous les bordereaux attendus sont présents</div>
-          : alertes.map((a,i) => <div key={i} style={D.alertBox("warn")}>
-              <span style={{ fontSize:15 }}>⚠</span>
-              <div style={{ flex:1 }}><strong>{a.cie}</strong> — {a.type} manquant · {MOIS_L[a.mois]} 2026</div>
-            </div>)}
-      </div>}
     </div>
   )
 }
