@@ -43,25 +43,64 @@ export default function BlocComptes({ societeCode, color }) {
 
   useEffect(() => { chargerComptes() }, [societeCode])
 
+  // Le déclenchement est asynchrone (pg_net n'attend pas la réponse) : on suit donc le
+  // résultat dans jobs_log, le journal du garde-fou. Le bouton ne dit pas « lancée » puis
+  // se tait — il annonce combien d'opérations sont réellement arrivées, ou qu'il n'y en a
+  // aucune, sans que personne ait à rafraîchir la page.
   async function lancerSynchro() {
     if (syncEtat === 'running') return
-    setSyncEtat('running'); setSyncMsg(null)
+    setSyncEtat('running'); setSyncMsg('Lancement…')
+    const debut = new Date(Date.now() - 2000).toISOString()   // petite marge d'horloge
+
     try {
       const { data, error } = await supabase.rpc('lancer_sync_ponto')
       if (error) throw error
       if (!data?.ok) {
         setSyncEtat('error')
         setSyncMsg(data?.message || 'Synchronisation refusée.')
-        setTimeout(() => { setSyncEtat('idle'); setSyncMsg(null) }, 6000)
+        setTimeout(() => { setSyncEtat('idle'); setSyncMsg(null) }, 7000)
         return
       }
-      setSyncEtat('ok'); setSyncMsg('Lancée…')
-      // Ponto met quelques secondes : on recharge deux fois plutôt que de faire attendre.
-      setTimeout(async () => { await chargerComptes(); setSyncMsg('Soldes mis à jour') }, 9000)
-      setTimeout(() => { chargerComptes(); setSyncEtat('idle'); setSyncMsg(null) }, 20000)
+
+      setSyncMsg('Synchronisation en cours…')
+      // Jusqu'à ~60 s d'attente : une synchro complète des 13 comptes prend ~7 s,
+      // davantage si Ponto remonte plusieurs pages d'historique.
+      for (let essai = 0; essai < 30; essai++) {
+        await new Promise(r => setTimeout(r, 2000))
+        const { data: journal } = await supabase
+          .from('jobs_log')
+          .select('statut,message,lignes_ecrites')
+          .eq('job', 'sync-ponto-comptes')
+          .gte('demarre_a', debut)
+          .order('demarre_a', { ascending: false })
+          .limit(1)
+
+        const execution = journal?.[0]
+        if (!execution || execution.statut === 'en_cours') continue
+
+        await chargerComptes()
+        if (execution.statut === 'echec') {
+          setSyncEtat('error')
+          setSyncMsg(execution.message || 'La synchronisation a échoué.')
+          setTimeout(() => { setSyncEtat('idle'); setSyncMsg(null) }, 10000)
+        } else {
+          const n = execution.lignes_ecrites ?? 0
+          setSyncEtat('ok')
+          setSyncMsg(n > 0
+            ? `${n} nouvelle${n > 1 ? 's' : ''} opération${n > 1 ? 's' : ''}`
+            : 'Aucune nouvelle opération')
+          setTimeout(() => { setSyncEtat('idle'); setSyncMsg(null) }, 10000)
+        }
+        return
+      }
+
+      // Le journal n'a rien conclu : on ne prétend pas que c'est fini.
+      setSyncEtat('error')
+      setSyncMsg("Toujours en cours — regarde Outils → Synchronisations.")
+      setTimeout(() => { setSyncEtat('idle'); setSyncMsg(null) }, 10000)
     } catch (e) {
       setSyncEtat('error'); setSyncMsg('Échec : ' + (e.message || e))
-      setTimeout(() => { setSyncEtat('idle'); setSyncMsg(null) }, 6000)
+      setTimeout(() => { setSyncEtat('idle'); setSyncMsg(null) }, 7000)
     }
   }
 
