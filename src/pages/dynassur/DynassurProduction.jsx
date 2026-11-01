@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
-import Layout from '../../components/Layout'
 import { ENTITES } from '../../lib/entites'
 import { StatBanner } from '../../components/ui/AccountableUI'
 import { useAuth } from '../../lib/auth'
@@ -628,7 +627,7 @@ function OngletDetail({ data }) {
 // ══════════════════════════════════════════════
 // PAGE PRINCIPALE
 // ══════════════════════════════════════════════
-export default function DynassurProduction() {
+export function ProductionContent() {
   const [onglet, setOnglet]   = useState('global')
   const [annee, setAnnee]     = useState(new Date().getFullYear())
   const [data, setData]       = useState([])
@@ -675,7 +674,7 @@ export default function DynassurProduction() {
   }, [annee])
 
   return (
-    <Layout currentPage="Production">
+    <>
       <div style={{ fontFamily:"'Source Sans Pro', sans-serif", width:'100%' }}>
 
         <StatBanner
@@ -741,6 +740,6 @@ export default function DynassurProduction() {
         )}
       </div>
       {detail && <ActsModal titre={detail.titre} rows={detail.rows} onClose={()=>setDetail(null)} />}
-    </Layout>
+    </>
   )
 }
