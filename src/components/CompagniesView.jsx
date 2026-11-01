@@ -214,6 +214,10 @@ export default function CompagniesView() {
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null)
   const [search, setSearch] = useState("")
+  const [statutFiltre, setStatutFiltre] = useState("tous")   // tous | actives | inactives
+  const [tri, setTri] = useState("nom")                      // nom | comptes
+  const [selId, setSelId] = useState(null)                   // fiche ouverte à droite
+  const [copie, setCopie] = useState(null)                   // n° copié, pour le retour visuel
 
   useEffect(() => { loadCies() }, [])
 
@@ -281,6 +285,8 @@ export default function CompagniesView() {
   }
 
   const filtered = cies.filter(c => {
+    if (statutFiltre === "actives" && !c.actif) return false
+    if (statutFiltre === "inactives" && c.actif) return false
     const q = search.toLowerCase().trim()
     if (!q) return true
     if ((c.nom||"").toLowerCase().includes(q)) return true
@@ -288,60 +294,144 @@ export default function CompagniesView() {
     // Recherche sur les numéros de producteurs
     if (comptesDe(c).some(p => (p.numero_producteur||"").toLowerCase().includes(q))) return true
     return false
-  })
+  }).sort((a,b) => tri === "comptes"
+    ? comptesDe(b).length - comptesDe(a).length || (a.nom||"").localeCompare(b.nom||"", "fr")
+    : (a.nom||"").localeCompare(b.nom||"", "fr"))
+
+  const selection = cies.find(c => c.id === selId) || null
+
+  // Les numéros producteurs sont des chaînes : les zéros initiaux comptent.
+  const copier = async (txt) => {
+    try { await navigator.clipboard.writeText(txt); setCopie(txt); setTimeout(() => setCopie(null), 1800) }
+    catch { setCopie(null) }
+  }
+
+  // Le logo s'affiche sans cadre ni tuile : seuls les fonds propres à la marque restent.
+  const Logo = ({ c, taille = 34 }) => {
+    const lu = logoUrl(c)
+    return (
+      <div style={{ width:taille, height:taille, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center" }}>
+        {lu
+          ? <img src={lu} alt="" style={{ maxWidth:"100%", maxHeight:"100%", objectFit:"contain" }}
+              onError={e => { e.currentTarget.style.display = "none" }} />
+          : <span style={{ fontSize:taille/3, fontWeight:800, color:c.couleur||C.navy }}>{(c.code||"?").slice(0,3)}</span>}
+      </div>
+    )
+  }
 
   if (loading) return <div style={{ padding:40, textAlign:"center", color:C.textL, fontFamily:"'Source Sans Pro', sans-serif" }}>Chargement…</div>
 
   return (
     <div style={{ fontFamily:"'Source Sans Pro', sans-serif" }}>
-      <div style={{ ...D.card, padding:"14px 20px" }}>
-        <div style={{ display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
-          <div style={{ fontSize:13, fontWeight:600, color:C.navy }}>{cies.length} compagnie{cies.length>1?"s":""}</div>
-          <input style={{ ...D.input, flex:1, maxWidth:280 }} placeholder="🔍 Compagnie, code ou n° producteur..." value={search} onChange={e => setSearch(e.target.value)} />
-          <button style={{ ...D.btn("primary"), marginLeft:"auto" }} onClick={() => setModal({ ...EMPTY_CIE })}>➕ Nouvelle compagnie</button>
-        </div>
+      <div style={{ display:"flex", alignItems:"center", gap:12, flexWrap:"wrap", marginBottom:14 }}>
+        <h2 style={{ fontSize:26, fontWeight:800, color:C.navy, margin:0 }}>Compagnies</h2>
+        <span style={{ fontSize:13, fontWeight:700, color:C.navyMid, background:"#E6F2FB", borderRadius:14, padding:"2px 10px" }}>{cies.length}</span>
+        <button style={{ ...D.btn("primary"), marginLeft:"auto" }} onClick={() => setModal({ ...EMPTY_CIE })}>➕ Nouvelle compagnie</button>
       </div>
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(220px, 1fr))", gap:12 }}>
-        {filtered.map(c => {
-          const comptes = comptesDe(c)
-          const ouvert = comptes.length > 0
-          return (
-          <div key={c.id} style={{ ...D.card, marginBottom:0, padding:0, overflow:"hidden", opacity:c.actif?1:0.5, cursor:"pointer", transition:"transform 0.15s, box-shadow 0.15s", border: ouvert?`1px solid ${C.border}`:`1px solid #F5C6CB` }}
-            onClick={() => setModal({ ...c })}
-            onMouseOver={e => { e.currentTarget.style.transform="translateY(-2px)"; e.currentTarget.style.boxShadow="0 6px 20px rgba(0,0,0,0.12)" }}
-            onMouseOut={e => { e.currentTarget.style.transform=""; e.currentTarget.style.boxShadow="" }}>
-            <div style={{ height:6, background:c.couleur||C.navy }} />
-            <div style={{ padding:"16px 16px 12px" }}>
-              {(() => { const lu = logoUrl(c); return (
-              <div style={{ width:52, height:52, borderRadius:10, background:lu?"#fff":(c.couleur||C.navy)+"20", border:`2px solid ${c.couleur||C.border}`, display:"flex", alignItems:"center", justifyContent:"center", marginBottom:10, overflow:"hidden" }}>
-                {lu
-                  ? <img src={lu} style={{ width:"100%", height:"100%", objectFit:"contain" }} alt={c.code} onError={e=>{ e.currentTarget.style.display='none'; e.currentTarget.parentNode.innerHTML='<span style="font-size:16px;font-weight:800;color:'+(c.couleur||C.navy)+'">'+((c.code||'?').slice(0,3))+'</span>' }} />
-                  : <span style={{ fontSize:16, fontWeight:800, color:c.couleur||C.navy }}>{(c.code||"?").slice(0,3)}</span>}
-              </div>
-              )})()}
-              <div style={{ fontSize:13, fontWeight:700, color:C.navy, marginBottom:2 }}>{c.nom}</div>
-              <div style={{ fontSize:11, color:C.textL, marginBottom:8 }}>{c.code}</div>
-              {/* Comptes producteurs */}
-              {ouvert ? (
-                <div>
-                  <div style={{ fontSize:10, fontWeight:700, color:C.textL, textTransform:"uppercase", letterSpacing:.5, marginBottom:4 }}>{comptes.length} compte{comptes.length>1?"s":""} producteur{comptes.length>1?"s":""}</div>
-                  <div style={{ display:"flex", flexWrap:"wrap", gap:4 }}>
-                    {comptes.slice(0,6).map((p,j) => (
-                      <span key={j} style={{ fontSize:10, fontWeight:600, padding:"2px 6px", borderRadius:5, background:(c.couleur||C.navy)+"14", color:c.couleur||C.navy }}>{p.numero_producteur}</span>
-                    ))}
-                    {comptes.length>6 && <span style={{ fontSize:10, color:C.textL, padding:"2px 4px" }}>+{comptes.length-6}</span>}
-                  </div>
-                </div>
-              ) : (
-                <div style={{ fontSize:11, fontWeight:700, color:C.danger }}>⚠ Aucun n° producteur</div>
-              )}
-            </div>
-            <div style={{ borderTop:`1px solid ${C.border}`, padding:"6px 16px", background: ouvert?C.bg:"#FDECEA", fontSize:11, color:C.textL, display:"flex", justifyContent:"space-between" }}>
-              <span>{c.actif ? "✅ Active" : "🔴 Inactive"}</span>
-              <span style={{ color:C.cyanB }}>✏️ Modifier</span>
-            </div>
+
+      <div style={{ display:"flex", gap:10, flexWrap:"wrap", marginBottom:12 }}>
+        <input style={{ ...D.input, flex:1, minWidth:240 }} value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="🔍 Rechercher une compagnie, un code ou un n° producteur…" />
+        <select style={{ ...D.input, width:"auto" }} value={statutFiltre} onChange={e => setStatutFiltre(e.target.value)}>
+          <option value="tous">Statut : tous</option>
+          <option value="actives">Actives</option>
+          <option value="inactives">Inactives</option>
+        </select>
+        <select style={{ ...D.input, width:"auto" }} value={tri} onChange={e => setTri(e.target.value)}>
+          <option value="nom">Nom A-Z</option>
+          <option value="comptes">Nombre de comptes</option>
+        </select>
+      </div>
+
+      <div style={{ display:"grid", gridTemplateColumns: selection ? "minmax(0,1fr) minmax(0,340px)" : "1fr", gap:16, alignItems:"start" }}>
+        <div style={{ ...D.card, marginBottom:0, padding:0, overflow:"hidden" }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 120px 110px 100px 28px", gap:8, padding:"10px 16px", borderBottom:`1px solid ${C.border}`, background:C.bg }}>
+            {["Compagnie","Code","Comptes","Statut",""].map(h =>
+              <span key={h} style={{ fontSize:10.5, fontWeight:700, color:C.textL, textTransform:"uppercase", letterSpacing:.5 }}>{h}</span>)}
           </div>
-        )})}
+          {filtered.length === 0 && <div style={{ padding:36, textAlign:"center", color:C.textL, fontSize:13 }}>Aucune compagnie ne correspond.</div>}
+          {filtered.map(c => {
+            const comptes = comptesDe(c)
+            const choisie = selId === c.id
+            return (
+              <div key={c.id} onClick={() => setSelId(choisie ? null : c.id)}
+                style={{ display:"grid", gridTemplateColumns:"1fr 120px 110px 100px 28px", gap:8, alignItems:"center",
+                  padding:"10px 16px", borderBottom:`1px solid ${C.bg}`, cursor:"pointer",
+                  background: choisie ? "#EAF4FC" : "#fff",
+                  borderLeft: choisie ? `3px solid ${C.cyanB}` : "3px solid transparent", opacity:c.actif?1:.55 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:12, minWidth:0 }}>
+                  <Logo c={c} />
+                  <span style={{ fontSize:15, fontWeight:700, color: choisie ? C.cyanB : C.navy, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.nom}</span>
+                </div>
+                <span style={{ fontSize:13, color:C.textL }}>{c.code}</span>
+                <span style={{ fontSize:13, fontWeight:700, color: comptes.length ? C.navy : C.danger }}>
+                  {comptes.length ? `${comptes.length} compte${comptes.length>1?"s":""}` : "aucun n°"}
+                </span>
+                <span style={{ fontSize:12, fontWeight:700, borderRadius:14, padding:"3px 10px", justifySelf:"start",
+                  background: c.actif ? "#E6F7EC" : "#F1F5F9", color: c.actif ? C.ok : C.textL }}>
+                  {c.actif ? "● Active" : "● Inactive"}
+                </span>
+                <span style={{ color:C.textL, fontSize:16, textAlign:"right" }}>›</span>
+              </div>
+            )
+          })}
+          <div style={{ padding:"10px 16px", fontSize:12, color:C.textL }}>
+            {filtered.length} compagnie{filtered.length>1?"s":""} affichée{filtered.length>1?"s":""} sur {cies.length}
+          </div>
+        </div>
+
+        {selection && (
+          <div style={{ ...D.card, marginBottom:0, position:"sticky", top:12 }}>
+            <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:12 }}>
+              <span style={{ fontSize:10.5, fontWeight:700, color:C.textL, textTransform:"uppercase", letterSpacing:.5 }}>Fiche compagnie</span>
+              <button onClick={() => setSelId(null)} aria-label="Fermer la fiche"
+                style={{ border:"none", background:"none", color:C.textL, fontSize:18, cursor:"pointer", lineHeight:1 }}>✕</button>
+            </div>
+            <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:6 }}>
+              <Logo c={selection} taille={52} />
+              <div style={{ minWidth:0 }}>
+                <div style={{ fontSize:19, fontWeight:800, color:C.navy }}>{selection.nom}</div>
+                <div style={{ fontSize:13, color:C.textL }}>Code : {selection.code}</div>
+              </div>
+            </div>
+            <span style={{ display:"inline-block", fontSize:12, fontWeight:700, borderRadius:14, padding:"3px 10px", marginBottom:14,
+              background: selection.actif ? "#E6F7EC" : "#F1F5F9", color: selection.actif ? C.ok : C.textL }}>
+              {selection.actif ? "● Active" : "● Inactive"}
+            </span>
+
+            {(selection.telephone || selection.email_contact || selection.site_web) && (
+              <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:12, marginBottom:14, display:"flex", flexDirection:"column", gap:5 }}>
+                {selection.telephone && <div style={{ fontSize:13, color:C.textM }}>☎ {selection.telephone}</div>}
+                {selection.email_contact && <div style={{ fontSize:13, color:C.textM, wordBreak:"break-all" }}>✉ {selection.email_contact}</div>}
+                {selection.site_web && <a href={selection.site_web} target="_blank" rel="noreferrer" style={{ fontSize:13, color:C.cyanB, wordBreak:"break-all" }}>🌐 {selection.site_web}</a>}
+              </div>
+            )}
+
+            <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:12 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
+                <span style={{ fontSize:15, fontWeight:800, color:C.navy }}>Comptes producteurs</span>
+                <span style={{ fontSize:12, fontWeight:700, color:C.navyMid, background:"#E6F2FB", borderRadius:12, padding:"1px 8px" }}>{comptesDe(selection).length}</span>
+              </div>
+              {comptesDe(selection).length === 0
+                ? <div style={{ fontSize:13, color:C.danger, fontWeight:600 }}>⚠ Aucun numéro de producteur enregistré</div>
+                : comptesDe(selection).map(p => (
+                    <div key={p.id} style={{ display:"flex", alignItems:"center", gap:8, background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, padding:"8px 12px", marginBottom:6 }}>
+                      <span style={{ fontSize:14, fontWeight:600, color:C.navy, fontFamily:"monospace" }}>{p.numero_producteur}</span>
+                      {p.statut && p.statut !== "actif" && <span style={{ fontSize:10.5, color:C.warn, fontWeight:700 }}>{p.statut}</span>}
+                      <button onClick={() => copier(p.numero_producteur)} title="Copier le numéro"
+                        style={{ marginLeft:"auto", border:"none", background:"none", cursor:"pointer", color:C.textL, fontSize:14 }}>
+                        {copie === p.numero_producteur ? "✓" : "⧉"}
+                      </button>
+                    </div>
+                  ))}
+              <div aria-live="polite" style={{ fontSize:12, color:C.ok, minHeight:16 }}>
+                {copie ? `Numéro ${copie} copié` : ""}
+              </div>
+            </div>
+
+            <button onClick={() => setModal({ ...selection })} style={{ ...D.btn("ghost"), width:"100%", marginTop:10 }}>✏️ Modifier la compagnie</button>
+          </div>
+        )}
       </div>
 
 

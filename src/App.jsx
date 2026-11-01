@@ -152,7 +152,7 @@ export default function App() {
           <Route path="/dynassur/bordereaux"   element={<Navigate to="/dynassur/compagnies" replace />} />
           <Route path="/dynassur/credits"      element={<P need="dyn_credits"><DynassurCredits /></P>} />
           <Route path="/dynassur/objectifs"    element={<Navigate to="/dynassur/production" replace />} />
-          <Route path="/dynassur/compagnies"   element={<P need={["dyn_compagnies","dyn_bordereaux"]}><DynassurCompagnies /></P>} />
+          <Route path="/dynassur/compagnies"   element={<P need="dyn_compagnies"><DynassurCompagnies /></P>} />
           <Route path="/dynassur/sinistres"    element={<P need="dyn_sinistres"><DynassurSinistres /></P>} />
           <Route path="/dynassur/rdv"          element={<P need="dyn_rdv"><DynassurRdv /></P>} />
           <Route path="/dynassur/appels"       element={<P need="dyn_appels"><DynassurAppels /></P>} />
