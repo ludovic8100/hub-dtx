@@ -27,18 +27,18 @@ const STATUT_PROD = {
   cloture: { label:"Clôturé",  couleur:"#8A9BBE" },
 }
 
-function CieFormModal({ cie, comptes = [], logos = [], onClose, onSave, onDelete, onAddProd, onSetStatut, onDelProd }) {
+function CieFormModal({ cie, comptes = [], logos = [], onClose, onSave, onDelete, onAddProd, onSetStatut, onSetDescriptif, onDelProd }) {
   const isNew = !cie.id
   const [form, setForm] = useState({ ...cie })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
-  const [newProd, setNewProd] = useState({ numero:"", fsma:"" })
+  const [newProd, setNewProd] = useState({ numero:"", fsma:"", descriptif:"" })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   const ajouterProd = async () => {
     if (!newProd.numero.trim()) return
-    await onAddProd({ id: form.id, nom: form.nom }, newProd.numero.trim(), newProd.fsma.trim())
-    setNewProd({ numero:"", fsma:"" })
+    await onAddProd({ id: form.id, nom: form.nom }, newProd.numero.trim(), newProd.fsma.trim(), newProd.descriptif.trim())
+    setNewProd({ numero:"", fsma:"", descriptif:"" })
   }
   const supprimerCie = async () => {
     if (comptes.length > 0) { setError("Cette compagnie a des numéros de producteur : désactive-la plutôt que la supprimer."); return }
@@ -112,8 +112,12 @@ function CieFormModal({ cie, comptes = [], logos = [], onClose, onSave, onDelete
                     <div key={p.id} style={{ display:"flex", alignItems:"center", gap:8, background:"#fff", border:`1px solid ${C.border}`, borderRadius:6, padding:"6px 8px" }}>
                       <span style={{ fontSize:12, fontWeight:700, color:C.navy, fontFamily:"monospace" }}>{p.numero_producteur}</span>
                       {p.fsma && <span style={{ fontSize:10, color:C.textL }}>FSMA {p.fsma}</span>}
+                      {/* À quoi sert ce compte : AG en a cinq, Record un PAT et un PH. */}
+                      <input defaultValue={p.descriptif || ""} placeholder="À quoi sert ce compte ? (PH, PAT, portefeuille…)"
+                        onBlur={e => { const v = e.target.value.trim(); if (v !== (p.descriptif || "")) onSetDescriptif(p.id, v) }}
+                        style={{ ...D.input, flex:1, minWidth:120, fontSize:12, padding:"4px 8px" }} />
                       <select value={p.statut||"actif"} onChange={e => onSetStatut(p.id, e.target.value)}
-                        style={{ marginLeft:"auto", border:"none", borderRadius:5, padding:"2px 6px", fontSize:11, fontWeight:600, cursor:"pointer", color:"#fff", background:st.couleur }}>
+                        style={{ border:"none", borderRadius:5, padding:"2px 6px", fontSize:11, fontWeight:600, cursor:"pointer", color:"#fff", background:st.couleur }}>
                         <option value="actif" style={{ color:"#000", background:"#fff" }}>Actif</option>
                         <option value="runoff" style={{ color:"#000", background:"#fff" }}>Run-off</option>
                         <option value="cloture" style={{ color:"#000", background:"#fff" }}>Clôturé</option>
@@ -123,9 +127,10 @@ function CieFormModal({ cie, comptes = [], logos = [], onClose, onSave, onDelete
                     </div>
                   )})}
                 </div>
-                <div style={{ display:"flex", gap:6, marginTop:8 }}>
-                  <input style={{ ...D.input, flex:1 }} placeholder="Nouveau n° producteur" value={newProd.numero} onChange={e => setNewProd(n => ({ ...n, numero:e.target.value }))} />
+                <div style={{ display:"flex", gap:6, marginTop:8, flexWrap:"wrap" }}>
+                  <input style={{ ...D.input, width:150 }} placeholder="Nouveau n° producteur" value={newProd.numero} onChange={e => setNewProd(n => ({ ...n, numero:e.target.value }))} />
                   <input style={{ ...D.input, width:90 }} placeholder="FSMA" value={newProd.fsma} onChange={e => setNewProd(n => ({ ...n, fsma:e.target.value }))} />
+                  <input style={{ ...D.input, flex:1, minWidth:140 }} placeholder="Descriptif (PH, PAT, portefeuille…)" value={newProd.descriptif} onChange={e => setNewProd(n => ({ ...n, descriptif:e.target.value }))} />
                   <button style={D.btn("ghost")} onClick={ajouterProd}>➕ Ajouter</button>
                 </div>
               </>
@@ -255,12 +260,16 @@ export default function CompagniesView() {
     const { data } = await supabase.from("producteurs").select("*").order("compagnie_nom")
     setProducteurs(Array.isArray(data) ? data : [])
   }
-  const addProd = async (cie, numero, fsma) => {
-    await supabase.from("producteurs").insert({ numero_producteur:numero, fsma:fsma||null, compagnie_id:cie.id, compagnie_nom:cie.nom, statut:"actif" })
+  const addProd = async (cie, numero, fsma, descriptif) => {
+    await supabase.from("producteurs").insert({ numero_producteur:numero, fsma:fsma||null, descriptif:descriptif||null, compagnie_id:cie.id, compagnie_nom:cie.nom, statut:"actif" })
     await reloadProd()
   }
   const setProdStatut = async (id, statut) => {
     await supabase.from("producteurs").update({ statut, updated_at:new Date().toISOString() }).eq("id", id)
+    await reloadProd()
+  }
+  const setProdDescriptif = async (id, descriptif) => {
+    await supabase.from("producteurs").update({ descriptif: descriptif || null, updated_at:new Date().toISOString() }).eq("id", id)
     await reloadProd()
   }
   const delProd = async (id) => {
@@ -415,13 +424,16 @@ export default function CompagniesView() {
               {comptesDe(selection).length === 0
                 ? <div style={{ fontSize:13, color:C.danger, fontWeight:600 }}>⚠ Aucun numéro de producteur enregistré</div>
                 : comptesDe(selection).map(p => (
-                    <div key={p.id} style={{ display:"flex", alignItems:"center", gap:8, background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, padding:"8px 12px", marginBottom:6 }}>
-                      <span style={{ fontSize:14, fontWeight:600, color:C.navy, fontFamily:"monospace" }}>{p.numero_producteur}</span>
-                      {p.statut && p.statut !== "actif" && <span style={{ fontSize:10.5, color:C.warn, fontWeight:700 }}>{p.statut}</span>}
-                      <button onClick={() => copier(p.numero_producteur)} title="Copier le numéro"
-                        style={{ marginLeft:"auto", border:"none", background:"none", cursor:"pointer", color:C.textL, fontSize:14 }}>
-                        {copie === p.numero_producteur ? "✓" : "⧉"}
-                      </button>
+                    <div key={p.id} style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, padding:"8px 12px", marginBottom:6 }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                        <span style={{ fontSize:14, fontWeight:600, color:C.navy, fontFamily:"monospace" }}>{p.numero_producteur}</span>
+                        {p.statut && p.statut !== "actif" && <span style={{ fontSize:10.5, color:C.warn, fontWeight:700 }}>{p.statut}</span>}
+                        <button onClick={() => copier(p.numero_producteur)} title="Copier le numéro"
+                          style={{ marginLeft:"auto", border:"none", background:"none", cursor:"pointer", color:C.textL, fontSize:14 }}>
+                          {copie === p.numero_producteur ? "✓" : "⧉"}
+                        </button>
+                      </div>
+                      {p.descriptif && <div style={{ fontSize:12, color:C.textM, marginTop:3 }}>{p.descriptif}</div>}
                     </div>
                   ))}
               <div aria-live="polite" style={{ fontSize:12, color:C.ok, minHeight:16 }}>
@@ -457,7 +469,7 @@ export default function CompagniesView() {
         </div>
       )}
 
-      {modal && <CieFormModal cie={modal} comptes={comptesDe(modal)} logos={logos} onClose={() => setModal(null)} onSave={handleSave} onDelete={delCie} onAddProd={addProd} onSetStatut={setProdStatut} onDelProd={delProd} />}
+      {modal && <CieFormModal cie={modal} comptes={comptesDe(modal)} logos={logos} onClose={() => setModal(null)} onSave={handleSave} onDelete={delCie} onAddProd={addProd} onSetStatut={setProdStatut} onSetDescriptif={setProdDescriptif} onDelProd={delProd} />}
     </div>
   )
 }
