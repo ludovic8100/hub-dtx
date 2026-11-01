@@ -44,8 +44,6 @@ function Bar({ pct, col }) {
 
 export default function DashboardDynassur() {
   const { perms, user, isAdmin } = useAuth()
-  const [syncing, setSyncing] = useState(false)
-  const [syncResult, setSyncResult] = useState(null)
   const [data, setData] = useState({ stats:{clients:0,sinistres:0,naAnnee:0,naMois:0,renonAnnee:0}, bordereaux:[], objectifs:[], prodMois:[] })
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
@@ -90,23 +88,6 @@ export default function DashboardDynassur() {
 
   const { stats, bordereaux, objectifs, prodMois } = data
 
-  async function handleSync() {
-    setSyncing(true)
-    setSyncResult(null)
-    try {
-      const { data: nb, error } = await supabase.rpc('sync_taches_bordereaux_manquants')
-      if (error) throw error
-      setSyncResult({ ok: true, nb })
-      // Recharger les bordereaux
-      const { data: bord } = await supabase.from('v_bordereaux_reconciliation')
-        .select('annee,mois,type,compagnie,statut_reconciliation')
-        .in('statut_reconciliation',['fichier_ok_non_encaisse','fichier_sans_chiffres','commission_sans_fichier','manquant']).eq('annee',annee)
-      setData(d => ({ ...d, bordereaux: bord||[] }))
-    } catch(e) {
-      setSyncResult({ ok: false, msg: e.message })
-    }
-    setSyncing(false)
-  }
   const obj = objectifs[0]
   const soldeNet = stats.naAnnee - stats.renonAnnee
   const AGENT_NOMS = { GGO:'G. Godfroid', TJA:'T. Japsenne', PFQ:'P. Fernandez', MTE:'M. Terrana', NGI:'N. Ginis', LDE:'L. Detilloux' }
@@ -226,23 +207,7 @@ export default function DashboardDynassur() {
                 ? <span style={{ fontSize:11, background:'#fee2e2', color:C.danger, padding:'2px 7px', borderRadius:10, fontWeight:700 }}>{bordereaux.length} alertes</span>
                 : <span style={{ fontSize:11, background:'#dcfce7', color:C.ok, padding:'2px 7px', borderRadius:10, fontWeight:700 }}>✓ OK</span>
               }
-              <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:8 }}>
-                {syncResult && (
-                  <span style={{ fontSize:11, color: syncResult.ok ? C.ok : C.danger, fontWeight:600 }}>
-                    {syncResult.ok ? `✓ ${syncResult.nb} tâche${syncResult.nb>1?'s':''} créée${syncResult.nb>1?'s':''}` : `⚠ ${syncResult.msg}`}
-                  </span>
-                )}
-                <button onClick={handleSync} disabled={syncing} style={{
-                  fontSize:11, fontWeight:700, padding:'4px 10px', borderRadius:6, cursor:syncing?'wait':'pointer',
-                  background: syncing?'#f1f5f9':C.blue, color:syncing?C.muted:'#fff',
-                  border:`1px solid ${syncing?C.border:C.blue}`, transition:'all 0.15s', display:'flex', alignItems:'center', gap:5
-                }}>
-                  <i className={`ti ${syncing?'ti-loader-2':'ti-refresh'}`} style={{ fontSize:12, animation:syncing?'spin 1s linear infinite':'' }} />
-                  {syncing ? 'Sync…' : 'Créer tâches'}
-                </button>
-              </div>
             </div>
-            <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
             {loading ? <div style={{ padding:30, textAlign:'center', color:C.muted }}>Chargement…</div>
             : bordereaux.length === 0 ? <div style={{ padding:30, textAlign:'center', color:C.ok, fontSize:13 }}>✓ Tous les bordereaux sont réconciliés</div>
             : (

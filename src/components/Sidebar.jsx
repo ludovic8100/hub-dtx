@@ -7,10 +7,10 @@ import { supabase } from '../lib/supabase'
 
 // Icônes métal du menu (public/icons/hub-dtx-metal/, 24 px, PNG transparents).
 // La correspondance se fait sur le suffixe de la clé, donc une même icône sert
-// à toutes les sociétés : dyn_taches, lode_taches et hex_taches partagent « taches ».
+// à toutes les sociétés : dyn_notesfrais et lode_notesfrais partagent « notes-de-frais ».
 // Une entrée sans correspondance garde son icône Tabler d'origine.
 const ICONES = {
-  dashboard: 'tableau-de-bord', taches: 'taches', notesfrais: 'notes-de-frais',
+  dashboard: 'tableau-de-bord', notesfrais: 'notes-de-frais',
   notes_frais: 'notes-de-frais', clients: 'clients', production: 'production',
   compagnies: 'compagnies-bordereaux', credits: 'credits', sinistres: 'sinistres',
   rdv: 'rdv-agenda', appels: 'appels', comptabilite: 'comptabilite',
