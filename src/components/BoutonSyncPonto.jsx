@@ -44,7 +44,9 @@ export const IconeSyncPonto = ({ taille = 18, anime = false }) => (
   </svg>
 )
 
-export default function BoutonSyncPonto({ onTermine, style }) {
+// `surFonce` : le bouton vit aussi dans l'en-tête sombre du tableau de bord général,
+// où un message gris ardoise devient illisible.
+export default function BoutonSyncPonto({ onTermine, style, surFonce = false }) {
   const [etat, setEtat] = useState('idle')   // idle | running | ok | error
   const [message, setMessage] = useState(null)
 
@@ -108,7 +110,11 @@ export default function BoutonSyncPonto({ onTermine, style }) {
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, ...style }}>
       {message && (
         <span style={{ fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
-          color: etat === 'error' ? '#dc2626' : etat === 'ok' ? '#16a34a' : '#64748b' }}>
+          color: etat === 'error'
+            ? (surFonce ? '#fca5a5' : '#dc2626')
+            : etat === 'ok'
+              ? (surFonce ? '#86efac' : '#16a34a')
+              : (surFonce ? 'rgba(255,255,255,0.85)' : '#64748b') }}>
           {message}
         </span>
       )}
