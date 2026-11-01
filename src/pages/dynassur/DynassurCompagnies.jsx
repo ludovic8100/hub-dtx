@@ -7,7 +7,7 @@ import { ENTITES } from '../../lib/entites'
 import { StatBanner } from '../../components/ui/AccountableUI'
 import { useAuth } from '../../lib/auth'
 
-const BORD_VIEWS = ['matrice', 'reconciliation', 'quittances', 'alertes']
+const BORD_VIEWS = ['reconciliation', 'quittances']
 
 export default function DynassurCompagnies() {
   const E = ENTITES.dynassur
@@ -18,7 +18,7 @@ export default function DynassurCompagnies() {
 
   const tabs = [
     ...(canComp ? [['compagnies', 'Compagnies'], ['producteurs', 'Producteurs']] : []),
-    ...(canBord ? [['matrice', 'Matrice BQT/RCP'], ['reconciliation', 'Réconciliation'], ['quittances', 'Quittances'], ['alertes', 'Alertes']] : []),
+    ...(canBord ? [['reconciliation', 'Réconciliation'], ['quittances', 'Quittances']] : []),
   ]
   const [tab, setTab] = useState(tabs[0] ? tabs[0][0] : 'compagnies')
 
