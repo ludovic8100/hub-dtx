@@ -174,8 +174,18 @@ export default function Sidebar() {
         borderLeft: active ? `3px solid ${accentColor}` : '3px solid transparent',
         transition:'all 0.15s', marginBottom:'1px'
       }}
-        onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
-        onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}
+        onMouseEnter={e => {
+          // Gris clair franc au survol : les icônes gardent leurs couleurs métalliques,
+          // elles ne peuvent plus signaler le survol en changeant de teinte comme avant.
+          if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.22)'
+          const img = e.currentTarget.querySelector('img')
+          if (img) img.style.opacity = '1'
+        }}
+        onMouseLeave={e => {
+          if (!active) e.currentTarget.style.background = 'transparent'
+          const img = e.currentTarget.querySelector('img')
+          if (img && !active) img.style.opacity = '0.6'
+        }}
       >
         {iconePng(item.key)
           ? <img src={`/icons/hub-dtx-metal/${iconePng(item.key)}.png`} alt="" width={24} height={24}
