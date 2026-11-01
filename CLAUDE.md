@@ -90,7 +90,9 @@ pour les GitHub Actions, `job_tickets_rappels()` pour les crons purement SQL.
 Premier effet mesuré : la synchronisation Entra échouait depuis sa création (secrets jamais
 saisis, `Token Entra 404`). Révélée dès la mise en service du garde-fou, elle a été retirée
 le 01/11/2026 — **les accès du Hub se gèrent désormais à la main** dans Paramètres, et rien
-ne coupe plus automatiquement l'accès d'un collaborateur parti. Voir `docs/DROITS-ACCES.md`.
+ne coupe plus automatiquement l'accès d'un collaborateur parti. Elle sera remise en place avec
+le chantier sécurité (bloc 2 bis de `docs/DROITS-ACCES.md`), en même temps que le suivi d'accès
+et la traçabilité des modifications — les trois dépendent du retour du login.
 
 **Règle** : ne pas rajouter de dépendance n8n. Ce qui doit tourner côté serveur passe par une
 fonction Edge Supabase + `pg_cron`, ou une fonction serverless Vercel.

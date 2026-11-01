@@ -163,6 +163,32 @@ liste unique de modules et une table d'attribution utilisateur × société × m
 d'administration (`ConfigModule.jsx`, onglet « users ») garde la même forme, piloté par la table
 plutôt que par du code en dur.
 
+## Bloc 2 bis — Sécurité des accès (à venir, décidé le 01/11/2026)
+
+Trois chantiers qui vont ensemble et qui n'ont de sens qu'une fois le login remis :
+
+**1. Remettre la synchronisation Entra.** Retirée le 01/11 parce qu'elle n'avait jamais
+fonctionné (secrets `MS_TENANT_ID` / `MS_CLIENT_ID` / `MS_CLIENT_SECRET` jamais saisis).
+À reconstruire en Edge Function + `pg_cron`, avec cette fois une entrée dans `jobs_attendus`
+dès le premier jour pour qu'un échec soit visible. Le code retiré est récupérable dans
+l'historique Git (`supabase/functions/sync-entra-collaborateurs/`, retiré en PR #29).
+**En attendant, l'accès d'un collaborateur qui part se coupe à la main** : `compte_hub_actif`
+à `false` dans Paramètres.
+
+**2. Suivi d'accès.** Qui se connecte, qui travaille, sur quoi. La matière existe déjà :
+`connexions_log` (4 160 lignes, identités réelles jusqu'au 30/10) et `clients_consultes`.
+Ce qui manque est un écran qui les croise, et surtout la reprise du login — depuis le
+31/10, `ACCES_LIBRE_TEMPORAIRE = true` fait entrer tout le monde sous `lde@dynassur.be`,
+donc toute mesure d'activité est actuellement fausse.
+
+**3. Traçabilité des modifications.** Pouvoir répondre à « qui a changé ça ? » sur les tables
+sensibles (clients, contrats, collaborateurs, bordereaux, comptes). Techniquement simple —
+triggers `AFTER INSERT/UPDATE/DELETE` écrivant dans une table d'audit, avec `auth.uid()`.
+**Mais sans valeur tant que le login n'est pas remis** : aujourd'hui chaque écriture serait
+attribuée au même utilisateur. L'ordre est donc imposé : login d'abord, audit ensuite.
+À noter : l'historique ne se reconstruit pas rétroactivement — tout ce qui est modifié
+d'ici la mise en place est perdu pour l'audit.
+
 ## Bloc 3 — Espace client (à venir, après le bloc 2)
 
 Connexion par numéro de GSM avec code reçu par SMS à chaque connexion (Supabase Auth, provider
