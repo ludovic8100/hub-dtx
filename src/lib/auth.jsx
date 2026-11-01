@@ -68,7 +68,6 @@ export function AuthProvider({ children }) {
       const { data: co } = await supabase.from('collaborateurs').select('premiere_connexion').eq('email', email).single()
       if (co && !co.premiere_connexion) {
         await supabase.from('collaborateurs').update({ premiere_connexion: now, derniere_connexion: now }).eq('email', email)
-        await supabase.from('taches').update({ statut: 'terminee', date_cloture: now }).eq('user_email', email).eq('source', 'acces').neq('statut', 'terminee')
       } else {
         await supabase.from('collaborateurs').update({ derniere_connexion: now }).eq('email', email)
       }

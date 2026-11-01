@@ -13,10 +13,10 @@ Application interne de gestion pour un groupe de 6 entités belges :
 
 ## Structure
 
-- `src/pages/<entite>/…` : une page par module et par société (dashboard, comptabilité, banque, tâches…).
-- `src/components/` : composants partagés (ComptabiliteView, VueFactures, SelecteurFactureAchat, RapprochementAuto, BordereauxView…).
+- `src/pages/<entite>/…` : une page par module et par société (dashboard, comptabilité, banque, clients…).
+- `src/components/` : composants partagés (ComptabiliteView, VueFactures, SelecteurFactureAchat, RapprochementAuto, CompagniesView, TicketsView…).
 - `src/lib/` : client supabase, auth (`user_permissions`), configs par entité, utilitaires (`factures.js` : exclusion des extraits de compte).
-- `sql/` : schéma canonique régénéré depuis la base (`schema.sql`, 100 tables) + scripts par module.
+- `sql/` : schéma canonique régénéré depuis la base (`schema.sql`, 93 tables) + scripts par module.
 - `n8n_workflows/` : exports JSON de certains workflows n8n (pas tous, voir inventaire).
 - `api/` : fonctions serverless Vercel (3CX lookup/call, envoi devis).
 
@@ -30,7 +30,7 @@ Application interne de gestion pour un groupe de 6 entités belges :
 | Commissions | `bordereaux`, `collaborateur_taux` |
 | Facturation vente | `lode_*` (actif), `dtx_*` / `dyn_*` (prévus, vides) |
 | Hexagroup | `hex_membres`, `hex_cotisations*` |
-| Activité | `rdv`, `appels` (3CX), `taches*`, `tickets_messages` |
+| Activité | `appels` (3CX), `taches` (porte les **tickets**, `is_ticket = true`), `tickets_messages`, `ticket_categories` |
 
 Conventions : montants en `numeric`, dates ISO, colonne `societe` = code entité en MAJUSCULES.
 
@@ -49,23 +49,46 @@ règles : portefeuille par bureau, un seul modèle de modules, espace client sé
   sont filtrés côté app via `src/lib/factures.js` (`sansExtraits`). Idéalement ils devraient aussi être exclus
   à la source dans le nœud « Compiler Factures » du workflow n8n de rapprochement.
 
+## Refonte applicative (01/11/2026)
+
+Objectif : sortir des liens fragiles vers n8n et construire une vraie base applicative.
+Les workflows n8n ont été arrêtés et archivés côté n8n ; le Hub ne doit plus en dépendre.
+
+**Modules supprimés** — code, routes, menus, permissions et tables :
+
+| Module | Tables supprimées | Pourquoi |
+|---|---|---|
+| Tâches | `taches_historique`, `taches_suivi`, `taches_rapprochement` + les 59 lignes non-ticket de `taches` | alimenté par « Mails HUB → Tâches », jamais adopté |
+| RDV / Agenda | `rdv`, `rdv_categories`, fonction `rdv_autolink()` | plus aucune écriture depuis le 6 août 2026 |
+| Liens cassés | `liens_casses_log` | plus aucune écriture depuis le 13 août 2026 |
+| Synchronisation | `sync_log` (vide) | boutons pointant vers des webhooks morts |
+
+⚠️ **`taches` reste** : elle porte les tickets (`is_ticket = true`), seul module du groupe
+encore utilisé, avec `tickets_messages` et `ticket_categories`. Le jour où on y touche, il
+faudra sortir les tickets dans leur propre table plutôt que de prolonger ce partage.
+
+**La seule synchronisation externe conservée** : Qlik → Hub pour les **clients**, les
+**contrats** et le **statut de production** (N.A., Renon…). Elle passe par la GitHub Action
+`qlik-sync.yml`, déclenchable depuis le dashboard Dynassur (`src/components/SyncQlik.jsx`
+→ `api/reload-qlik.js`). Tout ce qui est **financier** (comptes, quittances, commissions,
+objectifs) ne vient plus de Qlik mais des comptes bancaires (Ponto) et des bordereaux.
+
+**Règle** : ne pas rajouter de dépendance n8n. Ce qui doit tourner côté serveur passe par une
+fonction Edge Supabase + `pg_cron`, ou une fonction serverless Vercel.
+
 ## Workflows n8n (inventaire, vérifié le 30/10/2026 via le connecteur n8n)
 
 Détail complet (nœuds, écritures Supabase, credentials, implications test) : `docs/N8N-INVENTAIRE.md`.
 
 | ID | Nom | Rôle | Déclencheur |
 |---|---|---|---|
-| ~~`hf6G2dE1ZcfXDO4W`~~ | ~~IBAN SYNC~~ | Remplacé le 31/10/2026 par la fonction Edge `sync-ponto-comptes` + `pg_cron` (`sync_ponto_comptes_daily`, 00:11) — la synchro n8n utilisait une clé Supabase invalide, 11 jours de retard découverts au passage. À désactiver dans n8n une fois les secrets Ponto renseignés. | — |
 | `hmL5WFBknLUfDwGw` | Rapprochement Factures ↔ Transactions | scan SharePoint `COMPTA/FACTURES/_*` → `factures_achat`, purge des orphelins, puis appelle `backfill-thumbs2` | cron quotidien + webhook `rapprochement-factures` |
 | `slxHb4qy0VvvZsz2` | Miniatures Factures v2 | vignettes PDF → bucket `factures-thumbs`, `transactions.facture_thumb_url` | webhook `backfill-thumbs2` |
 | `9mVOQPAN2fI5z9um` | Bordereaux BQT/RCP → Supabase | fichiers `AAAA.MM - BQT/RCP - Cie - n°.pdf` → `bordereaux` (sans montants, extraction Claude désactivée) | cron 01:00 + webhook `run-bordereaux` |
-| `c680QZUbZkFpwMEh` | Nettoyage liens cassés | délie les transactions dont la facture a disparu, log `liens_casses_log` | cron 02:00 + webhook `nettoyer-liens-casses` |
 | `3HDF690T2XJeaSWY` | Notes de frais - Notifications | mails Outlook soumission / acceptation | webhook `nf-notify` |
 | `i9dZDnCbZRhiDVI7` | NF - Liste _NOTE_DE_FRAIS | liste Graph du dossier `COMPTA/_NOTE_DE_FRAIS` | webhook GET `nf-list` |
 | `xgkgnuSSkoQXlXlp` | Tickets - Alertes mail | envoi mail via Graph `sendMail` | webhook `ticket-alerte` |
 | `szxoCijzm3wJ55Jd` | Tickets - Réponses mail → fil | lit la boîte hub, RPC ticket, archive | cron 2 min |
-| `Rted8kqbayA30OaJ` | Mails HUB → Tâches | mails → `taches` | cron 15 min |
-| `EH3JHKrmbzv6rItv` | Agenda → RDV | calendriers O365 → `rdv` | cron horaire |
 | `UnuI7LdT7RHfow8n` | HUB_DTX_USER_PERMISSION | users Entra ↔ `user_permissions` (insert / désactivation) | cron horaire |
 | `mGJGzrRNLw1ZAfOZ` | LODE - Peppol Send (Billit) | facture LODE → Billit → Peppol | webhook `lode-peppol-send` |
 | `EiB9oTn9MPJjELKW` | LODE - Facture Archive | PDF → SharePoint `COMPTA/FACTURES/_LODE/VENTES/<année>` | webhook `lode-facture-archive` |

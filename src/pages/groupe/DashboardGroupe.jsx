@@ -5,7 +5,6 @@ import Layout from '../../components/Layout'
 import { ENTITES } from '../../lib/entites'
 import { StatBanner, PrimaryButton } from '../../components/ui/AccountableUI'
 import VueFactures from '../../components/VueFactures'
-import { SyncButtonsRow } from '../../components/SyncCards'
 
 // ── Constantes ──
 const SOCIETES = {
@@ -549,7 +548,6 @@ export default function DashboardGroupe() {
         />
 
         <div style={{ marginBottom:20 }}>
-          <SyncButtonsRow />
         </div>
 
         {/* 2 — KPIs */}

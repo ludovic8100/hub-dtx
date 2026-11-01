@@ -6,7 +6,6 @@ import { useAuth } from '../../lib/auth'
 import BlocComptes from '../../components/BlocComptes'
 import { ENTITES } from '../../lib/entites'
 import { StatBanner, DataCard, StatusBadge } from '../../components/ui/AccountableUI'
-import { SyncButtonsRow } from '../../components/SyncCards'
 
 const E = ENTITES.hexagroup
 const fmt = v => v == null ? '—' : new Intl.NumberFormat('fr-BE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v)
@@ -76,7 +75,6 @@ export default function DashboardHexagroup() {
         />
 
         <div style={{ marginBottom:20 }}>
-          <SyncButtonsRow />
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14, marginBottom: 22 }}>

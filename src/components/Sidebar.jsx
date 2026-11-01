@@ -13,9 +13,9 @@ const ICONES = {
   dashboard: 'tableau-de-bord', notesfrais: 'notes-de-frais',
   notes_frais: 'notes-de-frais', clients: 'clients', production: 'production',
   compagnies: 'compagnies-bordereaux', credits: 'credits', sinistres: 'sinistres',
-  rdv: 'rdv-agenda', appels: 'appels', comptabilite: 'comptabilite',
+  appels: 'appels', comptabilite: 'comptabilite',
   devis: 'devis-factures', rentabilite: 'rentabilite', config: 'parametres',
-  sync: 'synchronisation', tools: 'outils', tickets: 'tickets',
+  tools: 'outils', tickets: 'tickets',
 }
 const iconePng = (key) => {
   if (!key) return null
