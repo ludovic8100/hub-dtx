@@ -12,6 +12,10 @@ const PROD = {
   SUPABASE_ANON_KEY: 'sb_publishable_xBt6ZaZGh5trEloyMCNRuA_MN-jesVJ', // clé publishable (publique)
   N8N_URL:           'https://n8n.srv1082740.hstgr.cloud',
   SHAREPOINT_SITE:   'https://dynassur.sharepoint.com/sites/ADMINISTRATION',
+  // Identifiant Graph du même site (repris du workflow n8n « Apercu facture »).
+  SHAREPOINT_SITE_ID: '438fcfb3-10f8-455b-8308-1f832d4db26d',
+  // Boîte Graph qui expédie les mails du Hub (repris de « Tickets - Alertes mail »).
+  MAIL_EXPEDITEUR_ID: '4614cde7-a3af-40a7-a945-b95536399ead',
   SHAREPOINT_ROOT:   'Documents partages',
   HUB_URL:           'https://hub-dtx.vercel.app',
 }
@@ -49,6 +53,10 @@ export const N8N_URL = lire('N8N_URL')
 export const N8N_TEST_SUFFIX = IS_TEST ? (env.N8N_TEST_SUFFIX ?? '-test') : ''
 export const n8nWebhook = chemin => `${N8N_URL}/webhook/${String(chemin).replace(/^\/+/, '')}${N8N_TEST_SUFFIX}`
 export const SHAREPOINT_SITE = lire('SHAREPOINT_SITE')
+export const SHAREPOINT_SITE_ID = lire('SHAREPOINT_SITE_ID')
+export const MAIL_EXPEDITEUR_ID = lire('MAIL_EXPEDITEUR_ID')
+// Clé CBEAPI (recherche Banque-Carrefour). Aucun défaut : secret, jamais dans le dépôt.
+export const CBEAPI_KEY = env.CBEAPI_KEY || ''
 export const SHAREPOINT_ROOT = lire('SHAREPOINT_ROOT', { defautTest: 'Documents partages/_TEST' })
 export const HUB_URL = lire('HUB_URL')
 
@@ -71,6 +79,7 @@ export default {
   APP_ENV, IS_PROD, IS_TEST,
   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY,
   N8N_URL, N8N_TEST_SUFFIX, n8nWebhook, SHAREPOINT_SITE, SHAREPOINT_ROOT, HUB_URL,
+  SHAREPOINT_SITE_ID, MAIL_EXPEDITEUR_ID, CBEAPI_KEY,
   AZURE, MAIL_REDIRECT_TO,
   GITHUB_DISPATCH_TOKEN, GITHUB_REPO, GITHUB_SYNC_REF,
 }

@@ -82,15 +82,16 @@ function StatCard({ label, count, tickets, color }) {
   )
 }
 
-import { n8nWebhook, HUB_URL } from '../config/env'
-const ALERTE_WEBHOOK = n8nWebhook('ticket-alerte')
+import { HUB_URL } from '../config/env'
+// Envoi via la fonction serverless Vercel (Microsoft Graph), plus par n8n.
+const ALERTE_ENDPOINT = '/api/ticket-alerte'
 
 // Envoie une alerte mail via le webhook n8n (ne bloque jamais l'UI)
 async function envoyerAlerte(destEmails, subject, htmlBody) {
   const to = (destEmails || []).filter(Boolean)
   if (!to.length) return
   try {
-    await fetch(ALERTE_WEBHOOK, {
+    await fetch(ALERTE_ENDPOINT, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ to, subject, html: htmlBody }),
     })
