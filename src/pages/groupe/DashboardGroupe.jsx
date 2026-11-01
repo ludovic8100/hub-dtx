@@ -139,7 +139,7 @@ function BlocBanque({ comptes, loading, onRafraichir }) {
       <BlocHeader icon="ti-credit-card" title="Comptes bancaires"
         right={(
           <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-            <BoutonSyncPonto onTermine={onRafraichir} />
+            <BoutonSyncPonto onTermine={onRafraichir} surFonce />
             {comptes.length > 0 && (
           <button onClick={() => {
             const next = !allRevealed
