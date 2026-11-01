@@ -58,6 +58,14 @@ jobs:
           if [ "$APP_ENV" = "test" ] && [ -z "$SUPABASE_URL" ]; then echo "::error::Variable SUPABASE_URL manquante dans l'environnement GitHub 'test'"; exit 1; fi
           echo "Cible: $APP_ENV (${SUPABASE_URL:-production par défaut}) — Mode: ${DRY_RUN:+DRY_RUN}${DRY_RUN:-ECRITURE REELLE}"
 
+      # Garde-fou : déclare le job au Hub (table jobs_log, vue v_jobs_sante).
+      # Sans cela, une synchro qui échoue en silence est invisible — c'est ce qui
+      # a laissé la synchro Ponto tourner 11 jours dans le vide.
+      - name: Journal - debut
+        id: journal
+        if: ${{ !inputs.dry_run }}
+        run: echo "id=$(python scripts/job_journal.py debut qlik-sync ${{ github.event_name == 'schedule' && 'cron' || 'manuel' }})" >> "$GITHUB_OUTPUT"
+
       # Ordre : clients (base) -> contrats -> production -> quittances,
       # puis enrichissements -> sinistres en dernier.
       - name: Clients            
@@ -82,3 +90,10 @@ jobs:
         run: python scripts/qlik_sinistre_paiements.py
       - name: Sinistres          
         run: python scripts/qlik_sync.py
+
+      - name: Journal - fin
+        if: ${{ always() && !inputs.dry_run }}
+        run: |
+          python scripts/job_journal.py fin "${{ steps.journal.outputs.id }}" \
+            "${{ job.status == 'success' && 'succes' || 'echec' }}" "" \
+            "GitHub Action qlik-sync — ${{ job.status }}"
