@@ -4,6 +4,7 @@ import { useAuth } from '../../lib/auth'
 import { ProductionContent } from './DynassurProduction'
 import { ChiffresContent } from './DynassurChiffres'
 import { RentabiliteContent } from './DynassurRentabilite'
+import ObjectifsView from '../../components/ObjectifsView'
 
 // Fusion du 01/11/2026 : Production, Chiffres et Rentabilité étaient trois entrées
 // séparées dans le menu Dynassur ; elles deviennent trois onglets d'une seule page
@@ -13,6 +14,7 @@ const ONGLETS = [
   ['production', 'Production', 'ti-chart-line', 'dyn_production'],
   ['chiffres', 'Chiffres', 'ti-report-analytics', 'dyn_chiffres'],
   ['rentabilite', 'Rentabilité', 'ti-coin', 'dyn_rentabilite'],
+  ['objectifs', 'Objectifs', 'ti-target', 'dyn_objectifs'],
 ]
 
 export default function DynassurPerformance() {
@@ -38,6 +40,7 @@ export default function DynassurPerformance() {
         {actif === 'production' && <ProductionContent />}
         {actif === 'chiffres' && <ChiffresContent />}
         {actif === 'rentabilite' && <RentabiliteContent />}
+        {actif === 'objectifs' && <ObjectifsView />}
         {!actif && <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>Aucun accès à ces écrans.</div>}
       </div>
     </Layout>
