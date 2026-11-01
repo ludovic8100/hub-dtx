@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import BoutonSyncPonto from '../../components/BoutonSyncPonto'
 import Layout from '../../components/Layout'
 import { ENTITES } from '../../lib/entites'
 import { StatBanner, PrimaryButton } from '../../components/ui/AccountableUI'
@@ -113,7 +114,7 @@ function BlocHeader({ icon, title, right }) {
   )
 }
 
-function BlocBanque({ comptes, loading }) {
+function BlocBanque({ comptes, loading, onRafraichir }) {
   const navigate = useNavigate()
   const [revealed, setRevealed] = useState({})
 
@@ -136,7 +137,10 @@ function BlocBanque({ comptes, loading }) {
   return (
     <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
       <BlocHeader icon="ti-credit-card" title="Comptes bancaires"
-        right={comptes.length > 0 && (
+        right={(
+          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <BoutonSyncPonto onTermine={onRafraichir} />
+            {comptes.length > 0 && (
           <button onClick={() => {
             const next = !allRevealed
             const all = { '__total__': next }
@@ -146,6 +150,8 @@ function BlocBanque({ comptes, loading }) {
           }} style={{ fontSize:11, color:'rgba(255,255,255,0.8)', background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.2)', borderRadius:6, padding:'4px 10px', cursor:'pointer', fontWeight:600 }}>
             {allRevealed ? '🔒 Tout masquer' : '👁 Tout révéler'}
           </button>
+            )}
+          </div>
         )}
       />
 
@@ -510,8 +516,8 @@ export default function DashboardGroupe() {
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading]           = useState(true)
 
-  useEffect(() => {
-    async function load() {
+  // Extrait du useEffect pour que le bouton Sync PONTO puisse le rappeler.
+  const load = useCallback(async () => {
       setLoading(true)
       try {
         const [
@@ -525,9 +531,8 @@ export default function DashboardGroupe() {
         setTransactions(txs || [])
       } catch(e) { console.error('DashboardGroupe load error:', e) }
       setLoading(false)
-    }
-    load()
   }, [])
+  useEffect(() => { load() }, [load])
 
   const [nbObjectifs, setNbObjectifs] = useState(null)
   useEffect(() => {
@@ -558,7 +563,7 @@ export default function DashboardGroupe() {
 
         {/* 3 — Comptes bancaires pleine largeur */}
         <div style={{ marginBottom:24 }}>
-          <BlocBanque comptes={comptes} loading={loading} />
+          <BlocBanque comptes={comptes} loading={loading} onRafraichir={load} />
         </div>
 
         {/* 3b — Factures à pointer (toutes sociétés, tous comptes) */}
