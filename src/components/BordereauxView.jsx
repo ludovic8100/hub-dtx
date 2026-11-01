@@ -16,16 +16,15 @@ const D = {
 const MOIS_L = { "1":"Jan","2":"Fév","3":"Mar","4":"Avr","5":"Mai","6":"Jun","7":"Jul","8":"Aoû","9":"Sep","10":"Oct","11":"Nov","12":"Déc","01":"Jan","02":"Fév","03":"Mar","04":"Avr","05":"Mai","06":"Jun","07":"Jul","08":"Aoû","09":"Sep" }
 const MOIS_FULL = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"]
 
-export default function BordereauxView({ view: viewProp, embedded } = {}) {
-  const [viewInt, setViewInt] = useState("quittances")
-  const view = viewProp || viewInt
-  const setView = setViewInt
+export default function BordereauxView({ view: viewProp } = {}) {
+  const view = viewProp || "reconciliation"
   const [qRows, setQRows] = useState([])
   const [bRows, setBRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [filterMois, setFilterMois] = useState(String(new Date().getMonth()+1))
   const [filterAnnee, setFilterAnnee] = useState("2026")
   const [bordSearch, setBordSearch] = useState("")
+  const [collabs, setCollabs] = useState([])
 
   useEffect(() => {
     const load = async () => {
@@ -49,6 +48,8 @@ export default function BordereauxView({ view: viewProp, embedded } = {}) {
         setBRows(b)
         const qq = await fetchAll(() => supabase.from("quittances").select("compagnie,date_comptable,prime_totale,commission,commission_sa,sous_agent,compte_producteur"))
         setQRows(qq)
+        const cb = await fetchAll(() => supabase.from("collaborateurs").select("code,nom_complet,nom_sa_data,noms_repris,regroupe_code"))
+        setCollabs(cb)
         // Défaut : dernier mois de l'année sélectionnée ayant des quittances (évite l'onglet vide)
         const moisDispo = {}
         qq.forEach(r => { if (r.date_comptable) { const d = new Date(r.date_comptable); if (String(d.getFullYear()) === filterAnnee) moisDispo[d.getMonth()+1] = true } })
@@ -59,6 +60,24 @@ export default function BordereauxView({ view: viewProp, embedded } = {}) {
     }
     load()
   }, [])
+
+  // Rapprochement nom de sous-agent -> code collaborateur, identique à celui de
+  // ObjectifsView et de v_pnl_producteur_annee : un même sous-agent peut apparaître dans
+  // les quittances sous plusieurs libellés (nom_sa_data + noms_repris), et regroupe_code
+  // fusionne les codes d'un même bénéficiaire. Sans ça, les montants à reverser étaient
+  // éclatés en plusieurs lignes partielles.
+  const saIndex = useMemo(() => {
+    const nameToCode = {}, label = {}, effOf = {}
+    collabs.forEach(c => {
+      if (!c.code) return
+      effOf[c.code] = c.regroupe_code || c.code
+      label[c.code] = c.nom_complet || c.code
+      const add = n => { const k = String(n || "").trim().toLowerCase(); if (k) nameToCode[k] = c.code }
+      add(c.nom_sa_data)
+      ;(c.noms_repris || []).forEach(add)
+    })
+    return { nameToCode, label, effOf }
+  }, [collabs])
 
   // Agrégation unique des quittances du mois par compagnie : l'onglet « Quittances » et
   // la réconciliation la calculaient séparément, à l'identique, avec un risque de divergence.
@@ -77,10 +96,6 @@ export default function BordereauxView({ view: viewProp, embedded } = {}) {
     }
     return agg
   }, [qRows, filterMois, filterAnnee])
-
-  const qAgg = useMemo(() => Object.entries(parCompagnie).sort((a, b) => b[1].primes - a[1].primes), [parCompagnie])
-
-  const totQ = useMemo(() => qAgg.reduce((s, [, v]) => ({ primes:s.primes+v.primes, commission:s.commission+v.commission, commission_sa:s.commission_sa+v.commission_sa }), { primes:0, commission:0, commission_sa:0 }), [qAgg])
 
   // Normalise : majuscules, sans espaces ni accents (pour matcher "ALPHA CREDIT" -> "ALPHACREDIT")
   const norm = (s) => (s || "").toString().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9]/g, "")
@@ -133,6 +148,12 @@ export default function BordereauxView({ view: viewProp, embedded } = {}) {
     return rows.sort((a,b) => b.commission - a.commission)
   }, [parCompagnie, bRows, idx, filterMois, filterAnnee])
 
+  const tauxNet = r => r.primes > 0 ? (r.commission / r.primes * 100) : 0
+  const totRecon = useMemo(() => reconcil.reduce((s,r) => ({
+    nb: s.nb + (r.nb||0), primes: s.primes + (r.primes||0),
+    commission: s.commission + (r.commission||0), commission_sa: s.commission_sa + (r.commission_sa||0),
+  }), { nb:0, primes:0, commission:0, commission_sa:0 }), [reconcil])
+
   const reconKpi = useMemo(() => ({
     nbCie: reconcil.filter(r=>r.nb>0).length,
     commission: reconcil.reduce((s,r)=>s+r.commission,0),
@@ -147,84 +168,24 @@ export default function BordereauxView({ view: viewProp, embedded } = {}) {
       if (!r.date_comptable) continue
       const d = new Date(r.date_comptable)
       if (String(d.getMonth()+1) !== filterMois || String(d.getFullYear()) !== filterAnnee) continue
-      const sa = (r.sous_agent || "").trim() || "(aucun)"
-      if (!m[sa]) m[sa] = { sa, nb:0, commission_sa:0 }
-      m[sa].nb++
-      m[sa].commission_sa += parseFloat(r.commission_sa)||0
+      const brut = (r.sous_agent || "").trim()
+      if (!brut || brut === "-") continue
+      const code = saIndex.nameToCode[brut.toLowerCase()]
+      const eff = code ? (saIndex.effOf[code] || code) : null
+      // Nom non rattaché à un collaborateur : on le garde à part plutôt que de le fondre
+      // dans un autre, et on le signale dans le tableau.
+      const key = eff || `?${brut.toLowerCase()}`
+      if (!m[key]) m[key] = { key, sa: eff ? (saIndex.label[eff] || eff) : brut, code: eff, rattache: !!eff, nb:0, commission_sa:0 }
+      m[key].nb++
+      m[key].commission_sa += parseFloat(r.commission_sa)||0
     }
     return Object.values(m).filter(x => x.commission_sa > 0).sort((a,b) => b.commission_sa - a.commission_sa)
-  }, [qRows, filterMois, filterAnnee])
+  }, [qRows, filterMois, filterAnnee, saIndex])
 
   if (loading) return <div style={{ padding:40, textAlign:"center", color:C.textL, fontFamily:"'Source Sans Pro', sans-serif" }}>Chargement…</div>
 
   return (
     <div style={{ fontFamily:"'Source Sans Pro', sans-serif" }}>
-      {/* Onglets */}
-      {!embedded && <div style={{ display:"flex", gap:8, marginBottom:16, alignItems:"center", flexWrap:"wrap" }}>
-        {[["quittances","💰 Quittances réelles"],["reconciliation","🔗 Réconciliation"]].map(([k,l]) =>
-          <button key={k} style={D.btn(view===k?"primary":"ghost")} onClick={() => setView(k)}>{l}</button>)}
-      </div>}
-      {/* Quittances réelles */}
-      {view === "quittances" && <div>
-        <div style={{ ...D.card, padding:"12px 18px", marginBottom:12 }}>
-          <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap" }}>
-            <span style={{ fontSize:13, fontWeight:600, color:C.navy }}>Période :</span>
-            <select style={{ ...D.input, width:"auto" }} value={filterMois} onChange={e => setFilterMois(e.target.value)}>
-              {["1","2","3","4","5","6","7","8","9","10","11","12"].map((m,i) => <option key={m} value={m}>{MOIS_FULL[i]}</option>)}
-            </select>
-            <select style={{ ...D.input, width:"auto" }} value={filterAnnee} onChange={e => setFilterAnnee(e.target.value)}>
-              {["2026","2025","2024"].map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
-            <div style={{ marginLeft:"auto", fontSize:12, color:C.textL }}>{qAgg.length} compagnies · {qRows.filter(r => { if(!r.date_comptable) return false; const d=new Date(r.date_comptable); return String(d.getMonth()+1)===filterMois && String(d.getFullYear())===filterAnnee }).length.toLocaleString("fr-BE")} quittances</div>
-          </div>
-        </div>
-
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12, marginBottom:16 }}>
-          {[
-            { l:"Total primes", v:fmt(totQ.primes), c:C.navy },
-            { l:"Commissions Dynassur", v:fmt(totQ.commission), c:C.cyanB },
-            { l:"Commissions sous-agents", v:fmt(totQ.commission_sa), c:"#9B59B6" }
-          ].map((k,i) => <div key={i} style={{ ...D.kpi, borderTop:`3px solid ${k.c}` }}>
-            <div style={{ fontSize:22, fontWeight:700, color:k.c }}>{k.v}</div>
-            <div style={{ fontSize:11, color:C.textL, marginTop:3 }}>{k.l}</div>
-          </div>)}
-        </div>
-
-        {qAgg.length === 0 ? (
-          <div style={{ ...D.card, textAlign:"center", padding:40, color:C.textL }}>Aucune quittance pour cette période</div>
-        ) : (
-          <div style={D.card}>
-            <div style={D.cardTitle}>Détail par compagnie — {MOIS_FULL[parseInt(filterMois)-1]} {filterAnnee}</div>
-            <div style={{ overflowX:"auto" }}>
-            <table style={D.table}><thead><tr style={{ background:C.bg }}>
-              {["Compagnie","Quittances","Primes totales","Commission Dynassur","Commission SA","Taux net"].map(h =>
-                <th key={h} style={{ ...D.th, textAlign:h==="Compagnie"?"left":"right" }}>{h}</th>)}
-            </tr></thead><tbody>
-              {qAgg.map(([cie, v], i) => {
-                const tauxNet = v.primes > 0 ? (v.commission / v.primes * 100) : 0
-                return <tr key={i} style={{ background:i%2?C.bg:"#fff" }}>
-                  <td style={{ ...D.td, fontWeight:600, color:C.navy }}>{cie}</td>
-                  <td style={{ ...D.td, textAlign:"right", color:C.textM }}>{v.nb.toLocaleString("fr-BE")}</td>
-                  <td style={{ ...D.td, textAlign:"right", fontWeight:600, fontVariantNumeric:"tabular-nums" }}>{fmt(v.primes)}</td>
-                  <td style={{ ...D.td, textAlign:"right", color:C.ok, fontWeight:600, fontVariantNumeric:"tabular-nums" }}>{fmt(v.commission)}</td>
-                  <td style={{ ...D.td, textAlign:"right", color:"#9B59B6", fontVariantNumeric:"tabular-nums" }}>{fmt(v.commission_sa)}</td>
-                  <td style={{ ...D.td, textAlign:"right", color:tauxNet>10?C.ok:tauxNet>5?C.warn:C.danger, fontWeight:600 }}>{tauxNet.toFixed(1)}%</td>
-                </tr>
-              })}
-              <tr style={{ background:C.navy+"08", fontWeight:700, borderTop:`2px solid ${C.navy}` }}>
-                <td style={{ ...D.td, fontWeight:700, color:C.navy }}>TOTAL</td>
-                <td style={{ ...D.td, textAlign:"right", fontWeight:700 }}>{qAgg.reduce((s,[,v])=>s+v.nb,0).toLocaleString("fr-BE")}</td>
-                <td style={{ ...D.td, textAlign:"right", fontWeight:700, color:C.navy }}>{fmt(totQ.primes)}</td>
-                <td style={{ ...D.td, textAlign:"right", fontWeight:700, color:C.ok }}>{fmt(totQ.commission)}</td>
-                <td style={{ ...D.td, textAlign:"right", fontWeight:700, color:"#9B59B6" }}>{fmt(totQ.commission_sa)}</td>
-                <td style={{ ...D.td, textAlign:"right", fontWeight:700, color:C.navy }}>{totQ.primes>0?(totQ.commission/totQ.primes*100).toFixed(1):0}%</td>
-              </tr>
-            </tbody></table>
-            </div>
-          </div>
-        )}
-      </div>}
-
       {/* Réconciliation quittances ↔ bordereaux */}
       {view === "reconciliation" && <div>
         <div style={{ ...D.card, padding:"12px 18px", marginBottom:12 }}>
@@ -285,8 +246,8 @@ export default function BordereauxView({ view: viewProp, embedded } = {}) {
             <div style={D.cardTitle}>Réconciliation par compagnie — {MOIS_FULL[parseInt(filterMois)-1]} {filterAnnee}</div>
             <div style={{ overflowX:"auto" }}>
             <table style={D.table}><thead><tr style={{ background:C.bg }}>
-              {["Compagnie","Polices","Prime","Comm. Dynassur","Comm. sous-agents","Bordereau","Statut"].map((h,i) =>
-                <th key={h} style={{ ...D.th, textAlign:i>=1&&i<=4?"right":"left" }}>{h}</th>)}
+              {["Compagnie","Polices","Prime","Comm. Dynassur","Comm. sous-agents","Taux net","Bordereau","Statut"].map((h,i) =>
+                <th key={h} style={{ ...D.th, textAlign:i>=1&&i<=5?"right":"left" }}>{h}</th>)}
             </tr></thead><tbody>
               {reconcil.map((r,i) => {
                 const st = RST[r.statut] || RST.complet
@@ -296,6 +257,9 @@ export default function BordereauxView({ view: viewProp, embedded } = {}) {
                   <td style={{ ...D.td, textAlign:"right", fontVariantNumeric:"tabular-nums" }}>{r.primes ? fmt(r.primes) : "—"}</td>
                   <td style={{ ...D.td, textAlign:"right", color:C.ok, fontWeight:600, fontVariantNumeric:"tabular-nums" }}>{r.commission ? fmt(r.commission) : "—"}</td>
                   <td style={{ ...D.td, textAlign:"right", color:"#9B59B6", fontVariantNumeric:"tabular-nums" }}>{r.commission_sa ? fmt(r.commission_sa) : "—"}</td>
+                  <td style={{ ...D.td, textAlign:"right", fontWeight:600, color: !r.primes ? C.textL : tauxNet(r)>10?C.ok:tauxNet(r)>5?C.warn:C.danger }}>
+                    {r.primes ? tauxNet(r).toFixed(1) + "%" : "—"}
+                  </td>
                   <td style={D.td}>
                     {r.hasRcp && <span style={D.badge(C.navyMid)}>RCP</span>}
                     {r.hasBqt && <span style={{ ...D.badge(C.cyanB), marginLeft:4 }}>BQT</span>}
@@ -304,6 +268,15 @@ export default function BordereauxView({ view: viewProp, embedded } = {}) {
                   <td style={D.td}><span style={D.badge(st.c)}>{st.l}</span></td>
                 </tr>
               })}
+              <tr style={{ background:C.navy+"08", fontWeight:700, borderTop:`2px solid ${C.navy}` }}>
+                <td style={{ ...D.td, fontWeight:700, color:C.navy }}>TOTAL</td>
+                <td style={{ ...D.td, textAlign:"right", fontWeight:700 }}>{totRecon.nb.toLocaleString("fr-BE")}</td>
+                <td style={{ ...D.td, textAlign:"right", fontWeight:700, color:C.navy }}>{fmt(totRecon.primes)}</td>
+                <td style={{ ...D.td, textAlign:"right", fontWeight:700, color:C.ok }}>{fmt(totRecon.commission)}</td>
+                <td style={{ ...D.td, textAlign:"right", fontWeight:700, color:"#9B59B6" }}>{fmt(totRecon.commission_sa)}</td>
+                <td style={{ ...D.td, textAlign:"right", fontWeight:700, color:C.navy }}>{totRecon.primes>0 ? (totRecon.commission/totRecon.primes*100).toFixed(1) : "0.0"}%</td>
+                <td style={D.td}></td><td style={D.td}></td>
+              </tr>
             </tbody></table>
             </div>
           </div>
@@ -313,14 +286,25 @@ export default function BordereauxView({ view: viewProp, embedded } = {}) {
         {parSousAgent.length > 0 && (
           <div style={{ ...D.card, marginTop:16 }}>
             <div style={D.cardTitle}>💸 Commissions sous-agents à reverser — {MOIS_FULL[parseInt(filterMois)-1]} {filterAnnee}</div>
+            {parSousAgent.some(s => !s.rattache) && (
+              <div style={{ fontSize:12, color:C.warn, background:"#FEF3CD", border:"1px solid #F6D55C", borderRadius:8, padding:"8px 12px", marginBottom:10 }}>
+                ⚠ Certains noms de sous-agent présents dans les quittances ne correspondent à aucun collaborateur.
+                Leur montant est isolé ci-dessous : complétez « Nom en donnée SOUS-AGENT » ou les alias dans Paramètres pour les rattacher.
+              </div>
+            )}
             <div style={{ overflowX:"auto" }}>
             <table style={D.table}><thead><tr style={{ background:C.bg }}>
               {["Sous-agent","Quittances","Commission à reverser"].map((h,i) =>
                 <th key={h} style={{ ...D.th, textAlign:i===0?"left":"right" }}>{h}</th>)}
             </tr></thead><tbody>
               {parSousAgent.map((s,i) => (
-                <tr key={i} style={{ background:i%2?C.bg:"#fff" }}>
-                  <td style={{ ...D.td, fontWeight:600, color:C.navy }}>{s.sa}</td>
+                <tr key={s.key} style={{ background:i%2?C.bg:"#fff" }}>
+                  <td style={{ ...D.td, fontWeight:600, color:s.rattache?C.navy:C.warn }}>
+                    {s.sa}
+                    {s.rattache
+                      ? <span style={{ fontSize:10, color:C.textL, marginLeft:6 }}>{s.code}</span>
+                      : <span style={{ ...D.badge(C.warn), marginLeft:6 }}>non rattaché</span>}
+                  </td>
                   <td style={{ ...D.td, textAlign:"right", color:C.textM }}>{s.nb}</td>
                   <td style={{ ...D.td, textAlign:"right", color:"#9B59B6", fontWeight:600, fontVariantNumeric:"tabular-nums" }}>{fmt(s.commission_sa)}</td>
                 </tr>
