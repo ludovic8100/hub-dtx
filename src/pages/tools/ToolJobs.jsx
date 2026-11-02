@@ -11,6 +11,7 @@
 
 import { useState, useEffect } from 'react'
 import OutilPage, { Chargement } from '../../components/OutilPage'
+import Diagnostic3cx from '../../components/Diagnostic3cx'
 import { supabase } from '../../lib/supabase'
 
 const NAVY = '#0D2F5E'
@@ -88,6 +89,8 @@ export default function ToolJobs() {
       erreur={erreur}
     >
       <>
+        <Diagnostic3cx />
+
         {enAlerte.length > 0 && (
           <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '12px 16px', marginBottom: 18, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
             <i className="ti ti-alert-triangle" style={{ color: '#dc2626', fontSize: 18, marginTop: 1 }} />
