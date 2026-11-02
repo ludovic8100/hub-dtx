@@ -260,6 +260,60 @@ troisième, supprimée du locataire, sans rapport avec le login.
 
 Locataire : `29a87d83-130a-42d9-82c9-29c930952c76`.
 
+## Fermeture de l'accès anonyme (02/11/2026)
+
+L'accès libre est refermé. Trois gestes, le même jour, dans cet ordre :
+
+1. `ACCES_LIBRE_TEMPORAIRE` à `false`, déployé, **connexion Microsoft testée et
+   fonctionnelle**.
+2. Retrait des 91 policies `temp_acces_libre_sans_login`.
+3. Resserrage des policies `USING (true)` antérieures — **c'est celui-là qui
+   comptait**.
+
+### Pourquoi le point 3 était indispensable
+
+Mesuré avant d'agir : **49 tables portaient leurs propres policies
+`USING (true)` pour le rôle `public`**, antérieures au 31/10. Retirer les 91
+policies temporaires n'aurait donc presque rien fermé — `collaborateurs` et ses
+IBAN, `transactions`, `sinistres`, `credits`, `connexions_log` seraient restés
+lisibles par quiconque possède la clé publishable, laquelle est publique par
+conception et écrite dans un dépôt public.
+
+**Et 4 vues contournaient tout** : une vue qui n'est pas `security_invoker`
+ignore les RLS des tables qu'elle lit. `v_jobs_sante`, `v_lacunes_bordereaux`,
+`v_rp_qualite` et `mv_rp_mensuel` étaient lisibles par `anon`. Fermer les tables
+sans elles n'aurait servi à rien.
+
+### Vérification, depuis l'extérieur, avec la clé publique
+
+| Cible | Avant | Après |
+|---|---|---|
+| `collaborateurs` (IBAN, BIC, naissance) | lisible | **401** |
+| `clients` | lisible | **401** |
+| `v_jobs_sante` (vue) | lisible | **401** |
+| `sinistres`, `credits`, `connexions_log`, `ref_bureaux`, `lode_clients` | lisibles | **200 `[]`** |
+| `transactions`, `factures_achat` | lisibles | lisibles — **exclues, voir ci-dessous** |
+
+`authenticated` conserve `EXECUTE` sur `is_admin()` : les utilisateurs connectés
+passent normalement.
+
+### Trois tables restent ouvertes, et pourquoi
+
+`transactions`, `factures_achat` et `bordereaux` sont **exclues volontairement**.
+Le workflow n8n « Miniatures Factures v2 », toujours actif, les lit et les écrit
+directement en REST avec la clé publique. Les fermer le casserait.
+
+L'ordre à suivre est celui déjà écrit dans `docs/N8N-INVENTAIRE.md` § 2 :
+**d'abord** basculer n8n sur un credential `service_role`, **ensuite** fermer ces
+trois tables. Tant que ce n'est pas fait, n'importe qui peut lire et modifier les
+6 576 transactions bancaires et supprimer des lignes de `factures_achat`.
+
+### Ce qui reste à faire après
+
+Exiger une session n'est pas cloisonner. Un collaborateur connecté voit encore
+tout ce que ces tables contiennent — toutes sociétés confondues. Le découpage par
+bureau, société et module reste entier : c'est le bloc 2 ci-dessous.
+
 ## Table `personnes` et fusion Utilisateurs/Acteurs métier (31/10/2026)
 
 Suite au point précédent, première étape du modèle d'identité unique : table `personnes`

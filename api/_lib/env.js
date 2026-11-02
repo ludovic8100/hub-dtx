@@ -9,7 +9,7 @@
 
 const PROD = {
   SUPABASE_URL:      'https://tndwonqdbeszkcztkzqe.supabase.co',
-  SUPABASE_ANON_KEY: 'sb_publishable_xBt6ZaZGh5trEloyMCNRuA_MN-jesVJ', // clé publishable (publique)
+  SUPABASE_ANON_KEY: 'sb_publishable_LrEXAIusF3VxlBPmJnwddg_fk_wdCzw', // clé publishable (publique) — alignée sur src/config/env.js le 02/11/2026 ; l'ancienne, supprimée le 31/10, était restée ici
   N8N_URL:           'https://n8n.srv1082740.hstgr.cloud',
   SHAREPOINT_SITE:   'https://dynassur.sharepoint.com/sites/ADMINISTRATION',
   SHAREPOINT_ROOT:   'Documents partages',
