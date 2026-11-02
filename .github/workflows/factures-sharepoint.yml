@@ -1,0 +1,89 @@
+name: Factures SharePoint → Supabase
+
+# Alimente `factures_achat` depuis le dossier SharePoint COMPTA/FACTURES, en
+# remplacement du workflow n8n « Rapprochement Factures » qui n'existe plus.
+#
+# Le scan complet est trop long pour une fonction Vercel ou une Edge Function :
+# plusieurs milliers d'éléments, parcours récursif, pagination Graph. D'où une
+# GitHub Action, sur le modèle de qlik-sync.yml.
+#
+# Lancement manuel en DRY_RUN par défaut : on vérifie ce qui serait écrit avant
+# d'écrire quoi que ce soit.
+
+on:
+  # TEMPORAIRE — mise au point avant le merge. À retirer avant d'ouvrir la PR :
+  # une fois sur main, workflow_dispatch suffit.
+  push:
+    branches: [feat/scan-factures-sharepoint]
+  schedule:
+    - cron: '37 5 * * *'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Environnement cible (base Supabase)"
+        type: choice
+        options: [test, production]
+        default: test
+      dry_run:
+        description: "Test sans écriture (parcourt et affiche seulement)"
+        type: boolean
+        default: true
+      purge:
+        description: "Supprimer les lignes dont le fichier a disparu"
+        type: boolean
+        default: true
+
+concurrency:
+  group: factures-sharepoint
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'production' }}
+    env:
+      APP_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'production' }}
+      SUPABASE_URL: ${{ vars.SUPABASE_URL || ((github.event_name == 'workflow_dispatch' && inputs.target || 'production') == 'test' && 'https://lvdnzbhplnzuwdqtitdb.supabase.co' || '') }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      GRAPH_TENANT_ID: ${{ secrets.GRAPH_TENANT_ID }}
+      GRAPH_CLIENT_ID: ${{ secrets.GRAPH_CLIENT_ID }}
+      GRAPH_CLIENT_SECRET: ${{ secrets.GRAPH_CLIENT_SECRET }}
+      # Un push sur la branche de mise au point ne doit jamais écrire en base.
+      DRY_RUN: ${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.dry_run)) && '1' || '' }}
+      PURGE: ${{ (github.event_name == 'workflow_dispatch' && !inputs.purge) && '0' || '1' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verifier les secrets
+        run: |
+          for s in GRAPH_TENANT_ID GRAPH_CLIENT_ID GRAPH_CLIENT_SECRET; do
+            if [ -z "${!s}" ]; then echo "::error::Secret $s manquant"; exit 1; fi
+          done
+          if [ -z "$SUPABASE_SERVICE_KEY" ] && [ -z "$DRY_RUN" ]; then
+            echo "::error::Secret SUPABASE_SERVICE_KEY manquant (requis hors DRY_RUN)"; exit 1
+          fi
+          echo "Cible: $APP_ENV (${SUPABASE_URL:-production par defaut}) — Mode: ${DRY_RUN:+DRY_RUN}${DRY_RUN:-ECRITURE REELLE}"
+
+      # Garde-fou : sans entrée dans jobs_attendus et sans journal, une synchro
+      # qui s'arrête ne se voit pas. C'est précisément ce qui est arrivé au
+      # workflow n8n — arrêté le 20/10, découvert le 02/11.
+      - name: Journal - debut
+        id: journal
+        if: ${{ env.DRY_RUN == '' }}
+        run: echo "id=$(python scripts/job_journal.py debut factures-sharepoint ${{ github.event_name == 'schedule' && 'cron' || 'manuel' }})" >> "$GITHUB_OUTPUT"
+
+      - name: Scan SharePoint
+        id: scan
+        run: python scripts/factures_sharepoint.py | tee /tmp/scan.log
+
+      - name: Journal - fin
+        if: ${{ always() && env.DRY_RUN == '' }}
+        run: |
+          LIGNES=$(grep -oP 'LIGNES_ECRITES=\K[0-9]+' /tmp/scan.log | tail -1 || true)
+          python scripts/job_journal.py fin "${{ steps.journal.outputs.id }}" \
+            "${{ job.status == 'success' && 'succes' || 'echec' }}" "$LIGNES" \
+            "GitHub Action factures-sharepoint — ${{ job.status }}"
