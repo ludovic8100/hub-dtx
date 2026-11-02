@@ -12,17 +12,26 @@ UPDATE public.collaborateurs SET extension = '28'
    AND NOT EXISTS (SELECT 1 FROM public.collaborateurs WHERE extension = '28');
 DELETE FROM public.postes_telephonie WHERE extension = '28';
 
-UPDATE public.postes_telephonie SET libelle = 'Numéro général',              categorie = 'service' WHERE extension = '80';
+-- 80 est le serveur vocal d'accueil : le menu que le client entend en appelant.
+-- D'où les 10 secondes de durée moyenne sur 492 appels — on n'y parle à personne.
+UPDATE public.postes_telephonie SET libelle = 'Menu d''accueil',             categorie = 'svi'     WHERE extension = '80';
 UPDATE public.postes_telephonie SET libelle = 'File d''attente — Assurance', categorie = 'file'    WHERE extension = '91';
 UPDATE public.postes_telephonie SET libelle = 'File d''attente — Crédit',    categorie = 'file'    WHERE extension = '92';
 UPDATE public.postes_telephonie SET libelle = 'File d''attente — Sinistres', categorie = 'file'    WHERE extension = '93';
 
--- « 30 = tu peux supprimer, messagerie ».
+-- Les deux boîtes vocales. 30 recueille les messages hors horaires, 32 ceux
+-- du service Crédit.
 -- Marqué inactif plutôt que détruit : actif = false le retire des tableaux par
 -- poste, et ses 125 appels restent au journal. Effacer les lignes serait
 -- irréversible, et un message vocal laissé sans rappel reste une information.
 -- Un UPDATE suffit à revenir en arrière.
 UPDATE public.postes_telephonie
-   SET libelle = 'Messagerie', categorie = 'messagerie', actif = false,
-       commentaire = 'Masqué des tableaux par poste à la demande (02/11/2026). Les appels restent au journal.'
+   SET libelle = 'Messagerie — bureau fermé', categorie = 'messagerie', actif = false,
+       commentaire = 'Masquée des tableaux par poste à la demande (02/11/2026). Les 125 messages restent au journal.'
  WHERE extension = '30';
+
+INSERT INTO public.postes_telephonie (extension, libelle, categorie, actif, commentaire)
+VALUES ('32', 'Messagerie — Crédit', 'messagerie', false, 'Masquée des tableaux par poste à la demande (02/11/2026).')
+ON CONFLICT (extension) DO UPDATE
+   SET libelle = excluded.libelle, categorie = excluded.categorie,
+       actif = excluded.actif, commentaire = excluded.commentaire;

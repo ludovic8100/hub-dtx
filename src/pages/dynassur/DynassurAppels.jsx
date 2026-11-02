@@ -139,12 +139,18 @@ export default function DynassurAppels() {
   }, [periodeCourante, sens, q])
 
   // ── Statistiques ────────────────────────────────────────────────────────
+  // Serveur vocal, messagerie, bureau fermé : l'appel a bien eu lieu, mais
+  // personne n'a parlé à personne. On les garde dans les volumes et on les
+  // exclut du temps de conversation — sans quoi les 492 passages de dix
+  // secondes dans le menu d'accueil écrasent la moyenne.
+  const estMachine = x => ['svi', 'messagerie', 'hors_horaires'].includes(x.poste_categorie)
+
   const calcul = lot => {
     const manques = lot.filter(x => x.manque)
     const entrants = lot.filter(x => x.sens === 'entrant' && !x.manque)
     const sortants = lot.filter(x => x.sens === 'sortant')
     const entrantsTotal = entrants.length + manques.length
-    const repondus = lot.filter(x => !x.manque && x.duree_s > 0)
+    const repondus = lot.filter(x => !x.manque && x.duree_s > 0 && !estMachine(x))
     const secondes = repondus.reduce((a, x) => a + (x.duree_s || 0), 0)
     return {
       total: lot.length, entrants: entrants.length, sortants: sortants.length,
@@ -218,7 +224,7 @@ export default function DynassurAppels() {
       if (x.manque) p.manque++; else if (x.sens === 'entrant') p.entrant++; else p.sortant++
       if (x.sens === 'sortant' && x.duree_s > 0) p.sortantsAboutis++
       if (!p.dernier || x.debut > p.dernier) p.dernier = x.debut
-      if (!x.manque && x.duree_s > 0) { p.secondes += x.duree_s; p.repondus++; p.plusLong = Math.max(p.plusLong, x.duree_s) }
+      if (!x.manque && x.duree_s > 0 && !estMachine(x)) { p.secondes += x.duree_s; p.repondus++; p.plusLong = Math.max(p.plusLong, x.duree_s) }
     }
     // Un poste marqué inactif dans le référentiel (ex. la messagerie) disparaît
     // des tableaux par poste. Ses appels restent au journal : on masque une
@@ -467,7 +473,7 @@ function ChiffresCles({ stats, compact = false }) {
       courbe: stats.courbeManques, couleur: COULEURS.manque,
       delta: a ? <Delta valeur={stats.manques} avant={a.manques} sensBon={-1} /> : null },
     { cle: 'duree',  label: 'Durée moyenne', valeur: fmtDuree(stats.moyenne),
-      sous: 'Temps en ligne ' + fmtDuree(stats.secondes),
+      sous: 'Hors menu et messagerie · total ' + fmtDuree(stats.secondes),
       courbe: stats.courbeDuree, couleur: COULEURS.sortant,
       delta: a?.moyenne != null && stats.moyenne != null ? <Delta valeur={stats.moyenne} avant={a.moyenne} unite=" s" sensBon={0} /> : null },
     { cle: 'hors',   label: 'Hors horaires', valeur: fmtNb(stats.horsHoraires),
