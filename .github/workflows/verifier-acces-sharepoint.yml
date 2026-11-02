@@ -1,0 +1,21 @@
+# Vérification ponctuelle de l'accès SharePoint de l'application Azure du Hub.
+# À lancer à la main depuis l'onglet Actions. Ne modifie rien.
+name: Vérifier l'accès SharePoint
+
+on:
+  workflow_dispatch:
+
+jobs:
+  verifier:
+    runs-on: ubuntu-latest
+    env:
+      GRAPH_TENANT_ID: ${{ secrets.GRAPH_TENANT_ID }}
+      GRAPH_CLIENT_ID: ${{ secrets.GRAPH_CLIENT_ID }}
+      GRAPH_CLIENT_SECRET: ${{ secrets.GRAPH_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Vérifier
+        run: python scripts/verifier_acces_sharepoint.py
