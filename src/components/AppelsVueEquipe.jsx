@@ -144,8 +144,10 @@ export function VueEquipe({ stats, heures, rappels, onCollaborateur, onVoirRappe
           </table>
         </div>
         <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 12, paddingTop: 10, borderTop: '1px solid #f1f5f9' }}>
-          Traités = appels entrants décrochés + appels sortants aboutis. « Activité » se déduit du dernier
-          appel : la présence en direct (disponible, en pause) n'est pas remontée par 3CX dans le Hub.
+          Traités = appels entrants décrochés + appels sortants aboutis. Le temps de conversation exclut
+          le menu d'accueil, les messageries et le bureau fermé : l'appel a eu lieu, mais personne n'y a
+          parlé. « Activité » se déduit du dernier appel — la présence en direct (disponible, en pause)
+          n'est pas remontée par 3CX dans le Hub.
         </div>
       </section>
 

@@ -60,7 +60,7 @@ export default function DynassurAppels() {
   const [periode, setPeriode] = useState('30')
   const [sens, setSens] = useState('tous')            // tous | entrant | sortant | manque
   const [q, setQ] = useState('')
-  const [postes, setPostes] = useState([])
+  const [postes, setPostes] = useState([])   // référentiel postes_telephonie
   const [edition, setEdition] = useState(null)        // { extension, libelle }
 
   // Deux bornes : le début de la période affichée, et celui de la période
@@ -139,12 +139,18 @@ export default function DynassurAppels() {
   }, [periodeCourante, sens, q])
 
   // ── Statistiques ────────────────────────────────────────────────────────
+  // Serveur vocal, messagerie, bureau fermé : l'appel a bien eu lieu, mais
+  // personne n'a parlé à personne. On les garde dans les volumes et on les
+  // exclut du temps de conversation — sans quoi les 492 passages de dix
+  // secondes dans le menu d'accueil écrasent la moyenne.
+  const estMachine = x => ['svi', 'messagerie', 'hors_horaires'].includes(x.poste_categorie)
+
   const calcul = lot => {
     const manques = lot.filter(x => x.manque)
     const entrants = lot.filter(x => x.sens === 'entrant' && !x.manque)
     const sortants = lot.filter(x => x.sens === 'sortant')
     const entrantsTotal = entrants.length + manques.length
-    const repondus = lot.filter(x => !x.manque && x.duree_s > 0)
+    const repondus = lot.filter(x => !x.manque && x.duree_s > 0 && !estMachine(x))
     const secondes = repondus.reduce((a, x) => a + (x.duree_s || 0), 0)
     return {
       total: lot.length, entrants: entrants.length, sortants: sortants.length,
@@ -155,6 +161,7 @@ export default function DynassurAppels() {
     }
   }
 
+  const refPostes = postes
   const stats = useMemo(() => {
     // 3CX rapporte chaque coup de sonnerie comme un événement : un appel qui
     // sonne trois fois arrive en trois lignes. Le journal les montre toutes —
@@ -217,9 +224,14 @@ export default function DynassurAppels() {
       if (x.manque) p.manque++; else if (x.sens === 'entrant') p.entrant++; else p.sortant++
       if (x.sens === 'sortant' && x.duree_s > 0) p.sortantsAboutis++
       if (!p.dernier || x.debut > p.dernier) p.dernier = x.debut
-      if (!x.manque && x.duree_s > 0) { p.secondes += x.duree_s; p.repondus++; p.plusLong = Math.max(p.plusLong, x.duree_s) }
+      if (!x.manque && x.duree_s > 0 && !estMachine(x)) { p.secondes += x.duree_s; p.repondus++; p.plusLong = Math.max(p.plusLong, x.duree_s) }
     }
-    const postes = [...parPoste.values()]
+    // Un poste marqué inactif dans le référentiel (ex. la messagerie) disparaît
+    // des tableaux par poste. Ses appels restent au journal : on masque une
+    // ligne de synthèse, on n'efface pas ce qui s'est passé.
+    const masques = new Set(refPostes.filter(x => x.actif === false).map(x => x.extension))
+    const parPosteListe = [...parPoste.values()]
+      .filter(p => !masques.has(p.extension))
       .map(p => ({ ...p, total: p.entrant + p.sortant + p.manque, decroche: (p.entrant + p.manque) ? p.entrant / (p.entrant + p.manque) : null }))
       .sort((a, b) => b.total - a.total)
 
@@ -235,7 +247,7 @@ export default function DynassurAppels() {
     const topNumeros = [...parNum.values()].filter(n => n.n > 1).sort((a, b) => b.n - a.n).slice(0, 8)
 
     // Par personne : un poste rattaché à un collaborateur = une ligne.
-    const parPersonne = postes.map(p => ({
+    const parPersonne = parPosteListe.map(p => ({
       cle: p.extension || '—', nom: p.collaborateur || p.qui, extension: p.extension,
       estService: !p.collaborateur,
       entrants: p.entrant, manques: p.manque, entrantsTotal: p.entrant + p.manque,
@@ -291,12 +303,12 @@ export default function DynassurAppels() {
 
     return {
       ...base, avant, relances, jours, courbe, courbeManques, courbeDuree,
-      grille, heuresCarte, pic, postes, topNumeros,
+      grille, heuresCarte, pic, postes: parPosteListe, topNumeros,
       parPersonne, heuresVolume, rappels,
       traites: base.entrants + r.filter(x => x.sens === 'sortant' && x.duree_s > 0).length,
       identifies: r.filter(x => x.contact).length,
     }
-  }, [periodeCourante, periodePrecedente])
+  }, [periodeCourante, periodePrecedente, refPostes])
 
   const renommerPoste = async () => {
     if (!edition) return
@@ -461,7 +473,7 @@ function ChiffresCles({ stats, compact = false }) {
       courbe: stats.courbeManques, couleur: COULEURS.manque,
       delta: a ? <Delta valeur={stats.manques} avant={a.manques} sensBon={-1} /> : null },
     { cle: 'duree',  label: 'Durée moyenne', valeur: fmtDuree(stats.moyenne),
-      sous: 'Temps en ligne ' + fmtDuree(stats.secondes),
+      sous: 'Hors menu et messagerie · total ' + fmtDuree(stats.secondes),
       courbe: stats.courbeDuree, couleur: COULEURS.sortant,
       delta: a?.moyenne != null && stats.moyenne != null ? <Delta valeur={stats.moyenne} avant={a.moyenne} unite=" s" sensBon={0} /> : null },
     { cle: 'hors',   label: 'Hors horaires', valeur: fmtNb(stats.horsHoraires),
