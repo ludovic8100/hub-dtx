@@ -123,6 +123,18 @@ d'attribution — ni pour les chiffres, ni pour les objectifs, ni pour les commi
 **Règle** : ne pas rajouter de dépendance n8n. Ce qui doit tourner côté serveur passe par une
 fonction Edge Supabase + `pg_cron`, ou une fonction serverless Vercel.
 
+## Outils (`/tools`)
+
+Les six outils partagent depuis le 02/11/2026 un cadre commun : le registre `src/lib/outils.js`
+(une entrée par outil → route, carte sur `/tools`, permission) et la coquille
+`src/components/OutilPage.jsx` (retour, titre, chargement, erreurs). **Ajouter un outil =
+une entrée dans le registre**, plus aucun câblage dans `App.jsx` ni dans `ToolsHome`.
+Mode d'emploi : `docs/OUTILS.md`.
+
+Point ouvert : tous les outils partagent `acc_tools` sauf la succession (`prive_succession`) —
+grain trop grossier, dépend du modèle de modules (`docs/DROITS-ACCES.md`). Et aucun usage
+n'est mesuré, donc on ne sait pas lesquels servent.
+
 ## Workflows n8n (inventaire, vérifié le 30/10/2026 via le connecteur n8n)
 
 Détail complet (nœuds, écritures Supabase, credentials, implications test) : `docs/N8N-INVENTAIRE.md`.

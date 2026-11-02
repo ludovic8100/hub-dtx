@@ -10,7 +10,7 @@
 // les jobs eux-mêmes (service_role).
 
 import { useState, useEffect } from 'react'
-import Layout from '../../components/Layout'
+import OutilPage, { Chargement } from '../../components/OutilPage'
 import { supabase } from '../../lib/supabase'
 
 const NAVY = '#0D2F5E'
@@ -54,12 +54,17 @@ export default function ToolJobs() {
   const [jobs, setJobs] = useState(null)
   const [executions, setExecutions] = useState([])
   const [selection, setSelection] = useState(null)
+  const [erreur, setErreur] = useState(null)
 
+  // Un écran qui sert à voir les pannes ne doit pas masquer les siennes :
+  // si la lecture échoue, on le dit au lieu d'afficher « aucun job déclaré ».
   const charger = async () => {
-    const [{ data: s }, { data: e }] = await Promise.all([
+    setErreur(null)
+    const [{ data: s, error: e1 }, { data: e, error: e2 }] = await Promise.all([
       supabase.from('v_jobs_sante').select('*').order('plateforme').order('job'),
       supabase.from('jobs_log').select('*').order('demarre_a', { ascending: false }).limit(100),
     ])
+    if (e1 || e2) setErreur(e1 || e2)
     setJobs(s || [])
     setExecutions(e || [])
   }
@@ -68,22 +73,21 @@ export default function ToolJobs() {
   const enAlerte = (jobs || []).filter(j => ['en_retard', 'echec', 'bloque'].includes(j.sante))
   const lignes = selection ? executions.filter(e => e.job === selection) : executions
 
+  const boutonRafraichir = (
+    <button onClick={charger}
+      style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid #e2e8f0', background: '#fff', borderRadius: 8, padding: '7px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#334155', fontFamily: 'inherit' }}>
+      <i className="ti ti-reload" style={{ fontSize: 14 }} /> Rafraîchir
+    </button>
+  )
+
   return (
-    <Layout currentPage="Outils">
-      <div style={{ fontFamily: "'Segoe UI', sans-serif", width: '100%' }}>
-
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: NAVY, margin: 0 }}>Synchronisations</h1>
-          <button onClick={charger}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid #e2e8f0', background: '#fff', borderRadius: 8, padding: '7px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#334155', fontFamily: 'inherit' }}>
-            <i className="ti ti-reload" style={{ fontSize: 14 }} /> Rafraîchir
-          </button>
-        </div>
-        <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 18px' }}>
-          Ce qui doit tourner automatiquement, et ce qui a réellement tourné. Un job passe au rouge
-          dès qu'il n'a plus rien écrit depuis plus longtemps que sa fréquence ne l'autorise.
-        </p>
-
+    <OutilPage
+      titre="Synchronisations"
+      sousTitre="Ce qui doit tourner automatiquement, et ce qui a réellement tourné. Un job passe au rouge dès qu'il n'a plus rien écrit depuis plus longtemps que sa fréquence ne l'autorise."
+      actions={boutonRafraichir}
+      erreur={erreur}
+    >
+      <>
         {enAlerte.length > 0 && (
           <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '12px 16px', marginBottom: 18, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
             <i className="ti ti-alert-triangle" style={{ color: '#dc2626', fontSize: 18, marginTop: 1 }} />
@@ -95,7 +99,7 @@ export default function ToolJobs() {
         )}
 
         {jobs === null ? (
-          <p style={{ color: '#94a3b8', fontSize: 13 }}>Chargement…</p>
+          <Chargement />
         ) : !jobs.length ? (
           <p style={{ color: '#94a3b8', fontSize: 13 }}>Aucun job déclaré.</p>
         ) : (
@@ -195,7 +199,7 @@ export default function ToolJobs() {
             </table>
           </div>
         )}
-      </div>
-    </Layout>
+      </>
+    </OutilPage>
   )
 }

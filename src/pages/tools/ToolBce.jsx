@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import Layout from '../../components/Layout'
+import OutilPage from '../../components/OutilPage'
 import BceSearch from '../../components/BceSearch'
 
 // Outil autonome : recherche entreprise BCE/KBO. Réutilise le composant BceSearch.
@@ -25,16 +24,7 @@ export default function ToolBce() {
   ) : null
 
   return (
-    <Layout currentPage="Recherche BCE">
-      <div style={{ fontFamily: "'Segoe UI', sans-serif", width: '100%', maxWidth: 680 }}>
-        <div style={{ marginBottom: 6 }}>
-          <Link to="/tools" style={{ fontSize: 12.5, color: '#64748b', textDecoration: 'none' }}>← Outils</Link>
-        </div>
-        <div style={{ marginBottom: 18 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#1A3A6B', margin: 0 }}>Recherche BCE</h1>
-          <div style={{ fontSize: 14, color: '#8A9BBE', marginTop: 2 }}>Entreprise belge — par dénomination ou n° BCE (10 chiffres)</div>
-        </div>
-
+    <OutilPage titre="Recherche BCE" sousTitre="Entreprise belge — par dénomination ou n° BCE (10 chiffres)" largeurMax={680}>
         <BceSearch onSelect={setC} />
 
         {c && (
@@ -51,7 +41,6 @@ export default function ToolBce() {
             </details>
           </div>
         )}
-      </div>
-    </Layout>
+    </OutilPage>
   )
 }

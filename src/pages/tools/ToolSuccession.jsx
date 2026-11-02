@@ -1,7 +1,7 @@
 import { SUPABASE_PROJECT_REF } from '../../config/env'
 import { useEffect, useRef, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
-import Layout from '../../components/Layout'
+import OutilPage from '../../components/OutilPage'
 import { useAuth } from '../../lib/auth'
 
 export default function ToolsSuccession() {
@@ -2719,19 +2719,20 @@ update();
   }, [user])
 
   return (
-    <Layout currentPage="Succession">
+    <OutilPage titre="Droit de Succession" pleinePage>
       <iframe
         ref={iframeRef}
         src={blobUrl}
         style={{
           width: '100%',
-          height: 'calc(100vh - 60px)',
+          // En-tête du Hub (60) + marges du cadre (56) + ligne « ← Outils » (34)
+          height: 'calc(100vh - 150px)',
           border: 'none',
           borderRadius: '8px'
         }}
         title="Simulateur Successoral"
       />
-    </Layout>
+    </OutilPage>
   )
 }
 
