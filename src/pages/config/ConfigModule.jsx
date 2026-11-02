@@ -8,21 +8,21 @@ import { bootstrapConfigs } from '../../lib/bootstrapConfigs'
 import GestionCategories from './GestionCategories'
 import BceSearch from '../../components/BceSearch'
 
-// ─── Définition des accès par société (colonnes réelles de collaborateurs) ───
-const ACCES = [
-  { acc: 'acc_dynassur', label: 'Dynassur', pfx: 'dyn',  couleur: '#0080BD',
-    pages: [['dashboard', 'Tableau de bord'], ['clients', 'Clients'], ['production', 'Production'], ['credits', 'Crédits'], ['chiffres', 'Chiffres'], ['objectifs', 'Objectifs'], ['compagnies', 'Compagnies'], ['sinistres', 'Sinistres'], ['appels', 'Appels'], ['rentabilite', 'Rentabilité'], ['banque', 'Banque'], ['comptabilite', 'Comptabilité'], ['notesfrais', 'Notes de frais']] },
-  { acc: 'acc_dtx', label: 'DTX', pfx: 'dtx', couleur: '#1B3A6B',
-    pages: [['dashboard', 'Tableau de bord'], ['immobilier', 'Immobilier'], ['vehicules', 'Véhicules'], ['trading', 'Trading'], ['comptabilite', 'Comptabilité'], ['devis', 'Devis & Factures'], ['notesfrais', 'Notes de frais']] },
-  { acc: 'acc_lode', label: 'LODE', pfx: 'lode', couleur: '#F97316',
-    pages: [['dashboard', 'Tableau de bord'], ['clients', 'Clients'], ['banque', 'Banque'], ['comptabilite', 'Comptabilité'], ['devis', 'Devis & Factures'], ['notesfrais', 'Notes de frais']] },
-  { acc: 'acc_hexagroup', label: 'Hexagroup', pfx: 'hex', couleur: '#ec4899',
-    pages: [['dashboard', 'Tableau de bord'], ['banque', 'Banque'], ['comptabilite', 'Comptabilité'], ['notesfrais', 'Notes de frais'], ['membres', 'Membres'], ['cotisations', 'Cotisations']] },
-  { acc: 'acc_prive', label: 'Privé', pfx: 'prive', couleur: '#22c55e',
-    pages: [['dashboard', 'Tableau de bord'], ['banque', 'Banque'], ['comptabilite', 'Comptabilité'], ['notesfrais', 'Notes de frais']] },
-  { acc: 'acc_holding', label: 'Groupe (consolidé)', pfx: 'grp', couleur: '#7c3aed', pages: [['notesfrais', 'Notes de frais']] },
-  { acc: 'acc_tools', label: 'Outils', pfx: 'tools', couleur: '#0ea5e9', pages: [] },
-]
+// ─── Présentation des sociétés (libellé et couleur de la carte) ─────────────
+// La LISTE des modules, elle, n'est plus écrite ici : elle vient de la base
+// (ref_modules + ref_modules_societes). Ajouter un module au catalogue le fait
+// apparaître dans cet écran, sans toucher au code.
+const SOC_UI = {
+  DYNASSUR:    { label: 'Dynassur',           couleur: '#0080BD', ordre: 1 },
+  DTX:         { label: 'DTX',                couleur: '#1B3A6B', ordre: 2 },
+  LODE:        { label: 'LODE',               couleur: '#F97316', ordre: 3 },
+  HEXAGROUP:   { label: 'Hexagroup',          couleur: '#ec4899', ordre: 4 },
+  PRIVE:       { label: 'Privé',              couleur: '#22c55e', ordre: 5 },
+  HOL:         { label: 'Groupe (consolidé)', couleur: '#7c3aed', ordre: 6 },
+  TRANSVERSAL: { label: 'Outils',             couleur: '#0ea5e9', ordre: 7 },
+}
+const socUi = code => SOC_UI[code] || { label: code, couleur: '#64748b', ordre: 99 }
+
 
 const FIELDS_SOC = [
   ['nom', 'Dénomination'], ['activite', 'Activité'], ['forme_juridique', 'Forme juridique'],
@@ -61,7 +61,10 @@ export default function ConfigModule() {
   const [showFrais, setShowFrais] = useState(false)     // coûts internes (confidentiel)
   const [sel, setSel] = useState(() => new Set())       // ids user cochés (attribution groupée)
   const [bulkBureau, setBulkBureau] = useState('')      // bureau cible de l'attribution groupée
-  const [bulkAcces, setBulkAcces] = useState('')        // page cible de l'attribution groupée d'accès
+  const [bulkAcces, setBulkAcces] = useState('')        // module cible de l'attribution groupée (« SOCIETE|module »)
+  const [catalogue, setCatalogue] = useState([])        // [{ societe, modules: [{code, libelle}] }] — depuis la base
+  const [accesAll, setAccesAll] = useState(new Map())   // collaborateur_id -> Set('SOCIETE|module')
+  const [accesSel, setAccesSel] = useState(new Set())   // attributions de la fiche ouverte
 
   useEffect(() => {
     if (!isAdmin) { setLoading(false); return }
@@ -70,6 +73,24 @@ export default function ConfigModule() {
       const { data: us } = await supabase.from('collaborateurs').select('*').order('nom_complet', { nullsFirst: false })
       const { data: ts } = await supabase.from('collaborateur_taux').select('*')
       const { data: brx } = await supabase.from('ref_bureaux').select('id,libelle,rue,numero,boite,code_postal,ville,actif').order('libelle')
+      const { data: mods } = await supabase.from('ref_modules').select('code,libelle,ordre').order('ordre')
+      const { data: msoc } = await supabase.from('ref_modules_societes').select('module_code,societe')
+      const { data: acc } = await supabase.from('collaborateur_acces').select('collaborateur_id,societe,module_code')
+
+      // Catalogue : une carte par société, ses modules dans l'ordre du référentiel
+      const parLibelle = new Map((mods || []).map(m => [m.code, m]))
+      const parSoc = {}
+      ;(msoc || []).forEach(x => { (parSoc[x.societe] || (parSoc[x.societe] = [])).push(parLibelle.get(x.module_code)) })
+      setCatalogue(Object.entries(parSoc)
+        .map(([societe, ms]) => ({ societe, modules: ms.filter(Boolean).sort((a, b) => a.ordre - b.ordre) }))
+        .sort((a, b) => socUi(a.societe).ordre - socUi(b.societe).ordre))
+
+      const ma = new Map()
+      ;(acc || []).forEach(a => {
+        if (!ma.has(a.collaborateur_id)) ma.set(a.collaborateur_id, new Set())
+        ma.get(a.collaborateur_id).add(`${a.societe}|${a.module_code}`)
+      })
+      setAccesAll(ma)
       const mt = {}
       ;(ts || []).forEach(t => { (mt[t.collaborateur_id] || (mt[t.collaborateur_id] = {}))[t.type_travail] = t.taux })
       setSocietes(socs || []); setUsers(us || []); setTaux(mt); setBureaux(brx || [])
@@ -160,7 +181,24 @@ export default function ConfigModule() {
   function pick(u) {
     setSelUser({ ...u, noms_repris_str: (u.noms_repris || []).join(', ') })
     setSelTaux({ ...(taux[u.id] || {}) })
+    setAccesSel(new Set(accesAll.get(u.id) || []))
     setShowFrais(false)
+  }
+
+  // Coche / décoche un module pour la fiche ouverte (en mémoire, enregistré au Save)
+  function basculerModule(societe, moduleCode) {
+    setAccesSel(prev => {
+      const n = new Set(prev); const cle = `${societe}|${moduleCode}`
+      n.has(cle) ? n.delete(cle) : n.add(cle)
+      return n
+    })
+  }
+  function basculerSociete(societe, modules, tout) {
+    setAccesSel(prev => {
+      const n = new Set(prev)
+      modules.forEach(m => tout ? n.delete(`${societe}|${m.code}`) : n.add(`${societe}|${m.code}`))
+      return n
+    })
   }
 
   async function saveUser() {
@@ -224,6 +262,23 @@ export default function ConfigModule() {
     await supabase.from('collaborateur_taux').upsert(trows, { onConflict: 'collaborateur_id,type_travail' })
     setTaux(m => ({ ...m, [cid]: { ...selTaux } }))
 
+    // Droits : on enregistre l'écart avec ce qui est en base, pas tout le lot.
+    // Seules les lignes qui changent sont touchées — la date d'attribution des
+    // autres reste intacte.
+    const avant = accesAll.get(cid) || new Set()
+    const aAjouter = [...accesSel].filter(c => !avant.has(c))
+    const aRetirer = [...avant].filter(c => !accesSel.has(c))
+    if (aAjouter.length) {
+      await supabase.from('collaborateur_acces').insert(
+        aAjouter.map(c => { const [societe, module_code] = c.split('|'); return { collaborateur_id: cid, societe, module_code } }))
+    }
+    for (const c of aRetirer) {
+      const [societe, module_code] = c.split('|')
+      await supabase.from('collaborateur_acces').delete()
+        .eq('collaborateur_id', cid).eq('societe', societe).eq('module_code', module_code)
+    }
+    setAccesAll(m => { const nm = new Map(m); nm.set(cid, new Set(accesSel)); return nm })
+
     setSaving(false)
     notify('✓ Enregistré')
     const { data: fresh } = await supabase.from('collaborateurs').select('*').eq('id', cid).single()
@@ -234,21 +289,34 @@ export default function ConfigModule() {
   }
 
   async function bulkAccesApply(grant) {
-    if (!bulkAcces) { notify('❌ Choisis d\'abord une page'); return }
-    const grp = ACCES.find(g => bulkAcces.startsWith(g.pfx + '_'))
-    if (!grp) return
-    const pageLabel = grp.pages.find(([pg]) => `${grp.pfx}_${pg}` === bulkAcces)?.[1] || bulkAcces
-    // Admins exclus : ils ont déjà l'accès total, un flag par page n'a aucun effet pour eux
+    if (!bulkAcces) { notify('❌ Choisis d\'abord un module'); return }
+    const [societe, moduleCode] = bulkAcces.split('|')
+    const libelle = catalogue.find(c => c.societe === societe)?.modules.find(m => m.code === moduleCode)?.libelle || moduleCode
+    // Admins exclus : ils ont déjà tout, une attribution n'aurait aucun effet pour eux
     const ids = usersFiltres.filter(u => sel.has(u.id) && !u.est_admin).map(u => u.id)
     if (!ids.length) { notify('❌ Aucun utilisateur coché (hors admins)'); return }
-    if (!window.confirm(`${grant ? 'Donner' : 'Retirer'} l'accès « ${grp.label} · ${pageLabel} » à ${ids.length} utilisateur(s) ?`)) return
+    if (!window.confirm(`${grant ? 'Donner' : 'Retirer'} l'accès « ${socUi(societe).label} · ${libelle} » à ${ids.length} utilisateur(s) ?`)) return
     setSaving(true)
-    // Donner : on active aussi la société parente, sinon la page reste inaccessible
-    const patch = grant ? { [bulkAcces]: true, [grp.acc]: true } : { [bulkAcces]: false }
-    const { error } = await supabase.from('collaborateurs').update(patch).in('id', ids)
+    const { error } = grant
+      ? await supabase.from('collaborateur_acces')
+          .upsert(ids.map(id => ({ collaborateur_id: id, societe, module_code: moduleCode })),
+                  { onConflict: 'collaborateur_id,societe,module_code' })
+      : await supabase.from('collaborateur_acces').delete()
+          .in('collaborateur_id', ids).eq('societe', societe).eq('module_code', moduleCode)
     setSaving(false)
     if (error) { notify('❌ ' + error.message); return }
-    setUsers(prev => prev.map(u => ids.includes(u.id) ? { ...u, ...patch } : u))
+    setAccesAll(m => {
+      const nm = new Map(m)
+      ids.forEach(id => {
+        const s2 = new Set(nm.get(id) || [])
+        grant ? s2.add(bulkAcces) : s2.delete(bulkAcces)
+        nm.set(id, s2)
+      })
+      return nm
+    })
+    if (selUser?.id && ids.includes(selUser.id)) {
+      setAccesSel(prev => { const nm = new Set(prev); grant ? nm.add(bulkAcces) : nm.delete(bulkAcces); return nm })
+    }
     notify(`✓ Accès ${grant ? 'donné' : 'retiré'} à ${ids.length} utilisateur(s)`)
   }
 
@@ -319,8 +387,9 @@ export default function ConfigModule() {
       if (uBureau === 'sans') { if (u.bureau_id != null) return false }
       else if (String(u.bureau_id) !== uBureau) return false
     }
-    if (uSoc !== 'toutes' && !(u.est_admin || u[uSoc])) return false
-    if (uModule !== 'tous' && !(u.est_admin || u[uModule])) return false
+    const sesAcces = accesAll.get(u.id)
+    if (uSoc !== 'toutes' && !(u.est_admin || [...(sesAcces || [])].some(c => c.startsWith(uSoc + '|')))) return false
+    if (uModule !== 'tous' && !(u.est_admin || sesAcces?.has(uModule))) return false
     return true
   }).sort((a, b) => {
     const nomA = a.nom_complet || a.email || '', nomB = b.nom_complet || b.email || ''
@@ -435,7 +504,7 @@ export default function ConfigModule() {
               </select>
               <select value={uSoc} onChange={e => setUSoc(e.target.value)} style={{ ...inp, width: 'auto' }}>
                 <option value="toutes">Société : toutes</option>
-                {ACCES.map(g => <option key={g.acc} value={g.acc}>{g.label}</option>)}
+                {catalogue.map(c => <option key={c.societe} value={c.societe}>{socUi(c.societe).label}</option>)}
               </select>
               <select value={uBureau} onChange={e => setUBureau(e.target.value)} style={{ ...inp, width: 'auto' }}>
                 <option value="tous">Bureau : tous</option>
@@ -443,13 +512,13 @@ export default function ConfigModule() {
                 <option value="sans">— Sans bureau —</option>
               </select>
               <select value={uModule} onChange={e => setUModule(e.target.value)} style={{ ...inp, width: 'auto' }}>
-                <option value="tous">Accès page : tous</option>
-                {ACCES.flatMap(g => g.pages.map(([pg, pl]) => <option key={`${g.pfx}_${pg}`} value={`${g.pfx}_${pg}`}>{g.label} · {pl}</option>))}
+                <option value="tous">Accès module : tous</option>
+                {catalogue.flatMap(c => c.modules.map(m => <option key={`${c.societe}|${m.code}`} value={`${c.societe}|${m.code}`}>{socUi(c.societe).label} · {m.libelle}</option>))}
               </select>
               {(uSearch || uRole !== 'tous' || uStatut !== 'tous' || uSoc !== 'toutes' || uBureau !== 'tous' || uModule !== 'tous') && (
                 <button onClick={() => { setUSearch(''); setURole('tous'); setUStatut('tous'); setUSoc('toutes'); setUBureau('tous'); setUModule('tous') }} style={{ ...btnGhost }}>✕ Réinitialiser</button>
               )}
-              <button onClick={() => { setSelUser({ _nouveau: true, nom_complet: '', email: '', est_admin: false, compte_hub_actif: false, actif: true, type: 'physique' }); setSelTaux({}) }} style={{ ...btn('#16a34a'), padding: '8px 14px', fontSize: 13 }}>➕ Nouvel utilisateur</button>
+              <button onClick={() => { setSelUser({ _nouveau: true, nom_complet: '', email: '', est_admin: false, compte_hub_actif: false, actif: true, type: 'physique' }); setSelTaux({}); setAccesSel(new Set()) }} style={{ ...btn('#16a34a'), padding: '8px 14px', fontSize: 13 }}>➕ Nouvel utilisateur</button>
               <button onClick={() => setShowBureaux(v => !v)} style={{ ...btnGhost }}>🏢 Gérer les bureaux</button>
               <button onClick={() => setTriBureau(v => !v)} style={{ ...btnGhost, ...(triBureau ? { background: '#1e293b', color: '#fff', borderColor: '#1e293b' } : {}) }}>🏢 Trier par bureau</button>
               <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 'auto' }}>{usersFiltres.length} / {users.length}</span>
@@ -479,13 +548,13 @@ export default function ConfigModule() {
             )}
 
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 14, alignItems: 'center', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 10, padding: '8px 12px' }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#0369a1' }}>Attribution groupée d'un accès page</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#0369a1' }}>Attribution groupée d'un module</span>
               <select value={bulkAcces} onChange={e => setBulkAcces(e.target.value)} style={{ ...inp, width: 'auto' }}>
-                <option value="">— Choisir une page —</option>
-                {ACCES.flatMap(g => g.pages.map(([pg, pl]) => <option key={`${g.pfx}_${pg}`} value={`${g.pfx}_${pg}`}>{g.label} · {pl}</option>))}
+                <option value="">— Choisir un module —</option>
+                {catalogue.flatMap(c => c.modules.map(m => <option key={`${c.societe}|${m.code}`} value={`${c.societe}|${m.code}`}>{socUi(c.societe).label} · {m.libelle}</option>))}
               </select>
               {bulkAcces && (() => {
-                const holders = usersFiltres.filter(u => u[bulkAcces]).length
+                const holders = usersFiltres.filter(u => accesAll.get(u.id)?.has(bulkAcces)).length
                 const admins = usersFiltres.filter(u => u.est_admin).length
                 return <span style={{ fontSize: 12, color: '#0369a1' }}>{holders} ont l'accès{admins ? ` · ${admins} admin(s) accès total` : ''}</span>
               })()}
@@ -524,7 +593,9 @@ export default function ConfigModule() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', marginTop: 5 }}>
                       {u.est_admin
                         ? <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: '#7c3aed', borderRadius: 5, padding: '2px 7px' }}>Toutes sociétés</span>
-                        : ACCES.filter(g => u[g.acc]).map(g => <span key={g.acc} style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: g.couleur, borderRadius: 5, padding: '2px 7px' }}>{g.label}</span>)}
+                        : [...new Set([...(accesAll.get(u.id) || [])].map(c => c.split('|')[0]))]
+                            .sort((a, b) => socUi(a).ordre - socUi(b).ordre)
+                            .map(soc => <span key={soc} style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: socUi(soc).couleur, borderRadius: 5, padding: '2px 7px' }}>{socUi(soc).label}</span>)}
                       {[['est_commercial','Commercial'],['est_gestionnaire','Gestionnaire'],['est_sous_agent','Sous-agent'],['est_apporteur','Apporteur']].filter(([k]) => u[k]).map(([k,l]) => (
                         <span key={k} style={{ fontSize: 10, fontWeight: 700, color: '#475569', background: '#f1f5f9', borderRadius: 5, padding: '2px 7px' }}>{l}</span>
                       ))}
@@ -655,53 +726,47 @@ export default function ConfigModule() {
                     </div>
                   ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(260px,1fr))', gap: 14 }}>
-                      {ACCES.map(grp => {
-                        const estAdminSoc = grp.pages.length > 0 && grp.pages.every(([pg]) => selUser[`${grp.pfx}_${pg}`])
+                      {catalogue.map(c => {
+                        const ui = socUi(c.societe)
+                        const actifs = c.modules.filter(m => accesSel.has(`${c.societe}|${m.code}`)).length
+                        const tout = actifs === c.modules.length && c.modules.length > 0
                         return (
-                        <div key={grp.acc} style={{ border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
-                          <div style={{ background: grp.couleur, color: '#fff', padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontWeight: 700 }}>{grp.label}{estAdminSoc ? ' — Admin' : ''}</span>
-                            <Toggle label="" on={!!selUser[grp.acc]} light onClick={() => setSelUser(u => ({ ...u, [grp.acc]: !u[grp.acc] }))} />
+                        <div key={c.societe} style={{ border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
+                          <div style={{ background: ui.couleur, color: '#fff', padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontWeight: 700 }}>{ui.label}{tout ? ' — Tout' : ''}</span>
+                            <span style={{ fontSize: 11, opacity: .85 }}>{actifs} / {c.modules.length}</span>
                           </div>
-                          {grp.pages.length > 0 && (
-                            <div style={{ padding: '6px 10px', opacity: selUser[grp.acc] ? 1 : .45, pointerEvents: selUser[grp.acc] ? 'auto' : 'none' }}>
-                              <button
-                                onClick={() => {
-                                  const toutCoche = grp.pages.every(([pg]) => selUser[`${grp.pfx}_${pg}`])
-                                  setSelUser(u => {
-                                    const n = { ...u }
-                                    grp.pages.forEach(([pg]) => { n[`${grp.pfx}_${pg}`] = !toutCoche })
-                                    return n
-                                  })
-                                }}
-                                style={{ fontSize: 10.5, color: grp.couleur, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, padding: '2px 0 6px', textAlign: 'left' }}
-                                title="Tout cocher = administrateur de cette société"
-                              >{estAdminSoc ? '✕ Décocher tout' : '✓ Tout cocher (admin société)'}</button>
-                              {[...grp.pages].sort((a, b) => (a[0] === 'dashboard') !== (b[0] === 'dashboard') ? (a[0] === 'dashboard' ? -1 : 1) : a[1].localeCompare(b[1], 'fr', { sensitivity: 'base' })).map(([pg, plabel]) => {
-                                const col = `${grp.pfx}_${pg}`
-                                return <Toggle key={col} label={plabel} on={!!selUser[col]} small onClick={() => setSelUser(u => ({ ...u, [col]: !u[col] }))} />
-                              })}
-                              {grp.acc === 'acc_dynassur' && (
+                          <div style={{ padding: '6px 10px' }}>
+                            <button
+                              onClick={() => basculerSociete(c.societe, c.modules, tout)}
+                              style={{ fontSize: 10.5, color: ui.couleur, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, padding: '2px 0 6px', textAlign: 'left' }}
+                              title="Tout cocher = accès complet à cette société"
+                            >{tout ? '✕ Tout décocher' : '✓ Tout cocher'}</button>
+                            {c.modules.map(m => (
+                              <Toggle key={m.code} label={m.libelle} small
+                                on={accesSel.has(`${c.societe}|${m.code}`)}
+                                onClick={() => basculerModule(c.societe, m.code)} />
+                            ))}
+                            {c.societe === 'DYNASSUR' && (
+                              <div style={{ borderTop: '1px dashed #e2e8f0', marginTop: 6, paddingTop: 6 }}>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Portefeuille clients</div>
+                                <label style={{ display: 'block', marginBottom: 6 }}>
+                                  <Lbl>Bureau</Lbl>
+                                  <select value={selUser.bureau_id ?? ''} onChange={e => setBureau(e.target.value)} style={{ ...inp, padding: '6px 8px' }} disabled={!selUser.id}>
+                                    <option value="">— Aucun —</option>
+                                    {bureaux.map(b => <option key={b.id} value={b.id}>{b.libelle}</option>)}
+                                  </select>
+                                </label>
+                                <Toggle label="Voir tout le portefeuille (ignore le bureau)" on={!!selUser.voit_tout_portefeuille} small onClick={() => setSelUser(u => ({ ...u, voit_tout_portefeuille: !u.voit_tout_portefeuille }))} />
                                 <div style={{ borderTop: '1px dashed #e2e8f0', marginTop: 6, paddingTop: 6 }}>
-                                  <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Portefeuille clients</div>
-                                  <label style={{ display: 'block', marginBottom: 6 }}>
-                                    <Lbl>Bureau</Lbl>
-                                    <select value={selUser.bureau_id ?? ''} onChange={e => setBureau(e.target.value)} style={{ ...inp, padding: '6px 8px' }} disabled={!selUser.id}>
-                                      <option value="">— Aucun —</option>
-                                      {bureaux.map(b => <option key={b.id} value={b.id}>{b.libelle}</option>)}
-                                    </select>
-                                  </label>
-                                  <Toggle label="Voir tout le portefeuille (ignore le bureau)" on={!!selUser.voit_tout_portefeuille} small onClick={() => setSelUser(u => ({ ...u, voit_tout_portefeuille: !u.voit_tout_portefeuille }))} />
-                                  <div style={{ borderTop: '1px dashed #e2e8f0', marginTop: 6, paddingTop: 6 }}>
-                                    <Toggle label="Voir les commissions" on={!!selUser.voir_commissions} small onClick={() => setSelUser(u => ({ ...u, voir_commissions: !u.voir_commissions }))} />
-                                  </div>
+                                  <Toggle label="Voir les commissions" on={!!selUser.voir_commissions} small onClick={() => setSelUser(u => ({ ...u, voir_commissions: !u.voir_commissions }))} />
                                 </div>
-                              )}
-                              {(grp.acc === 'acc_lode' || grp.acc === 'acc_dtx' || grp.acc === 'acc_hexagroup') && (
-                                <div style={{ borderTop: '1px dashed #e2e8f0', marginTop: 6, paddingTop: 6, fontSize: 10.5, color: '#94a3b8' }}>Pas de portefeuille par bureau — un seul portefeuille pour {grp.label}.</div>
-                              )}
-                            </div>
-                          )}
+                              </div>
+                            )}
+                            {(c.societe === 'LODE' || c.societe === 'DTX' || c.societe === 'HEXAGROUP') && (
+                              <div style={{ borderTop: '1px dashed #e2e8f0', marginTop: 6, paddingTop: 6, fontSize: 10.5, color: '#94a3b8' }}>Pas de portefeuille par bureau — un seul portefeuille pour {ui.label}.</div>
+                            )}
+                          </div>
                         </div>
                       )})}
                     </div>
