@@ -274,7 +274,7 @@ def parcourir(jeton: str, site_id: str):
                 # Ni le dossier ni le nom ne nomment une société connue : on ne
                 # devine pas, mais on le dit — un fichier ignoré en silence est
                 # un fichier perdu pour la comptabilité.
-                ignores.setdefault(relatif[0] if relatif else "(racine)", []).append(nom)
+                ignores.setdefault("/".join(relatif[:-1]) or "(racine)", []).append(nom)
                 continue
 
             lignes.append({

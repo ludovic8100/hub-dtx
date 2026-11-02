@@ -11,10 +11,6 @@ name: Factures SharePoint → Supabase
 # d'écrire quoi que ce soit.
 
 on:
-  # TEMPORAIRE — mise au point avant le merge. À retirer avant d'ouvrir la PR :
-  # une fois sur main, workflow_dispatch suffit.
-  push:
-    branches: [feat/scan-factures-sharepoint]
   schedule:
     - cron: '37 5 * * *'
   workflow_dispatch:
@@ -48,8 +44,7 @@ jobs:
       GRAPH_TENANT_ID: ${{ secrets.GRAPH_TENANT_ID }}
       GRAPH_CLIENT_ID: ${{ secrets.GRAPH_CLIENT_ID }}
       GRAPH_CLIENT_SECRET: ${{ secrets.GRAPH_CLIENT_SECRET }}
-      # Un push sur la branche de mise au point ne doit jamais écrire en base.
-      DRY_RUN: ${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.dry_run)) && '1' || '' }}
+      DRY_RUN: ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '1' || '' }}
       PURGE: ${{ (github.event_name == 'workflow_dispatch' && !inputs.purge) && '0' || '1' }}
     steps:
       - uses: actions/checkout@v4
