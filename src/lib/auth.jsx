@@ -51,6 +51,7 @@ export function AuthProvider({ children }) {
   const [perms, setPerms] = useState(null)
   const [loading, setLoading] = useState(true)
   const [activeSociete, setActiveSociete] = useState(null)
+  const [erreurConnexion, setErreurConnexion] = useState(null)
 
   async function loadPerms(email) {
     const { data, error } = await supabase
@@ -129,14 +130,67 @@ export function AuthProvider({ children }) {
     return () => { cancelled = true; subscription.unsubscribe() }
   }, [])
 
+  // ── Connexion Microsoft ──────────────────────────────────────────────────
+  //
+  // POLITIQUE DE SESSION (le code ne fait qu'un tiers du travail) :
+  //
+  //  1. Supabase → Authentication → Sessions
+  //       Time-box user sessions : 24 h — une vraie authentification par jour
+  //       Inactivity timeout     :  4 h — session morte après 4 h sans usage
+  //  2. `prompt: 'login'` ci-dessous
+  //  3. Entra → méthodes d'authentification : passkey (FIDO2) en préféré,
+  //     Authenticator en secours
+  //
+  // Pourquoi le point 2 est indispensable : sans lui, l'expiration côté
+  // Supabase ne produit qu'une redirection INVISIBLE. Entra voit la session
+  // SSO encore ouverte par Outlook ou Teams et re-délivre un jeton sans rien
+  // demander — on croit se ré-authentifier tous les jours alors que personne
+  // n'a rien saisi. `prompt: 'login'` force Entra à redemander les
+  // identifiants, donc le facteur.
+  //
+  // Changement de navigateur ou d'appareil : rien à régler. La session vit
+  // dans le localStorage, qui est propre à chaque profil de navigateur et à
+  // chaque appareil — Chrome, Edge et le téléphone ne la partagent jamais.
+  //
+  // Les erreurs sont remontées à l'écran (voir pages/Login.jsx) : un provider
+  // désactivé côté Supabase rendait le bouton silencieux, ce qui a fait
+  // chercher la panne ailleurs pendant toute la session du 31/10/2026.
   async function signInWithMicrosoft() {
-    await supabase.auth.signInWithOAuth({ provider: 'azure', options: { scopes: 'email profile openid', redirectTo: `${window.location.origin}/auth/callback` } })
+    setErreurConnexion(null)
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'azure',
+      options: {
+        scopes: 'email profile openid',
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: { prompt: 'login' },
+      },
+    })
+    if (error) setErreurConnexion(error.message)
+    return { error }
   }
+
+  // Changer de compte : `select_account` affiche le sélecteur Microsoft, qui
+  // demande de toute façon les identifiants du compte choisi.
   async function switchUser() {
+    setErreurConnexion(null)
     await supabase.auth.signOut()
-    await supabase.auth.signInWithOAuth({ provider: 'azure', options: { scopes: 'email profile openid', redirectTo: `${window.location.origin}/auth/callback`, queryParams: { prompt: 'select_account' } } })
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'azure',
+      options: {
+        scopes: 'email profile openid',
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: { prompt: 'select_account' },
+      },
+    })
+    if (error) setErreurConnexion(error.message)
+    return { error }
   }
-  async function signOut() { await supabase.auth.signOut(); setUser(null); setPerms(null); setActiveSociete(null) }
+
+  async function signOut() {
+    const { error } = await supabase.auth.signOut()
+    setUser(null); setPerms(null); setActiveSociete(null); setErreurConnexion(null)
+    return { error }
+  }
 
   const isAdmin = perms?.est_admin === true
 
@@ -152,7 +206,7 @@ export function AuthProvider({ children }) {
   const societeActive = activeSociete ? SOCIETES_CONFIG[activeSociete] : null
 
   return (
-    <AuthContext.Provider value={{ user, perms, loading, isAdmin, activeSociete, setActiveSociete, societesDispo, societeActive, signInWithMicrosoft, switchUser, signOut }}>
+    <AuthContext.Provider value={{ user, perms, loading, isAdmin, activeSociete, setActiveSociete, societesDispo, societeActive, signInWithMicrosoft, switchUser, signOut, erreurConnexion }}>
       {children}
     </AuthContext.Provider>
   )

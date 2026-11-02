@@ -108,6 +108,65 @@ de reconstruire, plutôt que de continuer à deviner en production.
    `temp_acces_libre_sans_login`, dans l'ordre : jamais avant l'étape 1).
 3. Reconstruire un vrai login (Microsoft ou autre) avant de rouvrir l'accès.
 
+### Cause réelle de la « bascule infinie » — établie le 02/11/2026
+
+Les trois pistes évoquées en octobre (course de timing, verrou concurrent, flux
+PKCE) étaient fausses. Ce qui s'est réellement passé, vérifié dans l'historique
+Git, le journal d'audit Supabase et l'API Auth :
+
+1. **La clé Supabase publishable avait été supprimée** lors d'un nettoyage des
+   clés API, sans être remplacée → `401 Unauthorized` sur `/rest/v1` et sur
+   l'échange de jeton. L'utilisateur cliquait, partait chez Microsoft, revenait,
+   et retombait sur `/login` : la bascule. **Corrigée le 31/10 à 10:40**
+   (commit `c25d1f8`) — soit 28 minutes *après* la pose de
+   `ACCES_LIBRE_TEMPORAIRE` à 10:12. Le contournement étant déjà en place, le
+   login n'a jamais été retesté.
+2. `auth.audit_log_entries` confirme que la connexion Microsoft **fonctionnait**
+   ce matin-là : `user_signedup` · azure · `lde@dynassur.be` à 10:10:10. Les
+   comptes `lde@` et `ngi@` ont ensuite été supprimés par `service_role` à
+   10:18. `auth.users` est vide depuis — sans conséquence, une connexion OAuth
+   recrée l'utilisateur.
+3. **Ce qui bloque aujourd'hui est autre chose** : `GET /auth/v1/settings`
+   renvoie `"azure": false`. Le provider Microsoft a été désactivé dans le
+   projet Supabase. Repasser le drapeau à `false` sans le réactiver
+   reproduirait la bascule, avec une nouvelle cause.
+
+**Défaut de code qui a rendu tout cela indiagnosticable** : `signInWithMicrosoft`
+ignorait le `{ error }` renvoyé par `signInWithOAuth`. Provider désactivé = clic
+sans effet et sans message. Corrigé : les erreurs s'affichent sur l'écran de
+login, et le bloc de diagnostic laissé en production dans `AuthCallback`
+(il montrait des fragments de jeton) a été retiré.
+
+### Politique de session (décidée le 02/11/2026)
+
+Trois leviers, dont un seul est du code :
+
+| Où | Réglage | Valeur |
+|---|---|---|
+| Supabase → Authentication → Sessions | *Time-box user sessions* | **24 h** |
+| Supabase → Authentication → Sessions | *Inactivity timeout* | **4 h** |
+| `src/lib/auth.jsx` | `queryParams: { prompt: 'login' }` | posé |
+| Entra → méthodes d'authentification | passkey (FIDO2) préférée, Authenticator en secours | à activer |
+
+Sans `prompt: 'login'`, l'expiration côté Supabase ne produit qu'une redirection
+**invisible** : Entra réutilise la session SSO ouverte par Outlook ou Teams et
+re-délivre un jeton sans rien demander. On croirait se ré-authentifier chaque
+jour sans que personne n'ait rien saisi.
+
+Changement de navigateur ou d'appareil : rien à régler. La session vit dans le
+`localStorage`, propre à chaque profil de navigateur et à chaque appareil —
+Chrome, Edge et le téléphone ne la partagent jamais.
+
+Ce que l'*inactivity timeout* ne fait **pas** : il ne protège pas d'une fenêtre
+laissée ouverte. Supabase mesure l'activité à l'usage du jeton de
+rafraîchissement, et `supabase-js` le renouvelle tout seul tant que l'onglet est
+ouvert et visible. Un poste abandonné se protège par le verrouillage de session
+du système d'exploitation, pas par l'application.
+
+Aucune licence Entra ID P1 n'est nécessaire : la fréquence est imposée par le
+Hub (time-box + `prompt=login`), et les passkeys font partie du niveau gratuit
+d'Entra. P1 ne servirait qu'à un accès conditionnel par appareil ou par risque.
+
 ## Table `personnes` et fusion Utilisateurs/Acteurs métier (31/10/2026)
 
 Suite au point précédent, première étape du modèle d'identité unique : table `personnes`

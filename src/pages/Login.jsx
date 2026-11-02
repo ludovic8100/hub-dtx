@@ -2,7 +2,7 @@ import { Navigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 
 export default function Login() {
-  const { user, loading, signInWithMicrosoft } = useAuth()
+  const { user, loading, signInWithMicrosoft, erreurConnexion } = useAuth()
 
   // Évite d'afficher à nouveau l'écran de login si une session existe déjà
   // (sinon un simple retour sur /login masque une connexion pourtant réussie).
@@ -79,6 +79,20 @@ export default function Login() {
           </svg>
           Se connecter avec Microsoft
         </button>
+
+        {/* L'erreur est affichée telle que Supabase la renvoie : un provider
+            désactivé, une clé refusée ou une URL de redirection non autorisée
+            doivent se voir ici, pas rester silencieux. */}
+        {erreurConnexion && (
+          <p style={{
+            fontSize: '13px', color: '#b91c1c', background: '#fef2f2',
+            border: '1px solid #fecaca', borderRadius: '8px',
+            padding: '10px 12px', marginTop: '16px', marginBottom: 0,
+            lineHeight: '1.45', textAlign: 'left', wordBreak: 'break-word',
+          }}>
+            La connexion Microsoft a échoué : {erreurConnexion}
+          </p>
+        )}
 
         <p style={{ fontSize: '12px', color: '#94a3b8', marginTop: '20px' }}>
           Seuls les comptes @dynassur.be et @dtx-group.be sont autorisés
