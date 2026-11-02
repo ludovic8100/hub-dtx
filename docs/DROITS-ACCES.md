@@ -108,6 +108,158 @@ de reconstruire, plutôt que de continuer à deviner en production.
    `temp_acces_libre_sans_login`, dans l'ordre : jamais avant l'étape 1).
 3. Reconstruire un vrai login (Microsoft ou autre) avant de rouvrir l'accès.
 
+### Cause réelle de la « bascule infinie » — établie le 02/11/2026
+
+Les trois pistes évoquées en octobre (course de timing, verrou concurrent, flux
+PKCE) étaient fausses. Ce qui s'est réellement passé, vérifié dans l'historique
+Git, le journal d'audit Supabase et l'API Auth :
+
+1. **La clé Supabase publishable avait été supprimée** lors d'un nettoyage des
+   clés API, sans être remplacée → `401 Unauthorized` sur `/rest/v1` et sur
+   l'échange de jeton. L'utilisateur cliquait, partait chez Microsoft, revenait,
+   et retombait sur `/login` : la bascule. **Corrigée le 31/10 à 10:40**
+   (commit `c25d1f8`) — soit 28 minutes *après* la pose de
+   `ACCES_LIBRE_TEMPORAIRE` à 10:12. Le contournement étant déjà en place, le
+   login n'a jamais été retesté.
+2. `auth.audit_log_entries` confirme que la connexion Microsoft **fonctionnait**
+   ce matin-là : `user_signedup` · azure · `lde@dynassur.be` à 10:10:10. Les
+   comptes `lde@` et `ngi@` ont ensuite été supprimés par `service_role` à
+   10:18. `auth.users` est vide depuis — sans conséquence, une connexion OAuth
+   recrée l'utilisateur.
+3. **Ce qui bloque aujourd'hui est autre chose** : `GET /auth/v1/settings`
+   renvoie `"azure": false`. Le provider Microsoft a été désactivé dans le
+   projet Supabase. Repasser le drapeau à `false` sans le réactiver
+   reproduirait la bascule, avec une nouvelle cause.
+
+**Défaut de code qui a rendu tout cela indiagnosticable** : `signInWithMicrosoft`
+ignorait le `{ error }` renvoyé par `signInWithOAuth`. Provider désactivé = clic
+sans effet et sans message. Corrigé : les erreurs s'affichent sur l'écran de
+login, et le bloc de diagnostic laissé en production dans `AuthCallback`
+(il montrait des fragments de jeton) a été retiré.
+
+### Politique de session (décidée le 02/11/2026)
+
+Objectif : une authentification Microsoft complète au moins toutes les 24 h, et
+à chaque nouveau navigateur ou appareil.
+
+| Où | Quoi | État |
+|---|---|---|
+| `src/lib/auth.jsx` | `queryParams: { prompt: 'login' }` | posé |
+| `src/lib/auth.jsx` | `DUREE_MAX_SESSION` = 24 h, `DUREE_MAX_INACTIVITE` = 2 h | posé |
+| `src/lib/auth.jsx` | `RELECTURE_COMPTE` = 10 min — relecture de `compte_hub_actif` | posé |
+| Entra → Applications d'entreprise → Hub DTX | *Affectation requise* = Oui | posé le 02/11/2026 |
+| Entra → méthodes d'authentification | passkey (FIDO2) préférée, Authenticator en secours | à activer |
+
+**Pourquoi la durée est appliquée dans le code et non dans Supabase.** Les
+réglages serveur *Time-box user sessions* et *Inactivity timeout* existent, mais
+ils sont **réservés au plan Pro** ; le projet est en Free. Vérifié le 02/11/2026
+dans Authentication → Sessions.
+
+Limite à connaître : la règle vit dans le navigateur. Elle couvre une session
+laissée ouverte, un poste partagé, un navigateur resté connecté — le scénario
+réel. Elle ne couvre pas un jeton exfiltré et rejoué depuis ailleurs. Seul un
+time-box côté serveur (plan Pro) serait opposable.
+
+> **Décision du 02/11/2026 — passage au plan Pro, reporté.** Le Hub est encore
+> en construction et le remplacement de Brio n'est pas acté (tout n'a pas été
+> exploré). Le plan Pro sera activé **à la mise en production réelle**, et il
+> apportera alors deux choses, pas une :
+>
+> 1. le *time-box* et l'*inactivity timeout* côté serveur, qui rendront la règle
+>    des 24 h / 4 h opposable au lieu d'applicative ;
+> 2. **les sauvegardes de base de données**, absentes du plan Free — point le
+>    plus lourd des deux pour une base qui porte 10 298 fiches clients avec IBAN.
+>
+> À ce moment-là : activer Pro, régler Authentication → Sessions sur 24 h et 4 h,
+> puis retirer `DUREE_MAX_SESSION` / `DUREE_MAX_INACTIVITE` de `src/lib/auth.jsx`
+> pour ne pas garder deux mécanismes concurrents. `prompt: 'login'` reste, lui :
+> il est indispensable dans les deux cas.
+
+Effet de bord favorable : l'inactivité est mesurée sur les actions **réelles**
+(clic, touche), pas sur l'usage du jeton de rafraîchissement. Le réglage natif de
+Supabase ne fermait jamais une fenêtre laissée ouverte, puisque `supabase-js`
+renouvelle le jeton tout seul tant que l'onglet vit. Ici, si. Revenir sur un
+onglet ouvert depuis la veille ne compte pas comme une activité : la session est
+fermée, pas prolongée.
+
+**Pourquoi `prompt: 'login'` est indispensable.** Sans lui, l'expiration ne
+produit qu'une redirection **invisible** : Entra réutilise la session SSO ouverte
+par Outlook ou Teams et re-délivre un jeton sans rien demander. On croirait se
+ré-authentifier chaque jour sans que personne n'ait rien saisi.
+
+**Changement de navigateur ou d'appareil** : rien à régler. La session vit dans
+le `localStorage`, propre à chaque profil de navigateur et à chaque appareil —
+Chrome, Edge et le téléphone ne la partagent jamais.
+
+**Poste abandonné déverrouillé** : la vraie réponse reste le verrouillage de
+session du système d'exploitation (5 à 10 min, mot de passe à la reprise). Aucun
+réglage applicatif ne protège le reste du poste.
+
+**Révocation d'un accès : trois niveaux, trois délais.** Rien n'est instantané
+dans un système à jetons, il faut le savoir :
+
+| Geste | Effet | Délai |
+|---|---|---|
+| Retirer l'affectation dans Entra | Microsoft refuse tout **nouveau** jeton | immédiat pour une nouvelle connexion |
+| Bloquer la connexion dans Microsoft 365 | coupe Outlook, Teams, SharePoint | immédiat sur ces services |
+| `compte_hub_actif` à `false` | ferme la session en cours du Hub | **≤ 10 min** (`RELECTURE_COMPTE`) |
+| Ne rien faire d'autre | la session en cours s'éteint d'elle-même | ≤ 24 h, ou 2 h sans activité |
+
+Une session déjà ouverte ne meurt pas parce qu'Entra a changé d'avis : Supabase
+ne redemande rien à Microsoft pour la renouveler. C'est `RELECTURE_COMPTE` qui
+fait le lien, en redemandant à la base si le compte vit encore.
+
+**Gate d'accès : l'affectation Entra, pas le code.** Sur l'application
+d'entreprise *Hub DTX*, *Affectation requise* = Oui. Une personne non affectée
+n'obtient pas de jeton — elle ne franchit jamais la porte, le Hub ne la voit
+même pas. ⚠️ **L'affectation d'un groupe (plutôt que d'utilisateurs un par un)
+exige Entra ID P1.** En plan gratuit, il faut affecter les personnes
+individuellement.
+
+**Aucune licence Entra ID P1 n'est nécessaire pour le reste** : la fréquence de
+ré-authentification est imposée par le Hub, et les passkeys font partie du
+niveau gratuit d'Entra. P1 n'apporterait que l'affectation par groupe et l'accès
+conditionnel par appareil ou par risque.
+
+**Synchronisation Entra → Hub : un seul sens, lecture seule.** Décidé le
+02/11/2026 après avoir pesé l'écriture vers Entra.
+
+| Champ | Maître | Sens |
+|---|---|---|
+| Droit d'entrer (affectation Entra) | Entra | → `compte_hub_actif`, grisé dans le Hub |
+| E-mail, nom, prénom, nom affiché | Entra | → Hub |
+| GSM, adresse, CP, ville, titre | **Entra à la création**, Hub ensuite | → Hub, jamais l'inverse |
+| IBAN, BIC, BCE, date de naissance | Hub seul | jamais exposé |
+| Code, bureau, rôle métier, taux, droits modules | Hub seul | jamais exposé |
+
+Écrire dans Entra exigerait `User.ReadWrite.All` — l'écriture sur **toutes** les
+identités du locataire, sans découpage possible par champ. Refusé : le bénéfice
+(ne pas retaper un numéro de téléphone) ne vaut pas ce droit, et personne ne lit
+ces champs côté Microsoft. L'objectif d'encodage unique est atteint par la seule
+lecture, puisque la création se fait dans Entra. Si le Hub corrige ensuite une
+valeur et qu'elle diverge d'Entra, l'écran l'affiche — la divergence se voit au
+lieu de pourrir en silence.
+
+Permission à accorder à l'application `Hub DTX` : **`User.Read.All`** (type
+Application) + consentement administrateur. Lecture seule, rien d'autre.
+Elle n'existe pas encore.
+
+**Deux applications Azure distinctes, à ne pas fusionner** (constat du
+02/11/2026) :
+
+| Application | ID | Rôle |
+|---|---|---|
+| `Hub DTX` | `5065b920-f43b-489d-8c68-1576803f020f` | connexion des utilisateurs (OAuth délégué) |
+| `Hub DTX - Sharepoint` | `d9b91434-168e-4706-a113-ff4cd14b80e2` | lecture SharePoint (`Sites.Read.All`, permission d'application) |
+
+Les garder séparées est délibéré : la seconde porte un accès de niveau locataire
+sans utilisateur, qui n'a rien à faire sur l'application par laquelle 49
+personnes se connectent — et une rotation de secret d'un côté ne doit pas couper
+l'autre. L'application `d38526f5…` citée dans `office_users_sync.py` est une
+troisième, supprimée du locataire, sans rapport avec le login.
+
+Locataire : `29a87d83-130a-42d9-82c9-29c930952c76`.
+
 ## Table `personnes` et fusion Utilisateurs/Acteurs métier (31/10/2026)
 
 Suite au point précédent, première étape du modèle d'identité unique : table `personnes`
