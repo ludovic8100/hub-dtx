@@ -128,11 +128,26 @@ def lire_montant(nom: str):
     return valeur if 0 <= valeur < 1_000_000 else None
 
 
-def lire_societe(segments):
-    """Le dossier société est celui qui commence par « _ » : _DYNASSUR → DYNASSUR."""
+# Le préfixe « _ » ne suffit pas à désigner une société : COMPTA/FACTURES porte
+# aussi des dossiers fournisseurs ainsi nommés (_TRADEIFY, _TOPSTEP, _FUNDEDNEXT).
+# Sans cette liste, 35 fichiers partaient dans des sociétés inventées.
+SOCIETES = {"DYNASSUR", "DTX", "LODE", "HEXAGROUP", "PRIVE", "HOL"}
+
+
+def lire_societe(segments, nom=""):
+    """Société du document : d'abord le dossier _SOCIETE, sinon le nom du fichier.
+
+    Les fichiers rangés sous un dossier fournisseur gardent la société dans leur
+    nom (« 20260413 - DTX - TRADEIFY HOLDINGS, CORP. - … ») : on la récupère là
+    plutôt que de les laisser de côté.
+    """
     for segment in segments:
-        if segment.startswith("_") and len(segment) > 1:
+        if segment.startswith("_") and segment[1:].upper() in SOCIETES:
             return segment[1:].upper()
+    champs = [c.strip().upper() for c in nom.split(" - ")]
+    for champ in champs[:3]:
+        if champ in SOCIETES:
+            return champ
     return None
 
 
@@ -162,21 +177,36 @@ def supabase(methode: str, chemin: str, charge=None, entetes=None):
 def upsert(lignes):
     """Upsert par paquets sur la contrainte unique `fichier_id`.
 
-    Seules les colonnes envoyées sont écrasées : `transaction_id` et
-    `lode_devis_id` ne figurent pas dans la charge, le rapprochement survit donc
-    à chaque passage.
+    Deux règles tiennent la casse :
+
+    - seules les colonnes envoyées sont écrasées. `transaction_id` et
+      `lode_devis_id` ne figurent jamais dans la charge : le rapprochement
+      facture ↔ paiement survit à chaque passage ;
+    - une valeur absente n'est pas envoyée du tout. Près de 5 000 fichiers
+      portent l'ancienne convention de nommage, sans date lisible ; envoyer
+      `null` effacerait les dates déjà présentes en base. Les lignes sont donc
+      groupées par jeu de colonnes renseignées, PostgREST exigeant des clés
+      identiques au sein d'un même envoi.
     """
+    groupes = {}
+    for ligne in lignes:
+        charge = {cle: valeur for cle, valeur in ligne.items() if valeur is not None}
+        groupes.setdefault(tuple(sorted(charge)), []).append(charge)
+
     ecrites = 0
-    for debut in range(0, len(lignes), 500):
-        paquet = lignes[debut:debut + 500]
-        supabase(
-            "POST",
-            "factures_achat?on_conflict=fichier_id",
-            paquet,
-            {"Prefer": "resolution=merge-duplicates,return=minimal"},
-        )
-        ecrites += len(paquet)
-        print(f"    … {ecrites}/{len(lignes)}", flush=True)
+    for colonnes, paquet_complet in sorted(groupes.items(), key=lambda g: -len(g[1])):
+        omises = {"montant", "date_facture"} - set(colonnes)
+        detail = f" (sans {', '.join(sorted(omises))}, préservé en base)" if omises else ""
+        print(f"  {len(paquet_complet)} ligne(s){detail}", flush=True)
+        for debut in range(0, len(paquet_complet), 500):
+            paquet = paquet_complet[debut:debut + 500]
+            supabase(
+                "POST",
+                "factures_achat?on_conflict=fichier_id",
+                paquet,
+                {"Prefer": "resolution=merge-duplicates,return=minimal"},
+            )
+            ecrites += len(paquet)
     return ecrites
 
 
@@ -219,6 +249,7 @@ def purger(a_supprimer):
 def parcourir(jeton: str, site_id: str):
     """Descente en profondeur depuis la racine. Renvoie (lignes, nb_dossiers)."""
     lignes, dossiers, a_visiter = [], 0, [RACINE]
+    ignores = {}
     while a_visiter:
         chemin = a_visiter.pop()
         dossiers += 1
@@ -238,9 +269,13 @@ def parcourir(jeton: str, site_id: str):
                 continue
 
             relatif = sous_chemin[len(RACINE):].strip("/").split("/")
-            societe = lire_societe(relatif)
+            societe = lire_societe(relatif, nom)
             if not societe:
-                continue   # fichier posé à la racine de FACTURES, hors société
+                # Ni le dossier ni le nom ne nomment une société connue : on ne
+                # devine pas, mais on le dit — un fichier ignoré en silence est
+                # un fichier perdu pour la comptabilité.
+                ignores.setdefault(relatif[0] if relatif else "(racine)", []).append(nom)
+                continue
 
             lignes.append({
                 "fichier_id": element["id"],
@@ -255,7 +290,7 @@ def parcourir(jeton: str, site_id: str):
         if dossiers % 25 == 0:
             print(f"  {dossiers} dossiers parcourus, {len(lignes)} fichiers", flush=True)
 
-    return lignes, dossiers
+    return lignes, dossiers, ignores
 
 
 def main() -> int:
@@ -274,7 +309,7 @@ def main() -> int:
     site_id = graph(f"/sites/{SITE}", jeton)["id"]
     print(f"Site ouvert. Racine : {RACINE}", flush=True)
 
-    lignes, dossiers = parcourir(jeton, site_id)
+    lignes, dossiers, ignores = parcourir(jeton, site_id)
     print(f"\n{len(lignes)} fichiers dans {dossiers} dossiers.")
 
     par_societe = {}
@@ -283,6 +318,12 @@ def main() -> int:
         par_societe[cle] = par_societe.get(cle, 0) + 1
     for (societe, sens), nombre in sorted(par_societe.items()):
         print(f"  {societe:<12} {sens:<6} {nombre:>5}")
+
+    if ignores:
+        total = sum(len(v) for v in ignores.values())
+        print(f"\n{total} fichier(s) sans societe identifiable, non importe(s) :")
+        for dossier, noms in sorted(ignores.items(), key=lambda d: -len(d[1])):
+            print(f"  {dossier:<24} {len(noms):>4}   ex. {noms[0][:60]}")
 
     sans_montant = sum(1 for l in lignes if l["montant"] is None)
     sans_date = sum(1 for l in lignes if l["date_facture"] is None)
