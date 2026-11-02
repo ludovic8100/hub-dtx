@@ -10,18 +10,20 @@ import { useState } from 'react'
 // est le piège classique du daltonisme : les trois se confondent. Le couple
 // bleu/orange retenu ici se sépare de ΔE 24,7 en protanopie (seuil : 8), et le
 // rouge ne sert qu'au statut « manqué », jamais comme couleur de série.
-// Bleu vif de la maquette pour les entrants. Le mauve des sortants a été
-// remplacé par du vert à la demande : le couple d'origine
-// (#1e9bf0 / #a78bfa) se séparait de ΔE 2,0 en protanopie — seuil 8 — et de
-// 13,7 en vision normale, seuil 15 ; entrants et sortants étaient presque
-// indiscernables pour tout le monde. Le couple bleu/vert mesure 23,4 et 25,0.
-// Note : ce vert est aussi celui des indicateurs positifs du Hub (appels
-// traités, taux de décroché). Il porte donc deux sens à l'écran — identité
-// de série d'un côté, « c'est bon » de l'autre.
+// Couleurs reprises telles quelles de la maquette approuvée
+// (HUB-DTX-suivi-appels-v1.html).
+//
+// J'avais d'abord remplacé le violet par du vert, en jugeant le couple
+// bleu/violet illisible. C'était une erreur de ma part : j'avais relevé les
+// couleurs à l'œil sur l'image (#1e9bf0 / #a78bfa), et ce couple-là échoue
+// effectivement — ΔE 2,0 en protanopie. Les vraies valeurs du fichier
+// passent : ΔE 7,5 en deutéranopie et 18,9 en vision normale, ce qui est
+// acceptable dès lors qu'une légende et un écart séparent les barres — les
+// deux sont présents. Le violet est donc conservé.
 export const COULEURS = {
-  entrant: '#1e9bf0',
-  sortant: '#16a34a',
-  manque:  '#d03b3b',
+  entrant: '#00a2ee',
+  sortant: '#9962f7',
+  manque:  '#ed4568',
 }
 
 export const SERIES = [
