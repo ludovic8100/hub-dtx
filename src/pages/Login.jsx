@@ -80,9 +80,9 @@ export default function Login() {
           Se connecter avec Microsoft
         </button>
 
-        {/* L'erreur est affichée telle que Supabase la renvoie : un provider
-            désactivé, une clé refusée ou une URL de redirection non autorisée
-            doivent se voir ici, pas rester silencieux. */}
+        {/* Deux cas aboutissent ici : un échec de connexion (provider désactivé,
+            clé refusée, URL de redirection non autorisée — à voir, pas à taire),
+            et une session expirée par la règle des 24 h / 4 h d'inactivité. */}
         {erreurConnexion && (
           <p style={{
             fontSize: '13px', color: '#b91c1c', background: '#fef2f2',
@@ -90,7 +90,7 @@ export default function Login() {
             padding: '10px 12px', marginTop: '16px', marginBottom: 0,
             lineHeight: '1.45', textAlign: 'left', wordBreak: 'break-word',
           }}>
-            La connexion Microsoft a échoué : {erreurConnexion}
+            {erreurConnexion}
           </p>
         )}
 

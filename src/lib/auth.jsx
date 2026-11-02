@@ -13,6 +13,58 @@ const AuthContext = createContext(null)
 const ACCES_LIBRE_TEMPORAIRE = true
 const EMAIL_ACCES_LIBRE = 'lde@dynassur.be'
 
+// ── Durée de vie des sessions, imposée par l'application ─────────────────────
+//
+// Supabase sait le faire côté serveur (« Time-box user sessions » et
+// « Inactivity timeout »), mais ces deux réglages sont réservés au plan Pro ;
+// le projet est en Free. On les applique donc ici.
+//
+// Ce que ça couvre : une session laissée ouverte, un poste partagé, un
+// navigateur resté connecté chez quelqu'un. C'est le scénario réel.
+// Ce que ça NE couvre PAS : un jeton exfiltré et rejoué depuis ailleurs — la
+// règle vit dans le navigateur, ce n'est pas une frontière de sécurité. Seul
+// un time-box côté serveur (plan Pro) la rendrait opposable.
+//
+// À noter : l'inactivité est mesurée sur les actions RÉELLES de l'utilisateur
+// (clic, touche, retour sur l'onglet). Le réglage Supabase, lui, se fonde sur
+// l'usage du jeton de rafraîchissement — que supabase-js renouvelle tout seul
+// tant que l'onglet est ouvert. Une fenêtre abandonnée ne s'y fermait donc
+// jamais ; ici, si.
+const DUREE_MAX_SESSION = 24 * 60 * 60 * 1000   // 24 h depuis l'authentification Microsoft
+const DUREE_MAX_INACTIVITE = 4 * 60 * 60 * 1000 // 4 h sans action de l'utilisateur
+const CLE_DEBUT = 'hub.session.debut'
+const CLE_ACTIVITE = 'hub.session.activite'
+
+// localStorage peut lever (navigation privée, stockage bloqué) : jamais au prix
+// d'un plantage de l'authentification.
+function lireHorodatage(cle) {
+  try { return Number(window.localStorage.getItem(cle)) || 0 } catch { return 0 }
+}
+function ecrireHorodatage(cle, valeur) {
+  try { window.localStorage.setItem(cle, String(valeur)) } catch { /* ignoré */ }
+}
+function oublierHorodatages() {
+  try { window.localStorage.removeItem(CLE_DEBUT); window.localStorage.removeItem(CLE_ACTIVITE) } catch { /* ignoré */ }
+}
+
+/** Renvoie le motif d'expiration ('duree' | 'inactivite'), ou null si la session tient. */
+function motifExpiration() {
+  const maintenant = Date.now()
+  const debut = lireHorodatage(CLE_DEBUT)
+  const activite = lireHorodatage(CLE_ACTIVITE)
+  // Horodatage absent (session d'avant cette règle, ou stockage vidé) : on ne
+  // déconnecte pas sur une inconnue, on repart de maintenant.
+  if (!debut) return null
+  if (maintenant - debut > DUREE_MAX_SESSION) return 'duree'
+  if (activite && maintenant - activite > DUREE_MAX_INACTIVITE) return 'inactivite'
+  return null
+}
+
+const MESSAGE_EXPIRATION = {
+  duree: 'Ta session a dépassé 24 heures. Reconnecte-toi avec ton compte Microsoft.',
+  inactivite: 'Ta session a été fermée après 4 heures sans activité. Reconnecte-toi.',
+}
+
 export const SOCIETES_CONFIG = {
   groupe: {
     key: 'groupe', label: 'Tableau de bord général', short: 'GRP',
@@ -102,6 +154,28 @@ export function AuthProvider({ children }) {
     async function applySession(session, track) {
       if (cancelled) return
       if (session?.user) {
+        // Nouvelle authentification Microsoft : l'horloge des 24 h repart.
+        if (track) {
+          ecrireHorodatage(CLE_DEBUT, Date.now())
+          ecrireHorodatage(CLE_ACTIVITE, Date.now())
+        } else if (!lireHorodatage(CLE_DEBUT)) {
+          // Session déjà en place mais jamais horodatée (règle introduite après
+          // sa création, ou stockage vidé) : on l'adopte à partir de maintenant.
+          ecrireHorodatage(CLE_DEBUT, Date.now())
+          ecrireHorodatage(CLE_ACTIVITE, Date.now())
+        }
+
+        const motif = motifExpiration()
+        if (motif) {
+          oublierHorodatages()
+          await supabase.auth.signOut()
+          if (cancelled) return
+          setUser(null); setPerms(null); setActiveSociete(null)
+          setErreurConnexion(MESSAGE_EXPIRATION[motif])
+          setLoading(false)
+          return
+        }
+
         setUser(session.user)
         const p = await loadPerms(session.user.email)
         if (cancelled) return
@@ -129,6 +203,44 @@ export function AuthProvider({ children }) {
 
     return () => { cancelled = true; subscription.unsubscribe() }
   }, [])
+
+  // Surveillance pendant la session : on note l'activité réelle de
+  // l'utilisateur, et on vérifie chaque minute que la session tient encore.
+  // Sans ce minuteur, un onglet laissé ouvert ne verrait jamais l'expiration —
+  // c'est précisément le cas qu'on veut couvrir.
+  useEffect(() => {
+    if (ACCES_LIBRE_TEMPORAIRE || !user) return
+
+    // Activité = une action délibérée. Revenir sur l'onglet n'en est PAS une :
+    // retrouver une fenêtre ouverte depuis la veille doit déconnecter, pas
+    // relancer le compteur.
+    const noterActivite = () => ecrireHorodatage(CLE_ACTIVITE, Date.now())
+    const actions = ['pointerdown', 'keydown']
+    actions.forEach(e => window.addEventListener(e, noterActivite, { passive: true }))
+
+    async function verifier() {
+      const motif = motifExpiration()
+      if (!motif) return
+      oublierHorodatages()
+      await supabase.auth.signOut()
+      setUser(null); setPerms(null); setActiveSociete(null)
+      setErreurConnexion(MESSAGE_EXPIRATION[motif])
+    }
+
+    // Le retour sur l'onglet déclenche une vérification immédiate : les
+    // navigateurs ralentissent les minuteurs des onglets en arrière-plan, on
+    // ne veut pas d'une minute de session en trop au réveil.
+    const auRetour = () => { if (!document.hidden) verifier() }
+    document.addEventListener('visibilitychange', auRetour)
+
+    const minuteur = setInterval(verifier, 60 * 1000)
+
+    return () => {
+      actions.forEach(e => window.removeEventListener(e, noterActivite))
+      document.removeEventListener('visibilitychange', auRetour)
+      clearInterval(minuteur)
+    }
+  }, [user])
 
   // ── Connexion Microsoft ──────────────────────────────────────────────────
   //
@@ -165,7 +277,7 @@ export function AuthProvider({ children }) {
         queryParams: { prompt: 'login' },
       },
     })
-    if (error) setErreurConnexion(error.message)
+    if (error) setErreurConnexion(`La connexion Microsoft a échoué : ${error.message}`)
     return { error }
   }
 
@@ -182,12 +294,13 @@ export function AuthProvider({ children }) {
         queryParams: { prompt: 'select_account' },
       },
     })
-    if (error) setErreurConnexion(error.message)
+    if (error) setErreurConnexion(`La connexion Microsoft a échoué : ${error.message}`)
     return { error }
   }
 
   async function signOut() {
     const { error } = await supabase.auth.signOut()
+    oublierHorodatages()
     setUser(null); setPerms(null); setActiveSociete(null); setErreurConnexion(null)
     return { error }
   }

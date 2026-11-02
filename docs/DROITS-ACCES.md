@@ -139,33 +139,64 @@ login, et le bloc de diagnostic laissé en production dans `AuthCallback`
 
 ### Politique de session (décidée le 02/11/2026)
 
-Trois leviers, dont un seul est du code :
+Objectif : une authentification Microsoft complète au moins toutes les 24 h, et
+à chaque nouveau navigateur ou appareil.
 
-| Où | Réglage | Valeur |
+| Où | Quoi | État |
 |---|---|---|
-| Supabase → Authentication → Sessions | *Time-box user sessions* | **24 h** |
-| Supabase → Authentication → Sessions | *Inactivity timeout* | **4 h** |
 | `src/lib/auth.jsx` | `queryParams: { prompt: 'login' }` | posé |
+| `src/lib/auth.jsx` | `DUREE_MAX_SESSION` = 24 h, `DUREE_MAX_INACTIVITE` = 4 h | posé |
 | Entra → méthodes d'authentification | passkey (FIDO2) préférée, Authenticator en secours | à activer |
 
-Sans `prompt: 'login'`, l'expiration côté Supabase ne produit qu'une redirection
-**invisible** : Entra réutilise la session SSO ouverte par Outlook ou Teams et
-re-délivre un jeton sans rien demander. On croirait se ré-authentifier chaque
-jour sans que personne n'ait rien saisi.
+**Pourquoi la durée est appliquée dans le code et non dans Supabase.** Les
+réglages serveur *Time-box user sessions* et *Inactivity timeout* existent, mais
+ils sont **réservés au plan Pro** ; le projet est en Free. Vérifié le 02/11/2026
+dans Authentication → Sessions.
 
-Changement de navigateur ou d'appareil : rien à régler. La session vit dans le
-`localStorage`, propre à chaque profil de navigateur et à chaque appareil —
+Limite à connaître : la règle vit dans le navigateur. Elle couvre une session
+laissée ouverte, un poste partagé, un navigateur resté connecté — le scénario
+réel. Elle ne couvre pas un jeton exfiltré et rejoué depuis ailleurs. Seul un
+time-box côté serveur (plan Pro) serait opposable.
+
+Effet de bord favorable : l'inactivité est mesurée sur les actions **réelles**
+(clic, touche), pas sur l'usage du jeton de rafraîchissement. Le réglage natif de
+Supabase ne fermait jamais une fenêtre laissée ouverte, puisque `supabase-js`
+renouvelle le jeton tout seul tant que l'onglet vit. Ici, si. Revenir sur un
+onglet ouvert depuis la veille ne compte pas comme une activité : la session est
+fermée, pas prolongée.
+
+**Pourquoi `prompt: 'login'` est indispensable.** Sans lui, l'expiration ne
+produit qu'une redirection **invisible** : Entra réutilise la session SSO ouverte
+par Outlook ou Teams et re-délivre un jeton sans rien demander. On croirait se
+ré-authentifier chaque jour sans que personne n'ait rien saisi.
+
+**Changement de navigateur ou d'appareil** : rien à régler. La session vit dans
+le `localStorage`, propre à chaque profil de navigateur et à chaque appareil —
 Chrome, Edge et le téléphone ne la partagent jamais.
 
-Ce que l'*inactivity timeout* ne fait **pas** : il ne protège pas d'une fenêtre
-laissée ouverte. Supabase mesure l'activité à l'usage du jeton de
-rafraîchissement, et `supabase-js` le renouvelle tout seul tant que l'onglet est
-ouvert et visible. Un poste abandonné se protège par le verrouillage de session
-du système d'exploitation, pas par l'application.
+**Poste abandonné déverrouillé** : la vraie réponse reste le verrouillage de
+session du système d'exploitation (5 à 10 min, mot de passe à la reprise). Aucun
+réglage applicatif ne protège le reste du poste.
 
-Aucune licence Entra ID P1 n'est nécessaire : la fréquence est imposée par le
-Hub (time-box + `prompt=login`), et les passkeys font partie du niveau gratuit
-d'Entra. P1 ne servirait qu'à un accès conditionnel par appareil ou par risque.
+**Aucune licence Entra ID P1 n'est nécessaire** : la fréquence est imposée par le
+Hub, et les passkeys font partie du niveau gratuit d'Entra. P1 ne servirait qu'à
+un accès conditionnel par appareil ou par risque.
+
+**Deux applications Azure distinctes, à ne pas fusionner** (constat du
+02/11/2026) :
+
+| Application | ID | Rôle |
+|---|---|---|
+| `Hub DTX` | `5065b920-f43b-489d-8c68-1576803f020f` | connexion des utilisateurs (OAuth délégué) |
+| `Hub DTX - Sharepoint` | `d9b91434-168e-4706-a113-ff4cd14b80e2` | lecture SharePoint (`Sites.Read.All`, permission d'application) |
+
+Les garder séparées est délibéré : la seconde porte un accès de niveau locataire
+sans utilisateur, qui n'a rien à faire sur l'application par laquelle 49
+personnes se connectent — et une rotation de secret d'un côté ne doit pas couper
+l'autre. L'application `d38526f5…` citée dans `office_users_sync.py` est une
+troisième, supprimée du locataire, sans rapport avec le login.
+
+Locataire : `29a87d83-130a-42d9-82c9-29c930952c76`.
 
 ## Table `personnes` et fusion Utilisateurs/Acteurs métier (31/10/2026)
 
