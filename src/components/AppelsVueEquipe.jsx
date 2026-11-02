@@ -67,7 +67,7 @@ const Pastille = ({ c, f, t }) => (
 export function VueEquipe({ stats, heures, rappels, onCollaborateur, onVoirRappels }) {
   const kpis = [
     { icone: 'ti-phone-incoming', label: 'Appels entrants',      valeur: fmtNb(stats.entrantsTotal), couleur: COULEURS.entrant, fond: '#e3f2fd' },
-    { icone: 'ti-phone-outgoing', label: 'Appels sortants',      valeur: fmtNb(stats.sortants),      couleur: COULEURS.sortant, fond: '#ede9fe' },
+    { icone: 'ti-phone-outgoing', label: 'Appels sortants',      valeur: fmtNb(stats.sortants),      couleur: COULEURS.sortant, fond: '#dcfce7' },
     { icone: 'ti-circle-check',   label: 'Appels traités',       valeur: fmtNb(stats.traites),       couleur: '#16a34a',        fond: '#dcfce7' },
     { icone: 'ti-phone-off',      label: 'Entrants manqués',     valeur: fmtNb(stats.manques),       couleur: COULEURS.manque,  fond: '#fee2e2' },
     { icone: 'ti-clock',          label: 'Temps de conversation', valeur: fmtHM(stats.secondes),     couleur: '#0369a1',        fond: '#e0f2fe' },

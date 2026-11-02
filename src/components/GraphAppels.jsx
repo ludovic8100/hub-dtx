@@ -10,14 +10,17 @@ import { useState } from 'react'
 // est le piège classique du daltonisme : les trois se confondent. Le couple
 // bleu/orange retenu ici se sépare de ΔE 24,7 en protanopie (seuil : 8), et le
 // rouge ne sert qu'au statut « manqué », jamais comme couleur de série.
-// Le bleu vif et le violet viennent de la maquette. Le violet a été foncé :
-// le couple d'origine (#1e9bf0 / #a78bfa) se séparait de ΔE 2,0 en
-// protanopie — seuil 8 — et de 13,7 en vision normale, seuil 15. Autrement
-// dit, entrants et sortants étaient presque indiscernables, y compris pour
-// un œil normal. #7c3aed garde l'intention et passe (12,6 / 22,1).
+// Bleu vif de la maquette pour les entrants. Le mauve des sortants a été
+// remplacé par du vert à la demande : le couple d'origine
+// (#1e9bf0 / #a78bfa) se séparait de ΔE 2,0 en protanopie — seuil 8 — et de
+// 13,7 en vision normale, seuil 15 ; entrants et sortants étaient presque
+// indiscernables pour tout le monde. Le couple bleu/vert mesure 23,4 et 25,0.
+// Note : ce vert est aussi celui des indicateurs positifs du Hub (appels
+// traités, taux de décroché). Il porte donc deux sens à l'écran — identité
+// de série d'un côté, « c'est bon » de l'autre.
 export const COULEURS = {
   entrant: '#1e9bf0',
-  sortant: '#7c3aed',
+  sortant: '#16a34a',
   manque:  '#d03b3b',
 }
 
