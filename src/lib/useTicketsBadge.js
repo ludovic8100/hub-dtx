@@ -15,7 +15,7 @@ export function useTicketsBadge(pollMs = 60000) {
       // Tickets où je suis concerné
       let tks = []
       for (let from = 0; ; from += 1000) {
-        const { data, error } = await supabase.from('taches')
+        const { data, error } = await supabase.from('tickets')
           .select('id,gestionnaire,cree_par,participants')
           .eq('is_ticket', true).neq('ticket_statut', 'cloture').range(from, from + 999)
         if (error || !data) break

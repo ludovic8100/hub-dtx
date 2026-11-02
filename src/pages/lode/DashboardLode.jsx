@@ -52,7 +52,7 @@ export default function DashboardLode() {
       const [{ data: txs }, { data: tck }] = await Promise.all([
         socId ? supabase.from('transactions').select('montant').eq('societe_id', socId)
           .gte('date_valeur', annee + '-' + mois + '-01').lte('date_valeur', annee + '-' + mois + '-31') : { data: [] },
-        supabase.from('taches').select('id,titre,gestionnaire,ticket_statut,priorite,derniere_activite').eq('is_ticket', true).neq('statut', 'terminee').eq('entite', 'lode').order('derniere_activite', { ascending: false }).limit(50),
+        supabase.from('tickets').select('id,titre,gestionnaire,ticket_statut,priorite,derniere_activite').eq('is_ticket', true).neq('statut', 'terminee').eq('entite', 'lode').order('derniere_activite', { ascending: false }).limit(50),
       ])
       setTickets(tck || [])
       const entrees = (txs || []).filter(t => t.montant > 0).reduce((s, t) => s + t.montant, 0)
