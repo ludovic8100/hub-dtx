@@ -139,18 +139,27 @@ export default function DynassurAppels() {
   }, [periodeCourante, sens, q])
 
   // ── Statistiques ────────────────────────────────────────────────────────
-  // Serveur vocal, messagerie, bureau fermé : l'appel a bien eu lieu, mais
-  // personne n'a parlé à personne. On les garde dans les volumes et on les
-  // exclut du temps de conversation — sans quoi les 492 passages de dix
-  // secondes dans le menu d'accueil écrasent la moyenne.
-  const estMachine = x => ['svi', 'messagerie', 'hors_horaires'].includes(x.poste_categorie)
+  // Un appel n'est compté dans les statistiques que lorsqu'il atteint le poste
+  // d'un collaborateur.
+  //
+  // Le parcours est : numéro général → menu → file (CQ_assurance, crédit,
+  // sinistres) → poste d'un collaborateur ; hors horaires, l'appel va au
+  // bureau fermé. Le menu et les files ne sont donc que des étapes, pas des
+  // destinations — leurs 10 et 51 secondes de durée moyenne le confirment.
+  //
+  // Attention en lisant ce code : 3CX ne journalise QU'UNE étape par appel,
+  // pas le transfert. Sur 492 passages au menu, 76 seulement sont suivis d'un
+  // appel du même numéro chez un collaborateur dans la journée. Exclure ces
+  // étapes retire donc 2 807 appels entrants sur 4 646 — ils ne sont pas
+  // perdus pour autant : ils sont comptés à part, sous « hors collaborateur ».
+  const estCollab = x => !!x.collaborateur
 
   const calcul = lot => {
     const manques = lot.filter(x => x.manque)
     const entrants = lot.filter(x => x.sens === 'entrant' && !x.manque)
     const sortants = lot.filter(x => x.sens === 'sortant')
     const entrantsTotal = entrants.length + manques.length
-    const repondus = lot.filter(x => !x.manque && x.duree_s > 0 && !estMachine(x))
+    const repondus = lot.filter(x => !x.manque && x.duree_s > 0)
     const secondes = repondus.reduce((a, x) => a + (x.duree_s || 0), 0)
     return {
       total: lot.length, entrants: entrants.length, sortants: sortants.length,
@@ -167,11 +176,22 @@ export default function DynassurAppels() {
     // sonne trois fois arrive en trois lignes. Le journal les montre toutes —
     // c'est ce qui s'est passé — mais les compteurs ne retiennent que la
     // première, sans quoi un seul appel manqué en vaudrait trois.
-    const r = periodeCourante.filter(x => !x.relance_sonnerie)
+    const tout = periodeCourante.filter(x => !x.relance_sonnerie)
+    const r = tout.filter(estCollab)
     const base = calcul(r)
     const avant = periodePrecedente.length
-      ? calcul(periodePrecedente.filter(x => !x.relance_sonnerie)) : null
-    const relances = periodeCourante.length - r.length
+      ? calcul(periodePrecedente.filter(x => !x.relance_sonnerie && estCollab(x))) : null
+    const relances = periodeCourante.length - tout.length
+
+    // Ce que la règle écarte, détaillé plutôt qu'escamoté.
+    const dehors = tout.filter(x => x.sens === 'entrant' && !estCollab(x))
+    const hors = {
+      total: dehors.length,
+      menuFiles:   dehors.filter(x => ['svi', 'file'].includes(x.poste_categorie)).length,
+      bureauFerme: dehors.filter(x => x.poste_categorie === 'hors_horaires').length,
+      messagerie:  dehors.filter(x => x.poste_categorie === 'messagerie').length,
+      sansPoste:   dehors.filter(x => !x.extension).length,
+    }
 
     // Par jour
     const parJour = new Map()
@@ -268,13 +288,13 @@ export default function DynassurAppels() {
     // Rappels : entrant manqué ou reçu bureau fermé, sans sortant vers le même
     // numéro dans les 48 h qui suivent.
     const sortantsParNum = new Map()
-    for (const x of r) {
+    for (const x of tout) {
       if (x.sens !== 'sortant' || !x.numero) continue
       if (!sortantsParNum.has(x.numero)) sortantsParNum.set(x.numero, [])
       sortantsParNum.get(x.numero).push(new Date(x.debut).getTime())
     }
     const H48 = 48 * 3600 * 1000
-    const enAttente = r
+    const enAttente = tout
       .filter(x => x.numero && !x.relance_sonnerie
         && (x.manque || (x.sens === 'entrant' && x.poste_categorie === 'hors_horaires')))
       .filter(x => {
@@ -302,7 +322,8 @@ export default function DynassurAppels() {
       .sort((a, b) => (b.tentatives - a.tentatives) || (new Date(b.debut) - new Date(a.debut)))
 
     return {
-      ...base, avant, relances, jours, courbe, courbeManques, courbeDuree,
+      ...base, avant, relances, hors, jours, courbe, courbeManques, courbeDuree,
+      horsHoraires: hors.bureauFerme,
       grille, heuresCarte, pic, postes: parPosteListe, topNumeros,
       parPersonne, heuresVolume, rappels,
       traites: base.entrants + r.filter(x => x.sens === 'sortant' && x.duree_s > 0).length,
