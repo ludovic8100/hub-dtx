@@ -62,6 +62,13 @@ export const AZURE = {
 export const MAIL_REDIRECT_TO = IS_TEST ? (env.MAIL_REDIRECT_TO || '') : ''
 
 // ── GitHub (relance des Actions de synchronisation) ───────────────────────────
+// Téléphonie 3CX — lecture de l'état du standard (sens Hub → 3CX, nouveau).
+// Absentes tant que le client API n'est pas créé dans la console 3CX : les
+// fonctions qui s'en servent répondent alors « non configuré », sans planter.
+export const THREECX_URL           = (env.THREECX_URL || '').replace(/\/+$/, '')
+export const THREECX_CLIENT_ID     = env.THREECX_CLIENT_ID || ''
+export const THREECX_CLIENT_SECRET = env.THREECX_CLIENT_SECRET || ''
+
 export const GITHUB_DISPATCH_TOKEN = env.GITHUB_DISPATCH_TOKEN || ''
 export const GITHUB_REPO = env.GITHUB_REPO || 'ludovic8100/hub-dtx'
 /** Branche sur laquelle lancer les workflows : main en prod, staging en test. */
