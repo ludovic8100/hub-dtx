@@ -15,7 +15,7 @@
 // Appel : POST /api/3cx/diagnostic, avec le jeton de session Supabase.
 
 import { SUPABASE_URL as SB_URL, SUPABASE_ANON_KEY as SB_KEY } from '../_lib/env.js'
-import { lire3cx, troisCxConfigure } from '../_lib/threecx.js'
+import { lire3cx, troisCxConfigure, jeton3cx, modeAuth } from '../_lib/threecx.js'
 
 // Ce qu'on cherche, et pourquoi.
 const SONDES = [
@@ -59,6 +59,27 @@ export default async function handler(req, res) {
     })
   }
 
+  // Le jeton d'abord, UNE seule fois. Sans lui, sonder huit endpoints ne fait
+  // qu'enchaîner huit demandes de jeton refusées — et 3CX bannit l'IP sortante
+  // au bout de quelques échecs (observé : deux 401 puis six 403).
+  try {
+    await jeton3cx()
+  } catch (e) {
+    return res.status(200).json({
+      ok: false,
+      configure: true,
+      authentifie: false,
+      erreur: String(e.message || e),
+      pistes: [
+        "Le client API existe-t-il ? Console 3CX → Admin → Intégrations → API. La clé n'est montrée qu'UNE fois : si elle n'a pas été copiée, il faut en régénérer une.",
+        'Le Service Principal a-t-il un Département et un Rôle attribués ? 3CX les exige.',
+        "La licence couvre-t-elle l'accès API ? Certaines éditions le réservent aux paliers supérieurs.",
+        "Vérifier que THREECX_URL est bien la racine du central (https://xxx.3cx.be), sans /xapi ni port d'administration.",
+      ],
+      note: "L'URL et la joignabilité sont confirmées : le central répond, il refuse seulement les identifiants. Aucune nouvelle tentative pendant 60 s, pour ne pas déclencher la liste noire anti-intrusion.",
+    })
+  }
+
   const resultats = []
   for (const s of SONDES) {
     const r = await lire3cx(s.chemin)
@@ -78,6 +99,8 @@ export default async function handler(req, res) {
   return res.status(200).json({
     ok: ok.length > 0,
     configure: true,
+    authentifie: true,
+    modeAuth: modeAuth(),
     disponibles: ok,
     resultats,
     suite: ok.length
