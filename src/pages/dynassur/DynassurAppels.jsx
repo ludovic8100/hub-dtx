@@ -60,7 +60,7 @@ export default function DynassurAppels() {
   const [periode, setPeriode] = useState('30')
   const [sens, setSens] = useState('tous')            // tous | entrant | sortant | manque
   const [q, setQ] = useState('')
-  const [postes, setPostes] = useState([])
+  const [postes, setPostes] = useState([])   // référentiel postes_telephonie
   const [edition, setEdition] = useState(null)        // { extension, libelle }
 
   // Deux bornes : le début de la période affichée, et celui de la période
@@ -155,6 +155,7 @@ export default function DynassurAppels() {
     }
   }
 
+  const refPostes = postes
   const stats = useMemo(() => {
     // 3CX rapporte chaque coup de sonnerie comme un événement : un appel qui
     // sonne trois fois arrive en trois lignes. Le journal les montre toutes —
@@ -219,7 +220,12 @@ export default function DynassurAppels() {
       if (!p.dernier || x.debut > p.dernier) p.dernier = x.debut
       if (!x.manque && x.duree_s > 0) { p.secondes += x.duree_s; p.repondus++; p.plusLong = Math.max(p.plusLong, x.duree_s) }
     }
-    const postes = [...parPoste.values()]
+    // Un poste marqué inactif dans le référentiel (ex. la messagerie) disparaît
+    // des tableaux par poste. Ses appels restent au journal : on masque une
+    // ligne de synthèse, on n'efface pas ce qui s'est passé.
+    const masques = new Set(refPostes.filter(x => x.actif === false).map(x => x.extension))
+    const parPosteListe = [...parPoste.values()]
+      .filter(p => !masques.has(p.extension))
       .map(p => ({ ...p, total: p.entrant + p.sortant + p.manque, decroche: (p.entrant + p.manque) ? p.entrant / (p.entrant + p.manque) : null }))
       .sort((a, b) => b.total - a.total)
 
@@ -235,7 +241,7 @@ export default function DynassurAppels() {
     const topNumeros = [...parNum.values()].filter(n => n.n > 1).sort((a, b) => b.n - a.n).slice(0, 8)
 
     // Par personne : un poste rattaché à un collaborateur = une ligne.
-    const parPersonne = postes.map(p => ({
+    const parPersonne = parPosteListe.map(p => ({
       cle: p.extension || '—', nom: p.collaborateur || p.qui, extension: p.extension,
       estService: !p.collaborateur,
       entrants: p.entrant, manques: p.manque, entrantsTotal: p.entrant + p.manque,
@@ -291,12 +297,12 @@ export default function DynassurAppels() {
 
     return {
       ...base, avant, relances, jours, courbe, courbeManques, courbeDuree,
-      grille, heuresCarte, pic, postes, topNumeros,
+      grille, heuresCarte, pic, postes: parPosteListe, topNumeros,
       parPersonne, heuresVolume, rappels,
       traites: base.entrants + r.filter(x => x.sens === 'sortant' && x.duree_s > 0).length,
       identifies: r.filter(x => x.contact).length,
     }
-  }, [periodeCourante, periodePrecedente])
+  }, [periodeCourante, periodePrecedente, refPostes])
 
   const renommerPoste = async () => {
     if (!edition) return
