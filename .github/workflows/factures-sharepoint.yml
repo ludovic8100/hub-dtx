@@ -71,8 +71,12 @@ jobs:
         if: ${{ env.DRY_RUN == '' }}
         run: echo "id=$(python scripts/job_journal.py debut factures-sharepoint ${{ github.event_name == 'schedule' && 'cron' || 'manuel' }})" >> "$GITHUB_OUTPUT"
 
+      # `shell: bash` impose -o pipefail. Sans lui, le code de sortie du tube
+      # est celui de `tee` : un scan qui plante en plein vol remonterait en
+      # succes, et le journal enregistrerait « succes » sur une synchro morte.
       - name: Scan SharePoint
         id: scan
+        shell: bash
         run: python scripts/factures_sharepoint.py | tee /tmp/scan.log
 
       - name: Journal - fin
