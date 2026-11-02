@@ -107,6 +107,19 @@ export function VueEquipe({ stats, heures, rappels, selection, onCollaborateur, 
         {kpis.map(k => <CarteKpi key={k.label} {...k} />)}
       </section>
 
+      {stats.hors?.total > 0 && (
+        <p style={{ fontSize: 11.5, color: '#637899', margin: '-6px 0 18px 2px', lineHeight: 1.6 }}>
+          Ces chiffres ne comptent que les appels arrivés sur le poste d'un collaborateur.
+          <b> {fmtNb(stats.hors.total)} appels entrants</b> se sont arrêtés avant :
+          {stats.hors.menuFiles > 0 && ` ${fmtNb(stats.hors.menuFiles)} au menu ou en file,`}
+          {stats.hors.bureauFerme > 0 && ` ${fmtNb(stats.hors.bureauFerme)} au bureau fermé,`}
+          {stats.hors.messagerie > 0 && ` ${fmtNb(stats.hors.messagerie)} en messagerie,`}
+          {stats.hors.sansPoste > 0 && ` ${fmtNb(stats.hors.sansPoste)} sans poste identifié,`}
+          {' '}tous visibles au journal. 3CX ne journalisant qu'une étape par appel, un appel
+          transféré du menu vers un collaborateur n'apparaît qu'une fois.
+        </p>
+      )}
+
       {/* ── Activité par collaborateur ── */}
       <div style={panneau}>
         <div style={{ padding: '17px 18px 12px', display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
@@ -208,12 +221,13 @@ export function VueEquipe({ stats, heures, rappels, selection, onCollaborateur, 
 
         <section style={{ ...panneau, padding: '13px 19px 17px' }}>
           <h2 style={{ fontSize: 23, letterSpacing: '-.5px', margin: 0, color: T.ink, fontWeight: 700 }}>À surveiller</h2>
-          <p style={{ fontSize: 11, color: '#7d8ca1', margin: '2px 0 10px' }}>
+          <p style={{ fontSize: 11, color: '#7d8ca1', margin: '2px 0 10px', lineHeight: 1.5 }}>
             Calculé sur la période affichée · la file d'attente en direct n'est pas remontée par 3CX
           </p>
-          <LigneSurveille icone="ti-phone-off" label="Personnes à rappeler"       valeur={fmtNb(rappels.length)} alerte />
-          <LigneSurveille icone="ti-repeat"    label="Ont essayé 2 fois ou plus"  valeur={fmtNb(rappels.filter(r => r.tentatives > 1).length)} />
-          <LigneSurveille icone="ti-moon"      label="Reçus bureau fermé"         valeur={fmtNb(stats.horsHoraires)} />
+          <LigneSurveille icone="ti-phone-off" label="Personnes à rappeler"      valeur={fmtNb(rappels.length)} alerte />
+          <LigneSurveille icone="ti-moon"      label="Reçus bureau fermé"        valeur={fmtNb(stats.hors?.bureauFerme ?? stats.horsHoraires)} />
+          <LigneSurveille icone="ti-arrows-split" label="Restés au menu ou en file" valeur={fmtNb(stats.hors?.menuFiles ?? 0)}
+            alerte={(stats.hors?.menuFiles ?? 0) > 0} />
           <button onClick={onVoirRappels}
             style={{ width: '100%', marginTop: 13, minHeight: 34, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9,
               border: `1px solid ${T.bleu}`, borderRadius: 7, background: '#fff', color: '#0086d9', fontWeight: 650, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', padding: 4 }}>
