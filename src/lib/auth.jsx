@@ -3,14 +3,18 @@ import { supabase } from './supabase'
 
 const AuthContext = createContext(null)
 
-// ⚠️ ACCÈS LIBRE TEMPORAIRE, SANS CONNEXION — décidé le 31/10/2026 pendant la
-// reconstruction du login Microsoft (bascule infinie non résolue entre
-// Supabase et l'app). Quiconque ouvre le Hub entre directement, avec les
-// droits admin. Pour revenir au login normal : repasser ce drapeau à false
-// (le code de connexion Microsoft est conservé plus bas, inchangé) ET
-// exécuter sql/retirer_acces_libre_temporaire.sql pour retirer les règles
-// d'accès ouvertes côté base. Voir docs/DROITS-ACCES.md.
-const ACCES_LIBRE_TEMPORAIRE = true
+// ⚠️ NE JAMAIS REMETTRE CE DRAPEAU À true.
+//
+// Vestige de l'accès libre ouvert du 31/10 au 02/11/2026, le temps de
+// reconstruire l'authentification Microsoft. À true, il court-circuite tout le
+// flux de connexion : quiconque ouvre hub-dtx.vercel.app entre directement avec
+// les droits d'administrateur — clients, IBAN, contrats, commissions, visibles
+// et modifiables par n'importe qui ayant le lien.
+//
+// Il reste là quelques jours, le temps de confirmer que la connexion fonctionne
+// pour tout le monde, puis il sera retiré avec la branche qu'il commande.
+// Voir docs/DROITS-ACCES.md.
+const ACCES_LIBRE_TEMPORAIRE = false
 const EMAIL_ACCES_LIBRE = 'lde@dynassur.be'
 
 // ── Durée de vie des sessions, imposée par l'application ─────────────────────
