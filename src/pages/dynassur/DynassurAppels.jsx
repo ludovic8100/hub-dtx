@@ -347,50 +347,66 @@ export default function DynassurAppels() {
 
   return (
     <Layout currentPage="Appels">
-      {/* En-tête */}
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, flexWrap: 'wrap', marginBottom: 14 }}>
-        <h1 style={{ fontSize: 29, fontWeight: 800, color: NAVY, margin: 0, letterSpacing: '-0.025em' }}>Suivi des appels</h1>
-        <span style={{ width: 1, height: 24, background: '#cbd5e1', alignSelf: 'center' }} />
-        <span style={{ fontSize: 15, color: '#64748b' }}>Supervision par collaborateur</span>
+      <style>{`
+        /* Grilles reprises de HUB-DTX-suivi-appels-v1.html, media queries comprises.
+           Styles inline ailleurs, comme le reste du Hub ; ici une règle est
+           nécessaire, un style inline ne portant pas de point de rupture. */
+        .ap-filtres{display:grid;grid-template-columns:1.05fr 1fr 1fr 1.1fr auto;gap:16px;align-items:end;margin-bottom:21px}
+        .ap-kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:16px;margin-bottom:20px}
+        @media(max-width:1250px){.ap-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+        @media(max-width:980px){.ap-filtres{grid-template-columns:repeat(2,1fr);gap:10px}
+          .ap-filtres>:last-child{grid-column:span 2}}
+        @media(max-width:620px){.ap-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+          .ap-filtres{grid-template-columns:1fr}.ap-filtres>:last-child{grid-column:auto}}
+      `}</style>
+
+      {/* En-tête — gabarit de la maquette */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 22, flexWrap: 'wrap', marginBottom: 14 }}>
+        <h1 style={{ fontSize: 'clamp(25px,2.4vw,37px)', letterSpacing: '-1px', margin: 0, fontWeight: 750, color: '#102344' }}>Suivi des appels</h1>
+        <p style={{ margin: 0, borderLeft: '1px solid #bbcde0', paddingLeft: 22, fontSize: 19, color: '#3b5981', fontWeight: 550 }}>
+          Supervision par collaborateur
+        </p>
       </div>
 
       {/* Onglets soulignés */}
-      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid #e2e8f0', marginBottom: 16, overflowX: 'auto' }}>
+      <div style={{ display: 'flex', gap: 18, borderBottom: '1px solid #d6e2ef', margin: '0 0 16px', overflowX: 'auto' }}>
         {ONGLETS.map(o => {
           const actif = onglet === o.v
           return (
             <button key={o.v} onClick={() => setOnglet(o.v)}
+              onMouseEnter={e => { if (!actif) e.currentTarget.style.background = '#e7f1fa' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
               style={{
-                padding: '9px 16px 11px', border: 'none', background: 'none', cursor: 'pointer',
-                fontSize: 14, fontWeight: actif ? 700 : 600, fontFamily: 'inherit',
-                color: actif ? COULEURS.entrant : '#64748b',
-                boxShadow: actif ? `inset 0 -3px 0 ${COULEURS.entrant}` : 'none',
+                padding: '12px 23px 11px', border: 0, borderBottom: `3px solid ${actif ? '#00a8ef' : 'transparent'}`,
+                background: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 650, fontFamily: 'inherit',
+                color: actif ? '#008de2' : '#446183',
                 whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 7,
               }}>
               {o.l}
               {o.badge > 0 && (
-                <span style={{ background: actif ? COULEURS.entrant : '#e2e8f0', color: actif ? '#fff' : '#64748b', borderRadius: 20, padding: '1px 8px', fontSize: 11, fontWeight: 800 }}>{o.badge}</span>
+                <span style={{ background: '#e4f4ff', color: '#0086c7', borderRadius: 20, padding: '2px 9px', fontSize: 12, fontWeight: 650 }}>{o.badge}</span>
               )}
             </button>
           )
         })}
       </div>
 
-      {/* Barre de filtres */}
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 18 }}>
-        <Filtre icone="ti-calendar" valeur={periode} onChange={setPeriode}
+      {/* Barre de filtres — gabarit de la maquette */}
+      <div className="ap-filtres">
+        <Filtre libelle="Période" valeur={periode} onChange={setPeriode}
           options={PERIODES.map(p => ({ v: p.cle, l: p.label }))} />
-        <Filtre icone="ti-user" valeur={filtrePersonne} onChange={setFiltrePersonne}
+        <Filtre libelle="Collaborateur" valeur={filtrePersonne} onChange={setFiltrePersonne}
           options={[{ v: '', l: 'Tous les collaborateurs' },
             ...collabs.filter(c => c.extension).map(c => ({ v: c.extension, l: c.nom_complet || `Poste ${c.extension}` }))]} />
-        <Filtre icone="ti-building" valeur={filtreBureau} onChange={setFiltreBureau}
+        <Filtre libelle="Bureau" valeur={filtreBureau} onChange={setFiltreBureau}
           options={[{ v: '', l: 'Tous les bureaux' }, ...bureaux.map(b => ({ v: String(b.id), l: b.nom }))]} />
-        <Filtre icone="ti-arrows-left-right" valeur={sens} onChange={setSens}
-          options={[{ v: 'tous', l: 'Entrants + sortants' }, { v: 'entrant', l: 'Entrants' }, { v: 'sortant', l: 'Sortants' }, { v: 'manque', l: 'Manqués' }]} />
-        <span style={{ flex: 1 }} />
+        <Filtre libelle="Sens des appels" valeur={sens} onChange={setSens}
+          options={[{ v: 'tous', l: 'Entrants + sortants' }, { v: 'entrant', l: 'Entrants uniquement' }, { v: 'sortant', l: 'Sortants uniquement' }, { v: 'manque', l: 'Manqués uniquement' }]} />
         <button onClick={exporter} disabled={chargement}
-          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px', borderRadius: 10, border: `1px solid ${COULEURS.entrant}`, background: '#fff', color: COULEURS.entrant, fontWeight: 700, fontSize: 13.5, cursor: 'pointer', fontFamily: 'inherit' }}>
-          <i className="ti ti-download" style={{ fontSize: 16 }} />Exporter
+          style={{ height: 43, minWidth: 140, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9,
+            border: '1px solid #008fe8', borderRadius: 7, background: '#fff', color: '#0086d9',
+            fontWeight: 650, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', padding: '8px 16px' }}>
+          <i className="ti ti-download" style={{ fontSize: 17 }} />Exporter CSV
         </button>
       </div>
 
@@ -404,7 +420,7 @@ export default function DynassurAppels() {
       {chargement ? (
         <div style={{ padding: '60px 0', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>Chargement…</div>
       ) : onglet === 'equipe' ? (
-        <VueEquipe stats={stats} heures={stats.heuresVolume} rappels={stats.rappels}
+        <VueEquipe stats={stats} heures={stats.heuresVolume} rappels={stats.rappels} selection={filtrePersonne}
           onCollaborateur={p => { setFiltrePersonne(p.extension || ''); setOnglet('journal') }}
           onVoirRappels={() => setOnglet('rappels')} />
       ) : onglet === 'rappels' ? (
@@ -424,16 +440,18 @@ export default function DynassurAppels() {
   )
 }
 
-/* ── Liste déroulante de filtre ── */
-function Filtre({ icone, valeur, onChange, options }) {
+/* ── Liste déroulante de filtre — gabarit de la maquette ── */
+function Filtre({ libelle, valeur, onChange, options }) {
   return (
-    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '0 12px', height: 40, minWidth: 0 }}>
-      <i className={`ti ${icone}`} style={{ fontSize: 16, color: '#94a3b8', flexShrink: 0 }} />
+    <div style={{ minWidth: 0 }}>
+      <label style={{ display: 'block', color: '#637899', fontSize: 11, fontWeight: 600, margin: '0 0 5px 2px' }}>{libelle}</label>
       <select value={valeur} onChange={e => onChange(e.target.value)}
-        style={{ border: 'none', outline: 'none', background: 'none', fontSize: 13.5, color: '#334155', fontFamily: 'inherit', fontWeight: 600, cursor: 'pointer', paddingRight: 4, maxWidth: 210 }}>
+        style={{ height: 43, width: '100%', border: '1px solid #cadbed', borderRadius: 7, background: '#fff',
+          color: '#102344', padding: '0 13px', fontWeight: 550, fontSize: 14, fontFamily: 'inherit',
+          boxShadow: '0 3px 13px #18396a07', cursor: 'pointer' }}>
         {options.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
       </select>
-    </label>
+    </div>
   )
 }
 
