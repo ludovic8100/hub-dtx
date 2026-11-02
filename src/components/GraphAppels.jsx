@@ -10,9 +10,14 @@ import { useState } from 'react'
 // est le piège classique du daltonisme : les trois se confondent. Le couple
 // bleu/orange retenu ici se sépare de ΔE 24,7 en protanopie (seuil : 8), et le
 // rouge ne sert qu'au statut « manqué », jamais comme couleur de série.
+// Le bleu vif et le violet viennent de la maquette. Le violet a été foncé :
+// le couple d'origine (#1e9bf0 / #a78bfa) se séparait de ΔE 2,0 en
+// protanopie — seuil 8 — et de 13,7 en vision normale, seuil 15. Autrement
+// dit, entrants et sortants étaient presque indiscernables, y compris pour
+// un œil normal. #7c3aed garde l'intention et passe (12,6 / 22,1).
 export const COULEURS = {
-  entrant: '#2a78d6',
-  sortant: '#eb6834',
+  entrant: '#1e9bf0',
+  sortant: '#7c3aed',
   manque:  '#d03b3b',
 }
 
@@ -248,6 +253,71 @@ export function CarteChaleur({ grille, heures, max, legende = 'appels reçus' })
         <span>Plus</span>
         <span style={{ marginLeft: 'auto' }}>Pic : {max} {legende} sur une heure</span>
       </div>
+    </div>
+  )
+}
+
+
+/* ─── Barres groupées (et non empilées) ───
+   Pour comparer deux séries tranche par tranche, comme sur la maquette. */
+export function BarresGroupees({ donnees, series, hauteur = 190, vide = 'Aucun appel sur la période.' }) {
+  const [survol, setSurvol] = useState(null)
+  if (!donnees.length) return <div style={{ padding: '32px 0', textAlign: 'center', color: '#94a3b8', fontSize: 12.5 }}>{vide}</div>
+
+  const max = Math.max(1, ...donnees.flatMap(d => series.map(s => d.valeurs[s.cle] || 0)))
+  const { haut, ticks } = echelle(max)
+  const MARGE_G = 32, MARGE_B = 22
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <div style={{ display: 'flex' }}>
+        <div style={{ width: MARGE_G, height: hauteur, position: 'relative', flexShrink: 0 }}>
+          {ticks.map(g => (
+            <div key={g} style={{ position: 'absolute', right: 6, bottom: (g / haut) * hauteur - 6, fontSize: 10, color: AXE, fontVariantNumeric: 'tabular-nums' }}>{g}</div>
+          ))}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ position: 'relative', height: hauteur }}>
+            {ticks.map(g => (
+              <div key={g} style={{ position: 'absolute', left: 0, right: 0, bottom: (g / haut) * hauteur, height: 1, background: GRILLE }} />
+            ))}
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'flex-end' }}>
+              {donnees.map((d, i) => (
+                <div key={d.cle} onMouseEnter={() => setSurvol(i)} onMouseLeave={() => setSurvol(null)}
+                  style={{ flex: 1, height: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 3, position: 'relative', background: survol === i ? 'rgba(30,155,240,0.07)' : 'transparent', borderRadius: 4 }}>
+                  {series.map(s => {
+                    const v = d.valeurs[s.cle] || 0
+                    return (
+                      <div key={s.cle} title={`${s.label} : ${v}`}
+                        style={{ width: 11, maxWidth: '38%', height: Math.max(v ? 2 : 0, (v / haut) * hauteur), background: s.couleur, borderRadius: '3px 3px 0 0' }} />
+                    )
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ display: 'flex', height: MARGE_B, borderTop: `1px solid ${GRILLE}` }}>
+            {donnees.map((d, i) => (
+              <div key={d.cle} style={{ flex: 1, textAlign: 'center', fontSize: 10.5, color: survol === i ? '#0f172a' : AXE, fontWeight: survol === i ? 700 : 400, paddingTop: 5 }}>{d.label}</div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {survol != null && (
+        <div style={{ position: 'absolute', top: -4, left: 0, right: 0, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
+          <div style={{ background: '#0f172a', color: '#fff', borderRadius: 8, padding: '7px 11px', fontSize: 11.5, boxShadow: '0 6px 20px rgba(15,23,42,0.28)', minWidth: 130 }}>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>{donnees[survol].labelLong ?? donnees[survol].label}</div>
+            {series.map(s => (
+              <div key={s.cle} style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 2 }}>
+                <span style={{ width: 8, height: 8, borderRadius: 2, background: s.couleur, flexShrink: 0 }} />
+                <span style={{ flex: 1 }}>{s.label}</span>
+                <b style={{ fontVariantNumeric: 'tabular-nums' }}>{donnees[survol].valeurs[s.cle] || 0}</b>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
 import { ENTITES } from '../../lib/entites'
-import { StatBanner } from '../../components/ui/AccountableUI'
+import { VueEquipe, Rappels } from '../../components/AppelsVueEquipe'
 import { BarresEmpilees, Legende, COULEURS, Sparkline, Jauge, CarteChaleur } from '../../components/GraphAppels'
 
 // Journal et statistiques de la téléphonie 3CX.
@@ -19,6 +19,7 @@ const NAVY = '#0D2F5E'
 const PAGE = 1000
 
 const PERIODES = [
+  { cle: '1',   label: "Aujourd'hui", jours: 1 },
   { cle: '7',   label: '7 jours',  jours: 7 },
   { cle: '30',  label: '30 jours', jours: 30 },
   { cle: '90',  label: '90 jours', jours: 90 },
@@ -51,7 +52,11 @@ export default function DynassurAppels() {
   const navigate = useNavigate()
   const [rows, setRows] = useState(null)
   const [erreur, setErreur] = useState(null)
-  const [onglet, setOnglet] = useState('journal')     // journal | stats
+  const [onglet, setOnglet] = useState('equipe')     // equipe | journal | stats | rappels
+  const [filtrePersonne, setFiltrePersonne] = useState('')
+  const [filtreBureau, setFiltreBureau] = useState('')
+  const [bureaux, setBureaux] = useState([])
+  const [collabs, setCollabs] = useState([])
   const [periode, setPeriode] = useState('30')
   const [sens, setSens] = useState('tous')            // tous | entrant | sortant | manque
   const [q, setQ] = useState('')
@@ -86,19 +91,38 @@ export default function DynassurAppels() {
     } catch (e) {
       setErreur(e); setRows([])
     }
-    const { data: p } = await supabase.from('postes_telephonie').select('*').order('extension')
+    const [{ data: p }, { data: b }, { data: c }] = await Promise.all([
+      supabase.from('postes_telephonie').select('*').order('extension'),
+      supabase.from('ref_bureaux').select('id,nom').order('nom'),
+      supabase.from('collaborateurs').select('id,nom_complet,extension,bureau_id').not('extension', 'is', null),
+    ])
     setPostes(p || [])
+    setBureaux(b || [])
+    setCollabs(c || [])
   }
   useEffect(() => { charger() }, [depuisCompare, depuis])   // eslint-disable-line react-hooks/exhaustive-deps
 
   // Les lignes chargées débordent sur la période précédente (comparaison) :
   // tout ce qui s'affiche repart de `periodeCourante`.
+  // Extensions retenues par le filtre « bureau » (le bureau est porté par le
+  // collaborateur, donc un poste de service n'appartient à aucun bureau).
+  const extensionsBureau = useMemo(() => {
+    if (!filtreBureau) return null
+    return new Set(collabs.filter(c => String(c.bureau_id) === filtreBureau).map(c => c.extension).filter(Boolean))
+  }, [filtreBureau, collabs])
+
   const periodeCourante = useMemo(
-    () => (rows || []).filter(r => !depuis || r.debut >= depuis),
-    [rows, depuis])
+    () => (rows || []).filter(r =>
+      (!depuis || r.debut >= depuis) &&
+      (!filtrePersonne || r.extension === filtrePersonne) &&
+      (!extensionsBureau || extensionsBureau.has(r.extension))),
+    [rows, depuis, filtrePersonne, extensionsBureau])
   const periodePrecedente = useMemo(
-    () => (depuis ? (rows || []).filter(r => r.debut < depuis) : []),
-    [rows, depuis])
+    () => (depuis ? (rows || []).filter(r =>
+      r.debut < depuis &&
+      (!filtrePersonne || r.extension === filtrePersonne) &&
+      (!extensionsBureau || extensionsBureau.has(r.extension))) : []),
+    [rows, depuis, filtrePersonne, extensionsBureau])
 
   const lignes = useMemo(() => {
     const s = q.trim().toLowerCase()
@@ -158,13 +182,18 @@ export default function DynassurAppels() {
 
     // Carte de chaleur : jour de semaine (lundi = 0) × heure, appels entrants
     const grille = Array.from({ length: 7 }, () => ({}))
+    const parHeure = Array.from({ length: 24 }, () => ({ entrant: 0, sortant: 0 }))
     let pic = 0, hMin = 23, hMax = 0
     for (const x of r) {
-      if (!x.debut || x.sens !== 'entrant') continue
+      if (!x.debut) continue
       const d = new Date(x.debut)
       const j = (d.getDay() + 6) % 7, h = d.getHours()
-      grille[j][h] = (grille[j][h] || 0) + 1
-      pic = Math.max(pic, grille[j][h]); hMin = Math.min(hMin, h); hMax = Math.max(hMax, h)
+      hMin = Math.min(hMin, h); hMax = Math.max(hMax, h)
+      if (x.sens === 'entrant') {
+        parHeure[h].entrant++
+        grille[j][h] = (grille[j][h] || 0) + 1
+        pic = Math.max(pic, grille[j][h])
+      } else parHeure[h].sortant++
     }
     if (hMin > hMax) { hMin = 7; hMax = 20 }
     const heuresCarte = Array.from({ length: hMax - hMin + 1 }, (_, i) => hMin + i)
@@ -175,10 +204,13 @@ export default function DynassurAppels() {
       const cle = x.extension || '—'
       if (!parPoste.has(cle)) parPoste.set(cle, {
         extension: x.extension, qui: quiPoste(x), categorie: x.poste_categorie,
-        collaborateur: x.collaborateur, entrant: 0, sortant: 0, manque: 0, secondes: 0, repondus: 0, plusLong: 0,
+        collaborateur: x.collaborateur, entrant: 0, sortant: 0, manque: 0, secondes: 0, repondus: 0,
+        plusLong: 0, sortantsAboutis: 0, dernier: null,
       })
       const p = parPoste.get(cle)
       if (x.manque) p.manque++; else if (x.sens === 'entrant') p.entrant++; else p.sortant++
+      if (x.sens === 'sortant' && x.duree_s > 0) p.sortantsAboutis++
+      if (!p.dernier || x.debut > p.dernier) p.dernier = x.debut
       if (!x.manque && x.duree_s > 0) { p.secondes += x.duree_s; p.repondus++; p.plusLong = Math.max(p.plusLong, x.duree_s) }
     }
     const postes = [...parPoste.values()]
@@ -196,9 +228,65 @@ export default function DynassurAppels() {
     }
     const topNumeros = [...parNum.values()].filter(n => n.n > 1).sort((a, b) => b.n - a.n).slice(0, 8)
 
+    // Par personne : un poste rattaché à un collaborateur = une ligne.
+    const parPersonne = postes.map(p => ({
+      cle: p.extension || '—', nom: p.collaborateur || p.qui, extension: p.extension,
+      estService: !p.collaborateur,
+      entrants: p.entrant, manques: p.manque, entrantsTotal: p.entrant + p.manque,
+      sortants: p.sortant, traites: p.entrant + p.sortantsAboutis,
+      secondes: p.secondes, moyenne: p.repondus ? Math.round(p.secondes / p.repondus) : null,
+      decroche: p.decroche, dernier: p.dernier,
+    })).sort((a, b) =>
+      // Les personnes d'abord : l'écran s'appelle « Activité par collaborateur ».
+      (a.estService - b.estService) || ((b.entrantsTotal + b.sortants) - (a.entrantsTotal + a.sortants)))
+
+    // Volume par heure, deux séries côte à côte (maquette)
+    const heuresVolume = heuresCarte.map(h => ({
+      cle: String(h), label: String(h).padStart(2, '0') + 'h',
+      labelLong: `${String(h).padStart(2, '0')} h – ${String((h + 1) % 24).padStart(2, '0')} h`,
+      valeurs: { entrant: parHeure[h].entrant, sortant: parHeure[h].sortant },
+    }))
+
+    // Rappels : entrant manqué ou reçu bureau fermé, sans sortant vers le même
+    // numéro dans les 48 h qui suivent.
+    const sortantsParNum = new Map()
+    for (const x of r) {
+      if (x.sens !== 'sortant' || !x.numero) continue
+      if (!sortantsParNum.has(x.numero)) sortantsParNum.set(x.numero, [])
+      sortantsParNum.get(x.numero).push(new Date(x.debut).getTime())
+    }
+    const H48 = 48 * 3600 * 1000
+    const enAttente = r
+      .filter(x => x.numero && (x.manque || (x.sens === 'entrant' && x.poste_categorie === 'hors_horaires')))
+      .filter(x => {
+        const t = new Date(x.debut).getTime()
+        return !(sortantsParNum.get(x.numero) || []).some(ts => ts > t && ts < t + H48)
+      })
+
+    // Un rappel = une personne à joindre, pas un appel. Trois tentatives du
+    // même numéro ne font qu'un coup de fil à passer — et le nombre de
+    // tentatives est justement ce qui dit lesquelles sont urgentes.
+    const parNumero = new Map()
+    for (const x of enAttente) {
+      if (!parNumero.has(x.numero)) parNumero.set(x.numero, {
+        id: x.numero, numero: x.numero, contact: x.contact, client_dossier: x.client_dossier,
+        tentatives: 0, manque: false, debut: x.debut, extension: x.extension, qui: quiPoste(x),
+      })
+      const e = parNumero.get(x.numero)
+      e.tentatives++
+      if (x.manque) e.manque = true
+      if (!e.contact && x.contact) e.contact = x.contact
+      if (!e.client_dossier && x.client_dossier) e.client_dossier = x.client_dossier
+      if (x.debut > e.debut) { e.debut = x.debut; e.extension = x.extension; e.qui = quiPoste(x) }
+    }
+    const rappels = [...parNumero.values()]
+      .sort((a, b) => (b.tentatives - a.tentatives) || (new Date(b.debut) - new Date(a.debut)))
+
     return {
       ...base, avant, jours, courbe, courbeManques, courbeDuree,
       grille, heuresCarte, pic, postes, topNumeros,
+      parPersonne, heuresVolume, rappels,
+      traites: base.entrants + r.filter(x => x.sens === 'sortant' && x.duree_s > 0).length,
       identifies: r.filter(x => x.contact).length,
     }
   }, [periodeCourante, periodePrecedente])
@@ -217,17 +305,75 @@ export default function DynassurAppels() {
 
   const chargement = rows === null
 
+  const exporter = () => {
+    const cols = ['Date', 'Sens', 'Statut', 'Numéro', 'Contact', 'Dossier', 'Poste', 'Qui', 'Durée (s)']
+    const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`
+    const lignesCsv = periodeCourante.map(r => [
+      r.debut, r.sens, r.manque ? 'manqué' : 'traité', r.numero, r.contact, r.client_dossier,
+      r.extension, quiPoste(r), r.duree_s,
+    ].map(esc).join(';'))
+    const csv = '﻿' + [cols.join(';'), ...lignesCsv].join('\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+    const a = document.createElement('a')
+    a.href = url; a.download = `appels-${new Date().toISOString().slice(0, 10)}.csv`; a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const ONGLETS = [
+    { v: 'equipe',  l: 'Vue équipe' },
+    { v: 'journal', l: 'Journal des appels' },
+    { v: 'stats',   l: 'Statistiques' },
+    { v: 'rappels', l: 'Rappels', badge: chargement ? null : stats.rappels.length },
+  ]
+
   return (
     <Layout currentPage="Appels">
-      <StatBanner
-        color={E.color} colorDark={E.colorDark} logoUrl={E.logo}
-        title="Appels" subtitle="Journal et statistiques — téléphonie 3CX"
-        action={
-          <button onClick={charger} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.15)', color: '#fff', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
-            <i className="ti ti-refresh" style={{ marginRight: 6 }} />Actualiser
-          </button>
-        }
-      />
+      {/* En-tête */}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, flexWrap: 'wrap', marginBottom: 14 }}>
+        <h1 style={{ fontSize: 29, fontWeight: 800, color: NAVY, margin: 0, letterSpacing: '-0.025em' }}>Suivi des appels</h1>
+        <span style={{ width: 1, height: 24, background: '#cbd5e1', alignSelf: 'center' }} />
+        <span style={{ fontSize: 15, color: '#64748b' }}>Supervision par collaborateur</span>
+      </div>
+
+      {/* Onglets soulignés */}
+      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid #e2e8f0', marginBottom: 16, overflowX: 'auto' }}>
+        {ONGLETS.map(o => {
+          const actif = onglet === o.v
+          return (
+            <button key={o.v} onClick={() => setOnglet(o.v)}
+              style={{
+                padding: '9px 16px 11px', border: 'none', background: 'none', cursor: 'pointer',
+                fontSize: 14, fontWeight: actif ? 700 : 600, fontFamily: 'inherit',
+                color: actif ? COULEURS.entrant : '#64748b',
+                boxShadow: actif ? `inset 0 -3px 0 ${COULEURS.entrant}` : 'none',
+                whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 7,
+              }}>
+              {o.l}
+              {o.badge > 0 && (
+                <span style={{ background: actif ? COULEURS.entrant : '#e2e8f0', color: actif ? '#fff' : '#64748b', borderRadius: 20, padding: '1px 8px', fontSize: 11, fontWeight: 800 }}>{o.badge}</span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Barre de filtres */}
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 18 }}>
+        <Filtre icone="ti-calendar" valeur={periode} onChange={setPeriode}
+          options={PERIODES.map(p => ({ v: p.cle, l: p.label }))} />
+        <Filtre icone="ti-user" valeur={filtrePersonne} onChange={setFiltrePersonne}
+          options={[{ v: '', l: 'Tous les collaborateurs' },
+            ...collabs.filter(c => c.extension).map(c => ({ v: c.extension, l: c.nom_complet || `Poste ${c.extension}` }))]} />
+        <Filtre icone="ti-building" valeur={filtreBureau} onChange={setFiltreBureau}
+          options={[{ v: '', l: 'Tous les bureaux' }, ...bureaux.map(b => ({ v: String(b.id), l: b.nom }))]} />
+        <Filtre icone="ti-arrows-left-right" valeur={sens} onChange={setSens}
+          options={[{ v: 'tous', l: 'Entrants + sortants' }, { v: 'entrant', l: 'Entrants' }, { v: 'sortant', l: 'Sortants' }, { v: 'manque', l: 'Manqués' }]} />
+        <span style={{ flex: 1 }} />
+        <button onClick={exporter} disabled={chargement}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px', borderRadius: 10, border: `1px solid ${COULEURS.entrant}`, background: '#fff', color: COULEURS.entrant, fontWeight: 700, fontSize: 13.5, cursor: 'pointer', fontFamily: 'inherit' }}>
+          <i className="ti ti-download" style={{ fontSize: 16 }} />Exporter
+        </button>
+      </div>
 
       {erreur && (
         <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '12px 16px', marginBottom: 16, color: '#991b1b', fontSize: 13, display: 'flex', gap: 9 }}>
@@ -236,25 +382,14 @@ export default function DynassurAppels() {
         </div>
       )}
 
-      {/* Onglets + période */}
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 }}>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {[{ v: 'journal', l: 'Journal', i: 'ti-list' }, { v: 'stats', l: 'Statistiques', i: 'ti-chart-bar' }].map(o => (
-            <button key={o.v} onClick={() => setOnglet(o.v)} style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid ' + (onglet === o.v ? E.color : '#e2e8f0'), background: onglet === o.v ? E.color : '#fff', color: onglet === o.v ? '#fff' : '#64748b', fontWeight: 700, fontSize: 12.5, cursor: 'pointer' }}>
-              <i className={`ti ${o.i}`} style={{ marginRight: 6 }} />{o.l}
-            </button>
-          ))}
-        </div>
-        <span style={{ flex: 1 }} />
-        <div style={{ display: 'flex', gap: 5 }}>
-          {PERIODES.map(p => (
-            <button key={p.cle} onClick={() => setPeriode(p.cle)} style={{ padding: '6px 11px', borderRadius: 7, border: '1px solid ' + (periode === p.cle ? NAVY : '#e2e8f0'), background: periode === p.cle ? NAVY : '#fff', color: periode === p.cle ? '#fff' : '#64748b', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>{p.label}</button>
-          ))}
-        </div>
-      </div>
-
       {chargement ? (
         <div style={{ padding: '60px 0', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>Chargement…</div>
+      ) : onglet === 'equipe' ? (
+        <VueEquipe stats={stats} heures={stats.heuresVolume} rappels={stats.rappels}
+          onCollaborateur={p => { setFiltrePersonne(p.extension || ''); setOnglet('journal') }}
+          onVoirRappels={() => setOnglet('rappels')} />
+      ) : onglet === 'rappels' ? (
+        <Rappels rappels={stats.rappels} ouvrirFiche={ouvrirFiche} />
       ) : onglet === 'stats' ? (
         <Stats stats={stats} postes={postes} edition={edition} setEdition={setEdition} renommer={renommerPoste} joursPeriode={joursPeriode} />
       ) : (
@@ -267,6 +402,19 @@ export default function DynassurAppels() {
         </>
       )}
     </Layout>
+  )
+}
+
+/* ── Liste déroulante de filtre ── */
+function Filtre({ icone, valeur, onChange, options }) {
+  return (
+    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '0 12px', height: 40, minWidth: 0 }}>
+      <i className={`ti ${icone}`} style={{ fontSize: 16, color: '#94a3b8', flexShrink: 0 }} />
+      <select value={valeur} onChange={e => onChange(e.target.value)}
+        style={{ border: 'none', outline: 'none', background: 'none', fontSize: 13.5, color: '#334155', fontFamily: 'inherit', fontWeight: 600, cursor: 'pointer', paddingRight: 4, maxWidth: 210 }}>
+        {options.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+      </select>
+    </label>
   )
 }
 
