@@ -158,6 +158,21 @@ laissée ouverte, un poste partagé, un navigateur resté connecté — le scén
 réel. Elle ne couvre pas un jeton exfiltré et rejoué depuis ailleurs. Seul un
 time-box côté serveur (plan Pro) serait opposable.
 
+> **Décision du 02/11/2026 — passage au plan Pro, reporté.** Le Hub est encore
+> en construction et le remplacement de Brio n'est pas acté (tout n'a pas été
+> exploré). Le plan Pro sera activé **à la mise en production réelle**, et il
+> apportera alors deux choses, pas une :
+>
+> 1. le *time-box* et l'*inactivity timeout* côté serveur, qui rendront la règle
+>    des 24 h / 4 h opposable au lieu d'applicative ;
+> 2. **les sauvegardes de base de données**, absentes du plan Free — point le
+>    plus lourd des deux pour une base qui porte 10 298 fiches clients avec IBAN.
+>
+> À ce moment-là : activer Pro, régler Authentication → Sessions sur 24 h et 4 h,
+> puis retirer `DUREE_MAX_SESSION` / `DUREE_MAX_INACTIVITE` de `src/lib/auth.jsx`
+> pour ne pas garder deux mécanismes concurrents. `prompt: 'login'` reste, lui :
+> il est indispensable dans les deux cas.
+
 Effet de bord favorable : l'inactivité est mesurée sur les actions **réelles**
 (clic, touche), pas sur l'usage du jeton de rafraîchissement. Le réglage natif de
 Supabase ne fermait jamais une fenêtre laissée ouverte, puisque `supabase-js`
