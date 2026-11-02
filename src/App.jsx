@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/auth'
+import { OUTILS } from './lib/outils'
 
 // Chargées immédiatement (chemin non-authentifié, très légères)
 import Login              from './pages/Login'
@@ -16,11 +17,8 @@ const DashboardGroupe     = lazy(() => import('./pages/groupe/DashboardGroupe'))
 const DashboardDynassur   = lazy(() => import('./pages/dynassur/DashboardDynassur'))
 const Tickets             = lazy(() => import('./pages/Tickets'))
 const ToolsHome           = lazy(() => import('./pages/tools/ToolsHome'))
-const ToolBce             = lazy(() => import('./pages/tools/ToolBce'))
-const ToolQuestionnaire   = lazy(() => import('./pages/tools/ToolQuestionnaire'))
-const ToolDevoirInfo      = lazy(() => import('./pages/tools/ToolDevoirInfo'))
-const ToolSuccession     = lazy(() => import('./pages/tools/ToolSuccession'))
-const ToolJobs           = lazy(() => import('./pages/tools/ToolJobs'))
+// Les outils eux-mêmes sont déclarés dans src/lib/outils.js (registre OUTILS) :
+// leur import différé et leur route en découlent, plus rien à câbler ici.
 const DynassurClients     = lazy(() => import('./pages/dynassur/DynassurClients'))
 const DynassurPerformance = lazy(() => import('./pages/dynassur/DynassurPerformance'))
 const DynassurCompagnies  = lazy(() => import('./pages/dynassur/DynassurCompagnies'))
@@ -177,11 +175,10 @@ export default function App() {
           {/* Admin */}
           <Route path="/tickets" element={<P><Tickets /></P>} />
           <Route path="/tools"     element={<P need="acc_tools"><ToolsHome /></P>} />
-          <Route path="/tools/bce" element={<P need="acc_tools"><ToolBce /></P>} />
-          <Route path="/tools/questionnaire" element={<P need="acc_tools"><ToolQuestionnaire /></P>} />
-          <Route path="/tools/devoir-information" element={<P need="acc_tools"><ToolDevoirInfo /></P>} />
-          <Route path="/tools/succession" element={<P need="prive_succession"><ToolSuccession /></P>} />
-          <Route path="/tools/jobs" element={<P need="acc_tools"><ToolJobs /></P>} />
+          {OUTILS.filter(o => o.composant).map(o => {
+            const Outil = o.composant
+            return <Route key={o.cle} path={o.chemin} element={<P need={o.permission}><Outil /></P>} />
+          })}
           <Route path="/admin/notes-frais" element={<A><AdminNotesFrais /></A>} />
 
           <Route path="/" element={<P><RootRedirect /></P>} />
