@@ -12,6 +12,8 @@ const PROD = {
   SUPABASE_ANON_KEY: 'sb_publishable_LrEXAIusF3VxlBPmJnwddg_fk_wdCzw', // clé publishable (publique) — alignée sur src/config/env.js le 02/11/2026 ; l'ancienne, supprimée le 31/10, était restée ici
   N8N_URL:           'https://n8n.srv1082740.hstgr.cloud',
   SHAREPOINT_SITE:   'https://dynassur.sharepoint.com/sites/ADMINISTRATION',
+  // Identifiant Graph du meme site (repris du workflow n8n « Apercu facture »).
+  SHAREPOINT_SITE_ID: '438fcfb3-10f8-455b-8308-1f832d4db26d',
   SHAREPOINT_ROOT:   'Documents partages',
   HUB_URL:           'https://hub-dtx.vercel.app',
 }
@@ -49,6 +51,7 @@ export const N8N_URL = lire('N8N_URL')
 export const N8N_TEST_SUFFIX = IS_TEST ? (env.N8N_TEST_SUFFIX ?? '-test') : ''
 export const n8nWebhook = chemin => `${N8N_URL}/webhook/${String(chemin).replace(/^\/+/, '')}${N8N_TEST_SUFFIX}`
 export const SHAREPOINT_SITE = lire('SHAREPOINT_SITE')
+export const SHAREPOINT_SITE_ID = lire('SHAREPOINT_SITE_ID')
 export const SHAREPOINT_ROOT = lire('SHAREPOINT_ROOT', { defautTest: 'Documents partages/_TEST' })
 export const HUB_URL = lire('HUB_URL')
 
@@ -70,7 +73,7 @@ export const GITHUB_SYNC_REF = env.GITHUB_SYNC_REF || (IS_TEST ? 'staging' : 'ma
 export default {
   APP_ENV, IS_PROD, IS_TEST,
   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY,
-  N8N_URL, N8N_TEST_SUFFIX, n8nWebhook, SHAREPOINT_SITE, SHAREPOINT_ROOT, HUB_URL,
+  N8N_URL, N8N_TEST_SUFFIX, n8nWebhook, SHAREPOINT_SITE, SHAREPOINT_SITE_ID, SHAREPOINT_ROOT, HUB_URL,
   AZURE, MAIL_REDIRECT_TO,
   GITHUB_DISPATCH_TOKEN, GITHUB_REPO, GITHUB_SYNC_REF,
 }

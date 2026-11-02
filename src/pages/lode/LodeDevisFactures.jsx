@@ -1,4 +1,4 @@
-import { N8N_WEBHOOK_URL, n8nWebhook } from '../../config/env'
+import { n8nWebhook } from '../../config/env'
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { PEPPOL_ACTIF } from '../../lib/peppol'
@@ -1489,7 +1489,7 @@ function ChampL({ label, children }) {
 function ApercuFacture({ fid, nom }) {
   const [etat, setEtat] = useState('load')
   useEffect(() => { setEtat('load') }, [fid])
-  const src = `${N8N_WEBHOOK_URL}/apercu-facture?fid=${encodeURIComponent(fid)}`
+  const src = `/api/apercu-facture?fid=${encodeURIComponent(fid)}`
   return (
     <div style={{ position: 'fixed', top: '50%', right: 24, transform: 'translateY(-50%)', zIndex: 2100, width: 520, maxWidth: '48vw', maxHeight: '88vh', background: '#fff', borderRadius: 14, boxShadow: '0 20px 60px rgba(0,0,0,0.35)', border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', pointerEvents: 'none' }}>
       <div style={{ padding: '10px 14px', background: '#0f172a', color: '#fff', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>📄 {nom}</div>
