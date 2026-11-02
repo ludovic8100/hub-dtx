@@ -156,9 +156,15 @@ export default function DynassurAppels() {
   }
 
   const stats = useMemo(() => {
-    const r = periodeCourante
+    // 3CX rapporte chaque coup de sonnerie comme un événement : un appel qui
+    // sonne trois fois arrive en trois lignes. Le journal les montre toutes —
+    // c'est ce qui s'est passé — mais les compteurs ne retiennent que la
+    // première, sans quoi un seul appel manqué en vaudrait trois.
+    const r = periodeCourante.filter(x => !x.relance_sonnerie)
     const base = calcul(r)
-    const avant = periodePrecedente.length ? calcul(periodePrecedente) : null
+    const avant = periodePrecedente.length
+      ? calcul(periodePrecedente.filter(x => !x.relance_sonnerie)) : null
+    const relances = periodeCourante.length - r.length
 
     // Par jour
     const parJour = new Map()
@@ -257,7 +263,8 @@ export default function DynassurAppels() {
     }
     const H48 = 48 * 3600 * 1000
     const enAttente = r
-      .filter(x => x.numero && (x.manque || (x.sens === 'entrant' && x.poste_categorie === 'hors_horaires')))
+      .filter(x => x.numero && !x.relance_sonnerie
+        && (x.manque || (x.sens === 'entrant' && x.poste_categorie === 'hors_horaires')))
       .filter(x => {
         const t = new Date(x.debut).getTime()
         return !(sortantsParNum.get(x.numero) || []).some(ts => ts > t && ts < t + H48)
@@ -283,7 +290,7 @@ export default function DynassurAppels() {
       .sort((a, b) => (b.tentatives - a.tentatives) || (new Date(b.debut) - new Date(a.debut)))
 
     return {
-      ...base, avant, jours, courbe, courbeManques, courbeDuree,
+      ...base, avant, relances, jours, courbe, courbeManques, courbeDuree,
       grille, heuresCarte, pic, postes, topNumeros,
       parPersonne, heuresVolume, rappels,
       traites: base.entrants + r.filter(x => x.sens === 'sortant' && x.duree_s > 0).length,
@@ -396,7 +403,7 @@ export default function DynassurAppels() {
         <>
           <ChiffresCles stats={stats} compact />
           <Journal
-            lignes={lignes} total={periodeCourante.length} sens={sens} setSens={setSens} q={q} setQ={setQ}
+            lignes={lignes} total={periodeCourante.length} relances={stats.relances} sens={sens} setSens={setSens} q={q} setQ={setQ}
             ouvrirFiche={ouvrirFiche} identifies={stats.identifies}
           />
         </>
@@ -710,7 +717,7 @@ const Mini = ({ label, valeur, alerte }) => (
 )
 
 /* ── Onglet Journal ── */
-function Journal({ lignes, total, sens, setSens, q, setQ, ouvrirFiche, identifies }) {
+function Journal({ lignes, total, relances = 0, sens, setSens, q, setQ, ouvrirFiche, identifies }) {
   return (
     <>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
@@ -736,7 +743,8 @@ function Journal({ lignes, total, sens, setSens, q, setQ, ouvrirFiche, identifie
               {!lignes.length ? (
                 <tr><td colSpan={7} style={{ padding: 24, textAlign: 'center', color: '#94a3b8' }}>Aucun appel.</td></tr>
               ) : lignes.map((r, i) => {
-                const etat = r.manque ? { l: 'Manqué', c: COULEURS.manque, f: '#fef2f2', i: 'ti-phone-off' }
+                const etat = r.relance_sonnerie ? { l: 'Re-sonnerie', c: '#94a3b8', f: '#f1f5f9', i: 'ti-bell-ringing' }
+                  : r.manque ? { l: 'Manqué', c: COULEURS.manque, f: '#fef2f2', i: 'ti-phone-off' }
                   : r.sens === 'entrant' ? { l: 'Entrant', c: COULEURS.entrant, f: '#eff6ff', i: 'ti-phone-incoming' }
                   : { l: 'Sortant', c: COULEURS.sortant, f: '#fff4ed', i: 'ti-phone-outgoing' }
                 return (
@@ -769,7 +777,8 @@ function Journal({ lignes, total, sens, setSens, q, setQ, ouvrirFiche, identifie
       </div>
 
       <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 10 }}>
-        {fmtNb(lignes.length)} appel(s) affiché(s) sur {fmtNb(total)} chargé(s) — toute la période, sans plafond.
+        {fmtNb(lignes.length)} ligne(s) affichée(s) sur {fmtNb(total)} chargée(s) — toute la période, sans plafond.
+        {relances > 0 && ` ${fmtNb(relances)} sont des re-sonneries du même appel, exclues des compteurs.`}
         {' '}{fmtNb(identifies)} contact(s) identifié(s). Clic sur une ligne = fiche client, quand un dossier est rattaché.
       </p>
     </>
