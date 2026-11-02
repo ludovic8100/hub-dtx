@@ -152,9 +152,19 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const [periodeOuverte, setPeriodeOuverte] = useState(false)
   const [periodePos, setPeriodePos] = useState({ top:0, left:0 })
   const periodeBtnRef = useRef(null)
+  const periodePanelRef = useRef(null)
   useEffect(() => {
     if (!periodeOuverte) return
-    const fermer = () => setPeriodeOuverte(false)
+    // Le panneau est en position fixe : il doit se fermer si la page defile
+    // sous lui, sinon il reste accroche dans le vide. Mais l'ecoute est en
+    // phase de capture, donc elle recoit aussi le defilement du panneau
+    // lui-meme — qui a sa propre barre (maxHeight 380px). Sans ce test, le
+    // menu se fermait des qu'on essayait d'y faire defiler les annees.
+    const fermer = (e) => {
+      const cible = e?.target
+      if (cible && cible.nodeType === 1 && periodePanelRef.current?.contains(cible)) return
+      setPeriodeOuverte(false)
+    }
     window.addEventListener('scroll', fermer, true)
     window.addEventListener('resize', fermer)
     return () => { window.removeEventListener('scroll', fermer, true); window.removeEventListener('resize', fermer) }
@@ -792,7 +802,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
           {periodeOuverte && (
             <>
               <div onClick={()=>setPeriodeOuverte(false)} style={{ position:'fixed', inset:0, zIndex:1000 }} />
-              <div style={{
+              <div ref={periodePanelRef} style={{
                 position:'fixed', top: periodePos.top, left: periodePos.left, zIndex:1001, background:'#fff',
                 border:'1px solid #e2e8f0', borderRadius:'10px', boxShadow:'0 12px 32px rgba(0,0,0,0.15)',
                 padding:'8px', width:'280px', maxHeight:'380px', overflowY:'auto'
