@@ -361,7 +361,59 @@ le rapprocher pour `collaborateurs` (49 lignes) est trivial, mais pour `clients`
 c'est un exercice de déduplication qui demande une revue humaine des correspondances proposées
 avant toute fusion réelle — pas une migration automatique. Non commencé.
 
-## Bloc 2 — Un seul modèle de modules (à venir)
+## Bloc 2 — Un seul modèle de modules (02/11/2026)
+
+Les ~55 colonnes booléennes de droits sont remplacées par trois tables :
+
+| Table | Rôle |
+|---|---|
+| `ref_modules` | le catalogue des fonctions, défini **une seule fois** |
+| `ref_modules_societes` | quels modules existent pour quelle société, et les anciennes colonnes correspondantes |
+| `collaborateur_acces` | qui a quoi : *(collaborateur, société, module)* |
+
+**178 attributions** remplacent 2 695 cases à cocher. Reprise dérivée des colonnes
+existantes avec la règle de `ProtectedRoute` : aucun accès gagné ni perdu
+(3/3, 15/15, 3/3, 4/4, 4/4, 3/3, 18/18 par société).
+
+### Les anciennes colonnes sont devenues une vue
+
+`auth.jsx` reconstitue `dyn_comptabilite`, `acc_lode`… à partir des attributions,
+via `ref_modules_societes.colonnes_legacy`. `App.jsx`, `Sidebar.jsx` et
+`outils.js` continuent donc de les lire **sans modification**, mais ce ne sont
+plus elles qui décident. Les colonnes réelles de `collaborateurs` ne sont plus
+lues pour les droits — elles subsistent en base, obsolètes.
+
+Point d'attention : `auth.jsx` remet d'abord à `false` toutes les colonnes
+connues du catalogue avant d'appliquer les attributions. Sans cela, retirer un
+droit dans Paramètres ne le retirerait pas, la vieille colonne restant vraie.
+
+### Ce qui n'a pas été repris
+
+Les colonnes dont le module n'existe plus depuis le 01/11 : `dyn_taches`
+(16 personnes), `dyn_rdv` (15), les cinq autres `*_taches`, `dyn_devis`,
+`dyn_bordereaux`. Et les quatre `*_banque` — **les routes banque sont réservées
+aux administrateurs**, ces colonnes ne décidaient de rien.
+
+### Un bug trouvé en chemin
+
+La colonne `lode_rentabilite` n'a **jamais existé** en base alors que la route
+`/lode/rentabilite` l'exige : la page était inatteignable pour les
+non-administrateurs depuis toujours. Le nom est désormais porté par le
+catalogue — attribuer le module suffit, sans qu'aucune colonne soit nécessaire.
+
+### Premier usage réel : le cloisonnement de la comptabilité
+
+Voir la section « Cloisonnement de la comptabilité » plus haut : la visibilité de
+`comptes_bancaires`, `transactions`, `transaction_ventilation` et
+`factures_achat` s'appuie sur `collaborateur_acces` via `a_module()`.
+
+### Reste à faire
+
+Supprimer les ~55 colonnes de `collaborateurs` une fois quelques jours passés
+sans incident, et faire lire `collaborateur_acces` directement par `App.jsx`,
+`Sidebar.jsx` et `outils.js` au lieu de passer par la reconstitution.
+
+## Bloc 2 (énoncé d'origine)
 
 Remplacer les ~70 colonnes booléennes de `user_permissions` (une par page × par société,
 largement dupliquées, ex. `dyn_comptabilite`/`dtx_comptabilite`/`lode_comptabilite`…) par une

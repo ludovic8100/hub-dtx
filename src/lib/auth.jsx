@@ -120,12 +120,43 @@ export function AuthProvider({ children }) {
   const [activeSociete, setActiveSociete] = useState(null)
   const [erreurConnexion, setErreurConnexion] = useState(null)
 
+  // Charge la fiche du collaborateur ET ses droits.
+  //
+  // La source de vérité des droits est désormais `collaborateur_acces`
+  // (collaborateur × société × module). Les anciennes colonnes booléennes
+  // (dyn_comptabilite, acc_lode…) sont RECONSTITUÉES à partir des attributions,
+  // via la correspondance stockée dans `ref_modules_societes`. Les écrans qui
+  // les lisent encore — App.jsx, Sidebar.jsx, outils.js — continuent donc de
+  // fonctionner sans modification, mais ce ne sont plus elles qui décident.
+  //
+  // Important : on remet d'abord à false toutes les colonnes connues du
+  // catalogue, sinon retirer un droit dans Paramètres ne le retirerait pas —
+  // la valeur de l'ancienne colonne resterait vraie.
   async function loadPerms(email) {
     const { data, error } = await supabase
       .from('collaborateurs').select('*')
       .eq('email', email).eq('compte_hub_actif', true).single()
     if (error || !data) return null
-    return data
+
+    const [{ data: acces }, { data: catalogue }] = await Promise.all([
+      supabase.from('collaborateur_acces').select('societe,module_code').eq('collaborateur_id', data.id),
+      supabase.from('ref_modules_societes').select('module_code,societe,colonnes_legacy,colonne_acces'),
+    ])
+    if (!catalogue) return data // catalogue illisible : on garde les colonnes telles quelles
+
+    const drapeaux = {}
+    for (const m of catalogue) {
+      if (m.colonne_acces) drapeaux[m.colonne_acces] = false
+      for (const col of (m.colonnes_legacy || [])) drapeaux[col] = false
+    }
+    const index = new Map(catalogue.map(m => [`${m.societe}|${m.module_code}`, m]))
+    for (const a of (acces || [])) {
+      const m = index.get(`${a.societe}|${a.module_code}`)
+      if (!m) continue
+      if (m.colonne_acces) drapeaux[m.colonne_acces] = true
+      for (const col of (m.colonnes_legacy || [])) drapeaux[col] = true
+    }
+    return { ...data, ...drapeaux, acces_modules: acces || [] }
   }
 
   // Suivi de connexion — additif, ne bloque jamais le login (fire-and-forget)
