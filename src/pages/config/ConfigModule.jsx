@@ -627,6 +627,8 @@ export default function ConfigModule() {
                   <Grid>
                     <F label="Titre / fonction" value={selUser.titre} onChange={v => setSelUser(u => ({ ...u, titre: v }))} />
                     <F label="GSM" value={selUser.gsm} onChange={v => setSelUser(u => ({ ...u, gsm: v }))} />
+                    {/* Poste 3CX : relie le collaborateur à ses appels (module Appels, vue v_appels). */}
+                    <F label="Poste 3CX" value={selUser.extension} onChange={v => setSelUser(u => ({ ...u, extension: v.trim() || null }))} />
                     <F label="Adresse" value={selUser.adresse} onChange={v => setSelUser(u => ({ ...u, adresse: v }))} />
                     <F label="Code postal" value={selUser.code_postal} onChange={v => setSelUser(u => ({ ...u, code_postal: v }))} />
                     <F label="Ville" value={selUser.ville} onChange={v => setSelUser(u => ({ ...u, ville: v }))} />
