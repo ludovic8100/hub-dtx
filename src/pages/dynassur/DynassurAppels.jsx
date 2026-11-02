@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
 import { ENTITES } from '../../lib/entites'
 import { StatBanner } from '../../components/ui/AccountableUI'
-import { BarresEmpilees, Legende, COULEURS } from '../../components/GraphAppels'
+import { BarresEmpilees, Legende, COULEURS, Sparkline, Jauge, CarteChaleur } from '../../components/GraphAppels'
 
 // Journal et statistiques de la téléphonie 3CX.
 //
@@ -58,11 +58,14 @@ export default function DynassurAppels() {
   const [postes, setPostes] = useState([])
   const [edition, setEdition] = useState(null)        // { extension, libelle }
 
-  const depuis = useMemo(() => {
+  // Deux bornes : le début de la période affichée, et celui de la période
+  // précédente de même longueur — c'est elle qui donne les évolutions.
+  const { depuis, depuisCompare, jours: joursPeriode } = useMemo(() => {
     const p = PERIODES.find(x => x.cle === periode)
-    if (!p?.jours) return null
+    if (!p?.jours) return { depuis: null, depuisCompare: null, jours: null }
     const d = new Date(); d.setDate(d.getDate() - p.jours); d.setHours(0, 0, 0, 0)
-    return d.toISOString()
+    const d2 = new Date(d); d2.setDate(d2.getDate() - p.jours)
+    return { depuis: d.toISOString(), depuisCompare: d2.toISOString(), jours: p.jours }
   }, [periode])
 
   // Chargement paginé : la page affichait 1 000 appels et s'arrêtait là, sans
@@ -73,7 +76,7 @@ export default function DynassurAppels() {
     try {
       for (let from = 0; ; from += PAGE) {
         let req = supabase.from('v_appels').select('*').order('debut', { ascending: false }).range(from, from + PAGE - 1)
-        if (depuis) req = req.gte('debut', depuis)
+        if (depuisCompare) req = req.gte('debut', depuisCompare)
         const { data, error } = await req
         if (error) throw error
         tout.push(...(data || []))
@@ -86,11 +89,20 @@ export default function DynassurAppels() {
     const { data: p } = await supabase.from('postes_telephonie').select('*').order('extension')
     setPostes(p || [])
   }
-  useEffect(() => { charger() }, [depuis])   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { charger() }, [depuisCompare, depuis])   // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Les lignes chargées débordent sur la période précédente (comparaison) :
+  // tout ce qui s'affiche repart de `periodeCourante`.
+  const periodeCourante = useMemo(
+    () => (rows || []).filter(r => !depuis || r.debut >= depuis),
+    [rows, depuis])
+  const periodePrecedente = useMemo(
+    () => (depuis ? (rows || []).filter(r => r.debut < depuis) : []),
+    [rows, depuis])
 
   const lignes = useMemo(() => {
     const s = q.trim().toLowerCase()
-    return (rows || []).filter(r => {
+    return periodeCourante.filter(r => {
       if (sens === 'entrant' && (r.sens !== 'entrant' || r.manque)) return false
       if (sens === 'sortant' && r.sens !== 'sortant') return false
       if (sens === 'manque' && !r.manque) return false
@@ -100,18 +112,29 @@ export default function DynassurAppels() {
       }
       return true
     })
-  }, [rows, sens, q])
+  }, [periodeCourante, sens, q])
 
   // ── Statistiques ────────────────────────────────────────────────────────
-  const stats = useMemo(() => {
-    const r = rows || []
-    const manques = r.filter(x => x.manque)
-    const entrants = r.filter(x => x.sens === 'entrant' && !x.manque)
-    const sortants = r.filter(x => x.sens === 'sortant')
+  const calcul = lot => {
+    const manques = lot.filter(x => x.manque)
+    const entrants = lot.filter(x => x.sens === 'entrant' && !x.manque)
+    const sortants = lot.filter(x => x.sens === 'sortant')
     const entrantsTotal = entrants.length + manques.length
-    const repondus = r.filter(x => !x.manque && x.duree_s > 0)
-    const secondes = repondus.reduce((s, x) => s + (x.duree_s || 0), 0)
-    const horsHoraires = r.filter(x => x.poste_categorie === 'hors_horaires')
+    const repondus = lot.filter(x => !x.manque && x.duree_s > 0)
+    const secondes = repondus.reduce((a, x) => a + (x.duree_s || 0), 0)
+    return {
+      total: lot.length, entrants: entrants.length, sortants: sortants.length,
+      manques: manques.length, entrantsTotal,
+      decroche: entrantsTotal ? entrants.length / entrantsTotal : null,
+      secondes, moyenne: repondus.length ? Math.round(secondes / repondus.length) : null,
+      horsHoraires: lot.filter(x => x.poste_categorie === 'hors_horaires').length,
+    }
+  }
+
+  const stats = useMemo(() => {
+    const r = periodeCourante
+    const base = calcul(r)
+    const avant = periodePrecedente.length ? calcul(periodePrecedente) : null
 
     // Par jour
     const parJour = new Map()
@@ -124,25 +147,27 @@ export default function DynassurAppels() {
       if (x.manque) b.manque++; else if (x.sens === 'entrant') b.entrant++; else b.sortant++
     }
     const jours = [...parJour.values()].sort((a, b) => a.d - b.d).map(j => ({
-      cle: j.cle, label: fmtJour(j.d), valeurs: j.valeurs,
-      labelAxe: fmtJour(j.d),
+      cle: j.cle, label: fmtJour(j.d), labelAxe: fmtJour(j.d), valeurs: j.valeurs,
       labelLong: j.d.toLocaleDateString('fr-BE', { weekday: 'long', day: '2-digit', month: 'long' }),
     }))
-    // Au-delà de ~45 jours, un libellé sur deux pour que l'axe reste lisible
     const pas = Math.ceil(jours.length / 32)
     if (pas > 1) jours.forEach((j, i) => { j.labelAxe = i % pas === 0 ? j.label : '' })
+    const courbe = jours.map(j => j.valeurs.entrant + j.valeurs.sortant + j.valeurs.manque)
+    const courbeManques = jours.map(j => j.valeurs.manque)
+    const courbeDuree = jours.map(j => j.valeurs.entrant + j.valeurs.sortant)
 
-    // Par heure
-    const parHeure = Array.from({ length: 24 }, (_, h) => ({ cle: String(h), label: String(h).padStart(2, '0'), labelLong: `${String(h).padStart(2, '0')} h – ${String((h + 1) % 24).padStart(2, '0')} h`, valeurs: { entrant: 0, sortant: 0, manque: 0 } }))
+    // Carte de chaleur : jour de semaine (lundi = 0) × heure, appels entrants
+    const grille = Array.from({ length: 7 }, () => ({}))
+    let pic = 0, hMin = 23, hMax = 0
     for (const x of r) {
-      if (!x.debut) continue
-      const b = parHeure[new Date(x.debut).getHours()].valeurs
-      if (x.manque) b.manque++; else if (x.sens === 'entrant') b.entrant++; else b.sortant++
+      if (!x.debut || x.sens !== 'entrant') continue
+      const d = new Date(x.debut)
+      const j = (d.getDay() + 6) % 7, h = d.getHours()
+      grille[j][h] = (grille[j][h] || 0) + 1
+      pic = Math.max(pic, grille[j][h]); hMin = Math.min(hMin, h); hMax = Math.max(hMax, h)
     }
-    const actives = parHeure.filter(h => h.valeurs.entrant + h.valeurs.sortant + h.valeurs.manque > 0)
-    const hMin = actives.length ? Number(actives[0].cle) : 7
-    const hMax = actives.length ? Number(actives[actives.length - 1].cle) : 20
-    const heures = parHeure.slice(hMin, hMax + 1)
+    if (hMin > hMax) { hMin = 7; hMax = 20 }
+    const heuresCarte = Array.from({ length: hMax - hMin + 1 }, (_, i) => hMin + i)
 
     // Par poste
     const parPoste = new Map()
@@ -156,11 +181,11 @@ export default function DynassurAppels() {
       if (x.manque) p.manque++; else if (x.sens === 'entrant') p.entrant++; else p.sortant++
       if (!x.manque && x.duree_s > 0) { p.secondes += x.duree_s; p.repondus++; p.plusLong = Math.max(p.plusLong, x.duree_s) }
     }
-    const pPostes = [...parPoste.values()]
-      .map(p => ({ ...p, total: p.entrant + p.sortant + p.manque }))
+    const postes = [...parPoste.values()]
+      .map(p => ({ ...p, total: p.entrant + p.sortant + p.manque, decroche: (p.entrant + p.manque) ? p.entrant / (p.entrant + p.manque) : null }))
       .sort((a, b) => b.total - a.total)
 
-    // Numéros qui reviennent le plus
+    // Numéros récurrents
     const parNum = new Map()
     for (const x of r) {
       if (!x.numero) continue
@@ -169,18 +194,14 @@ export default function DynassurAppels() {
       if (!e.contact && x.contact) e.contact = x.contact
       if (!e.dossier && x.client_dossier) e.dossier = x.client_dossier
     }
-    const topNumeros = [...parNum.values()].sort((a, b) => b.n - a.n).slice(0, 8)
+    const topNumeros = [...parNum.values()].filter(n => n.n > 1).sort((a, b) => b.n - a.n).slice(0, 8)
 
     return {
-      total: r.length, entrants: entrants.length, sortants: sortants.length,
-      manques: manques.length, entrantsTotal,
-      tauxDecroche: entrantsTotal ? entrants.length / entrantsTotal : null,
-      secondes, moyenne: repondus.length ? Math.round(secondes / repondus.length) : null,
-      horsHoraires: horsHoraires.length,
+      ...base, avant, jours, courbe, courbeManques, courbeDuree,
+      grille, heuresCarte, pic, postes, topNumeros,
       identifies: r.filter(x => x.contact).length,
-      jours, heures, postes: pPostes, topNumeros,
     }
-  }, [rows])
+  }, [periodeCourante, periodePrecedente])
 
   const renommerPoste = async () => {
     if (!edition) return
@@ -232,161 +253,313 @@ export default function DynassurAppels() {
         </div>
       </div>
 
-      {/* KPI */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(155px,1fr))', gap: 12, marginBottom: 20 }}>
-        <Kpi label="Appels" value={chargement ? '…' : fmtNb(stats.total)} col={E.color} sub={chargement ? null : `${fmtNb(stats.entrantsTotal)} entrants · ${fmtNb(stats.sortants)} sortants`} />
-        <Kpi label="Taux de décroché" value={chargement ? '…' : (stats.tauxDecroche == null ? '—' : fmtPct(stats.entrants, stats.entrantsTotal))} col={COULEURS.entrant} sub={chargement ? null : `${fmtNb(stats.entrants)} répondus sur ${fmtNb(stats.entrantsTotal)}`} />
-        <Kpi label="Appels manqués" value={chargement ? '…' : fmtNb(stats.manques)} col={COULEURS.manque} sub={chargement ? null : fmtPct(stats.manques, stats.entrantsTotal) + ' des entrants'} />
-        <Kpi label="Durée moyenne" value={chargement ? '…' : fmtDuree(stats.moyenne)} col={COULEURS.sortant} sub={chargement ? null : 'Total ' + fmtDuree(stats.secondes)} />
-        <Kpi label="Hors horaires" value={chargement ? '…' : fmtNb(stats.horsHoraires)} col="#7c3aed" sub="Arrivés bureau fermé" />
-      </div>
-
       {chargement ? (
-        <div style={{ padding: '40px 0', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>Chargement…</div>
+        <div style={{ padding: '60px 0', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>Chargement…</div>
       ) : onglet === 'stats' ? (
-        <Stats stats={stats} postes={postes} edition={edition} setEdition={setEdition} renommer={renommerPoste} />
+        <Stats stats={stats} postes={postes} edition={edition} setEdition={setEdition} renommer={renommerPoste} joursPeriode={joursPeriode} />
       ) : (
-        <Journal
-          lignes={lignes} total={(rows || []).length} sens={sens} setSens={setSens} q={q} setQ={setQ}
-          ouvrirFiche={ouvrirFiche} identifies={stats.identifies}
-        />
+        <>
+          <ChiffresCles stats={stats} compact />
+          <Journal
+            lignes={lignes} total={periodeCourante.length} sens={sens} setSens={setSens} q={q} setQ={setQ}
+            ouvrirFiche={ouvrirFiche} identifies={stats.identifies}
+          />
+        </>
       )}
     </Layout>
   )
 }
 
-/* ── Vignette de chiffre ── */
-function Kpi({ label, value, col, sub }) {
+/* ── Évolution par rapport à la période précédente ── */
+function Delta({ valeur, avant, unite = '', sensBon = 1, pts = false }) {
+  if (avant == null || valeur == null || !isFinite(avant)) return null
+  const d = valeur - avant
+  if (Math.abs(d) < (pts ? 0.005 : 0.5)) {
+    return <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>= stable</span>
+  }
+  // sensBon = 0 : la grandeur n'a pas de sens souhaitable (le volume d'appels
+  // n'est ni bon ni mauvais). On montre l'évolution sans la juger.
+  const couleur = sensBon === 0 ? '#94a3b8' : (d * sensBon > 0 ? '#16a34a' : '#dc2626')
+  const txt = pts ? `${Math.abs(Math.round(d * 100))} pts` : `${Math.abs(Math.round(d))}${unite}`
   return (
-    <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #e2e8f0', borderTop: `3px solid ${col}`, padding: '14px 18px' }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 24, fontWeight: 800, color: '#0f172a', lineHeight: 1 }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>{sub}</div>}
+    <span title={`${d > 0 ? 'En hausse' : 'En baisse'} par rapport à la période précédente`}
+      style={{ fontSize: 11, color: couleur, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap' }}>
+      <span style={{ fontSize: 9 }}>{d > 0 ? '\u25B2' : '\u25BC'}</span>{txt}
+    </span>
+  )
+}
+
+/* ── Chiffres clés ──────────────────────────────────────────────────────
+   Un chiffre domine — le taux de décroché, celui qui décide si le standard
+   tient — les quatre autres l'entourent en plus petit, chacun avec sa
+   tendance sur la période. Pas de camembert à deux parts : une jauge dit la
+   même chose en moins de place. */
+function ChiffresCles({ stats, compact = false }) {
+  const a = stats.avant
+  const tuiles = [
+    { cle: 'total',  label: 'Appels',        valeur: fmtNb(stats.total),
+      sous: `${fmtNb(stats.entrantsTotal)} entrants · ${fmtNb(stats.sortants)} sortants`,
+      courbe: stats.courbe, couleur: COULEURS.entrant,
+      delta: a ? <Delta valeur={stats.total} avant={a.total} sensBon={0} /> : null },
+    { cle: 'manque', label: 'Appels manqués', valeur: fmtNb(stats.manques),
+      sous: fmtPct(stats.manques, stats.entrantsTotal) + ' des entrants',
+      courbe: stats.courbeManques, couleur: COULEURS.manque,
+      delta: a ? <Delta valeur={stats.manques} avant={a.manques} sensBon={-1} /> : null },
+    { cle: 'duree',  label: 'Durée moyenne', valeur: fmtDuree(stats.moyenne),
+      sous: 'Temps en ligne ' + fmtDuree(stats.secondes),
+      courbe: stats.courbeDuree, couleur: COULEURS.sortant,
+      delta: a?.moyenne != null && stats.moyenne != null ? <Delta valeur={stats.moyenne} avant={a.moyenne} unite=" s" sensBon={0} /> : null },
+    { cle: 'hors',   label: 'Hors horaires', valeur: fmtNb(stats.horsHoraires),
+      sous: 'Arrivés bureau fermé', courbe: null, couleur: '#7c3aed',
+      delta: a ? <Delta valeur={stats.horsHoraires} avant={a.horsHoraires} sensBon={-1} /> : null },
+  ]
+
+  if (compact) {
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(165px,1fr))', gap: 12, marginBottom: 18 }}>
+        <Tuile label="Taux de décroché" valeur={stats.decroche == null ? '—' : fmtPct(stats.entrants, stats.entrantsTotal)}
+          sous={`${fmtNb(stats.entrants)} répondus sur ${fmtNb(stats.entrantsTotal)}`} couleur={COULEURS.entrant} />
+        {tuiles.map(t => <Tuile key={t.cle} label={t.label} valeur={t.valeur} sous={t.sous} couleur={t.couleur} />)}
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 1.15fr) minmax(300px, 2fr)', gap: 14, marginBottom: 18 }}>
+      {/* Chiffre dominant */}
+      <div style={{ background: 'linear-gradient(150deg,#0D2F5E 0%,#17487f 100%)', borderRadius: 16, padding: '22px 24px', color: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: 168 }}>
+        <div>
+          <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.09em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.62)' }}>Taux de décroché</div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginTop: 6 }}>
+            <div style={{ fontSize: 46, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.02em' }}>
+              {stats.decroche == null ? '—' : fmtPct(stats.entrants, stats.entrantsTotal)}
+            </div>
+            {a?.decroche != null && stats.decroche != null && (
+              <span style={{ background: 'rgba(255,255,255,0.14)', borderRadius: 20, padding: '3px 9px' }}>
+                <Delta valeur={stats.decroche} avant={a.decroche} sensBon={1} pts />
+              </span>
+            )}
+          </div>
+          <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.6)', marginTop: 8, lineHeight: 1.5, maxWidth: 230 }}>
+            Part des appels entrants auxquels quelqu'un a répondu.
+          </div>
+        </div>
+        <div>
+          <div style={{ marginBottom: 8 }}>
+            <Jauge part={stats.entrants} total={stats.entrantsTotal} couleur="#6da7ec" reste={COULEURS.manque} hauteur={9} />
+          </div>
+          <div style={{ display: 'flex', gap: 16, fontSize: 11.5, color: 'rgba(255,255,255,0.78)' }}>
+            <span><b style={{ color: '#fff' }}>{fmtNb(stats.entrants)}</b> répondus</span>
+            <span><b style={{ color: '#fff' }}>{fmtNb(stats.manques)}</b> manqués</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Les quatre satellites */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gridTemplateRows: 'repeat(2,minmax(0,1fr))', gap: 14 }}>
+        {tuiles.map(t => (
+          <div key={t.cle} style={{ background: '#fff', border: '1px solid #e8edf4', borderRadius: 14, padding: '14px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: 77 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: '#94a3b8' }}>{t.label}</div>
+              {t.delta}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 8, marginTop: 4 }}>
+              <div>
+                <div style={{ fontSize: 23, fontWeight: 800, color: '#0f172a', lineHeight: 1.1 }}>{t.valeur}</div>
+                <div style={{ fontSize: 10.5, color: '#94a3b8', marginTop: 3 }}>{t.sous}</div>
+              </div>
+              {t.courbe && t.courbe.length > 2 && <Sparkline valeurs={t.courbe} couleur={t.couleur} largeur={72} hauteur={28} />}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
 
-const Carte = ({ titre, aide, children }) => (
-  <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: '16px 18px', marginBottom: 16 }}>
-    <div style={{ fontSize: 14, fontWeight: 800, color: NAVY, marginBottom: aide ? 2 : 12 }}>{titre}</div>
-    {aide && <div style={{ fontSize: 11.5, color: '#94a3b8', marginBottom: 12 }}>{aide}</div>}
+function Tuile({ label, valeur, sous, couleur }) {
+  return (
+    <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e8edf4', borderTop: `3px solid ${couleur}`, padding: '13px 16px' }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', lineHeight: 1 }}>{valeur}</div>
+      {sous && <div style={{ fontSize: 10.5, color: '#64748b', marginTop: 4 }}>{sous}</div>}
+    </div>
+  )
+}
+
+/* ── Carte de section ── */
+const Carte = ({ titre, aide, extra, children }) => (
+  <section style={{ background: '#fff', borderRadius: 16, border: '1px solid #e8edf4', padding: '18px 20px 20px', marginBottom: 16 }}>
+    <header style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 14 }}>
+      <span style={{ width: 3, alignSelf: 'stretch', minHeight: 26, borderRadius: 2, background: COULEURS.entrant, flexShrink: 0 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <h2 style={{ fontSize: 14.5, fontWeight: 800, color: NAVY, margin: 0, letterSpacing: '-0.01em' }}>{titre}</h2>
+        {aide && <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 3, lineHeight: 1.45 }}>{aide}</div>}
+      </div>
+      {extra}
+    </header>
     {children}
-  </div>
+  </section>
 )
 
 /* ── Onglet Statistiques ── */
-function Stats({ stats, postes, edition, setEdition, renommer }) {
+function Stats({ stats, postes, edition, setEdition, renommer, joursPeriode }) {
   const aNommer = postes.filter(p => p.categorie === 'inconnu')
   const maxPoste = Math.max(1, ...stats.postes.map(p => p.total))
+  const libelleCompare = joursPeriode ? `vs ${joursPeriode} jours précédents` : null
 
   return (
     <>
-      {aNommer.length > 0 && (
-        <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 12.5, color: '#92400e' }}>
-          <b>{aNommer.length} poste{aNommer.length > 1 ? 's' : ''} sans nom</b> — {aNommer.map(p => p.extension).join(', ')}.
-          Nommez-les dans le tableau ci-dessous ; un poste qui appartient à quelqu'un se renseigne plutôt
-          dans Paramètres → fiche du collaborateur → « Poste 3CX ».
+      <ChiffresCles stats={stats} />
+      {libelleCompare && (
+        <div style={{ fontSize: 11, color: '#94a3b8', margin: '-8px 0 16px 2px' }}>
+          Les évolutions comparent la période affichée aux {joursPeriode} jours qui la précèdent.
         </div>
       )}
 
-      <Carte titre="Volume par jour" aide="Les trois séries s'excluent : leur somme est le total d'appels de la journée.">
-        <Legende />
+      {aNommer.length > 0 && (
+        <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12, padding: '12px 16px', marginBottom: 16, fontSize: 12.5, color: '#92400e', display: 'flex', gap: 10 }}>
+          <i className="ti ti-help-circle" style={{ fontSize: 17, marginTop: 1, flexShrink: 0 }} />
+          <div>
+            <b>{aNommer.length} poste{aNommer.length > 1 ? 's' : ''} sans nom</b> — {aNommer.map(p => p.extension).join(', ')}.
+            Nommez-les plus bas ; un poste qui appartient à quelqu'un se renseigne plutôt dans
+            Paramètres → fiche du collaborateur → « Poste 3CX ».
+          </div>
+        </div>
+      )}
+
+      <Carte titre="Activité jour par jour" aide="Les trois séries s'excluent : leur somme est le total d'appels de la journée."
+        extra={<Legende />}>
         <BarresEmpilees donnees={stats.jours} hauteur={190} />
       </Carte>
 
-      <Carte titre="Répartition par heure" aide="Quand le téléphone sonne — la donnée qui sert à décider des présences.">
-        <Legende />
-        <BarresEmpilees donnees={stats.heures} hauteur={160} vide="Aucun appel sur la période." />
+      <Carte titre="Quand le téléphone sonne"
+        aide="Appels entrants par jour de semaine et par heure. C'est la carte qui sert à décider des présences.">
+        <CarteChaleur grille={stats.grille} heures={stats.heuresCarte} max={stats.pic} />
       </Carte>
 
-      <Carte titre="Par poste" aide="Cliquez sur un libellé de poste de service pour le renommer.">
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-            <thead>
-              <tr style={{ background: '#f8fafc', textAlign: 'left' }}>
-                {['Poste', 'Qui', 'Volume', 'Entrants', 'Sortants', 'Manqués', 'Décroché', 'Temps en ligne', 'Moyenne', 'Plus long'].map(h => (
-                  <th key={h} style={{ padding: '9px 12px', fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {stats.postes.map((p, i) => {
-                const entrantsTotal = p.entrant + p.manque
-                const estService = !p.collaborateur && p.extension
-                const enEdition = edition?.extension === p.extension
-                return (
-                  <tr key={p.extension || i} style={{ borderTop: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '8px 12px', fontWeight: 700, color: NAVY, whiteSpace: 'nowrap' }}>{p.extension || '—'}</td>
-                    <td style={{ padding: '8px 12px', color: '#1e293b', minWidth: 190 }}>
-                      {enEdition ? (
-                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                          <input autoFocus value={edition.libelle} onChange={e => setEdition({ ...edition, libelle: e.target.value })}
-                            onKeyDown={e => { if (e.key === 'Enter') renommer(); if (e.key === 'Escape') setEdition(null) }}
-                            style={{ flex: 1, padding: '5px 8px', border: '1px solid #cbd5e1', borderRadius: 6, fontSize: 12.5, fontFamily: 'inherit' }} />
-                          <select value={edition.categorie} onChange={e => setEdition({ ...edition, categorie: e.target.value })}
-                            style={{ padding: '5px 6px', border: '1px solid #cbd5e1', borderRadius: 6, fontSize: 11.5, fontFamily: 'inherit' }}>
-                            <option value="service">Service</option>
-                            <option value="file">File d'attente</option>
-                            <option value="svi">Serveur vocal</option>
-                            <option value="hors_horaires">Hors horaires</option>
-                            <option value="inconnu">À nommer</option>
-                          </select>
-                          <button onClick={renommer} style={{ padding: '5px 9px', border: 'none', borderRadius: 6, background: '#16a34a', color: '#fff', fontWeight: 700, fontSize: 11.5, cursor: 'pointer' }}>OK</button>
-                        </div>
-                      ) : estService ? (
-                        <button onClick={() => { const po = postes.find(x => x.extension === p.extension); setEdition({ extension: p.extension, libelle: po?.libelle || '', categorie: po?.categorie || 'service' }) }}
-                          style={{ border: 'none', background: 'none', padding: 0, font: 'inherit', color: p.categorie === 'inconnu' ? '#b45309' : '#1e293b', cursor: 'pointer', textDecoration: 'underline dotted', textUnderlineOffset: 3 }}>
-                          {p.qui}
-                        </button>
-                      ) : p.qui}
-                    </td>
-                    <td style={{ padding: '8px 12px', minWidth: 110 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                        <div style={{ flex: 1, height: 7, background: '#f1f5f9', borderRadius: 4, overflow: 'hidden', minWidth: 46 }}>
-                          <div style={{ width: `${(p.total / maxPoste) * 100}%`, height: '100%', background: COULEURS.entrant, borderRadius: 4 }} />
-                        </div>
-                        <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700, color: '#0f172a' }}>{fmtNb(p.total)}</span>
-                      </div>
-                    </td>
-                    <td style={{ padding: '8px 12px', fontVariantNumeric: 'tabular-nums', color: '#475569' }}>{fmtNb(p.entrant)}</td>
-                    <td style={{ padding: '8px 12px', fontVariantNumeric: 'tabular-nums', color: '#475569' }}>{fmtNb(p.sortant)}</td>
-                    <td style={{ padding: '8px 12px', fontVariantNumeric: 'tabular-nums', color: p.manque ? COULEURS.manque : '#94a3b8', fontWeight: p.manque ? 700 : 400 }}>{fmtNb(p.manque)}</td>
-                    <td style={{ padding: '8px 12px', fontVariantNumeric: 'tabular-nums', color: '#475569' }}>{entrantsTotal ? fmtPct(p.entrant, entrantsTotal) : '—'}</td>
-                    <td style={{ padding: '8px 12px', color: '#475569', whiteSpace: 'nowrap' }}>{fmtDuree(p.secondes)}</td>
-                    <td style={{ padding: '8px 12px', color: '#475569', whiteSpace: 'nowrap' }}>{p.repondus ? fmtDuree(Math.round(p.secondes / p.repondus)) : '—'}</td>
-                    <td style={{ padding: '8px 12px', color: '#475569', whiteSpace: 'nowrap' }}>{p.plusLong ? fmtDuree(p.plusLong) : '—'}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+      <Carte titre="Par poste" aide="Un poste de service se renomme en cliquant sur son libellé.">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(282px,1fr))', gap: 12 }}>
+          {stats.postes.map((p, i) => (
+            <CartePoste key={p.extension || i} p={p} maxPoste={maxPoste} postes={postes}
+              edition={edition} setEdition={setEdition} renommer={renommer} />
+          ))}
         </div>
       </Carte>
 
-      <Carte titre="Numéros les plus fréquents" aide="Huit numéros qui reviennent le plus sur la période.">
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-          <thead>
-            <tr style={{ background: '#f8fafc', textAlign: 'left' }}>
-              {['Numéro', 'Contact', 'Appels', 'dont manqués'].map(h => (
-                <th key={h} style={{ padding: '9px 12px', fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.04em' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {stats.topNumeros.map(n => (
-              <tr key={n.numero} style={{ borderTop: '1px solid #f1f5f9' }}>
-                <td style={{ padding: '8px 12px', color: '#1e293b' }}>{n.numero}</td>
-                <td style={{ padding: '8px 12px', color: n.contact ? '#1e293b' : '#94a3b8' }}>{n.contact || 'Inconnu'}{n.dossier ? <span style={{ color: '#94a3b8' }}> · {n.dossier}</span> : null}</td>
-                <td style={{ padding: '8px 12px', fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{fmtNb(n.n)}</td>
-                <td style={{ padding: '8px 12px', fontVariantNumeric: 'tabular-nums', color: n.manque ? COULEURS.manque : '#94a3b8' }}>{fmtNb(n.manque)}</td>
-              </tr>
+      {stats.topNumeros.length > 0 && (
+        <Carte titre="Numéros qui reviennent" aide="Les numéros vus plusieurs fois sur la période — rappels en attente, ou dossiers qui s'éternisent.">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {stats.topNumeros.map((n, i) => (
+              <div key={n.numero} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 10px', borderRadius: 9, background: i % 2 ? '#fbfcfe' : '#fff' }}>
+                <span style={{ width: 21, height: 21, borderRadius: 6, background: i < 3 ? COULEURS.entrant : '#eef2f7', color: i < 3 ? '#fff' : '#94a3b8', fontSize: 10.5, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</span>
+                <span style={{ fontSize: 12.5, color: '#1e293b', fontVariantNumeric: 'tabular-nums', minWidth: 118 }}>{n.numero}</span>
+                <span style={{ flex: 1, fontSize: 12.5, color: n.contact ? '#1e293b' : '#cbd5e1', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {n.contact || 'Inconnu'}{n.dossier && <span style={{ color: '#94a3b8', fontSize: 11 }}> · {n.dossier}</span>}
+                </span>
+                {n.manque > 0 && (
+                  <span style={{ fontSize: 10.5, fontWeight: 700, color: COULEURS.manque, background: '#fef2f2', borderRadius: 6, padding: '2px 7px', whiteSpace: 'nowrap' }}>
+                    <i className="ti ti-phone-off" style={{ marginRight: 3 }} />{n.manque} manqué{n.manque > 1 ? 's' : ''}
+                  </span>
+                )}
+                <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', fontVariantNumeric: 'tabular-nums', minWidth: 26, textAlign: 'right' }}>{fmtNb(n.n)}</span>
+              </div>
             ))}
-          </tbody>
-        </table>
-      </Carte>
+          </div>
+        </Carte>
+      )}
     </>
   )
 }
+
+/* ── Une carte par poste ── */
+function CartePoste({ p, maxPoste, postes, edition, setEdition, renommer }) {
+  const estService = !p.collaborateur && p.extension
+  const enEdition = edition?.extension === p.extension
+  const initiales = (p.collaborateur || p.qui || '?').split(/[\s-]+/).filter(Boolean).slice(0, 2).map(m => m[0]).join('').toUpperCase()
+  const entrantsTotal = p.entrant + p.manque
+  const segments = [
+    { v: p.entrant, c: COULEURS.entrant },
+    { v: p.sortant, c: COULEURS.sortant },
+    { v: p.manque,  c: COULEURS.manque },
+  ].filter(x => x.v > 0)
+
+  return (
+    <div style={{ border: '1px solid #e8edf4', borderRadius: 13, padding: '13px 15px', background: '#fff' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 11 }}>
+        <span style={{
+          width: 33, height: 33, borderRadius: 9, flexShrink: 0,
+          background: estService ? '#f1f5f9' : '#e8f1fd', color: estService ? '#64748b' : '#1c5cab',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11.5, fontWeight: 800,
+        }}>
+          {estService ? (p.extension || '?') : initiales}
+        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {enEdition ? (
+            <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+              <input autoFocus value={edition.libelle} onChange={e => setEdition({ ...edition, libelle: e.target.value })}
+                onKeyDown={e => { if (e.key === 'Enter') renommer(); if (e.key === 'Escape') setEdition(null) }}
+                style={{ flex: 1, minWidth: 0, padding: '4px 7px', border: '1px solid #cbd5e1', borderRadius: 6, fontSize: 12.5, fontFamily: 'inherit' }} />
+              <select value={edition.categorie} onChange={e => setEdition({ ...edition, categorie: e.target.value })}
+                style={{ padding: '4px 4px', border: '1px solid #cbd5e1', borderRadius: 6, fontSize: 10.5, fontFamily: 'inherit', maxWidth: 82 }}>
+                <option value="service">Service</option>
+                <option value="file">File</option>
+                <option value="svi">Vocal</option>
+                <option value="hors_horaires">Hors horaires</option>
+                <option value="inconnu">À nommer</option>
+              </select>
+              <button onClick={renommer} style={{ padding: '4px 8px', border: 'none', borderRadius: 6, background: '#16a34a', color: '#fff', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>OK</button>
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {estService ? (
+                  <button onClick={() => { const po = postes.find(x => x.extension === p.extension); setEdition({ extension: p.extension, libelle: po?.libelle || '', categorie: po?.categorie || 'service' }) }}
+                    style={{ border: 'none', background: 'none', padding: 0, font: 'inherit', color: p.categorie === 'inconnu' ? '#b45309' : '#0f172a', cursor: 'pointer', textDecoration: 'underline dotted', textUnderlineOffset: 3 }}>
+                    {p.qui}
+                  </button>
+                ) : p.qui}
+              </div>
+              <div style={{ fontSize: 10.5, color: '#94a3b8' }}>Poste {p.extension || '—'}</div>
+            </>
+          )}
+        </div>
+        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+          <div style={{ fontSize: 19, fontWeight: 800, color: '#0f172a', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{fmtNb(p.total)}</div>
+          <div style={{ fontSize: 9.5, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.05em' }}>appels</div>
+        </div>
+      </div>
+
+      {/* Part de chaque sens, à l'échelle du poste le plus actif */}
+      <div style={{ display: 'flex', gap: 2, height: 7, marginBottom: 9, width: `${Math.max(14, (p.total / maxPoste) * 100)}%` }}>
+        {segments.map((sg, k) => (
+          <div key={k} style={{ flex: sg.v, background: sg.c, borderRadius: 4 }} />
+        ))}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
+        <Mini label="Décroché" valeur={entrantsTotal ? fmtPct(p.entrant, entrantsTotal) : '—'}
+          alerte={p.decroche != null && p.decroche < 0.8} />
+        <Mini label="En ligne" valeur={fmtDuree(p.secondes)} />
+        <Mini label="Moyenne" valeur={p.repondus ? fmtDuree(Math.round(p.secondes / p.repondus)) : '—'} />
+      </div>
+
+      <div style={{ display: 'flex', gap: 12, marginTop: 9, paddingTop: 8, borderTop: '1px solid #f1f5f9', fontSize: 10.5, color: '#64748b' }}>
+        <span><b style={{ color: COULEURS.entrant }}>{fmtNb(p.entrant)}</b> entrants</span>
+        <span><b style={{ color: COULEURS.sortant }}>{fmtNb(p.sortant)}</b> sortants</span>
+        {p.manque > 0 && <span><b style={{ color: COULEURS.manque }}>{fmtNb(p.manque)}</b> manqués</span>}
+        <span style={{ marginLeft: 'auto' }}>max {p.plusLong ? fmtDuree(p.plusLong) : '—'}</span>
+      </div>
+    </div>
+  )
+}
+
+const Mini = ({ label, valeur, alerte }) => (
+  <div style={{ background: alerte ? '#fef2f2' : '#f8fafc', borderRadius: 8, padding: '6px 8px' }}>
+    <div style={{ fontSize: 9, fontWeight: 700, color: alerte ? '#b91c1c' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '.05em' }}>{label}</div>
+    <div style={{ fontSize: 12, fontWeight: 700, color: alerte ? '#dc2626' : '#334155', marginTop: 2, whiteSpace: 'nowrap' }}>{valeur}</div>
+  </div>
+)
 
 /* ── Onglet Journal ── */
 function Journal({ lignes, total, sens, setSens, q, setQ, ouvrirFiche, identifies }) {

@@ -152,3 +152,102 @@ export function BarresEmpilees({ donnees, hauteur = 180, series = SERIES, vide =
     </div>
   )
 }
+
+/* ─── Rampe séquentielle (bleu, clair → foncé) ────────────────────────────
+   Pour la carte de chaleur : une seule teinte, l'intensité porte le volume.
+   Jamais d'arc-en-ciel sur une grandeur continue. */
+export const RAMPE = ['#e8f1fd', '#cde2fb', '#9ec5f4', '#6da7ec', '#3987e5', '#256abf', '#184f95']
+
+/* ─── Courbe de tendance miniature ─── */
+export function Sparkline({ valeurs, couleur = COULEURS.entrant, largeur = 104, hauteur = 30 }) {
+  if (!valeurs || valeurs.length < 2) return <div style={{ height: hauteur }} />
+  const max = Math.max(1, ...valeurs)
+  const pas = largeur / (valeurs.length - 1)
+  const y = v => hauteur - 3 - (v / max) * (hauteur - 6)
+  const pts = valeurs.map((v, i) => `${(i * pas).toFixed(1)},${y(v).toFixed(1)}`)
+  const id = 'sp' + couleur.replace('#', '')
+  return (
+    <svg width={largeur} height={hauteur} style={{ display: 'block', overflow: 'visible' }} aria-hidden="true">
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={couleur} stopOpacity="0.22" />
+          <stop offset="100%" stopColor={couleur} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <polygon points={`0,${hauteur} ${pts.join(' ')} ${largeur},${hauteur}`} fill={`url(#${id})`} />
+      <polyline points={pts.join(' ')} fill="none" stroke={couleur} strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" />
+      <circle cx={largeur} cy={y(valeurs[valeurs.length - 1])} r="2.6" fill={couleur} stroke="#fff" strokeWidth="1.5" />
+    </svg>
+  )
+}
+
+/* ─── Jauge : une part d'un total, en une barre ───
+   Préférée à un camembert à deux parts, qui ne dit rien de plus. */
+export function Jauge({ part, total, couleur = COULEURS.entrant, reste = COULEURS.manque, hauteur = 8 }) {
+  const pct = total ? (part / total) * 100 : 0
+  return (
+    <div style={{ display: 'flex', height: hauteur, borderRadius: hauteur / 2, overflow: 'hidden', background: '#eef2f7', gap: 2 }}>
+      <div style={{ width: `${pct}%`, background: couleur, borderRadius: hauteur / 2 }} />
+      {total > part && <div style={{ flex: 1, background: reste, borderRadius: hauteur / 2, opacity: 0.85 }} />}
+    </div>
+  )
+}
+
+/* ─── Carte de chaleur jour de semaine × heure ───
+   Le classique du centre d'appels : où se concentre la charge. Une teinte,
+   sept paliers ; la case vide reste au niveau du fond. */
+const JOURS_SEM = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
+
+export function CarteChaleur({ grille, heures, max, legende = 'appels reçus' }) {
+  const [survol, setSurvol] = useState(null)
+  const seuils = RAMPE.map((_, i) => (max * (i + 1)) / RAMPE.length)
+  const teinte = v => {
+    if (!v) return null
+    const i = seuils.findIndex(s => v <= s)
+    return RAMPE[i === -1 ? RAMPE.length - 1 : i]
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 3, marginBottom: 4, paddingLeft: 74 }}>
+        {heures.map(h => (
+          <div key={h} style={{ flex: 1, textAlign: 'center', fontSize: 9, color: '#94a3b8', fontVariantNumeric: 'tabular-nums' }}>{String(h).padStart(2, '0')}</div>
+        ))}
+      </div>
+      {JOURS_SEM.map((nom, j) => (
+        <div key={nom} style={{ display: 'flex', gap: 3, alignItems: 'center', marginBottom: 3 }}>
+          <div style={{ width: 70, fontSize: 10.5, color: '#64748b', textAlign: 'right', paddingRight: 4, whiteSpace: 'nowrap' }}>{nom}</div>
+          {heures.map(h => {
+            const v = grille[j]?.[h] || 0
+            const c = teinte(v)
+            const actif = survol && survol.j === j && survol.h === h
+            return (
+              <div key={h} onMouseEnter={() => setSurvol({ j, h, v })} onMouseLeave={() => setSurvol(null)}
+                title={`${nom} ${String(h).padStart(2, '0')} h — ${v} ${legende}`}
+                style={{
+                  flex: 1, height: 22, borderRadius: 4,
+                  background: c || '#f6f8fb',
+                  boxShadow: actif ? '0 0 0 2px #0f172a' : 'none',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 9.5, fontWeight: 700, fontVariantNumeric: 'tabular-nums',
+                  color: v && v > seuils[3] ? '#fff' : '#475569',
+                  transition: 'box-shadow .1s', cursor: v ? 'default' : 'default',
+                }}>
+                {v || ''}
+              </div>
+            )
+          })}
+        </div>
+      ))}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, fontSize: 10.5, color: '#94a3b8' }}>
+        <span>Moins</span>
+        <div style={{ display: 'flex', gap: 3 }}>
+          <div style={{ width: 18, height: 10, borderRadius: 3, background: '#f6f8fb' }} />
+          {RAMPE.map(c => <div key={c} style={{ width: 18, height: 10, borderRadius: 3, background: c }} />)}
+        </div>
+        <span>Plus</span>
+        <span style={{ marginLeft: 'auto' }}>Pic : {max} {legende} sur une heure</span>
+      </div>
+    </div>
+  )
+}
