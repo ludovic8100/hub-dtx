@@ -174,7 +174,7 @@ def supabase(methode: str, chemin: str, charge=None, entetes=None):
         return json.loads(corps) if corps else None
 
 
-def upsert(lignes):
+def upsert(lignes, deja_connus):
     """Upsert par paquets sur la contrainte unique `fichier_id`.
 
     Deux règles tiennent la casse :
@@ -182,6 +182,9 @@ def upsert(lignes):
     - seules les colonnes envoyées sont écrasées. `transaction_id` et
       `lode_devis_id` ne figurent jamais dans la charge : le rapprochement
       facture ↔ paiement survit à chaque passage ;
+    - `sens` n'est posé qu'à la création. Le dossier ne dit pas tout : Hexagroup
+      facture ses membres depuis un dossier ACHATS, et ces cinq ventes bien
+      réelles repasseraient en achat à chaque scan ;
     - une valeur absente n'est pas envoyée du tout. Près de 5 000 fichiers
       portent l'ancienne convention de nommage, sans date lisible ; envoyer
       `null` effacerait les dates déjà présentes en base. Les lignes sont donc
@@ -191,11 +194,13 @@ def upsert(lignes):
     groupes = {}
     for ligne in lignes:
         charge = {cle: valeur for cle, valeur in ligne.items() if valeur is not None}
+        if ligne["fichier_id"] in deja_connus:
+            charge.pop("sens", None)
         groupes.setdefault(tuple(sorted(charge)), []).append(charge)
 
     ecrites = 0
     for colonnes, paquet_complet in sorted(groupes.items(), key=lambda g: -len(g[1])):
-        omises = {"montant", "date_facture"} - set(colonnes)
+        omises = {"montant", "date_facture", "sens"} - set(colonnes)
         detail = f" (sans {', '.join(sorted(omises))}, préservé en base)" if omises else ""
         print(f"  {len(paquet_complet)} ligne(s){detail}", flush=True)
         for debut in range(0, len(paquet_complet), 500):
@@ -338,15 +343,26 @@ def main() -> int:
                   f"{str(exemple['date_facture']):<11} {str(exemple['montant']):>10}  {exemple['nom'][:70]}")
         return 0
 
+    connus, proteges = ids_en_base()
+    print(f"\n{len(connus)} ligne(s) SharePoint deja en base.")
+
     print("\nÉcriture dans factures_achat…", flush=True)
-    ecrites = upsert(lignes)
+    ecrites = upsert(lignes, connus)
+
+    vus = {l["fichier_id"] for l in lignes}
 
     if not PURGE:
-        print(f"\n{ecrites} lignes écrites. Purge désactivée.")
+        # Purge désactivée : on ne supprime rien, mais on chiffre ce qu'elle
+        # ferait. C'est ce compte qui permet de décider de l'activer ensuite.
+        candidates = connus - vus
+        print(f"\n{ecrites} lignes écrites, 0 supprimée (purge désactivée).")
+        print(f"La purge aurait porté sur {len(candidates - proteges)} ligne(s) "
+              f"({len(candidates & proteges)} epargnee(s) car rattachee(s) a un paiement).")
+        for fid in sorted(candidates - proteges)[:15]:
+            print(f"  {fid}")
+        print(f"LIGNES_ECRITES={ecrites}")
         return 0
 
-    connus, proteges = ids_en_base()
-    vus = {l["fichier_id"] for l in lignes}
     if connus and len(vus) < len(connus) * SEUIL_PURGE:
         print(f"::warning::Purge annulée : {len(vus)} fichiers vus pour {len(connus)} "
               f"en base (seuil {SEUIL_PURGE:.0%}). Scan probablement incomplet.")
