@@ -20,29 +20,62 @@ export const troisCxConfigure = () =>
 // on remplace 30 s avant l'échéance pour ne pas tomber en plein appel.
 let cache = { jeton: null, expire: 0 }
 
+// Un échec d'authentification est mémorisé lui aussi, 60 s. 3CX tient une liste
+// noire anti-intrusion : enchaîner les demandes de jeton avec de mauvais
+// identifiants fait bannir l'adresse IP sortante. Observé le 02/11/2026 — deux
+// 401 puis six 403 d'affilée. On ne retente donc pas en rafale.
+let echec = { message: null, jusqua: 0 }
+
+// La documentation de 3CX et ses exemples ne disent pas la même chose : la
+// spécification demande une authentification Basic, les exemples passent les
+// identifiants dans le corps du formulaire. On tente le corps, puis Basic.
+async function demanderJeton(mode) {
+  const corps = { grant_type: 'client_credentials' }
+  const entetes = { 'Content-Type': 'application/x-www-form-urlencoded' }
+
+  if (mode === 'basic') {
+    entetes.Authorization = 'Basic ' + Buffer
+      .from(`${THREECX_CLIENT_ID}:${THREECX_CLIENT_SECRET}`).toString('base64')
+  } else {
+    corps.client_id = THREECX_CLIENT_ID
+    corps.client_secret = THREECX_CLIENT_SECRET
+  }
+
+  const r = await fetch(`${THREECX_URL}/connect/token`, {
+    method: 'POST', headers: entetes, body: new URLSearchParams(corps),
+  })
+  const txt = await r.text()
+  return { ok: r.ok, status: r.status, txt }
+}
+
 export async function jeton3cx() {
   if (!troisCxConfigure()) throw new Error('3CX non configuré (THREECX_URL / THREECX_CLIENT_ID / THREECX_CLIENT_SECRET)')
   if (cache.jeton && Date.now() < cache.expire) return cache.jeton
+  if (echec.message && Date.now() < echec.jusqua) throw new Error(echec.message)
 
-  const r = await fetch(`${THREECX_URL}/connect/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'client_credentials',
-      client_id: THREECX_CLIENT_ID,
-      client_secret: THREECX_CLIENT_SECRET,
-    }),
-  })
-  const txt = await r.text()
-  if (!r.ok) throw new Error(`Jeton 3CX refusé (HTTP ${r.status}) : ${txt.slice(0, 200)}`)
+  let dernier = null
+  for (const mode of ['corps', 'basic']) {
+    const r = await demanderJeton(mode)
+    dernier = r
+    if (!r.ok) continue
+    let j
+    try { j = JSON.parse(r.txt) } catch { continue }
+    if (!j.access_token) continue
+    cache = { jeton: j.access_token, expire: Date.now() + Math.max(30, (j.expires_in || 3600) - 30) * 1000 }
+    echec = { message: null, jusqua: 0 }
+    cache.mode = mode
+    return cache.jeton
+  }
 
-  let j
-  try { j = JSON.parse(txt) } catch { throw new Error('Réponse de jeton 3CX illisible') }
-  if (!j.access_token) throw new Error('Réponse de jeton 3CX sans access_token')
-
-  cache = { jeton: j.access_token, expire: Date.now() + Math.max(30, (j.expires_in || 60) - 30) * 1000 }
-  return cache.jeton
+  const msg = `Jeton 3CX refusé (HTTP ${dernier?.status}) en identifiants dans le corps ET en Basic`
+            + (dernier?.txt ? ` : ${dernier.txt.slice(0, 200)}` : '')
+  // 60 s de silence : ne pas nourrir la liste noire du central.
+  echec = { message: msg, jusqua: Date.now() + 60000 }
+  throw new Error(msg)
 }
+
+/** Mode d'authentification retenu, une fois le jeton obtenu. */
+export const modeAuth = () => cache.mode || null
 
 /** GET sur l'API 3CX. Renvoie { ok, status, data|texte }. Ne jette pas. */
 export async function lire3cx(chemin) {
