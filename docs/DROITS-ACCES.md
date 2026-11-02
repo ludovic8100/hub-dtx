@@ -145,7 +145,9 @@ Objectif : une authentification Microsoft complète au moins toutes les 24 h, et
 | Où | Quoi | État |
 |---|---|---|
 | `src/lib/auth.jsx` | `queryParams: { prompt: 'login' }` | posé |
-| `src/lib/auth.jsx` | `DUREE_MAX_SESSION` = 24 h, `DUREE_MAX_INACTIVITE` = 4 h | posé |
+| `src/lib/auth.jsx` | `DUREE_MAX_SESSION` = 24 h, `DUREE_MAX_INACTIVITE` = 2 h | posé |
+| `src/lib/auth.jsx` | `RELECTURE_COMPTE` = 10 min — relecture de `compte_hub_actif` | posé |
+| Entra → Applications d'entreprise → Hub DTX | *Affectation requise* = Oui | posé le 02/11/2026 |
 | Entra → méthodes d'authentification | passkey (FIDO2) préférée, Authenticator en secours | à activer |
 
 **Pourquoi la durée est appliquée dans le code et non dans Supabase.** Les
@@ -193,9 +195,54 @@ Chrome, Edge et le téléphone ne la partagent jamais.
 session du système d'exploitation (5 à 10 min, mot de passe à la reprise). Aucun
 réglage applicatif ne protège le reste du poste.
 
-**Aucune licence Entra ID P1 n'est nécessaire** : la fréquence est imposée par le
-Hub, et les passkeys font partie du niveau gratuit d'Entra. P1 ne servirait qu'à
-un accès conditionnel par appareil ou par risque.
+**Révocation d'un accès : trois niveaux, trois délais.** Rien n'est instantané
+dans un système à jetons, il faut le savoir :
+
+| Geste | Effet | Délai |
+|---|---|---|
+| Retirer l'affectation dans Entra | Microsoft refuse tout **nouveau** jeton | immédiat pour une nouvelle connexion |
+| Bloquer la connexion dans Microsoft 365 | coupe Outlook, Teams, SharePoint | immédiat sur ces services |
+| `compte_hub_actif` à `false` | ferme la session en cours du Hub | **≤ 10 min** (`RELECTURE_COMPTE`) |
+| Ne rien faire d'autre | la session en cours s'éteint d'elle-même | ≤ 24 h, ou 2 h sans activité |
+
+Une session déjà ouverte ne meurt pas parce qu'Entra a changé d'avis : Supabase
+ne redemande rien à Microsoft pour la renouveler. C'est `RELECTURE_COMPTE` qui
+fait le lien, en redemandant à la base si le compte vit encore.
+
+**Gate d'accès : l'affectation Entra, pas le code.** Sur l'application
+d'entreprise *Hub DTX*, *Affectation requise* = Oui. Une personne non affectée
+n'obtient pas de jeton — elle ne franchit jamais la porte, le Hub ne la voit
+même pas. ⚠️ **L'affectation d'un groupe (plutôt que d'utilisateurs un par un)
+exige Entra ID P1.** En plan gratuit, il faut affecter les personnes
+individuellement.
+
+**Aucune licence Entra ID P1 n'est nécessaire pour le reste** : la fréquence de
+ré-authentification est imposée par le Hub, et les passkeys font partie du
+niveau gratuit d'Entra. P1 n'apporterait que l'affectation par groupe et l'accès
+conditionnel par appareil ou par risque.
+
+**Synchronisation Entra → Hub : un seul sens, lecture seule.** Décidé le
+02/11/2026 après avoir pesé l'écriture vers Entra.
+
+| Champ | Maître | Sens |
+|---|---|---|
+| Droit d'entrer (affectation Entra) | Entra | → `compte_hub_actif`, grisé dans le Hub |
+| E-mail, nom, prénom, nom affiché | Entra | → Hub |
+| GSM, adresse, CP, ville, titre | **Entra à la création**, Hub ensuite | → Hub, jamais l'inverse |
+| IBAN, BIC, BCE, date de naissance | Hub seul | jamais exposé |
+| Code, bureau, rôle métier, taux, droits modules | Hub seul | jamais exposé |
+
+Écrire dans Entra exigerait `User.ReadWrite.All` — l'écriture sur **toutes** les
+identités du locataire, sans découpage possible par champ. Refusé : le bénéfice
+(ne pas retaper un numéro de téléphone) ne vaut pas ce droit, et personne ne lit
+ces champs côté Microsoft. L'objectif d'encodage unique est atteint par la seule
+lecture, puisque la création se fait dans Entra. Si le Hub corrige ensuite une
+valeur et qu'elle diverge d'Entra, l'écran l'affiche — la divergence se voit au
+lieu de pourrir en silence.
+
+Permission à accorder à l'application `Hub DTX` : **`User.Read.All`** (type
+Application) + consentement administrateur. Lecture seule, rien d'autre.
+Elle n'existe pas encore.
 
 **Deux applications Azure distinctes, à ne pas fusionner** (constat du
 02/11/2026) :

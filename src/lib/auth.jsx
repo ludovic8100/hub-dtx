@@ -31,9 +31,19 @@ const EMAIL_ACCES_LIBRE = 'lde@dynassur.be'
 // tant que l'onglet est ouvert. Une fenêtre abandonnée ne s'y fermait donc
 // jamais ; ici, si.
 const DUREE_MAX_SESSION = 24 * 60 * 60 * 1000   // 24 h depuis l'authentification Microsoft
-const DUREE_MAX_INACTIVITE = 4 * 60 * 60 * 1000 // 4 h sans action de l'utilisateur
+const DUREE_MAX_INACTIVITE = 2 * 60 * 60 * 1000 // 2 h sans action de l'utilisateur
 const CLE_DEBUT = 'hub.session.debut'
 const CLE_ACTIVITE = 'hub.session.activite'
+
+// Révocation d'accès : le Hub redemande à la base, à intervalle régulier, si le
+// compte est toujours actif. C'est invisible pour l'utilisateur — une ligne lue,
+// rien à l'écran — et c'est ce qui ramène le délai de coupure de 24 h à 10
+// minutes le jour où on retire l'accès de quelqu'un. Sans cela, retirer
+// quelqu'un d'Entra ou décocher son compte ne ferait rien tant que sa session
+// en cours vit : Supabase ne redemande rien à Microsoft pour la renouveler.
+// Coût : 6 requêtes par heure et par onglet actif, aucune pour un onglet en
+// arrière-plan. Négligeable devant le reste du trafic.
+const RELECTURE_COMPTE = 10 * 60 * 1000
 
 // localStorage peut lever (navigation privée, stockage bloqué) : jamais au prix
 // d'un plantage de l'authentification.
@@ -62,7 +72,8 @@ function motifExpiration() {
 
 const MESSAGE_EXPIRATION = {
   duree: 'Ta session a dépassé 24 heures. Reconnecte-toi avec ton compte Microsoft.',
-  inactivite: 'Ta session a été fermée après 4 heures sans activité. Reconnecte-toi.',
+  inactivite: 'Ta session a été fermée après 2 heures sans activité. Reconnecte-toi.',
+  revoque: "Ton accès au Hub a été désactivé. Contacte l'administrateur.",
 }
 
 export const SOCIETES_CONFIG = {
@@ -235,10 +246,28 @@ export function AuthProvider({ children }) {
 
     const minuteur = setInterval(verifier, 60 * 1000)
 
+    // Le compte a-t-il été désactivé pendant la session ? On ne sollicite pas la
+    // base pour un onglet en arrière-plan, et on ne déconnecte jamais sur une
+    // erreur réseau : un incident de connexion ne doit pas ressembler à une
+    // révocation.
+    const minuteurCompte = setInterval(async () => {
+      if (document.hidden) return
+      const { data, error } = await supabase
+        .from('collaborateurs').select('compte_hub_actif')
+        .eq('email', user.email).maybeSingle()
+      if (error) return
+      if (data?.compte_hub_actif) return
+      await supabase.auth.signOut()
+      oublierHorodatages()
+      setUser(null); setPerms(null); setActiveSociete(null)
+      setErreurConnexion(MESSAGE_EXPIRATION.revoque)
+    }, RELECTURE_COMPTE)
+
     return () => {
       actions.forEach(e => window.removeEventListener(e, noterActivite))
       document.removeEventListener('visibilitychange', auRetour)
       clearInterval(minuteur)
+      clearInterval(minuteurCompte)
     }
   }, [user])
 
