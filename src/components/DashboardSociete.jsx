@@ -70,7 +70,10 @@ export default function DashboardSociete({ entite, sousTitre }) {
 
       const [resTx, resTickets] = await Promise.all([
         chargerFluxDuMois(societeCode, debut, finExclue),
-        supabase.from('taches')
+        // La table « taches » a ete renommee « tickets » le 02/11 : elle ne
+        // portait plus que des tickets. La vue de compatibilite existe encore,
+        // mais elle disparaitra — on vise la table.
+        supabase.from('tickets')
           .select('id,titre,gestionnaire,ticket_statut,priorite,derniere_activite')
           .eq('is_ticket', true).neq('statut', 'terminee').eq('entite', entite)
           .order('derniere_activite', { ascending: false }).limit(50),

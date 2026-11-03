@@ -4,6 +4,8 @@
 -- Régénéré le 2026-10-27 depuis information_schema (base vivante)
 -- Mis à jour le 2026-11-01 : retrait des 7 tables des modules Tâches, RDV,
 -- Liens cassés et Synchronisation (voir supabase/migrations/20261101090000_*).
+-- Mis à jour le 2026-11-02 : « taches » renommée « tickets » — elle ne portait
+-- plus que des tickets (voir supabase/migrations/20261102100000_table_tickets.sql).
 --
 -- ⚠️  Script de RECRÉATION (disaster-recovery / documentation).
 --     Idempotent (CREATE TABLE IF NOT EXISTS) — ne touche pas aux tables existantes.
@@ -1421,8 +1423,27 @@ CREATE TABLE IF NOT EXISTS public.succession_simulations (
   updated_at timestamp with time zone DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS public.taches (
-  id bigint NOT NULL DEFAULT nextval('taches_id_seq'::regclass),
+CREATE TABLE IF NOT EXISTS public.taux_reference (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  categorie text NOT NULL,
+  libelle text,
+  taux numeric NOT NULL,
+  source text DEFAULT 'BNB'::text,
+  date_maj date DEFAULT now(),
+  actif boolean DEFAULT true
+);
+
+CREATE TABLE IF NOT EXISTS public.ticket_categories (
+  id integer NOT NULL DEFAULT nextval('ticket_categories_id_seq'::regclass),
+  label text NOT NULL,
+  ordre integer NOT NULL DEFAULT 0,
+  actif boolean NOT NULL DEFAULT true,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  type text NOT NULL DEFAULT 'gestion'::text
+);
+
+CREATE TABLE IF NOT EXISTS public.tickets (
+  id bigint NOT NULL DEFAULT nextval('tickets_id_seq'::regclass),
   titre text NOT NULL,
   priorite text DEFAULT 'moyenne'::text,
   gestionnaire text,
@@ -1462,25 +1483,6 @@ CREATE TABLE IF NOT EXISTS public.taches (
   participants jsonb DEFAULT '[]'::jsonb,
   checklist jsonb DEFAULT '[]'::jsonb,
   ticket_echeance date
-);
-
-CREATE TABLE IF NOT EXISTS public.taux_reference (
-  id uuid NOT NULL DEFAULT gen_random_uuid(),
-  categorie text NOT NULL,
-  libelle text,
-  taux numeric NOT NULL,
-  source text DEFAULT 'BNB'::text,
-  date_maj date DEFAULT now(),
-  actif boolean DEFAULT true
-);
-
-CREATE TABLE IF NOT EXISTS public.ticket_categories (
-  id integer NOT NULL DEFAULT nextval('ticket_categories_id_seq'::regclass),
-  label text NOT NULL,
-  ordre integer NOT NULL DEFAULT 0,
-  actif boolean NOT NULL DEFAULT true,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  type text NOT NULL DEFAULT 'gestion'::text
 );
 
 CREATE TABLE IF NOT EXISTS public.tickets_messages (

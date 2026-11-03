@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Link } from 'react-router-dom'
-import Layout from '../../components/Layout'
+import OutilPage from '../../components/OutilPage'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { traduitGarantie } from '../../lib/garantieFr'
@@ -211,11 +210,12 @@ export default function ToolDevoirInfo() {
   )
 
   return (
-    <Layout currentPage="Devoir d'information">
-      <div style={{ fontFamily: "'Segoe UI', sans-serif", width: '100%', maxWidth: 780 }}>
-        <Link to="/tools" style={{ fontSize: 12.5, color: '#64748b', textDecoration: 'none' }}>← Outils</Link>
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: NAVY, margin: '6px 0 2px' }}>Devoir d'information — non-vie</h1>
-        <div style={{ fontSize: 14, color: '#8A9BBE', marginBottom: 18 }}>Client, contrat, conditions particulières, vérification, signature</div>
+    <OutilPage
+      titre="Devoir d'information — non-vie"
+      sousTitre="Client, contrat, conditions particulières, vérification, signature"
+      largeurMax={780}
+    >
+      <>
 
         <div style={card}>
           <div style={h2}>1. Client et contrat</div>
@@ -307,7 +307,7 @@ export default function ToolDevoirInfo() {
             </div>
           </div>
         </>)}
-      </div>
-    </Layout>
+      </>
+    </OutilPage>
   )
 }

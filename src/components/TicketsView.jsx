@@ -191,7 +191,7 @@ export default function TicketsView() {
     const sel = 'id,titre,description,entite,ticket_categorie,ticket_statut,ticket_origine,priorite,gestionnaire,cree_par,cloture_par,user_email,derniere_activite,date_creation,created_at,dossier_client,client_id,participants,checklist,date_cloture,ticket_echeance'
     let all = []
     for (let from = 0; ; from += 1000) {
-      const { data, error } = await supabase.from('taches').select(sel).eq('is_ticket', true).order('derniere_activite', { ascending: false }).range(from, from + 999)
+      const { data, error } = await supabase.from('tickets').select(sel).eq('is_ticket', true).order('derniere_activite', { ascending: false }).range(from, from + 999)
       if (error || !data) break
       all = all.concat(data)
       if (data.length < 1000) break
@@ -512,7 +512,7 @@ function CreateModal({ collabs, cats = CATEGORIES, catType = {}, lockedSociete =
         participants: partsUp, cree_par: myCode, statut: 'todo', source: 'ticket', derniere_activite: now,
         dossier_client: (f.dossier_client || '').trim() || prefill?.dossier_client || null, client_id: f.client_id || prefill?.client_id || null,
       }
-      const { data, error } = await supabase.from('taches').insert(payload).select().single()
+      const { data, error } = await supabase.from('tickets').insert(payload).select().single()
       if (error) throw error
       // message système initial
       await supabase.from('tickets_messages').insert({
@@ -695,7 +695,7 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
   const touch = async (patch, sysMsg) => {
     const now = new Date().toISOString()
     setT(x => ({ ...x, ...patch }))
-    await supabase.from('taches').update({ ...patch, derniere_activite: now }).eq('id', t.id)
+    await supabase.from('tickets').update({ ...patch, derniere_activite: now }).eq('id', t.id)
     if (sysMsg) await supabase.from('tickets_messages').insert({ tache_id: t.id, auteur_code: myCode, type: 'systeme', message: sysMsg })
     if (sysMsg) {
       const merged = { ...t, ...patch }
@@ -718,9 +718,9 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
     setSending(true)
     const txt = reply.trim()
     await supabase.from('tickets_messages').insert({ tache_id: t.id, auteur_code: myCode, auteur_nom: myNom, auteur_email: myEmail, message: txt, type: 'message' })
-    await supabase.from('taches').update({ derniere_activite: new Date().toISOString() }).eq('id', t.id)
+    await supabase.from('tickets').update({ derniere_activite: new Date().toISOString() }).eq('id', t.id)
     if ((t.ticket_statut || 'nouveau') === 'nouveau') {
-      await supabase.from('taches').update({ ticket_statut: 'en_cours' }).eq('id', t.id)
+      await supabase.from('tickets').update({ ticket_statut: 'en_cours' }).eq('id', t.id)
       await supabase.from('tickets_messages').insert({ tache_id: t.id, auteur_code: myCode, type: 'systeme', message: `Statut : Nouveau → En cours (1re réponse de ${myCode})` })
       setT(x => ({ ...x, ticket_statut: 'en_cours' }))
     }
@@ -738,7 +738,7 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
     setUpBusy(true)
     try {
       for (const file of arr) await uploadPiece(t.id, file, { code: myCode, nom: myNom, email: myEmail })
-      await supabase.from('taches').update({ derniere_activite: new Date().toISOString() }).eq('id', t.id)
+      await supabase.from('tickets').update({ derniere_activite: new Date().toISOString() }).eq('id', t.id)
       const concernes = [...new Set([(t.gestionnaire || '').toUpperCase(), (t.cree_par || '').toUpperCase(), ...parts].filter(c => c && c !== myCode))]
       const emails = emailsOf(concernes)
       if (emails.length) envoyerAlerte(emails, `[#${t.id}] 📎 Pièce jointe${t.titre ? ' — ' + (t.titre || '').slice(0, 60) : ''}`, mailTicket(t, `Bonjour,<br>${myCode} a ajouté ${arr.length > 1 ? arr.length + ' pièces jointes' : 'une pièce jointe'} au ticket.`, filRecentHtml(), true))

@@ -30,7 +30,7 @@ Application interne de gestion pour un groupe de 6 entités belges :
 | Commissions | `bordereaux`, `collaborateur_taux` |
 | Facturation vente | `lode_*` (actif), `dtx_*` / `dyn_*` (prévus, vides) |
 | Hexagroup | `hex_membres`, `hex_cotisations*` |
-| Activité | `appels` (3CX), `taches` (porte les **tickets**, `is_ticket = true`), `tickets_messages`, `ticket_categories` |
+| Activité | `appels` (3CX), `tickets`, `tickets_messages`, `ticket_categories` |
 
 Conventions : montants en `numeric`, dates ISO, colonne `societe` = code entité en MAJUSCULES.
 
@@ -58,14 +58,17 @@ Les workflows n8n ont été arrêtés et archivés côté n8n ; le Hub ne doit p
 
 | Module | Tables supprimées | Pourquoi |
 |---|---|---|
-| Tâches | `taches_historique`, `taches_suivi`, `taches_rapprochement` + les 59 lignes non-ticket de `taches` | alimenté par « Mails HUB → Tâches », jamais adopté |
+| Tâches | `taches_historique`, `taches_suivi`, `taches_rapprochement` + les 59 lignes non-ticket de `taches` (table renommée `tickets` le 02/11) | alimenté par « Mails HUB → Tâches », jamais adopté |
 | RDV / Agenda | `rdv`, `rdv_categories`, fonction `rdv_autolink()` | plus aucune écriture depuis le 6 août 2026 |
 | Liens cassés | `liens_casses_log` | plus aucune écriture depuis le 13 août 2026 |
 | Synchronisation | `sync_log` (vide) | boutons pointant vers des webhooks morts |
 
-⚠️ **`taches` reste** : elle porte les tickets (`is_ticket = true`), seul module du groupe
-encore utilisé, avec `tickets_messages` et `ticket_categories`. Le jour où on y touche, il
-faudra sortir les tickets dans leur propre table plutôt que de prolonger ce partage.
+✅ **Fait le 02/11** : la table `taches` ne contenait plus que des tickets. Elle a été
+renommée `tickets` (`supabase/migrations/20261102100000_table_tickets.sql`) — même lignes,
+mêmes identifiants, `tickets_messages.tache_id` pointe toujours dessus. Une vue `taches`
+assure la compatibilité le temps que les onglets ouverts se rechargent ; elle disparaîtra
+avec les colonnes héritées des tâches (`echeance`, `code_type`, `source`, `file_attente`,
+`assigne_par`, `lien_url`… — 20 colonnes à zéro usage sur les 62 tickets).
 
 **La seule synchronisation externe conservée** : Qlik → Hub pour les **clients**, les
 **contrats** et le **statut de production** (N.A., Renon…). Elle passe par la GitHub Action
@@ -122,6 +125,29 @@ d'attribution — ni pour les chiffres, ni pour les objectifs, ni pour les commi
 
 **Règle** : ne pas rajouter de dépendance n8n. Ce qui doit tourner côté serveur passe par une
 fonction Edge Supabase + `pg_cron`, ou une fonction serverless Vercel.
+
+## Outils (`/tools`)
+
+Les six outils partagent depuis le 02/11/2026 un cadre commun : le registre `src/lib/outils.js`
+(une entrée par outil → route, carte sur `/tools`, permission) et la coquille
+`src/components/OutilPage.jsx` (retour, titre, chargement, erreurs). **Ajouter un outil =
+une entrée dans le registre**, plus aucun câblage dans `App.jsx` ni dans `ToolsHome`.
+Mode d'emploi : `docs/OUTILS.md`.
+
+Point ouvert : tous les outils partagent `acc_tools` sauf la succession (`prive_succession`) —
+grain trop grossier, dépend du modèle de modules (`docs/DROITS-ACCES.md`). Et aucun usage
+n'est mesuré, donc on ne sait pas lesquels servent.
+
+## Téléphonie 3CX (module Appels)
+
+C'est 3CX qui écrit dans le Hub (`api/3cx/call.js` → `crm_log_appel` → `appels`), jamais l'inverse.
+Le sens Hub → 3CX est ouvert mais inutilisé, en attente d'un client API côté central.
+
+**Le piège principal** : 3CX ne journalise qu'**une étape par appel**, pas le transfert. Un appel
+passé par le menu puis transféré n'apparaît qu'une fois. Les statistiques ne comptent donc que les
+appels arrivés sur le poste d'un collaborateur, et c'est un plancher. Trois autres pièges déjà
+corrigés (quatre valeurs de `direction`, deux formats de durée, un événement par coup de sonnerie)
+et tout le reste : `docs/TELEPHONIE.md`.
 
 ## Workflows n8n (inventaire, vérifié le 30/10/2026 via le connecteur n8n)
 
