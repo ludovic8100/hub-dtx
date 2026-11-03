@@ -8,6 +8,7 @@ import Login              from './pages/Login'
 import AuthCallback       from './pages/AuthCallback'
 import AccessDenied       from './pages/AccessDenied'
 import BandeauEnv         from './components/BandeauEnv'
+import ErrorBoundary      from './components/ErrorBoundary'
 
 // Tout le reste : code-splitting — chaque page devient un chunk chargé à la demande
 const AdminNotesFrais     = lazy(() => import('./pages/admin/AdminNotesFrais'))
@@ -110,6 +111,9 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <BandeauEnv />
+        {/* Au-dessus du Suspense : l'ErrorBoundary de Layout est rendu PAR la page,
+            donc il ne voit jamais l'échec de chargement de cette page. */}
+        <ErrorBoundary>
         <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/login"         element={<Login />} />
@@ -185,6 +189,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         </Suspense>
+        </ErrorBoundary>
       </AuthProvider>
     </BrowserRouter>
   )
