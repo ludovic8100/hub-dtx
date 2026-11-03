@@ -81,21 +81,16 @@ function EditeurClient({ client, onClose, onSaved }) {
     setBceLoading(true); setBceError(null)
     const ctrl = new AbortController()
     const timer = setTimeout(async () => {
-      const KEY = 'WecYIpno6XvAgZY9jIbyakcL9XfPc1wg'
-      const digits = q.replace(/\D/g, '')
-      const isNum = digits.length === 10
-      const url = isNum
-        ? `https://cbeapi.be/api/v1/company/${digits}`
-        : `https://cbeapi.be/api/v1/company/search?name=${encodeURIComponent(q)}`
+      // La clé CBEAPI reste côté serveur : la recherche passe par /api/bce-search.
       try {
-        const res = await fetch(url, { headers: { Authorization: `Bearer ${KEY}`, Accept: 'application/json' }, signal: ctrl.signal })
-        if (!res.ok) {
-          if (res.status === 404) { setBceResults([]); setBceError('Aucune entreprise trouvée.'); return }
-          throw new Error(`HTTP ${res.status}`)
-        }
-        const json = await res.json()
-        const data = json.data
-        const list = Array.isArray(data) ? data : (data ? [data] : [])
+        const res = await fetch('/api/bce-search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: q }),
+          signal: ctrl.signal,
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const { results: list = [] } = await res.json()
         setBceResults(list.slice(0, 8))
         if (!list.length) setBceError('Aucune entreprise trouvée.')
       } catch (e) {

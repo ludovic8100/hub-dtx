@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react'
 
 // Recherche entreprise via CBE API (BCE/KBO belge). Autocomplétion debounce 350ms.
 // onSelect(company) reçoit l'objet brut cbeapi ; au parent de mapper les champs.
-// NB : clé API exposée côté front (comme dans le module clients) — à passer côté serveur à terme.
-const KEY = 'WecYIpno6XvAgZY9jIbyakcL9XfPc1wg'
+// La clé CBEAPI reste côté serveur : la recherche passe par /api/bce-search.
 
 export default function BceSearch({ onSelect, placeholder = 'Rechercher une entreprise (nom ou n° BCE à 10 chiffres)…' }) {
   const [q, setQ] = useState('')
@@ -17,20 +16,15 @@ export default function BceSearch({ onSelect, placeholder = 'Rechercher une entr
     setLoading(true); setError(null)
     const ctrl = new AbortController()
     const timer = setTimeout(async () => {
-      const digits = query.replace(/\D/g, '')
-      const isNum = digits.length === 10
-      const url = isNum
-        ? `https://cbeapi.be/api/v1/company/${digits}`
-        : `https://cbeapi.be/api/v1/company/search?name=${encodeURIComponent(query)}`
       try {
-        const res = await fetch(url, { headers: { Authorization: `Bearer ${KEY}`, Accept: 'application/json' }, signal: ctrl.signal })
-        if (!res.ok) {
-          if (res.status === 404) { setResults([]); setError('Aucune entreprise trouvée.'); return }
-          throw new Error(`HTTP ${res.status}`)
-        }
-        const json = await res.json()
-        const data = json.data
-        const list = Array.isArray(data) ? data : (data ? [data] : [])
+        const res = await fetch('/api/bce-search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query }),
+          signal: ctrl.signal,
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const { results: list = [] } = await res.json()
         setResults(list.slice(0, 8))
         if (!list.length) setError('Aucune entreprise trouvée.')
       } catch (e) {
