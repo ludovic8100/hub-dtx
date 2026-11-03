@@ -1,0 +1,72 @@
+name: Factures — lecture des PDF
+
+# Lit le CONTENU des factures PDF pour en tirer le montant et la date, au lieu
+# de les deviner dans le nom du fichier. Corrige les 1 290 factures sans montant
+# (fichiers du scanner, qui n'en portent pas) et les 198 montants faux herites
+# de l'ancien scan n8n.
+#
+# LECTURE SEULE cote SharePoint : le script n'emet que des GET. Aucun fichier
+# n'est renomme, deplace, modifie ni supprime — le renommage est un chantier
+# distinct, qui ne sera engage qu'apres validation de l'extraction.
+#
+# Pas de cron : ce traitement se lance a la main, par lots, et on regarde ce
+# qu'il produit avant d'ecrire.
+
+on:
+  workflow_dispatch:
+    inputs:
+      echantillon:
+        description: "Nombre de factures a lire (0 = toutes)"
+        type: string
+        default: '20'
+      dry_run:
+        description: "Lire et comparer sans rien ecrire en base"
+        type: boolean
+        default: true
+      target:
+        description: "Environnement cible (base Supabase)"
+        type: choice
+        options: [test, production]
+        default: production
+
+concurrency:
+  group: factures-lecture-pdf
+  cancel-in-progress: false
+
+jobs:
+  lire:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target }}
+    env:
+      APP_ENV: ${{ inputs.target }}
+      SUPABASE_URL: ${{ vars.SUPABASE_URL || (inputs.target == 'test' && 'https://lvdnzbhplnzuwdqtitdb.supabase.co' || '') }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      GRAPH_TENANT_ID: ${{ secrets.GRAPH_TENANT_ID }}
+      GRAPH_CLIENT_ID: ${{ secrets.GRAPH_CLIENT_ID }}
+      GRAPH_CLIENT_SECRET: ${{ secrets.GRAPH_CLIENT_SECRET }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      ECHANTILLON: ${{ inputs.echantillon }}
+      DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install deps
+        run: pip install -r scripts/requirements.txt
+
+      - name: Verifier les secrets
+        run: |
+          for s in ANTHROPIC_API_KEY GRAPH_TENANT_ID GRAPH_CLIENT_ID GRAPH_CLIENT_SECRET; do
+            if [ -z "${!s}" ]; then echo "::error::Secret $s manquant"; exit 1; fi
+          done
+          if [ -z "$SUPABASE_SERVICE_KEY" ] && [ -z "$DRY_RUN" ]; then
+            echo "::error::Secret SUPABASE_SERVICE_KEY manquant (requis hors DRY_RUN)"; exit 1
+          fi
+          echo "Cible: $APP_ENV — Echantillon: ${ECHANTILLON:-20} — Mode: ${DRY_RUN:+DRY_RUN}${DRY_RUN:-ECRITURE REELLE}"
+
+      - name: Lecture des PDF
+        shell: bash
+        run: python scripts/factures_lecture_pdf.py

@@ -1,12 +1,14 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/auth'
+import { OUTILS } from './lib/outils'
 
 // Chargées immédiatement (chemin non-authentifié, très légères)
 import Login              from './pages/Login'
 import AuthCallback       from './pages/AuthCallback'
 import AccessDenied       from './pages/AccessDenied'
 import BandeauEnv         from './components/BandeauEnv'
+import ErrorBoundary      from './components/ErrorBoundary'
 
 // Tout le reste : code-splitting — chaque page devient un chunk chargé à la demande
 const AdminNotesFrais     = lazy(() => import('./pages/admin/AdminNotesFrais'))
@@ -16,11 +18,8 @@ const DashboardGroupe     = lazy(() => import('./pages/groupe/DashboardGroupe'))
 const DashboardDynassur   = lazy(() => import('./pages/dynassur/DashboardDynassur'))
 const Tickets             = lazy(() => import('./pages/Tickets'))
 const ToolsHome           = lazy(() => import('./pages/tools/ToolsHome'))
-const ToolBce             = lazy(() => import('./pages/tools/ToolBce'))
-const ToolQuestionnaire   = lazy(() => import('./pages/tools/ToolQuestionnaire'))
-const ToolDevoirInfo      = lazy(() => import('./pages/tools/ToolDevoirInfo'))
-const ToolSuccession     = lazy(() => import('./pages/tools/ToolSuccession'))
-const ToolJobs           = lazy(() => import('./pages/tools/ToolJobs'))
+// Les outils eux-mêmes sont déclarés dans src/lib/outils.js (registre OUTILS) :
+// leur import différé et leur route en découlent, plus rien à câbler ici.
 const DynassurClients     = lazy(() => import('./pages/dynassur/DynassurClients'))
 const DynassurPerformance = lazy(() => import('./pages/dynassur/DynassurPerformance'))
 const DynassurCompagnies  = lazy(() => import('./pages/dynassur/DynassurCompagnies'))
@@ -61,6 +60,7 @@ const LodeNotesFrais      = lazy(() => import('./pages/lode/LodeNotesFrais'))
 const HexagroupNotesFrais = lazy(() => import('./pages/hexagroup/HexagroupNotesFrais'))
 const PriveNotesFrais     = lazy(() => import('./pages/prive/PriveNotesFrais'))
 const GroupeNotesFrais    = lazy(() => import('./pages/groupe/GroupeNotesFrais'))
+const GroupeComptabilite  = lazy(() => import('./pages/groupe/GroupeComptabilite'))
 
 function ProtectedRoute({ children, requireAdmin = false, need = null }) {
   const { user, perms, loading } = useAuth()
@@ -111,6 +111,9 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <BandeauEnv />
+        {/* Au-dessus du Suspense : l'ErrorBoundary de Layout est rendu PAR la page,
+            donc il ne voit jamais l'échec de chargement de cette page. */}
+        <ErrorBoundary>
         <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/login"         element={<Login />} />
@@ -130,6 +133,7 @@ export default function App() {
           <Route path="/hexagroup/notes-frais" element={<P need="hex_notesfrais"><HexagroupNotesFrais /></P>} />
           <Route path="/prive/notes-frais"     element={<P need="prive_notesfrais"><PriveNotesFrais /></P>} />
           <Route path="/groupe/notes-frais"    element={<P need="grp_notesfrais"><GroupeNotesFrais /></P>} />
+          <Route path="/groupe/comptabilite"   element={<P need="acc_holding"><GroupeComptabilite /></P>} />
           <Route path="/dynassur/clients"      element={<P need="dyn_clients"><DynassurClients /></P>} />
           <Route path="/dynassur/production"   element={<P need={["dyn_production","dyn_chiffres","dyn_rentabilite","dyn_objectifs"]}><DynassurPerformance /></P>} />
           <Route path="/dynassur/chiffres"     element={<Navigate to="/dynassur/production" replace />} />
@@ -175,17 +179,17 @@ export default function App() {
           {/* Admin */}
           <Route path="/tickets" element={<P><Tickets /></P>} />
           <Route path="/tools"     element={<P need="acc_tools"><ToolsHome /></P>} />
-          <Route path="/tools/bce" element={<P need="acc_tools"><ToolBce /></P>} />
-          <Route path="/tools/questionnaire" element={<P need="acc_tools"><ToolQuestionnaire /></P>} />
-          <Route path="/tools/devoir-information" element={<P need="acc_tools"><ToolDevoirInfo /></P>} />
-          <Route path="/tools/succession" element={<P need="prive_succession"><ToolSuccession /></P>} />
-          <Route path="/tools/jobs" element={<P need="acc_tools"><ToolJobs /></P>} />
+          {OUTILS.filter(o => o.composant).map(o => {
+            const Outil = o.composant
+            return <Route key={o.cle} path={o.chemin} element={<P need={o.permission}><Outil /></P>} />
+          })}
           <Route path="/admin/notes-frais" element={<A><AdminNotesFrais /></A>} />
 
           <Route path="/" element={<P><RootRedirect /></P>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         </Suspense>
+        </ErrorBoundary>
       </AuthProvider>
     </BrowserRouter>
   )

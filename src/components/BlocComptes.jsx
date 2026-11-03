@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import BoutonSyncPonto from './BoutonSyncPonto'
 
-// Les soldes et transactions Ponto sont rafraîchis automatiquement par la fonction Edge
-// `sync-ponto-comptes` (pg_cron, tous les jours à 00:11). Aucun déclenchement manuel ici.
+// Les soldes et transactions Ponto sont rafraîchis automatiquement chaque nuit à 00:11
+// (fonction Edge `sync-ponto-comptes` + pg_cron). Le bouton ci-dessous relance la même
+// synchro à la demande, via la fonction `lancer_sync_ponto()` : le secret reste en base,
+// jamais dans le navigateur. Une synchro toutes les 5 minutes au plus.
 
 const fmt = v => v==null?'—':new Intl.NumberFormat('fr-BE',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(v)
 const fmtDate = v => v ? new Date(v).toLocaleDateString('fr-BE',{day:'2-digit',month:'2-digit',year:'2-digit'}) : '—'
@@ -23,6 +26,7 @@ function bankInitial(name) {
   if (!name) return '?'
   return name.trim().slice(0,2).toUpperCase()
 }
+
 
 export default function BlocComptes({ societeCode, color }) {
   const [comptes, setComptes] = useState([])
@@ -60,6 +64,7 @@ export default function BlocComptes({ societeCode, color }) {
         </div>
         {comptes.length > 0 && (
           <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <BoutonSyncPonto onTermine={chargerComptes} />
             <button
               onClick={() => { const all={}; comptes.forEach(c=>{all[c.id]=!allRevealed}); setRevealed(all) }}
               style={{ fontSize:11, color, background:color+'15', border:`1px solid ${color}40`,

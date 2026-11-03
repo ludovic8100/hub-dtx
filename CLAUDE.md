@@ -30,7 +30,7 @@ Application interne de gestion pour un groupe de 6 entités belges :
 | Commissions | `bordereaux`, `collaborateur_taux` |
 | Facturation vente | `lode_*` (actif), `dtx_*` / `dyn_*` (prévus, vides) |
 | Hexagroup | `hex_membres`, `hex_cotisations*` |
-| Activité | `appels` (3CX), `taches` (porte les **tickets**, `is_ticket = true`), `tickets_messages`, `ticket_categories` |
+| Activité | `appels` (3CX), `tickets`, `tickets_messages`, `ticket_categories` |
 
 Conventions : montants en `numeric`, dates ISO, colonne `societe` = code entité en MAJUSCULES.
 
@@ -58,14 +58,17 @@ Les workflows n8n ont été arrêtés et archivés côté n8n ; le Hub ne doit p
 
 | Module | Tables supprimées | Pourquoi |
 |---|---|---|
-| Tâches | `taches_historique`, `taches_suivi`, `taches_rapprochement` + les 59 lignes non-ticket de `taches` | alimenté par « Mails HUB → Tâches », jamais adopté |
+| Tâches | `taches_historique`, `taches_suivi`, `taches_rapprochement` + les 59 lignes non-ticket de `taches` (table renommée `tickets` le 02/11) | alimenté par « Mails HUB → Tâches », jamais adopté |
 | RDV / Agenda | `rdv`, `rdv_categories`, fonction `rdv_autolink()` | plus aucune écriture depuis le 6 août 2026 |
 | Liens cassés | `liens_casses_log` | plus aucune écriture depuis le 13 août 2026 |
 | Synchronisation | `sync_log` (vide) | boutons pointant vers des webhooks morts |
 
-⚠️ **`taches` reste** : elle porte les tickets (`is_ticket = true`), seul module du groupe
-encore utilisé, avec `tickets_messages` et `ticket_categories`. Le jour où on y touche, il
-faudra sortir les tickets dans leur propre table plutôt que de prolonger ce partage.
+✅ **Fait le 02/11** : la table `taches` ne contenait plus que des tickets. Elle a été
+renommée `tickets` (`supabase/migrations/20261102100000_table_tickets.sql`) — même lignes,
+mêmes identifiants, `tickets_messages.tache_id` pointe toujours dessus. Une vue `taches`
+assure la compatibilité le temps que les onglets ouverts se rechargent ; elle disparaîtra
+avec les colonnes héritées des tâches (`echeance`, `code_type`, `source`, `file_attente`,
+`assigne_par`, `lien_url`… — 20 colonnes à zéro usage sur les 62 tickets).
 
 **La seule synchronisation externe conservée** : Qlik → Hub pour les **clients**, les
 **contrats** et le **statut de production** (N.A., Renon…). Elle passe par la GitHub Action
@@ -87,8 +90,64 @@ pour les GitHub Actions, `job_tickets_rappels()` pour les crons purement SQL.
 
 **Un nouveau job sans entrée dans `jobs_attendus` est un job qu'on ne verra pas tomber.**
 
+Premier effet mesuré : la synchronisation Entra échouait depuis sa création (secrets jamais
+saisis, `Token Entra 404`). Révélée dès la mise en service du garde-fou, elle a été retirée
+le 01/11/2026 — **les accès du Hub se gèrent désormais à la main** dans Paramètres, et rien
+ne coupe plus automatiquement l'accès d'un collaborateur parti. Elle sera remise en place avec
+le chantier sécurité (bloc 2 bis de `docs/DROITS-ACCES.md`), en même temps que le suivi d'accès
+et la traçabilité des modifications — les trois dépendent du retour du login.
+
+### Banque : Ponto lit les banques 4 fois par jour, pas en continu
+
+Ponto ne consulte pas les banques en temps réel : il se synchronise **4 fois par jour** en
+arrière-plan (vers 2h, 8h, 14h et 20h heure belge). Lire l'API Ponto plus souvent ne sert donc
+à rien — on relit le même cache.
+
+Le cron `sync_ponto_comptes_4x` lit à **03:15, 09:15, 15:15 et 21:15 UTC**, soit au moins deux
+heures après chaque synchro Ponto, été comme hiver.
+
+⚠️ **Un cron ne doit jamais déclencher de synchronisation Ponto → banque.** Ces synchronisations
+(`POST /synchronizations`) sont réservées aux cas « client présent » par les normes techniques
+PSD2, exigent l'adresse IP réelle du client et sont limitées à une par compte toutes les
+30 minutes. C'est le rôle du bouton **Synchroniser**, déclenché par un humain — jamais d'un
+traitement automatique.
+
+### Attribution de la production : la base fait foi, pas le bordereau
+
+Les lignes de bordereau portent un code sous-agent ou commercial (ex. `BLA` chez AG), **qui ne
+doit jamais servir à attribuer la production**. Ce code est figé au moment où la compagnie édite
+le document : il peut désigner un commercial parti depuis, et un contrat change de gestionnaire,
+de commercial ou de sous-agent au fil de sa vie.
+
+**Seuls `clients.gestionnaire_code` et `clients.sa_code` (et les mouvements de production) font
+foi.** Le code lu dans le bordereau n'est conservé qu'à titre d'information, jamais comme clé
+d'attribution — ni pour les chiffres, ni pour les objectifs, ni pour les commissions.
+
 **Règle** : ne pas rajouter de dépendance n8n. Ce qui doit tourner côté serveur passe par une
 fonction Edge Supabase + `pg_cron`, ou une fonction serverless Vercel.
+
+## Outils (`/tools`)
+
+Les six outils partagent depuis le 02/11/2026 un cadre commun : le registre `src/lib/outils.js`
+(une entrée par outil → route, carte sur `/tools`, permission) et la coquille
+`src/components/OutilPage.jsx` (retour, titre, chargement, erreurs). **Ajouter un outil =
+une entrée dans le registre**, plus aucun câblage dans `App.jsx` ni dans `ToolsHome`.
+Mode d'emploi : `docs/OUTILS.md`.
+
+Point ouvert : tous les outils partagent `acc_tools` sauf la succession (`prive_succession`) —
+grain trop grossier, dépend du modèle de modules (`docs/DROITS-ACCES.md`). Et aucun usage
+n'est mesuré, donc on ne sait pas lesquels servent.
+
+## Téléphonie 3CX (module Appels)
+
+C'est 3CX qui écrit dans le Hub (`api/3cx/call.js` → `crm_log_appel` → `appels`), jamais l'inverse.
+Le sens Hub → 3CX est ouvert mais inutilisé, en attente d'un client API côté central.
+
+**Le piège principal** : 3CX ne journalise qu'**une étape par appel**, pas le transfert. Un appel
+passé par le menu puis transféré n'apparaît qu'une fois. Les statistiques ne comptent donc que les
+appels arrivés sur le poste d'un collaborateur, et c'est un plancher. Trois autres pièges déjà
+corrigés (quatre valeurs de `direction`, deux formats de durée, un événement par coup de sonnerie)
+et tout le reste : `docs/TELEPHONIE.md`.
 
 ## Workflows n8n (inventaire, vérifié le 30/10/2026 via le connecteur n8n)
 
@@ -103,7 +162,6 @@ Détail complet (nœuds, écritures Supabase, credentials, implications test) : 
 | `i9dZDnCbZRhiDVI7` | NF - Liste _NOTE_DE_FRAIS | liste Graph du dossier `COMPTA/_NOTE_DE_FRAIS` | webhook GET `nf-list` |
 | `xgkgnuSSkoQXlXlp` | Tickets - Alertes mail | envoi mail via Graph `sendMail` | webhook `ticket-alerte` |
 | `szxoCijzm3wJ55Jd` | Tickets - Réponses mail → fil | lit la boîte hub, RPC ticket, archive | cron 2 min |
-| `UnuI7LdT7RHfow8n` | HUB_DTX_USER_PERMISSION | users Entra ↔ `user_permissions` (insert / désactivation) | cron horaire |
 | `mGJGzrRNLw1ZAfOZ` | LODE - Peppol Send (Billit) | facture LODE → Billit → Peppol | webhook `lode-peppol-send` |
 | `EiB9oTn9MPJjELKW` | LODE - Facture Archive | PDF → SharePoint `COMPTA/FACTURES/_LODE/VENTES/<année>` | webhook `lode-facture-archive` |
 | `M9QvKGMBz6WA0N7M` | BCE Search (proxy CBEAPI) | recherche Banque-Carrefour des Entreprises | webhook |

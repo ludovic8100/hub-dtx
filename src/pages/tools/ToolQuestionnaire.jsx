@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Link } from 'react-router-dom'
-import Layout from '../../components/Layout'
+import OutilPage from '../../components/OutilPage'
 import { supabase } from '../../lib/supabase'
 import jsPDF from 'jspdf'
 import * as pdfjsLib from 'pdfjs-dist'
@@ -1203,25 +1202,14 @@ export default function ToolQuestionnaire() {
   }
 
   return (
-    <Layout currentPage="Questionnaire Profil">
-      <div style={{ fontFamily: "'Segoe UI', sans-serif", width: '100%' }}>
-        <div style={{ marginBottom: 6 }}>
-          <Link to="/tools" style={{ fontSize: 12.5, color: '#64748b', textDecoration: 'none' }}>← Outils</Link>
-        </div>
-        <div style={{ marginBottom: 18 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#1A3A6B', margin: 0 }}>Questionnaire Profil Investisseur</h1>
-          <div style={{ fontSize: 14, color: '#8A9BBE', marginTop: 2 }}>Recherchez un client, sélectionnez un contrat Vie, uploadez la proposition, remplissez le questionnaire</div>
-        </div>
-
+    <OutilPage
+      titre="Questionnaire Profil Investisseur"
+      sousTitre="Recherchez un client, sélectionnez un contrat Vie, uploadez la proposition, remplissez le questionnaire"
+      erreur={error}
+    >
       <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
       {/* ═══ LEFT COLUMN — main workflow ═══ */}
       <div style={{ flex: 1, minWidth: 0, maxWidth: 760 }}>
-
-        {error && (
-          <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '12px 16px', marginBottom: 14, color: '#991b1b', fontSize: 13 }}>
-            {error}
-          </div>
-        )}
 
         {/* ═══ STEP 1: Search client ═══ */}
         {step === 'search' && (
@@ -1936,7 +1924,6 @@ export default function ToolQuestionnaire() {
       {/* ═══ END RIGHT PANEL ═══ */}
 
       </div>{/* end flex container */}
-      </div>
-    </Layout>
+    </OutilPage>
   )
 }

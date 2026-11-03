@@ -1,4 +1,4 @@
-import { sharepointUrl, n8nWebhook } from '../config/env'
+import { sharepointUrl } from '../config/env'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import VueFactures from './VueFactures'
@@ -24,6 +24,34 @@ const SHAREPOINT_FACTURES = {
 // Sociétés dont les factures d'achat sont intégralement rangées en _<SOC>/ACHATS/<année>.
 // PRIVE et HEXAGROUP en sont exclus (pas de dossier ACHATS complet) : pour eux on ouvre la racine.
 const SOCIETES_ACHATS = ['DYNASSUR', 'DTX', 'LODE']
+
+// Pastille « relevé de compte producteur » pour les rentrées de compagnies.
+// Même grammaire visuelle que la pastille facture : vert = rattaché, orange = manquant.
+function PastilleReleve({ releve }) {
+  if (releve) {
+    const titre = [
+      'Relevé rattaché :',
+      releve.nom_fichier,
+      releve.date_cloture ? `Clôture au ${new Date(releve.date_cloture).toLocaleDateString('fr-BE')}` : null,
+      '', 'Cliquer pour ouvrir',
+    ].filter(Boolean).join('\n')
+    return (
+      <a href={releve.url_sharepoint} target="_blank" rel="noreferrer" title={titre}
+        onClick={e => e.stopPropagation()}
+        style={{ display:'flex', alignItems:'center', justifyContent:'center', width:'30px', height:'30px',
+          borderRadius:'7px', background:'#16a34a', color:'#fff', fontSize:'15px', textDecoration:'none' }}>
+        <i className="ti ti-file-description" />
+      </a>
+    )
+  }
+  return (
+    <span title="Relevé de compte producteur manquant — à réclamer à la compagnie"
+      style={{ display:'flex', alignItems:'center', justifyContent:'center', width:'30px', height:'30px',
+        borderRadius:'7px', border:'1px solid #fde68a', background:'#fffbeb', color:'#b45309', fontSize:'15px' }}>
+      <i className="ti ti-file-alert" />
+    </span>
+  )
+}
 
 // ── VUE CONSOLIDÉE GROUPE ──
 function VueConsolidee({ comptes }) {
@@ -90,17 +118,54 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   const [comptes, setComptes] = useState([])
   const [transactions, setTransactions] = useState([])
   const [facturesParTx, setFacturesParTx] = useState({}) // { transaction_id: nb de factures liées } -> badge +N
+  const [fichierParTx, setFichierParTx] = useState({})   // { transaction_id: fichier_id SharePoint } -> aperçu au survol
   const [loading, setLoading] = useState(true)
   const [loadingTx, setLoadingTx] = useState(false)
   const [filtre, setFiltre] = useState({ compte: 'tous', type: 'tous', libelle: '', periodes: [], categorie: 'toutes', facture: 'toutes', employe: 'tous', activite: 'toutes' })
   const [onglet, setOnglet] = useState('mouvements') // 'mouvements' | 'factures'
+
+  // Rentrées de compagnies : ce n'est pas une facture qu'on attend, c'est le relevé
+  // de compte producteur. On charge les libellés sous lesquels les compagnies virent
+  // (111 alias) et les relevés déjà rattachés, pour afficher le bon état sur la ligne.
+  const [aliasCompagnies, setAliasCompagnies] = useState([])
+  const [relevesParTx, setRelevesParTx] = useState({})
+  useEffect(() => {
+    supabase.from('compagnies_alias').select('libelle,compagnie_id')
+      .then(({ data }) => setAliasCompagnies((data || []).map(a => (a.libelle || '').toUpperCase())))
+    supabase.from('bordereaux')
+      .select('id,nom_fichier,url_sharepoint,date_cloture,solde_releve,transaction_id')
+      .not('transaction_id', 'is', null)
+      .then(({ data }) => {
+        const parTx = {}
+        ;(data || []).forEach(b => { parTx[b.transaction_id] = b })
+        setRelevesParTx(parTx)
+      })
+  }, [])
+
+  // Une rentrée dont la contrepartie porte le nom d'une compagnie : c'est une
+  // commission, et elle doit avoir son relevé.
+  const estRentreeCompagnie = (t) => {
+    if (!(Number(t.montant) > 0)) return false
+    const nom = (t.contrepartie_nom || '').toUpperCase()
+    return !!nom && aliasCompagnies.some(a => a && nom.startsWith(a))
+  }
   const [montantsMasques, setMontantsMasques] = useState(true) // masquer soldes/entrées/sorties par défaut
   const [periodeOuverte, setPeriodeOuverte] = useState(false)
   const [periodePos, setPeriodePos] = useState({ top:0, left:0 })
   const periodeBtnRef = useRef(null)
+  const periodePanelRef = useRef(null)
   useEffect(() => {
     if (!periodeOuverte) return
-    const fermer = () => setPeriodeOuverte(false)
+    // Le panneau est en position fixe : il doit se fermer si la page defile
+    // sous lui, sinon il reste accroche dans le vide. Mais l'ecoute est en
+    // phase de capture, donc elle recoit aussi le defilement du panneau
+    // lui-meme — qui a sa propre barre (maxHeight 380px). Sans ce test, le
+    // menu se fermait des qu'on essayait d'y faire defiler les annees.
+    const fermer = (e) => {
+      const cible = e?.target
+      if (cible && cible.nodeType === 1 && periodePanelRef.current?.contains(cible)) return
+      setPeriodeOuverte(false)
+    }
     window.addEventListener('scroll', fermer, true)
     window.addEventListener('resize', fermer)
     return () => { window.removeEventListener('scroll', fermer, true); window.removeEventListener('resize', fermer) }
@@ -183,17 +248,23 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       // Compter les factures liées par mouvement (badge +N si un paiement couvre plusieurs factures)
       try {
         const cnt = {}
+        const fid = {}
         let f2 = 0
         for (;;) {
-          let q = supabase.from('factures_achat').select('transaction_id').not('transaction_id', 'is', null).range(f2, f2 + 999)
+          let q = supabase.from('factures_achat').select('transaction_id, fichier_id').not('transaction_id', 'is', null).range(f2, f2 + 999)
           if (societeCodes && societeCodes.length) q = q.in('societe', societeCodes)
           const { data: fd, error: fe } = await q
           if (fe || !fd) break
-          for (const r of fd) { if (r.transaction_id) cnt[r.transaction_id] = (cnt[r.transaction_id] || 0) + 1 }
+          for (const r of fd) {
+            if (!r.transaction_id) continue
+            cnt[r.transaction_id] = (cnt[r.transaction_id] || 0) + 1
+            if (!fid[r.transaction_id]) fid[r.transaction_id] = r.fichier_id
+          }
           if (fd.length < 1000) break
           f2 += 1000
         }
         setFacturesParTx(cnt)
+        setFichierParTx(fid)
       } catch {}
     })()
   }, [comptes.map(c=>c.id).join(',')])
@@ -365,6 +436,13 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   }
 
   // Forcer l'ouverture dans la visionneuse SharePoint (pas de téléchargement / Adobe)
+  // Vignette d'un document SharePoint, servie a la demande par la fonction
+  // Vercel. Remplace la colonne transactions.facture_thumb_url, qui etait
+  // pre-remplie par un workflow n8n : plus rien a generer ni a stocker.
+  function apercuUrl(fichierId) {
+    return fichierId ? `/api/apercu-facture?fid=${encodeURIComponent(fichierId)}` : null
+  }
+
   function urlVisionneuse(url) {
     if (!url) return url
     if (/[?&]web=1/.test(url)) return url
@@ -417,7 +495,6 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
     setFacturesParTx(prev => ({ ...prev, [ids[0]]: (prev[ids[0]] || 0) + factures.length }))
     setSelecteurFacture(null)
     if (sel.ids) viderSelection()
-    fetch(n8nWebhook('backfill-thumbs2'), { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' }).catch(()=>{})
   }
 
   // Retirer le lien facture (repasse en croix rouge)
@@ -738,7 +815,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
           {periodeOuverte && (
             <>
               <div onClick={()=>setPeriodeOuverte(false)} style={{ position:'fixed', inset:0, zIndex:1000 }} />
-              <div style={{
+              <div ref={periodePanelRef} style={{
                 position:'fixed', top: periodePos.top, left: periodePos.left, zIndex:1001, background:'#fff',
                 border:'1px solid #e2e8f0', borderRadius:'10px', boxShadow:'0 12px 32px rgba(0,0,0,0.15)',
                 padding:'8px', width:'280px', maxHeight:'380px', overflowY:'auto'
@@ -961,7 +1038,9 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                         <span style={{ fontSize:'11px', color:'#cbd5e1' }}>Sans catégorie</span>
                       )}
                       <div style={{ display:'flex', alignItems:'center', gap:'8px' }} onClick={e=>e.stopPropagation()}>
-                        {t.facture_url ? (
+                        {estRentreeCompagnie(t) ? (
+                          <PastilleReleve releve={relevesParTx[t.id]} />
+                        ) : t.facture_url ? (
 <span style={{ position:'relative', display:'inline-flex' }}>
                           <button onClick={()=>ouvrirFactureLiee(t)} title={`Facture liée :\n${cheminFacture(t.facture_url)}\n\nCliquer pour ouvrir`} style={{
                             display:'flex', alignItems:'center', justifyContent:'center', width:'30px', height:'30px',
@@ -1005,7 +1084,9 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                       title="Sélectionner pour justifier plusieurs mouvements avec une seule facture"
                       style={{ width:'15px', height:'15px', cursor:'pointer', accentColor:color, flexShrink:0 }} />
                   )}
-                  {t.facture_url ? (
+                  {estRentreeCompagnie(t) ? (
+                    <PastilleReleve releve={relevesParTx[t.id]} />
+                  ) : t.facture_url ? (
 <span style={{ position:'relative', display:'inline-flex' }}>
                     <button onClick={()=>ouvrirFactureLiee(t)} title={`Facture liée :\n${cheminFacture(t.facture_url)}\n\nCliquer pour ouvrir dans SharePoint`} style={{
                       display:'flex', alignItems:'center', justifyContent:'center', width:'26px', height:'26px',
@@ -1039,7 +1120,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                   {t.comptes_bancaires?.banque || '—'}
                 </div>
                 <div
-                  onMouseEnter={() => t.facture_url && setApercuFacture({ thumb: t.facture_thumb_url, lien: urlVisionneuse(t.facture_url), nom: cheminFacture(t.facture_url) })}
+                  onMouseEnter={() => t.facture_url && setApercuFacture({ thumb: apercuUrl(fichierParTx[t.id]), lien: urlVisionneuse(t.facture_url), nom: cheminFacture(t.facture_url) })}
                   onMouseLeave={() => setApercuFacture(null)}
                   style={{ fontSize:'12px', color: t.facture_url ? '#16a34a' : '#64748b', fontWeight: t.facture_url ? '600' : '400', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', cursor: t.facture_url ? 'zoom-in' : 'default' }}>
                   {t.contrepartie_nom || '—'}{t.facture_url ? ' 🔍' : ''}

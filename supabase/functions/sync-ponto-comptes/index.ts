@@ -72,33 +72,62 @@ async function getComptes(token: string) {
     .filter(Boolean) as { pontoAccountId: string; compteId: string; solde: number | null }[]
 }
 
-async function getTransactions(token: string, pontoAccountId: string, compteId: string) {
-  const res = await fetch(`https://api.myponto.com/accounts/${pontoAccountId}/transactions?page[limit]=100`, {
-    headers: { Accept: 'application/vnd.api+json', Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error(`Ponto /transactions ${res.status} : ${await res.text()}`)
-  const data = await res.json()
-  return (data.data || [])
-    .filter((tx: any) => {
-      const date = tx.attributes?.valueDate || tx.attributes?.executionDate || ''
-      return date.slice(0, 10) >= CUTOFF_DATE
+const dateDe = (tx: any) =>
+  String(tx.attributes?.valueDate || tx.attributes?.executionDate || '').slice(0, 10)
+
+const versLigne = (tx: any, compteId: string) => {
+  const attr = tx.attributes || {}
+  return {
+    compte_id: compteId,
+    date_valeur: attr.valueDate ? attr.valueDate.slice(0, 10) : '1970-01-01',
+    date_execution: attr.executionDate ? attr.executionDate.slice(0, 10) : '1970-01-01',
+    montant: attr.amount !== undefined ? parseFloat(attr.amount) : 0,
+    devise: attr.currency || 'EUR',
+    information_paiement: (attr.remittanceInformationUnstructured || attr.remittanceInformation || '').slice(0, 500),
+    description: attr.description || '',
+    contrepartie_iban: attr.counterpartReference || '',
+    contrepartie_nom: attr.counterpartName || '',
+    type_transaction: attr.bankTransactionCode || '',
+    ponto_transaction_id: tx.id,
+  }
+}
+
+// Ponto pagine en JSON:API : chaque réponse porte un lien `links.next`. Sans le suivre,
+// on ne voyait que les 100 derniers mouvements par compte — et une opération ratée ne
+// revenait jamais, puisque rien ne rattrape l'historique.
+//
+// On remonte page par page jusqu'à CUTOFF_DATE. L'arrêt se décide sur la page ENTIÈRE
+// (toutes ses lignes antérieures à la coupure) et non sur la première ligne ancienne
+// rencontrée : rien ne garantit que Ponto trie strictement par date.
+async function getTransactions(
+  token: string, pontoAccountId: string, compteId: string, maxPages = 60,
+): Promise<{ lignes: any[]; pages: number; tronque: boolean }> {
+  const lignes: any[] = []
+  let url: string | null = `https://api.myponto.com/accounts/${pontoAccountId}/transactions?page[limit]=100`
+  let pages = 0
+  let fini = false
+
+  while (url && pages < maxPages && !fini) {
+    const res = await fetch(url, {
+      headers: { Accept: 'application/vnd.api+json', Authorization: `Bearer ${token}` },
     })
-    .map((tx: any) => {
-      const attr = tx.attributes || {}
-      return {
-        compte_id: compteId,
-        date_valeur: attr.valueDate ? attr.valueDate.slice(0, 10) : '1970-01-01',
-        date_execution: attr.executionDate ? attr.executionDate.slice(0, 10) : '1970-01-01',
-        montant: attr.amount !== undefined ? parseFloat(attr.amount) : 0,
-        devise: attr.currency || 'EUR',
-        information_paiement: (attr.remittanceInformationUnstructured || attr.remittanceInformation || '').slice(0, 500),
-        description: attr.description || '',
-        contrepartie_iban: attr.counterpartReference || '',
-        contrepartie_nom: attr.counterpartName || '',
-        type_transaction: attr.bankTransactionCode || '',
-        ponto_transaction_id: tx.id,
-      }
-    })
+    if (!res.ok) throw new Error(`Ponto /transactions ${res.status} : ${await res.text()}`)
+
+    const data = await res.json()
+    const brut: any[] = data.data || []
+    pages++
+
+    for (const tx of brut) {
+      if (dateDe(tx) >= CUTOFF_DATE) lignes.push(versLigne(tx, compteId))
+    }
+
+    // Toute la page est antérieure à la coupure : inutile de remonter plus loin.
+    fini = brut.length > 0 && brut.every((tx) => dateDe(tx) < CUTOFF_DATE)
+    url = fini ? null : (data.links?.next ?? null)
+  }
+
+  // tronque = on s'est arrêté sur la limite de pages, pas sur la fin de l'historique.
+  return { lignes, pages, tronque: pages >= maxPages && !fini }
 }
 
 
@@ -142,8 +171,14 @@ Deno.serve(async (req) => {
     const token = await getPontoToken()
     const comptes = await getComptes(token)
 
-    let soldesMaj = 0, transactionsMaj = 0
+    // Combien de lignes AVANT : l'upsert ne distingue pas une création d'une mise à jour,
+    // et le Hub doit pouvoir dire « 12 nouvelles opérations » plutôt que « lancée ».
+    const { count: avant } = await supabase
+      .from('transactions').select('*', { count: 'exact', head: true })
+
+    let soldesMaj = 0, transactionsVues = 0, pagesLues = 0
     const erreurs: string[] = []
+    const tronques: string[] = []
 
     for (const c of comptes) {
       try {
@@ -152,28 +187,45 @@ Deno.serve(async (req) => {
           if (error) throw error
           soldesMaj++
         }
-        const transactions = await getTransactions(token, c.pontoAccountId, c.compteId)
-        if (transactions.length) {
-          const { error } = await supabase.from('transactions').upsert(transactions, { onConflict: 'ponto_transaction_id' })
+        const { lignes, pages, tronque } = await getTransactions(token, c.pontoAccountId, c.compteId)
+        pagesLues += pages
+        if (tronque) tronques.push(c.compteId)
+        if (lignes.length) {
+          const { error } = await supabase.from('transactions').upsert(lignes, { onConflict: 'ponto_transaction_id' })
           if (error) throw error
-          transactionsMaj += transactions.length
+          transactionsVues += lignes.length
         }
       } catch (e) {
         erreurs.push(`${c.compteId}: ${String(e)}`)
       }
     }
 
+    const { count: apres } = await supabase
+      .from('transactions').select('*', { count: 'exact', head: true })
+    const nouvelles = Math.max(0, (apres ?? 0) - (avant ?? 0))
+
+    const resume = erreurs.length
+      ? `${erreurs.length} compte(s) en erreur sur ${comptes.length}`
+      : `${comptes.length} comptes, ${soldesMaj} soldes, ${nouvelles} nouvelle(s) opération(s) sur ${transactionsVues} lue(s) en ${pagesLues} page(s)`
+
     await jobFin(
       supabase, jobId,
       erreurs.length ? 'echec' : 'succes',
-      transactionsMaj, comptes.length,
-      erreurs.length
-        ? `${erreurs.length} compte(s) en erreur sur ${comptes.length}`
-        : `${comptes.length} comptes, ${soldesMaj} soldes, ${transactionsMaj} transactions`,
-      erreurs.length ? { erreurs } : null,
+      nouvelles, transactionsVues,
+      resume,
+      (erreurs.length || tronques.length) ? { erreurs, tronques } : null,
     )
 
-    return new Response(JSON.stringify({ ok: erreurs.length === 0, comptes: comptes.length, soldesMaj, transactionsMaj, erreurs }), {
+    return new Response(JSON.stringify({
+      ok: erreurs.length === 0,
+      comptes: comptes.length,
+      soldesMaj,
+      nouvelles,
+      transactionsVues,
+      pagesLues,
+      tronques,
+      erreurs,
+    }), {
       status: erreurs.length ? 207 : 200,
       headers: { 'Content-Type': 'application/json' },
     })

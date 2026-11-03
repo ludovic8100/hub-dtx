@@ -27,6 +27,7 @@ const iconePng = (key) => {
 const MODULES = {
   groupe: [
     { key: 'acc_holding', label: 'Tableau de bord général', icon: 'ti-layout-grid', path: '/groupe' },
+    { key: 'acc_holding', label: 'Comptabilité', icon: 'ti-calculator', path: '/groupe/comptabilite' },
     { key: 'grp_notesfrais', label: 'Notes de frais', icon: 'ti-receipt', path: '/groupe/notes-frais' },
   ],
   dynassur: [
