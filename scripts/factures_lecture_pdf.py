@@ -36,6 +36,7 @@ Variables d'environnement :
 import base64
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.parse
@@ -226,6 +227,24 @@ def lire_facture(client, pdf: bytes) -> dict | None:
     return None
 
 
+RE_ISO = re.compile(r"^(20\d{2})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$")
+RE_BELGE = re.compile(r"^(0[1-9]|[12]\d|3[01])[-/](0[1-9]|1[0-2])[-/](20\d{2})$")
+
+
+def normaliser_date(valeur):
+    """Rend une date ISO, ou None. Le schema demande AAAA-MM-JJ ; le modele a
+    renvoye « 13-10-2017 » sur une facture Belfius de 2017, et Postgres a
+    refuse la ligne — emportant les 61 factures suivantes du lot. On convertit
+    ce qu'on reconnait, on jette le reste plutot que de l'envoyer en base."""
+    if not isinstance(valeur, str):
+        return None
+    v = valeur.strip()
+    if RE_ISO.match(v):
+        return v
+    m = RE_BELGE.match(v)
+    return f"{m.group(3)}-{m.group(2)}-{m.group(1)}" if m else None
+
+
 def montant_plausible(valeur) -> bool:
     return isinstance(valeur, (int, float)) and 0 <= valeur < SEUIL_ABERRANT
 
@@ -253,6 +272,7 @@ def main() -> int:
     client = anthropic.Anthropic()
 
     lus = corriges = illisibles = ignores = 0
+    refusees = 0
     desaccords, dates_divergentes = [], []
     jetons_entree = jetons_sortie = 0
 
@@ -312,7 +332,7 @@ def main() -> int:
         # remplace pas en silence. Les dates en base viennent du nom de fichier
         # et sont souvent justes a quelques jours pres ; les reecrire toutes
         # sans le dire serait exactement ce qu'on s'interdit pour les montants.
-        date_pdf = extrait.get("date_facture")
+        date_pdf = normaliser_date(extrait.get("date_facture"))
         if date_pdf:
             if not ligne.get("date_facture"):
                 charge["date_facture"] = date_pdf
@@ -323,12 +343,20 @@ def main() -> int:
         if DRY_RUN:
             corriges += 1
             continue
-        supabase("PATCH", f"factures_achat?id=eq.{ligne['id']}", charge,
-                 {"Prefer": "return=minimal"})
+        try:
+            supabase("PATCH", f"factures_achat?id=eq.{ligne['id']}", charge,
+                     {"Prefer": "return=minimal"})
+        except urllib.error.HTTPError as e:
+            # Un refus sur une ligne ne doit jamais emporter le lot entier :
+            # c'est ce qui a coute 44 minutes et 61 factures le 03/11.
+            print(f"    ECRITURE REFUSEE ({e.code}) : {e.read().decode()[:140]}", flush=True)
+            refusees += 1
+            continue
         corriges += 1
 
     print(f"\n{lus} lue(s), {corriges} {'a corriger' if DRY_RUN else 'corrigee(s)'}, "
           f"{illisibles} illisible(s), {ignores} trop lourde(s), "
+          f"{refusees} refusee(s) en base, "
           f"{len(desaccords)} desaccord(s) de montant, "
           f"{len(dates_divergentes)} date(s) divergente(s).")
 
