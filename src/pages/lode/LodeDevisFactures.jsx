@@ -1610,29 +1610,43 @@ export default function LodeDevisFactures() {
     finally { setBusy(null) }
   }
 
-  // Envoi de la facture sur le réseau Peppol via le proxy Billit (n8n)
-  const PEPPOL_WEBHOOK = n8nWebhook('lode-peppol-send')
+  // Envoi de la facture sur le réseau Peppol, via /api/peppol-send → Billit.
+  // L'OrderID renvoyé par Billit est conservé : c'est la seule trace qui permet
+  // de retrouver la facture chez eux si quelque chose cloche après coup.
   const envoyerPeppol = async (doc) => {
     if (!PEPPOL_ACTIF) { alert('Le lien Peppol est désactivé pour le moment.'); return }
+    if (!doc.client_tva) { alert('Numéro de TVA du client manquant — Peppol route sur la TVA.'); return }
     if (!confirm(`Envoyer la facture ${doc.numero} sur le réseau Peppol via Billit ?`)) return
     setBusy(doc.id + 'peppol')
     try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) throw new Error('Session expirée — reconnecte-toi.')
       const lignes = await getLignes('facture', doc.id)
-      const res = await fetch(PEPPOL_WEBHOOK, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ facture: { ...doc, lignes } }),
+      const res = await fetch('/api/peppol-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ entite: 'lode', facture: { ...doc, lignes } }),
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json().catch(() => ({}))
-      if (data && data.ok) {
-        await supabase.from('lode_factures').update({ statut: 'envoyée' }).eq('id', doc.id)
-        alert(`Facture ${doc.numero} envoyée sur Peppol ✓`)
-        load()
-      } else {
-        throw new Error(data?.error || 'Réponse inattendue de Billit')
+      if (!res.ok || !data.ok) {
+        // Étape « envoi » : la facture existe déjà chez Billit, il ne faut surtout
+        // pas la recréer — on garde l'OrderID pour la relancer depuis Billit.
+        if (data.orderID) {
+          await supabase.from('lode_factures')
+            .update({ billit_order_id: String(data.orderID), billit_statut: 'erreur_envoi' })
+            .eq('id', doc.id)
+          load()
+        }
+        throw new Error([data.error, data.detail].filter(Boolean).join(' — ') || `HTTP ${res.status}`)
       }
+      await supabase.from('lode_factures')
+        .update({ statut: 'envoyée', billit_order_id: String(data.orderID), billit_statut: 'envoye' })
+        .eq('id', doc.id)
+      alert(`Facture ${doc.numero} envoyée sur Peppol ✓`)
+      load()
     } catch (e) {
-      alert(`Échec de l'envoi Peppol : ${e.message}\n\nVérifie que le workflow n8n « LODE - Peppol Send » est actif et que la clé API Billit est renseignée.`)
+      alert(`Échec de l'envoi Peppol : ${e.message}`)
     } finally { setBusy(null) }
   }
 
