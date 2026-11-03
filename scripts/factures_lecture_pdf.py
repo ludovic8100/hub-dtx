@@ -253,7 +253,7 @@ def main() -> int:
     client = anthropic.Anthropic()
 
     lus = corriges = illisibles = ignores = 0
-    desaccords = []
+    desaccords, dates_divergentes = [], []
     jetons_entree = jetons_sortie = 0
 
     for i, ligne in enumerate(lignes, 1):
@@ -308,8 +308,18 @@ def main() -> int:
             continue
 
         charge = {"montant": apres}
-        if extrait.get("date_facture"):
-            charge["date_facture"] = extrait["date_facture"]
+        # Meme regle pour la date que pour le montant : on comble un vide, on ne
+        # remplace pas en silence. Les dates en base viennent du nom de fichier
+        # et sont souvent justes a quelques jours pres ; les reecrire toutes
+        # sans le dire serait exactement ce qu'on s'interdit pour les montants.
+        date_pdf = extrait.get("date_facture")
+        if date_pdf:
+            if not ligne.get("date_facture"):
+                charge["date_facture"] = date_pdf
+            elif str(ligne["date_facture"]) != str(date_pdf):
+                dates_divergentes.append((ligne["nom"], str(ligne["date_facture"]), date_pdf))
+                if ECRASER:
+                    charge["date_facture"] = date_pdf
         if DRY_RUN:
             corriges += 1
             continue
@@ -319,7 +329,8 @@ def main() -> int:
 
     print(f"\n{lus} lue(s), {corriges} {'a corriger' if DRY_RUN else 'corrigee(s)'}, "
           f"{illisibles} illisible(s), {ignores} trop lourde(s), "
-          f"{len(desaccords)} desaccord(s).")
+          f"{len(desaccords)} desaccord(s) de montant, "
+          f"{len(dates_divergentes)} date(s) divergente(s).")
 
     if desaccords:
         print(f"\n{len(desaccords)} facture(s) ou le PDF contredit la base. Rien n'a ete")
@@ -327,6 +338,13 @@ def main() -> int:
         print(f"  {'base':>12} {'PDF':>12}   fichier")
         for nom, av, ap in desaccords[:40]:
             print(f"  {av:>12.2f} {ap:>12.2f}   {nom[:62]}")
+
+    if dates_divergentes and not ECRASER:
+        print(f"\n{len(dates_divergentes)} date(s) ou le PDF differe de la base "
+              f"(celle-ci vient du nom de fichier). Conservees telles quelles ;")
+        print("ECRASER=1 fait foi au PDF.")
+        for nom, av, ap in dates_divergentes[:15]:
+            print(f"  {av} -> {ap}   {nom[:58]}")
     if DRY_RUN:
         print("DRY_RUN : aucune ecriture en base. Aucun fichier n'a ete modifie dans aucun cas.")
     print(f"LIGNES_ECRITES={corriges}")
