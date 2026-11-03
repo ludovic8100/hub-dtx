@@ -135,6 +135,17 @@ Point ouvert : tous les outils partagent `acc_tools` sauf la succession (`prive_
 grain trop grossier, dépend du modèle de modules (`docs/DROITS-ACCES.md`). Et aucun usage
 n'est mesuré, donc on ne sait pas lesquels servent.
 
+## Téléphonie 3CX (module Appels)
+
+C'est 3CX qui écrit dans le Hub (`api/3cx/call.js` → `crm_log_appel` → `appels`), jamais l'inverse.
+Le sens Hub → 3CX est ouvert mais inutilisé, en attente d'un client API côté central.
+
+**Le piège principal** : 3CX ne journalise qu'**une étape par appel**, pas le transfert. Un appel
+passé par le menu puis transféré n'apparaît qu'une fois. Les statistiques ne comptent donc que les
+appels arrivés sur le poste d'un collaborateur, et c'est un plancher. Trois autres pièges déjà
+corrigés (quatre valeurs de `direction`, deux formats de durée, un événement par coup de sonnerie)
+et tout le reste : `docs/TELEPHONIE.md`.
+
 ## Workflows n8n (inventaire, vérifié le 30/10/2026 via le connecteur n8n)
 
 Détail complet (nœuds, écritures Supabase, credentials, implications test) : `docs/N8N-INVENTAIRE.md`.
