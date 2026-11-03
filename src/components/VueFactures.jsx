@@ -1,4 +1,3 @@
-import { n8nWebhook } from '../config/env'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { sansExtraits } from '../lib/factures'
@@ -62,7 +61,6 @@ function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, s
     await supabase.from('factures_achat').update({ transaction_id: ids[0] }).eq('fichier_id', facture.fichier_id)
     setFactures(prev => prev.map(f => f.fichier_id === facture.fichier_id ? { ...f, transaction_id: ids[0] } : f))
     setLierPaiement(null)
-    fetch(n8nWebhook('backfill-thumbs2'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(() => {})
   }
   // Délier un paiement (remet la facture en « à vérifier » et libère le mouvement)
   async function delierPaiement(facture) {
