@@ -70,6 +70,26 @@ function extraireOrderId(reponse) {
 }
 
 export default async function handler(req, res) {
+  // Contrôle de configuration, en lecture seule, sans rien envoyer.
+  //
+  // Le contrôle de la configuration Billit se trouve volontairement APRÈS
+  // l'authentification et la validation de la facture : on ne veut pas qu'un
+  // appel anonyme puisse sonder quoi que ce soit. Mais cela rendait impossible
+  // de répondre à la question « les clés sont-elles bien posées ? » autrement
+  // qu'en envoyant une vraie facture à un vrai client.
+  //
+  // Ce GET répond par OUI ou NON, par entité. Jamais une valeur, jamais un
+  // fragment de clé. Les noms de variables sont déjà dans le dépôt public :
+  // savoir qu'une clé est configurée n'apprend rien à personne.
+  if (req.method === 'GET' && 'config' in (req.query || {})) {
+    const etat = {}
+    for (const entite of ['lode', 'dtx', 'dyn']) {
+      const { apiKey, partyId } = billit(entite)
+      etat[entite] = { cle: Boolean(apiKey), partyId: Boolean(partyId) }
+    }
+    return res.status(200).json({ ok: true, envoi_autorise: PEPPOL_AUTORISE, entites: etat })
+  }
+
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'method' })
 
   // Session Supabase obligatoire : cette fonction engage l'entreprise vis-à-vis d'un client.
