@@ -1,0 +1,72 @@
+name: Extraits de compte
+
+# Lit les extraits PDF archives dans COMPTA/EXTRAITS et en tire les mouvements
+# bancaires, pour les periodes que Ponto ne couvre pas.
+#
+# Ponto ne remonte pas avant 2025 — avant le 28/03/2025 pour DTX. Les extraits,
+# eux, remontent a 2017. Sans eux, toutes les factures anterieures etaient
+# condamnees a rester sans paiement.
+#
+# AUCUN MODELE N'EST APPELE : les PDF portent une couche texte, une expression
+# reguliere suffit. Zero jeton, meme resultat a chaque passage.
+#
+# Lecture seule cote SharePoint. En base, uniquement des insertions dans
+# transactions, dedupliquees par `cle_extrait`, et jamais sur une periode que
+# Ponto couvre deja.
+#
+# Pas de cron : on lance a la main, par dossier, en commencant a blanc.
+
+on:
+  workflow_dispatch:
+    inputs:
+      filtre_dossier:
+        description: "Restreindre, ex. DYNASSUR/2024 (vide = tout)"
+        type: string
+        default: ''
+      lot:
+        description: "Nombre maximum d'extraits a traiter (0 = tous)"
+        type: string
+        default: '0'
+      dry_run:
+        description: "Essai a blanc — analyse sans rien ecrire"
+        type: boolean
+        default: true
+      target:
+        description: "Environnement cible"
+        type: choice
+        options: [test, production]
+        default: production
+
+concurrency:
+  group: extraits-sharepoint
+  cancel-in-progress: false
+
+jobs:
+  lire:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target }}
+    env:
+      APP_ENV: ${{ inputs.target }}
+      SUPABASE_URL: ${{ vars.SUPABASE_URL || (inputs.target == 'test' && 'https://lvdnzbhplnzuwdqtitdb.supabase.co' || '') }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      GRAPH_TENANT_ID: ${{ secrets.GRAPH_TENANT_ID }}
+      GRAPH_CLIENT_ID: ${{ secrets.GRAPH_CLIENT_ID }}
+      GRAPH_CLIENT_SECRET: ${{ secrets.GRAPH_CLIENT_SECRET }}
+      FILTRE_DOSSIER: ${{ inputs.filtre_dossier }}
+      LOT: ${{ inputs.lot }}
+      DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r scripts/requirements.txt
+
+      - name: Verifier les secrets
+        run: |
+          for s in GRAPH_TENANT_ID GRAPH_CLIENT_ID GRAPH_CLIENT_SECRET SUPABASE_SERVICE_KEY; do
+            if [ -z "${!s}" ]; then echo "::error::Secret $s manquant"; exit 1; fi
+          done
+
+      - name: Lecture des extraits
+        run: python scripts/extraits_sharepoint.py
