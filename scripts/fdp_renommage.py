@@ -59,6 +59,13 @@ def jeton_graph() -> str:
         return json.load(r)["access_token"]
 
 
+def site_id(jeton) -> str:
+    """L'identifiant du site. Les chemins Graph se construisent dessus, pas
+    sur « dynassur.sharepoint.com:/sites/… » : deux « : » dans une URL et
+    Graph refuse le segment."""
+    return graph(jeton, "GET", f"/sites/{SITE}")["id"]
+
+
 def graph(jeton, methode, chemin, charge=None):
     url = chemin if chemin.startswith("http") else GRAPH + chemin
     donnees = json.dumps(charge).encode() if charge is not None else None
@@ -87,17 +94,27 @@ def codes_employes():
     return {l["code"].upper(): l.get("nom_complet") or "" for l in lignes if l.get("code")}
 
 
-def parcourir(jeton, item_id, chemin):
+def enfants(jeton, sid, chemin):
+    """Les elements d'un dossier, pagination suivie. Parcours PAR CHEMIN,
+    comme le scan des factures : c'est la forme qui tourne en production."""
+    url = f"/sites/{sid}/drive/root:/{urllib.parse.quote(chemin)}:/children?$top=200"
+    while url:
+        page = graph(jeton, "GET", url)
+        for el in page.get("value", []):
+            yield el
+        url = page.get("@odata.nextLink")
+
+
+def parcourir(jeton, sid, racine):
     """Tous les PDF du dossier et de ses sous-dossiers."""
-    suite = f"/sites/{SITE}:/drive/items/{item_id}/children?$top=200"
-    while suite:
-        rep = graph(jeton, "GET", suite)
-        for it in rep.get("value", []):
-            if "folder" in it:
-                yield from parcourir(jeton, it["id"], f"{chemin}/{it['name']}")
-            elif it["name"].lower().endswith(".pdf"):
-                yield it, chemin
-        suite = rep.get("@odata.nextLink")
+    a_visiter = [racine]
+    while a_visiter:
+        chemin = a_visiter.pop()
+        for el in enfants(jeton, sid, chemin):
+            if "folder" in el:
+                a_visiter.append(f"{chemin}/{el['name']}")
+            elif el["name"].lower().endswith(".pdf"):
+                yield el, chemin
 
 
 def sans_accent(t):
@@ -141,8 +158,8 @@ def main():
     codes = codes_employes()
     print(f"{len(codes)} trigramme(s) connu(s) en base.\n")
 
-    racine = graph(jeton, "GET", f"/sites/{SITE}:/drive/root:/{urllib.parse.quote(DOSSIER)}")
-    fichiers = list(parcourir(jeton, racine["id"], DOSSIER))
+    sid = site_id(jeton)
+    fichiers = list(parcourir(jeton, sid, DOSSIER))
     print(f"{len(fichiers)} PDF dans {DOSSIER} et ses sous-dossiers.\n")
 
     conformes, a_faire, a_verifier = 0, [], []
@@ -174,7 +191,7 @@ def main():
             break
         print(f"  {chemin}/\n      {it['name']}\n   →  {nouveau}")
         if not DRY_RUN:
-            graph(jeton, "PATCH", f"/sites/{SITE}:/drive/items/{it['id']}",
+            graph(jeton, "PATCH", f"/sites/{sid}/drive/items/{it['id']}",
                   {"name": nouveau})
         faits += 1
 
