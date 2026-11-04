@@ -12,7 +12,9 @@ Le nom de fichier n'est qu'une etiquette. Le PDF, lui, porte la bonne
 information. Ce script la lit.
 
 Ce qu'il fait :
-  1. choisit les lignes a reprendre (sans montant, ou montant aberrant) ;
+  1. choisit les lignes a reprendre (sans montant, montant aberrant, ou SANS
+     DATE — 4 722 factures sur 7 588 au 04/11/2026, qui portent l'ancienne
+     convention de nommage et ne peuvent donc pas etre rapprochees) ;
   2. telecharge le PDF depuis SharePoint — en LECTURE SEULE ;
   3. le fait lire par Claude, qui renvoie un JSON contraint par schema ;
   4. ecrit fournisseur, date, montant et numero dans `factures_achat`.
@@ -150,9 +152,48 @@ HORS_FACTURES = ("fiche de paie", "fiche_de_paie", "avis de remboursement",
                  "releve", "relevé", "extrait de compte", "coda")
 
 
+# Un montant egal a une annee ronde (2020, 2026) ou a un numero de piece
+# (202403) ne vient pas d'une facture : il vient du NOM du fichier, ou le
+# lecteur a pris un millesime ou une reference pour une somme.
+#   « I0881 - ... - Contrat 0729355225 - 06 07 2020.pdf »  ->  2020 EUR
+#   « C056-2 - NF202403 EUR 502,89.pdf »                   ->  202403 EUR
+# Ces valeurs sont sous le seuil d'aberration, donc elles passaient pour
+# normales et la facture n'etait jamais relue.
+def montant_suspect(valeur) -> bool:
+    if valeur is None:
+        return False
+    try:
+        v = float(valeur)
+    except (TypeError, ValueError):
+        return True
+    if v >= SEUIL_ABERRANT:
+        return True
+    if v != int(v):
+        return False                       # un montant a centimes est credible
+    entier = int(v)
+    if 1990 <= entier <= 2035:             # une annee
+        return True
+    if 199001 <= entier <= 203512:         # AAAAMM, un numero de piece
+        return True
+    return False
+
+
 def a_reprendre():
-    """Les factures d'achat dont le montant manque ou est manifestement faux."""
-    filtre = f"or=(montant.is.null,montant.gte.{int(SEUIL_ABERRANT)})"
+    """Les factures d'achat dont la base ne sait pas dire l'essentiel.
+
+    Trois cas, et le troisieme est le plus gros :
+
+    - montant absent ;
+    - montant manifestement faux (au-dela du seuil, ou qui est en realite une
+      annee ou un numero de piece — voir montant_suspect) ;
+    - DATE absente. 4 722 factures d'achat sur 7 588 au 04/11/2026, soit 62 %.
+      Elles portent l'ancienne convention de nommage (« I0881 - Nubeo EUR
+      139,65.pdf »), qui ne contient aucune date. Sans date, le rapprochement
+      bancaire ne peut rien en faire : c'est la cause principale du retard.
+      Le code plus bas savait deja remplir la date depuis le PDF — ces lignes
+      n'etaient simplement jamais choisies.
+    """
+    filtre = f"or=(montant.is.null,montant.gte.{int(SEUIL_ABERRANT)},date_facture.is.null)"
     lignes = supabase(
         "GET",
         f"factures_achat?select=id,fichier_id,nom,societe,montant,date_facture"
@@ -318,7 +359,7 @@ def main() -> int:
         #  - la base porte autre chose   -> on NE TRANCHE PAS. Ecraser 28,78 € par
         #    13,60 € sans que personne ne le voie serait la meme faute que celle
         #    qu'on repare : une donnee changee en silence.
-        if avant is None or (isinstance(avant, (int, float)) and float(avant) >= SEUIL_ABERRANT):
+        if avant is None or montant_suspect(avant):
             pass
         elif abs(float(avant) - float(apres)) < 0.01:
             continue                      # deja juste, rien a ecrire
