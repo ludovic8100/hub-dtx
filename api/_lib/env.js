@@ -75,6 +75,25 @@ export const AZURE = {
 /** En TEST : si renseignée, TOUT mail sortant est redirigé vers cette adresse (préfixe [TEST]). */
 export const MAIL_REDIRECT_TO = IS_TEST ? (env.MAIL_REDIRECT_TO || '') : ''
 
+// ── Billit (passerelle Peppol des factures de vente) ──────────────────────────
+// Une entité = un compte Billit, donc une clé et un partyID distincts. LODE est
+// la seule configurée aujourd'hui ; brancher DTX ou Dynassur sera une variable
+// de plus (BILLIT_DTX_API_KEY…), pas une ligne de code.
+export const billit = entite => {
+  const E = String(entite || '').toUpperCase().replace(/[^A-Z0-9]/g, '')
+  return {
+    apiKey:  (E && env[`BILLIT_${E}_API_KEY`])  || env.BILLIT_API_KEY  || '',
+    partyId: (E && env[`BILLIT_${E}_PARTY_ID`]) || env.BILLIT_PARTY_ID || '',
+  }
+}
+/**
+ * Garde-fou : une facture envoyée sur Peppol part chez un vrai client et ne se
+ * rattrape pas. Hors production, l'envoi est refusé sauf BILLIT_AUTORISE_EN_TEST=1.
+ * Avant, c'est le suffixe `-test` des webhooks n8n qui jouait ce rôle (404 = sans effet) ;
+ * une fonction Vercel, elle, répond pareil en test et en prod.
+ */
+export const PEPPOL_AUTORISE = IS_PROD || env.BILLIT_AUTORISE_EN_TEST === '1'
+
 // ── GitHub (relance des Actions de synchronisation) ───────────────────────────
 export const GITHUB_DISPATCH_TOKEN = env.GITHUB_DISPATCH_TOKEN || ''
 export const GITHUB_REPO = env.GITHUB_REPO || 'ludovic8100/hub-dtx'
@@ -87,5 +106,6 @@ export default {
   N8N_URL, N8N_TEST_SUFFIX, n8nWebhook, SHAREPOINT_SITE, SHAREPOINT_ROOT, HUB_URL,
   SHAREPOINT_SITE_ID, MAIL_EXPEDITEUR_ID, CBEAPI_KEY,
   AZURE, MAIL_REDIRECT_TO,
+  billit, PEPPOL_AUTORISE,
   GITHUB_DISPATCH_TOKEN, GITHUB_REPO, GITHUB_SYNC_REF,
 }
