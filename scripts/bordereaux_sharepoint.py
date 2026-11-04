@@ -263,19 +263,31 @@ def upsert(lignes):
     paiement_precedent, date_cloture, extrait_le) et le lien `transaction_id`
     ne figurent pas non plus dans la charge : ils survivent à chaque passage.
     """
+    # PostgREST refuse un envoi dont les objets n'ont pas exactement les mêmes
+    # clés (« All object keys must match »). Or une valeur absente ne doit PAS
+    # être envoyée : 2 887 bordereaux n'ont pas de compagnie reconnue en base,
+    # et envoyer compagnie_id = null effacerait les rattachements faits à la
+    # main sur les lignes déjà présentes. On groupe donc par jeu de colonnes
+    # renseignées, un envoi par groupe.
+    groupes = {}
+    for ligne in lignes:
+        charge = {cle: valeur for cle, valeur in ligne.items() if valeur is not None}
+        groupes.setdefault(tuple(sorted(charge)), []).append(charge)
+
     ecrites = 0
-    for debut in range(0, len(lignes), 500):
-        paquet = [
-            {cle: valeur for cle, valeur in ligne.items() if valeur is not None}
-            for ligne in lignes[debut:debut + 500]
-        ]
-        supabase(
-            "POST",
-            "bordereaux?on_conflict=sharepoint_item_id",
-            paquet,
-            {"Prefer": "resolution=merge-duplicates,return=minimal"},
-        )
-        ecrites += len(paquet)
+    for colonnes, paquet_complet in sorted(groupes.items(), key=lambda g: -len(g[1])):
+        absentes = {"compagnie_id", "url_sharepoint", "source"} - set(colonnes)
+        detail = f" (sans {', '.join(sorted(absentes))})" if absentes else ""
+        print(f"  {len(paquet_complet)} ligne(s){detail}", flush=True)
+        for debut in range(0, len(paquet_complet), 500):
+            paquet = paquet_complet[debut:debut + 500]
+            supabase(
+                "POST",
+                "bordereaux?on_conflict=sharepoint_item_id",
+                paquet,
+                {"Prefer": "resolution=merge-duplicates,return=minimal"},
+            )
+            ecrites += len(paquet)
     return ecrites
 
 
