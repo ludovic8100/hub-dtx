@@ -97,6 +97,28 @@ ne coupe plus automatiquement l'accès d'un collaborateur parti. Elle sera remis
 le chantier sécurité (bloc 2 bis de `docs/DROITS-ACCES.md`), en même temps que le suivi d'accès
 et la traçabilité des modifications — les trois dépendent du retour du login.
 
+### Factures entrantes : une seule chaîne, toutes les heures
+
+Déposer un PDF dans `COMPTA/FACTURES/<_SOCIETE>/ACHATS/<année>` suffit. La GitHub Action
+`factures-entrantes.yml` enchaîne les quatre étapes qui étaient quatre lancements manuels :
+
+1. **scan** (`factures_sharepoint.py`) — le fichier devient une ligne de `factures_achat` ;
+2. **lecture** (`factures_lecture_pdf.py`) — montant, date, fournisseur et **destinataire** ;
+3. **renommage** (`factures_renommage.py`) — le nom vient de la base, jamais l'inverse ;
+4. **rapprochement** (`rapprocher_factures_sures()`) — candidat unique + nom concordant +
+   **un paiement ne justifie qu'une facture**.
+
+Deux déclencheurs : cron horaire, et le bouton **Traiter les factures** de la comptabilité
+(`src/components/TraiterFactures.jsx` → `api/traiter-factures.js`). Le volume de lecture est
+borné par passage (`ECHANTILLON`) : cette chaîne sert le flux courant, pas l'arriéré.
+
+**La société d'une facture ne vient pas du dossier.** Le PDF dit à qui il est adressé ; si le
+destinataire ne correspond pas, la facture est marquée `a_verifier` et le renommeur lui rend
+son `nom_origine`. Un nom moche coûte une recherche, un nom faux clôt la question.
+
+La purge des lignes orphelines reste au scan quotidien de 5h37, qui voit tout l'arbre —
+jamais au passage horaire, qui n'en voit qu'une partie.
+
 ### Banque : Ponto lit les banques 4 fois par jour, pas en continu
 
 Ponto ne consulte pas les banques en temps réel : il se synchronise **4 fois par jour** en

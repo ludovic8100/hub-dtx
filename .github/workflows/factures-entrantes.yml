@@ -1,0 +1,116 @@
+name: Factures entrantes
+
+# La chaine complete d'une facture deposee dans SharePoint, en un seul passage :
+#
+#   1. scan      le fichier devient une ligne de factures_achat
+#   2. lecture   le PDF donne montant, date, fournisseur, DESTINATAIRE
+#   3. renommage le fichier prend son nom definitif depuis la base
+#   4. rapprochement  la facture trouve son paiement bancaire
+#
+# Avant, ces quatre etapes etaient quatre lancements separes, a la main. Une
+# facture deposee a 9h n'existait dans le Hub que le lendemain a 5h37, et
+# n'allait pas plus loin sans intervention.
+#
+# Deux declencheurs : toutes les heures, et le bouton « Traiter maintenant »
+# de la comptabilite (api/traiter-factures.js). Les horaires GitHub derivent
+# de 5 a 20 minutes — d'ou la tolerance de 2h dans jobs_attendus.
+#
+# Le volume de lecture est BORNE (ECHANTILLON) : ce traitement sert le flux
+# courant, pas l'arriere. L'arriere se rattrape avec factures-lecture-pdf,
+# lance a la main et surveille.
+
+on:
+  schedule:
+    - cron: '23 * * * *'
+  workflow_dispatch:
+    inputs:
+      annee:
+        description: "Annee a traiter (vide = l'annee en cours)"
+        type: string
+        default: ''
+      echantillon:
+        description: "Nombre maximum de PDF a lire dans ce passage"
+        type: string
+        default: '40'
+      target:
+        description: "Environnement cible"
+        type: choice
+        options: [test, production]
+        default: production
+
+concurrency:
+  group: factures-entrantes
+  cancel-in-progress: false
+
+jobs:
+  traiter:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target || 'production' }}
+    env:
+      APP_ENV: ${{ inputs.target || 'production' }}
+      SUPABASE_URL: ${{ vars.SUPABASE_URL || '' }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      GRAPH_TENANT_ID: ${{ secrets.GRAPH_TENANT_ID }}
+      GRAPH_CLIENT_ID: ${{ secrets.GRAPH_CLIENT_ID }}
+      GRAPH_CLIENT_SECRET: ${{ secrets.GRAPH_CLIENT_SECRET }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      ECHANTILLON: ${{ inputs.echantillon || '40' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verifier les secrets
+        run: |
+          for s in GRAPH_TENANT_ID GRAPH_CLIENT_ID GRAPH_CLIENT_SECRET SUPABASE_SERVICE_KEY ANTHROPIC_API_KEY; do
+            if [ -z "${!s}" ]; then echo "::error::Secret $s manquant"; exit 1; fi
+          done
+
+      - name: Annee a traiter
+        id: an
+        run: echo "annee=${{ inputs.annee || '' }}" >> "$GITHUB_OUTPUT"
+
+      - name: Journal - debut
+        id: journal
+        run: echo "id=$(python scripts/job_journal.py debut factures-entrantes ${{ github.event_name == 'schedule' && 'cron' || 'manuel' }})" >> "$GITHUB_OUTPUT"
+
+      # 1. Le fichier devient une ligne. Pas de purge ici : un passage horaire
+      #    qui supprime est un passage horaire qui peut supprimer a tort.
+      #    La purge reste au scan quotidien de 5h37, qui voit tout l'arbre.
+      - name: 1. Scan SharePoint
+        env:
+          PURGE: '0'
+        run: python scripts/factures_sharepoint.py
+
+      - name: 2. Lecture des PDF
+        env:
+          FILTRE_DOSSIER: ${{ steps.an.outputs.annee }}
+        run: python scripts/factures_lecture_pdf.py
+
+      - name: 3. Renommage
+        env:
+          FILTRE_DOSSIER: ${{ steps.an.outputs.annee }}
+          LOT: '0'
+        run: python scripts/factures_renommage.py
+
+      # 4. Candidat unique + nom concordant + un paiement par facture, et
+      #    jamais une facture marquee « a verifier ».
+      - name: 4. Rapprochement
+        shell: bash
+        run: |
+          URL="${SUPABASE_URL:-https://tndwonqdbeszkcztkzqe.supabase.co}"
+          N=$(curl -sS -X POST "$URL/rest/v1/rpc/rapprocher_factures_sures" \
+                -H "apikey: $SUPABASE_SERVICE_KEY" \
+                -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+                -H "Content-Type: application/json" -d '{}')
+          echo "Rapprochements ecrits : $N"
+          echo "LIGNES_ECRITES=$N" >> /tmp/chaine.log
+
+      - name: Journal - fin
+        if: ${{ always() }}
+        run: |
+          LIGNES=$(grep -oP 'LIGNES_ECRITES=\K[0-9]+' /tmp/chaine.log 2>/dev/null | tail -1 || true)
+          python scripts/job_journal.py fin "${{ steps.journal.outputs.id }}" \
+            "${{ job.status == 'success' && 'succes' || 'echec' }}" "$LIGNES" \
+            "GitHub Action factures-entrantes — ${{ job.status }}"
