@@ -271,6 +271,27 @@ def a_reprendre():
 _schema_accepte = True
 
 
+def normaliser_reponse(valeur):
+    """Ramene la reponse du modele a un objet, ou None.
+
+    Le 04/11/2026, a la 202e facture d'un lot de 839, le modele a renvoye une
+    LISTE au lieu d'un objet — probablement une facture portant plusieurs
+    documents. L'appelant a fait `.get()` dessus et tout le lot est tombe, 637
+    factures avant la fin.
+
+    Une facture bancale ne doit pas tuer un lot. On prend le premier objet
+    exploitable d'une liste, et on rend None pour tout le reste : la facture est
+    alors comptee illisible, et le lot continue.
+    """
+    if isinstance(valeur, dict):
+        return valeur
+    if isinstance(valeur, list):
+        for element in valeur:
+            if isinstance(element, dict):
+                return element
+    return None
+
+
 def lire_facture(client, pdf: bytes) -> dict | None:
     global _schema_accepte
 
@@ -310,7 +331,7 @@ def lire_facture(client, pdf: bytes) -> dict | None:
             continue
         texte = bloc.text.strip()
         try:
-            return json.loads(texte)
+            return normaliser_reponse(json.loads(texte))
         except json.JSONDecodeError:
             # En mode repli, la reponse peut etre entouree de texte.
             debut, fin = texte.find("{"), texte.rfind("}")
@@ -389,8 +410,15 @@ def main() -> int:
             print(f"    erreur API : {e}", flush=True)
             illisibles += 1
             continue
+        except Exception as e:
+            # Ceinture et bretelles. Un lot de 839 factures ne doit pas tomber
+            # parce qu'une seule a surpris le lecteur : on la signale, on la
+            # compte illisible, et on passe a la suivante.
+            print(f"    erreur inattendue, facture ignoree : {type(e).__name__} : {e}", flush=True)
+            illisibles += 1
+            continue
 
-        if not extrait or not extrait.get("lisible"):
+        if not isinstance(extrait, dict) or not extrait.get("lisible"):
             print("    document illisible ou pas une facture", flush=True)
             illisibles += 1
             continue
