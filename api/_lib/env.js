@@ -56,7 +56,13 @@ export const SHAREPOINT_SITE = lire('SHAREPOINT_SITE')
 export const SHAREPOINT_SITE_ID = lire('SHAREPOINT_SITE_ID')
 export const MAIL_EXPEDITEUR_ID = lire('MAIL_EXPEDITEUR_ID')
 // Clé CBEAPI (recherche Banque-Carrefour). Aucun défaut : secret, jamais dans le dépôt.
-export const CBEAPI_KEY = env.CBEAPI_KEY || ''
+//
+// Les deux noms sont acceptés. La variable posée dans Vercel s'appelle
+// « CBEAPI » ; ce fichier attendait « CBEAPI_KEY ». Plutôt que d'imposer un
+// renommage à la main — et de refaire l'erreur au prochain environnement — on
+// lit l'un ou l'autre. Un secret correctement posé ne doit pas rester inerte
+// pour une affaire de suffixe.
+export const CBEAPI_KEY = env.CBEAPI_KEY || env.CBEAPI || ''
 export const SHAREPOINT_ROOT = lire('SHAREPOINT_ROOT', { defautTest: 'Documents partages/_TEST' })
 export const HUB_URL = lire('HUB_URL')
 
