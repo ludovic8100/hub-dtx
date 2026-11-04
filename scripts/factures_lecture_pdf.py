@@ -17,7 +17,10 @@ Ce qu'il fait :
      convention de nommage et ne peuvent donc pas etre rapprochees) ;
   2. telecharge le PDF depuis SharePoint — en LECTURE SEULE ;
   3. le fait lire par Claude, qui renvoie un JSON contraint par schema ;
-  4. ecrit fournisseur, date, montant et numero dans `factures_achat`.
+  4. ecrit fournisseur, date, montant et numero dans `factures_achat`. Le
+     fournisseur et le numero etaient extraits puis jetes jusqu'au 04/11/2026,
+     faute de colonnes pour les recevoir — ce sont pourtant eux qui permettront
+     de renommer les fichiers depuis la base.
 
 Ce qu'il ne fait PAS, et ne doit jamais faire :
   - aucun fichier n'est renomme, deplace, modifie ni supprime. Le script
@@ -224,7 +227,7 @@ def a_reprendre():
     filtre = f"or=(montant.is.null,montant.gte.{int(SEUIL_ABERRANT)},date_facture.is.null)"
     lignes = supabase(
         "GET",
-        f"factures_achat?select=id,fichier_id,nom,societe,montant,date_facture"
+        f"factures_achat?select=id,fichier_id,nom,societe,montant,date_facture,fournisseur,numero"
                 # « nullsfirst » et non « nullslast » : les factures SANS date passent en
         # tete. Ce sont elles qui bloquent le rapprochement, et avec l'ancien
         # tri un lot de 15 n'en atteignait aucune — l'essai du 04/11 n'a lu que
@@ -400,6 +403,17 @@ def main() -> int:
             continue
 
         charge = {"montant": apres}
+
+        # Le fournisseur et le numero etaient extraits puis JETES : la table
+        # n'avait pas de colonnes pour les recevoir. Elles existent depuis le
+        # 04/11/2026, et ce sont elles qui permettront de renommer le fichier
+        # a partir de la base — jamais l'inverse.
+        fournisseur = (extrait.get("fournisseur") or "").strip()
+        if fournisseur and not ligne.get("fournisseur"):
+            charge["fournisseur"] = fournisseur[:200]
+        numero = (extrait.get("numero") or "").strip()
+        if numero and numero not in ("-", "n/a", "N/A") and not ligne.get("numero"):
+            charge["numero"] = numero[:60]
         # Meme regle pour la date que pour le montant : on comble un vide, on ne
         # remplace pas en silence. Les dates en base viennent du nom de fichier
         # et sont souvent justes a quelques jours pres ; les reecrire toutes
