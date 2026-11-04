@@ -1,8 +1,12 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import OutilPage from '../../components/OutilPage'
 import { supabase } from '../../lib/supabase'
 
 // ─── Fournisseurs ──────────────────────────────────────────────────────────
+//
+// Onglet de Paramètres, aux côtés des catégories. Ce n'est PAS un outil : le
+// menu Outils sert à gagner du temps ou à produire une analyse pour un client
+// (recherche BCE, questionnaire investisseur, simulateur successoral). Une
+// table de référence partagée n'y a rien à faire — elle se configure.
 //
 // Les fiches sont créées automatiquement à partir de ce qui est lu dans les
 // PDF, groupées par numéro de TVA. Une seule chose est saisie à la main, et
@@ -20,7 +24,7 @@ import { supabase } from '../../lib/supabase'
 
 const fmt = n => (n ?? 0).toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
 
-export default function ToolFournisseurs() {
+export default function GestionFournisseurs() {
   const [lignes, setLignes]   = useState(null)
   const [erreur, setErreur]   = useState(null)
   const [q, setQ]             = useState('')
@@ -88,15 +92,27 @@ export default function ToolFournisseurs() {
                color: filtre === v ? '#fff' : '#64748b' }}>{libelle}</button>
   )
 
+  if (lignes === null) {
+    return <div style={{ padding: 28, color: '#94a3b8', fontSize: 13 }}>Chargement des fournisseurs…</div>
+  }
+
   return (
-    <OutilPage
-      titre="Fournisseurs"
-      sousTitre="Donnez un nom court à chaque fournisseur — c'est lui qui nommera les fichiers"
-      chargement={lignes === null}
-      erreur={erreur}
-      largeurMax={1000}
-      actions={<button onClick={charger} style={{ padding: '7px 13px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Rafraîchir</button>}
-    >
+    <div>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#1e293b' }}>Fournisseurs</div>
+          <div style={{ fontSize: 12.5, color: '#94a3b8', marginTop: 2 }}>
+            Donnez un nom court à chaque fournisseur — c'est lui qui nommera les fichiers
+          </div>
+        </div>
+        <button onClick={charger} style={{ padding: '7px 13px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Rafraîchir</button>
+      </div>
+
+      {erreur && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '11px 15px', marginBottom: 12, color: '#991b1b', fontSize: 13 }}>
+          {erreur.message || String(erreur)}
+        </div>
+      )}
       <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 15px', marginBottom: 14, fontSize: 13, color: '#475569', lineHeight: 1.5 }}>
         <b>{nommes} / {total}</b> fournisseurs nommés — ils couvrent <b>{couv} %</b> de tes factures.
         {couv < 80 && <> Les premiers de la liste sont les plus rentables à traiter : inutile d'aller jusqu'au bout.</>}
@@ -150,6 +166,6 @@ export default function ToolFournisseurs() {
           </div>
         )
       })}
-    </OutilPage>
+    </div>
   )
 }

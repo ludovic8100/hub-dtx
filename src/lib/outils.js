@@ -24,16 +24,6 @@ import { lazy } from 'react'
 
 export const OUTILS = [
   {
-    cle: 'fournisseurs',
-    titre: 'Fournisseurs',
-    sousTitre: "Donnez un nom court à chaque fournisseur — c'est lui qui nommera les fichiers",
-    description: "Les fiches sont créées automatiquement depuis les factures lues, groupées par n° de TVA. Vous n'y saisissez qu'une chose : le nom d'usage.",
-    icone: '/assets/tools/icon-bce.png',
-    chemin: '/tools/fournisseurs',
-    permission: 'acc_tools',
-    composant: lazy(() => import('../pages/tools/ToolFournisseurs')),
-  },
-  {
     cle: 'bce',
     titre: 'Recherche BCE',
     sousTitre: 'Entreprise belge — par dénomination ou n° BCE (10 chiffres)',
