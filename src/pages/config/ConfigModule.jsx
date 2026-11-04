@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { bootstrapConfigs } from '../../lib/bootstrapConfigs'
 import GestionCategories from './GestionCategories'
+import GestionFournisseurs from './GestionFournisseurs'
 import BceSearch from '../../components/BceSearch'
 
 // ─── Présentation des sociétés (libellé et couleur de la carte) ─────────────
@@ -401,7 +402,7 @@ export default function ConfigModule() {
     return nomA.localeCompare(nomB, 'fr', { sensitivity: 'base' })
   })
 
-  const TABS = [['societes', '🏢 Sociétés'], ['documents', '📄 Documents'], ['users', '👥 Utilisateurs & acteurs métier'], ['categories', '🏷️ Catégories compta']]
+  const TABS = [['societes', '🏢 Sociétés'], ['documents', '📄 Documents'], ['users', '👥 Utilisateurs & acteurs métier'], ['categories', '🏷️ Catégories compta'], ['fournisseurs', '🚚 Fournisseurs']]
 
   return (
     <Layout currentPage="Configuration">
@@ -419,6 +420,7 @@ export default function ConfigModule() {
         {loading && <div style={{ color: '#94a3b8', padding: 20 }}>Chargement…</div>}
 
         {tab === 'categories' && <GestionCategories />}
+        {tab === 'fournisseurs' && <GestionFournisseurs />}
 
 
         {/* ─────────── SOCIÉTÉS & DOCUMENTS ─────────── */}
