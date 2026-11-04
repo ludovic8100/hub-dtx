@@ -30,11 +30,13 @@ Variables d'environnement :
   SUPABASE_URL, SUPABASE_SERVICE_KEY                voir scripts/_env.py
   DRY_RUN=1        lit et affiche la comparaison, n'ecrit rien (defaut en manuel)
   ECHANTILLON=20   nombre de factures a traiter ; 0 = toutes
-  SEUIL_ABERRANT   montant au-dela duquel une valeur est jugee fausse (100000)
+  SEUIL_ABERRANT   montant au-dela duquel une valeur est jugee fausse (1000000)
+  ECRASER=1        ecrire aussi quand la base porte deja un montant different
 """
 import base64
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.parse
@@ -56,7 +58,11 @@ SECRET = os.environ.get("GRAPH_CLIENT_SECRET", "").strip()
 
 MODELE = os.environ.get("MODELE_CLAUDE", "claude-haiku-5-5")
 ECHANTILLON = int(os.environ.get("ECHANTILLON", "20") or 0)
-SEUIL_ABERRANT = float(os.environ.get("SEUIL_ABERRANT", "100000"))
+# 100 000 etait trop bas : 127 factures entre 100 k€ et 1 M€ sont legitimes
+# (une facture DTX de 105 000 € a ete rejetee a tort au premier essai), quand
+# les 71 au-dessus du million viennent toutes d'un horodatage mal lu.
+SEUIL_ABERRANT = float(os.environ.get("SEUIL_ABERRANT", "1000000"))
+ECRASER = os.environ.get("ECRASER") == "1"
 # Une requete Claude accepte 32 Mo ; au-dela on passe son tour plutot que
 # d'echouer. Les factures depassant 20 Mo sont des scans tres lourds, rares.
 TAILLE_MAX = 20 * 1024 * 1024
@@ -134,15 +140,32 @@ def supabase(methode: str, chemin: str, charge=None, entetes=None):
         return json.loads(corps) if corps else None
 
 
+# Le dossier FACTURES ne contient pas que des factures d'achat. L'echantillon
+# du 03/11 l'a montre : 18 des 20 premiers fichiers etaient des fiches de paie,
+# des avis de remboursement ou des releves. Mesure en base : 373 des 1 290
+# lignes sans montant sont des fiches de paie. Les envoyer a la lecture coute
+# de l'argent pour un refus garanti, et prendrait le risque qu'un montant de
+# salaire finisse en montant de facture.
+HORS_FACTURES = ("fiche de paie", "fiche_de_paie", "avis de remboursement",
+                 "releve", "relevé", "extrait de compte", "coda")
+
+
 def a_reprendre():
-    """Les factures dont le montant manque ou est manifestement faux."""
+    """Les factures d'achat dont le montant manque ou est manifestement faux."""
     filtre = f"or=(montant.is.null,montant.gte.{int(SEUIL_ABERRANT)})"
-    limite = f"&limit={ECHANTILLON}" if ECHANTILLON else ""
-    return supabase(
+    lignes = supabase(
         "GET",
         f"factures_achat?select=id,fichier_id,nom,societe,montant,date_facture"
-        f"&sens=eq.achat&fichier_id=like.01*&{filtre}&order=date_facture.desc.nullslast{limite}",
+        f"&sens=eq.achat&fichier_id=like.01*&{filtre}&order=date_facture.desc.nullslast"
+        + (f"&limit={5 * ECHANTILLON}" if ECHANTILLON else ""),
     ) or []
+    gardees = [l for l in lignes
+               if not any(mot in (l.get("nom") or "").lower() for mot in HORS_FACTURES)]
+    ecartees = len(lignes) - len(gardees)
+    if ecartees:
+        print(f"{ecartees} document(s) ecarte(s) : ce ne sont pas des factures d'achat "
+              f"(fiches de paie, releves, avis).")
+    return gardees[:ECHANTILLON] if ECHANTILLON else gardees
 
 
 # ── Lecture par Claude ────────────────────────────────────────────────────────
@@ -204,6 +227,24 @@ def lire_facture(client, pdf: bytes) -> dict | None:
     return None
 
 
+RE_ISO = re.compile(r"^(20\d{2})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$")
+RE_BELGE = re.compile(r"^(0[1-9]|[12]\d|3[01])[-/](0[1-9]|1[0-2])[-/](20\d{2})$")
+
+
+def normaliser_date(valeur):
+    """Rend une date ISO, ou None. Le schema demande AAAA-MM-JJ ; le modele a
+    renvoye « 13-10-2017 » sur une facture Belfius de 2017, et Postgres a
+    refuse la ligne — emportant les 61 factures suivantes du lot. On convertit
+    ce qu'on reconnait, on jette le reste plutot que de l'envoyer en base."""
+    if not isinstance(valeur, str):
+        return None
+    v = valeur.strip()
+    if RE_ISO.match(v):
+        return v
+    m = RE_BELGE.match(v)
+    return f"{m.group(3)}-{m.group(2)}-{m.group(1)}" if m else None
+
+
 def montant_plausible(valeur) -> bool:
     return isinstance(valeur, (int, float)) and 0 <= valeur < SEUIL_ABERRANT
 
@@ -231,6 +272,8 @@ def main() -> int:
     client = anthropic.Anthropic()
 
     lus = corriges = illisibles = ignores = 0
+    refusees = 0
+    desaccords, dates_divergentes = [], []
     jetons_entree = jetons_sortie = 0
 
     for i, ligne in enumerate(lignes, 1):
@@ -269,17 +312,67 @@ def main() -> int:
             print("    montant non exploitable, ligne laissee telle quelle", flush=True)
             continue
 
-        charge = {"montant": apres}
-        if extrait.get("date_facture"):
-            charge["date_facture"] = extrait["date_facture"]
-        if DRY_RUN:
+        # Trois cas, et un seul interdit l'ecriture automatique :
+        #  - la base est vide            -> on remplit, c'est tout l'objet du script ;
+        #  - la base porte un aberrant   -> on corrige, la valeur est fausse a coup sur ;
+        #  - la base porte autre chose   -> on NE TRANCHE PAS. Ecraser 28,78 € par
+        #    13,60 € sans que personne ne le voie serait la meme faute que celle
+        #    qu'on repare : une donnee changee en silence.
+        if avant is None or (isinstance(avant, (int, float)) and float(avant) >= SEUIL_ABERRANT):
+            pass
+        elif abs(float(avant) - float(apres)) < 0.01:
+            continue                      # deja juste, rien a ecrire
+        elif not ECRASER:
+            desaccords.append((ligne["nom"], float(avant), float(apres)))
+            print("    DESACCORD avec la base — laisse tel quel, a arbitrer", flush=True)
             continue
-        supabase("PATCH", f"factures_achat?id=eq.{ligne['id']}", charge,
-                 {"Prefer": "return=minimal"})
+
+        charge = {"montant": apres}
+        # Meme regle pour la date que pour le montant : on comble un vide, on ne
+        # remplace pas en silence. Les dates en base viennent du nom de fichier
+        # et sont souvent justes a quelques jours pres ; les reecrire toutes
+        # sans le dire serait exactement ce qu'on s'interdit pour les montants.
+        date_pdf = normaliser_date(extrait.get("date_facture"))
+        if date_pdf:
+            if not ligne.get("date_facture"):
+                charge["date_facture"] = date_pdf
+            elif str(ligne["date_facture"]) != str(date_pdf):
+                dates_divergentes.append((ligne["nom"], str(ligne["date_facture"]), date_pdf))
+                if ECRASER:
+                    charge["date_facture"] = date_pdf
+        if DRY_RUN:
+            corriges += 1
+            continue
+        try:
+            supabase("PATCH", f"factures_achat?id=eq.{ligne['id']}", charge,
+                     {"Prefer": "return=minimal"})
+        except urllib.error.HTTPError as e:
+            # Un refus sur une ligne ne doit jamais emporter le lot entier :
+            # c'est ce qui a coute 44 minutes et 61 factures le 03/11.
+            print(f"    ECRITURE REFUSEE ({e.code}) : {e.read().decode()[:140]}", flush=True)
+            refusees += 1
+            continue
         corriges += 1
 
-    print(f"\n{lus} lue(s), {corriges} corrigee(s), {illisibles} illisible(s), "
-          f"{ignores} trop lourde(s).")
+    print(f"\n{lus} lue(s), {corriges} {'a corriger' if DRY_RUN else 'corrigee(s)'}, "
+          f"{illisibles} illisible(s), {ignores} trop lourde(s), "
+          f"{refusees} refusee(s) en base, "
+          f"{len(desaccords)} desaccord(s) de montant, "
+          f"{len(dates_divergentes)} date(s) divergente(s).")
+
+    if desaccords:
+        print(f"\n{len(desaccords)} facture(s) ou le PDF contredit la base. Rien n'a ete")
+        print("ecrit sur celles-ci — elles demandent un arbitrage humain :")
+        print(f"  {'base':>12} {'PDF':>12}   fichier")
+        for nom, av, ap in desaccords[:40]:
+            print(f"  {av:>12.2f} {ap:>12.2f}   {nom[:62]}")
+
+    if dates_divergentes and not ECRASER:
+        print(f"\n{len(dates_divergentes)} date(s) ou le PDF differe de la base "
+              f"(celle-ci vient du nom de fichier). Conservees telles quelles ;")
+        print("ECRASER=1 fait foi au PDF.")
+        for nom, av, ap in dates_divergentes[:15]:
+            print(f"  {av} -> {ap}   {nom[:58]}")
     if DRY_RUN:
         print("DRY_RUN : aucune ecriture en base. Aucun fichier n'a ete modifie dans aucun cas.")
     print(f"LIGNES_ECRITES={corriges}")

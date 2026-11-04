@@ -1,0 +1,89 @@
+name: Bordereaux SharePoint → Supabase
+
+# Alimente `bordereaux` depuis le dossier SharePoint BORDEREAUX, en remplacement
+# du workflow n8n « Bordereaux BQT/RCP → Supabase » arrêté le 20/10/2026.
+#
+# Sans cette indexation, les relevés de compte producteur n'entrent plus : au
+# 03/11, septembre n'avait que 18 relevés et octobre 1. Les deux chantiers qui
+# en dépendent — rapprochement des relevés avec les virements de commissions,
+# et suivi des factures manquantes — travaillaient donc sur des données
+# arrêtées en octobre.
+#
+# Lancement manuel en DRY_RUN par défaut : on regarde ce qui serait écrit avant
+# d'écrire quoi que ce soit.
+
+on:
+  schedule:
+    - cron: '52 5 * * *'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Environnement cible (base Supabase)"
+        type: choice
+        options: [test, production]
+        default: test
+      dry_run:
+        description: "Test sans écriture (parcourt et affiche seulement)"
+        type: boolean
+        default: true
+      purge:
+        description: "Supprimer les lignes dont le fichier a disparu"
+        type: boolean
+        default: false
+
+concurrency:
+  group: bordereaux-sharepoint
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'production' }}
+    env:
+      APP_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'production' }}
+      SUPABASE_URL: ${{ vars.SUPABASE_URL || ((github.event_name == 'workflow_dispatch' && inputs.target || 'production') == 'test' && 'https://lvdnzbhplnzuwdqtitdb.supabase.co' || '') }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      GRAPH_TENANT_ID: ${{ secrets.GRAPH_TENANT_ID }}
+      GRAPH_CLIENT_ID: ${{ secrets.GRAPH_CLIENT_ID }}
+      GRAPH_CLIENT_SECRET: ${{ secrets.GRAPH_CLIENT_SECRET }}
+      DRY_RUN: ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '1' || '' }}
+      # La purge est désactivée par défaut, à l'inverse des factures : un
+      # bordereau porte un montant extrait et un lien vers un virement, et un
+      # fichier déplacé dans SharePoint n'est pas un fichier disparu.
+      PURGE: ${{ (github.event_name == 'workflow_dispatch' && inputs.purge) && '1' || '0' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verifier les secrets
+        run: |
+          for s in GRAPH_TENANT_ID GRAPH_CLIENT_ID GRAPH_CLIENT_SECRET; do
+            if [ -z "${!s}" ]; then echo "::error::Secret $s manquant"; exit 1; fi
+          done
+          if [ -z "$SUPABASE_SERVICE_KEY" ] && [ -z "$DRY_RUN" ]; then
+            echo "::error::Secret SUPABASE_SERVICE_KEY manquant (requis hors DRY_RUN)"; exit 1
+          fi
+          echo "Cible: $APP_ENV (${SUPABASE_URL:-production par defaut}) — Mode: ${DRY_RUN:+DRY_RUN}${DRY_RUN:-ECRITURE REELLE}"
+
+      - name: Journal - debut
+        id: journal
+        if: ${{ env.DRY_RUN == '' }}
+        run: echo "id=$(python scripts/job_journal.py debut bordereaux-sharepoint ${{ github.event_name == 'schedule' && 'cron' || 'manuel' }})" >> "$GITHUB_OUTPUT"
+
+      # `shell: bash` impose -o pipefail : sans lui le code de sortie serait
+      # celui de `tee`, et un scan mort remonterait en succes.
+      - name: Scan SharePoint
+        id: scan
+        shell: bash
+        run: python scripts/bordereaux_sharepoint.py | tee /tmp/scan.log
+
+      - name: Journal - fin
+        if: ${{ always() && env.DRY_RUN == '' }}
+        run: |
+          LIGNES=$(grep -oP 'LIGNES_ECRITES=\K[0-9]+' /tmp/scan.log | tail -1 || true)
+          python scripts/job_journal.py fin "${{ steps.journal.outputs.id }}" \
+            "${{ job.status == 'success' && 'succes' || 'echec' }}" "$LIGNES" \
+            "GitHub Action bordereaux-sharepoint — ${{ job.status }}"

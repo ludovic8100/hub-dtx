@@ -9,11 +9,13 @@
 
 const PROD = {
   SUPABASE_URL:      'https://tndwonqdbeszkcztkzqe.supabase.co',
-  SUPABASE_ANON_KEY: 'sb_publishable_LrEXAIusF3VxlBPmJnwddg_fk_wdCzw', // clé publishable (publique) — alignée sur src/config/env.js le 02/11/2026 ; l'ancienne, supprimée le 31/10, était restée ici
+  SUPABASE_ANON_KEY: 'sb_publishable_xBt6ZaZGh5trEloyMCNRuA_MN-jesVJ', // clé publishable (publique)
   N8N_URL:           'https://n8n.srv1082740.hstgr.cloud',
   SHAREPOINT_SITE:   'https://dynassur.sharepoint.com/sites/ADMINISTRATION',
-  // Identifiant Graph du meme site (repris du workflow n8n « Apercu facture »).
+  // Identifiant Graph du même site (repris du workflow n8n « Apercu facture »).
   SHAREPOINT_SITE_ID: '438fcfb3-10f8-455b-8308-1f832d4db26d',
+  // Boîte Graph qui expédie les mails du Hub (repris de « Tickets - Alertes mail »).
+  MAIL_EXPEDITEUR_ID: '4614cde7-a3af-40a7-a945-b95536399ead',
   SHAREPOINT_ROOT:   'Documents partages',
   HUB_URL:           'https://hub-dtx.vercel.app',
 }
@@ -52,6 +54,15 @@ export const N8N_TEST_SUFFIX = IS_TEST ? (env.N8N_TEST_SUFFIX ?? '-test') : ''
 export const n8nWebhook = chemin => `${N8N_URL}/webhook/${String(chemin).replace(/^\/+/, '')}${N8N_TEST_SUFFIX}`
 export const SHAREPOINT_SITE = lire('SHAREPOINT_SITE')
 export const SHAREPOINT_SITE_ID = lire('SHAREPOINT_SITE_ID')
+export const MAIL_EXPEDITEUR_ID = lire('MAIL_EXPEDITEUR_ID')
+// Clé CBEAPI (recherche Banque-Carrefour). Aucun défaut : secret, jamais dans le dépôt.
+//
+// Les deux noms sont acceptés. La variable posée dans Vercel s'appelle
+// « CBEAPI » ; ce fichier attendait « CBEAPI_KEY ». Plutôt que d'imposer un
+// renommage à la main — et de refaire l'erreur au prochain environnement — on
+// lit l'un ou l'autre. Un secret correctement posé ne doit pas rester inerte
+// pour une affaire de suffixe.
+export const CBEAPI_KEY = env.CBEAPI_KEY || env.CBEAPI || ''
 export const SHAREPOINT_ROOT = lire('SHAREPOINT_ROOT', { defautTest: 'Documents partages/_TEST' })
 export const HUB_URL = lire('HUB_URL')
 
@@ -84,13 +95,6 @@ export const billit = entite => {
 export const PEPPOL_AUTORISE = IS_PROD || env.BILLIT_AUTORISE_EN_TEST === '1'
 
 // ── GitHub (relance des Actions de synchronisation) ───────────────────────────
-// Téléphonie 3CX — lecture de l'état du standard (sens Hub → 3CX, nouveau).
-// Absentes tant que le client API n'est pas créé dans la console 3CX : les
-// fonctions qui s'en servent répondent alors « non configuré », sans planter.
-export const THREECX_URL           = (env.THREECX_URL || '').replace(/\/+$/, '')
-export const THREECX_CLIENT_ID     = env.THREECX_CLIENT_ID || ''
-export const THREECX_CLIENT_SECRET = env.THREECX_CLIENT_SECRET || ''
-
 export const GITHUB_DISPATCH_TOKEN = env.GITHUB_DISPATCH_TOKEN || ''
 export const GITHUB_REPO = env.GITHUB_REPO || 'ludovic8100/hub-dtx'
 /** Branche sur laquelle lancer les workflows : main en prod, staging en test. */
@@ -99,7 +103,8 @@ export const GITHUB_SYNC_REF = env.GITHUB_SYNC_REF || (IS_TEST ? 'staging' : 'ma
 export default {
   APP_ENV, IS_PROD, IS_TEST,
   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY,
-  N8N_URL, N8N_TEST_SUFFIX, n8nWebhook, SHAREPOINT_SITE, SHAREPOINT_SITE_ID, SHAREPOINT_ROOT, HUB_URL,
+  N8N_URL, N8N_TEST_SUFFIX, n8nWebhook, SHAREPOINT_SITE, SHAREPOINT_ROOT, HUB_URL,
+  SHAREPOINT_SITE_ID, MAIL_EXPEDITEUR_ID, CBEAPI_KEY,
   AZURE, MAIL_REDIRECT_TO,
   billit, PEPPOL_AUTORISE,
   GITHUB_DISPATCH_TOKEN, GITHUB_REPO, GITHUB_SYNC_REF,

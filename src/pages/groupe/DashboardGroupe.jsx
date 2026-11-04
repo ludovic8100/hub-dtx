@@ -525,7 +525,15 @@ export default function DashboardGroupe() {
           { data: txs },
         ] = await Promise.all([
           supabase.from('comptes_bancaires').select('*, societes(code,nom)').eq('actif', true).order('banque'),
-          supabase.from('transactions').select('id,date_execution,date_valeur,montant,compte_id').gte('date_execution', new Date(new Date().setMonth(new Date().getMonth()-6)).toISOString().slice(0,10)).limit(2000),
+          // Six mois de mouvements, tous comptes : 2 050 lignes au 04/11/2026.
+          // L'ancienne limite de 2 000, sans tri, en coupait une partie au
+          // hasard — les flux mensuels affichés auraient ete faux sans rien
+          // dire. La marge tient plusieurs annees de croissance.
+          supabase.from('transactions')
+            .select('id,date_execution,date_valeur,montant,compte_id')
+            .gte('date_execution', new Date(new Date().setMonth(new Date().getMonth()-6)).toISOString().slice(0,10))
+            .order('date_execution', { ascending: false })
+            .limit(20000),
         ])
         setComptes(cpts || [])
         setTransactions(txs || [])
@@ -564,6 +572,14 @@ export default function DashboardGroupe() {
         {/* 3 — Comptes bancaires pleine largeur */}
         <div style={{ marginBottom:24 }}>
           <BlocBanque comptes={comptes} loading={loading} onRafraichir={load} />
+        </div>
+
+        {/* 3a — Trésorerie consolidée. Le bloc était écrit depuis le départ mais
+            n'était rendu nulle part : personne ne l'a jamais vu, et sa requête
+            était fausse, donc même en test il n'aurait rien montré de juste.
+            Les deux sont corrigés — les 13 comptes des six entités remontent. */}
+        <div style={{ marginBottom:24 }}>
+          <BlocTresorerie comptes={comptes} transactions={transactions} loading={loading} />
         </div>
 
         {/* 3b — Factures à pointer (toutes sociétés, tous comptes) */}

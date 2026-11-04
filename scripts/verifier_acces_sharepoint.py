@@ -10,6 +10,7 @@ Il dit en clair ce qui manque quand ça échoue, plutôt que de renvoyer un code
 HTTP brut : l'erreur la plus fréquente est l'autorisation ajoutée mais jamais
 consentie par un administrateur.
 """
+import base64
 import json
 import os
 import sys
@@ -44,6 +45,24 @@ def jeton_graph() -> str:
         return json.loads(r.read().decode())["access_token"]
 
 
+def permissions_du_jeton(jeton: str) -> list[str]:
+    """Les autorisations d'application reellement portees par le jeton.
+
+    Un jeton client_credentials liste ses permissions dans la claim `roles` de
+    sa charge utile. On la lit telle quelle — pas de verification de signature,
+    on ne fait que relire notre propre jeton — ce qui evite de deviner ce qui a
+    ete accorde dans le portail, ou d'envoyer un vrai mail pour le decouvrir.
+
+    Le jeton lui-meme n'est jamais affiche.
+    """
+    try:
+        charge = jeton.split(".")[1]
+        charge += "=" * (-len(charge) % 4)          # base64url sans remplissage
+        return sorted(json.loads(base64.urlsafe_b64decode(charge)).get("roles", []))
+    except (IndexError, ValueError, json.JSONDecodeError):
+        return []
+
+
 def main() -> int:
     manquants = [n for n, v in
                  (("GRAPH_TENANT_ID", TENANT), ("GRAPH_CLIENT_ID", CLIENT), ("GRAPH_CLIENT_SECRET", SECRET))
@@ -56,6 +75,13 @@ def main() -> int:
     try:
         jeton = jeton_graph()
         print("1/3  Jeton Microsoft Graph obtenu.")
+        roles = permissions_du_jeton(jeton)
+        print(f"     Autorisations portees : {', '.join(roles) if roles else '(aucune)'}")
+        for besoin, a_quoi in (("Sites.Read.All", "lire les documents SharePoint"),
+                               ("Mail.Send", "envoyer devis, factures et rappels"),
+                               ("Mail.Read", "lire une boite aux lettres")):
+            etat = "oui" if besoin in roles else "NON"
+            print(f"       {besoin:<22} {etat:<4} — {a_quoi}")
     except urllib.error.HTTPError as e:
         detail = e.read().decode()[:400]
         print(f"::error::Impossible d'obtenir un jeton ({e.code}). "
