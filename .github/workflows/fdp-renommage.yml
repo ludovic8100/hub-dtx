@@ -50,5 +50,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python scripts/fdp_renommage.py
-        working-directory: scripts
+
+      - name: Verifier les secrets
+        run: |
+          for s in GRAPH_TENANT_ID GRAPH_CLIENT_ID GRAPH_CLIENT_SECRET SUPABASE_SERVICE_KEY; do
+            if [ -z "${!s}" ]; then echo "::error::Secret $s manquant"; exit 1; fi
+          done
+          echo "Cible: $APP_ENV - Lot: ${LOT:-tous} - Mode: ${DRY_RUN:+ESSAI A BLANC}${DRY_RUN:-RENOMMAGE REEL}"
+
+      - name: Renommage
+        run: python scripts/fdp_renommage.py
