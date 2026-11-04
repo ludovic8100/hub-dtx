@@ -148,8 +148,36 @@ def supabase(methode: str, chemin: str, charge=None, entetes=None):
 # lignes sans montant sont des fiches de paie. Les envoyer a la lecture coute
 # de l'argent pour un refus garanti, et prendrait le risque qu'un montant de
 # salaire finisse en montant de facture.
+# L'essai du 04/11 a lu 13 documents sur 15 pour s'entendre repondre « ce n'est
+# pas une facture » : notes de frais, extraits ING et CBC, documents Partena.
+# Chacun coute un appel API pour rien. Sur les 4 722 factures sans date, environ
+# 780 sont dans ce cas.
+#
+# Les motifs restent volontairement prudents : mieux vaut lire un document de
+# trop que d'ecarter une vraie facture. « nf » n'est reconnu qu'isole, pour ne
+# pas ecarter « Confort NF » ou un fournisseur dont le nom contient ces lettres.
 HORS_FACTURES = ("fiche de paie", "fiche_de_paie", "avis de remboursement",
-                 "releve", "relevé", "extrait de compte", "coda")
+                 "releve", "relevé", "extrait de compte", "coda",
+                 "note de frais", "note_de_frais", "decompte", "dcompte",
+                 "décompte", "secretariat social", "secrétariat social")
+
+#: Motifs a mot entier, pour ceux que la simple inclusion rendrait trop larges.
+#
+# « partena » a ete essaye puis RETIRE : Partena facture ses services de
+# secretariat social, et « I0738 - Partena Asi EUR 347,50.pdf » est une vraie
+# facture d'achat. L'exclure en bloc aurait fait sauter 616 documents dont une
+# part est bien a rapprocher. Les bulletins de paie de Partena sont deja pris
+# par « fiche de paie » et « decompte » ; les rares qui passent coutent un
+# appel pour s'entendre dire que ce n'est pas une facture, ce qui est le bon
+# sens de l'erreur.
+HORS_FACTURES_MOTIFS = re.compile(
+    r"(?:^|[^a-z0-9])nf(?:[^a-z0-9]|$)", re.IGNORECASE)
+
+
+def est_hors_facture(nom: str) -> bool:
+    bas = (nom or "").lower()
+    return (any(mot in bas for mot in HORS_FACTURES)
+            or bool(HORS_FACTURES_MOTIFS.search(nom or "")))
 
 
 # Un montant egal a une annee ronde (2020, 2026) ou a un numero de piece
@@ -197,11 +225,14 @@ def a_reprendre():
     lignes = supabase(
         "GET",
         f"factures_achat?select=id,fichier_id,nom,societe,montant,date_facture"
-        f"&sens=eq.achat&fichier_id=like.01*&{filtre}&order=date_facture.desc.nullslast"
+                # « nullsfirst » et non « nullslast » : les factures SANS date passent en
+        # tete. Ce sont elles qui bloquent le rapprochement, et avec l'ancien
+        # tri un lot de 15 n'en atteignait aucune — l'essai du 04/11 n'a lu que
+        # des lignes deja datees.
+        f"&sens=eq.achat&fichier_id=like.01*&{filtre}&order=date_facture.asc.nullsfirst"
         + (f"&limit={5 * ECHANTILLON}" if ECHANTILLON else ""),
     ) or []
-    gardees = [l for l in lignes
-               if not any(mot in (l.get("nom") or "").lower() for mot in HORS_FACTURES)]
+    gardees = [l for l in lignes if not est_hors_facture(l.get("nom"))]
     ecartees = len(lignes) - len(gardees)
     if ecartees:
         print(f"{ecartees} document(s) ecarte(s) : ce ne sont pas des factures d'achat "
