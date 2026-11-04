@@ -432,26 +432,39 @@ def main() -> int:
               f"{str(avant):>14} {marque} {str(apres):<12} "
               f"n°{extrait.get('numero') or '-'}", flush=True)
 
-        if not montant_plausible(apres):
-            print("    montant non exploitable, ligne laissee telle quelle", flush=True)
-            continue
+        # Un montant illisible ne doit pas faire jeter le reste : « 20250105 -
+        # OPENAI - 60€.pdf » a rendu « OpenAI, LLC » et « n°34712550-0002 » avec
+        # un montant inexploitable. Le fournisseur et le numero valent d'etre
+        # gardes — c'est le montant seul qu'on laisse en l'etat.
+        montant_exploitable = montant_plausible(apres)
+        if not montant_exploitable:
+            print("    montant non exploitable — fournisseur et numero conserves", flush=True)
 
-        # Trois cas, et un seul interdit l'ecriture automatique :
+        # Le MONTANT suit une regle prudente, trois cas dont un seul interdit
+        # l'ecriture :
         #  - la base est vide            -> on remplit, c'est tout l'objet du script ;
         #  - la base porte un aberrant   -> on corrige, la valeur est fausse a coup sur ;
         #  - la base porte autre chose   -> on NE TRANCHE PAS. Ecraser 28,78 € par
         #    13,60 € sans que personne ne le voie serait la meme faute que celle
         #    qu'on repare : une donnee changee en silence.
-        if avant is None or montant_suspect(avant):
-            pass
+        #
+        # Cette regle ne vaut QUE pour le montant. Jusqu'au 04/11/2026 un
+        # `continue` partait d'ici des que le montant en base etait deja juste —
+        # c'est-a-dire dans la majorite des cas — et le fournisseur, le numero et
+        # la TVA, qu'on venait pourtant de payer pour lire, etaient jetes avec.
+        # On avait l'appel, on avait la reponse, et on n'en gardait rien.
+        charge = {}
+        if not montant_exploitable:
+            pass                          # on ne touche pas au montant
+        elif avant is None or montant_suspect(avant):
+            charge["montant"] = apres
         elif abs(float(avant) - float(apres)) < 0.01:
-            continue                      # deja juste, rien a ecrire
-        elif not ECRASER:
+            pass                          # deja juste : on n'y touche pas
+        elif ECRASER:
+            charge["montant"] = apres
+        else:
             desaccords.append((ligne["nom"], float(avant), float(apres)))
-            print("    DESACCORD avec la base — laisse tel quel, a arbitrer", flush=True)
-            continue
-
-        charge = {"montant": apres}
+            print("    DESACCORD de montant — laisse tel quel, a arbitrer", flush=True)
 
         # Le fournisseur et le numero etaient extraits puis JETES : la table
         # n'avait pas de colonnes pour les recevoir. Elles existent depuis le
@@ -484,6 +497,9 @@ def main() -> int:
                 dates_divergentes.append((ligne["nom"], str(ligne["date_facture"]), date_pdf))
                 if ECRASER:
                     charge["date_facture"] = date_pdf
+        if not charge:
+            continue                      # rien de neuf a ecrire sur cette facture
+
         if DRY_RUN:
             corriges += 1
             continue
