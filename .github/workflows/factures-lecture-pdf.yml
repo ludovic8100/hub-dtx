@@ -19,6 +19,10 @@ on:
         description: "Nombre de factures a lire (0 = toutes)"
         type: string
         default: '20'
+      filtre_dossier:
+        description: "Restreindre a un dossier, ex. _DYNASSUR/ACHATS/2025 (vide = partout)"
+        type: string
+        default: ''
       dry_run:
         description: "Lire et comparer sans rien ecrire en base"
         type: boolean
@@ -41,6 +45,7 @@ jobs:
       APP_ENV: ${{ inputs.target }}
       SUPABASE_URL: ${{ vars.SUPABASE_URL || (inputs.target == 'test' && 'https://lvdnzbhplnzuwdqtitdb.supabase.co' || '') }}
       SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      FILTRE_DOSSIER: ${{ inputs.filtre_dossier }}
       GRAPH_TENANT_ID: ${{ secrets.GRAPH_TENANT_ID }}
       GRAPH_CLIENT_ID: ${{ secrets.GRAPH_CLIENT_ID }}
       GRAPH_CLIENT_SECRET: ${{ secrets.GRAPH_CLIENT_SECRET }}

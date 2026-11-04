@@ -35,6 +35,7 @@ Variables d'environnement :
   SUPABASE_URL, SUPABASE_SERVICE_KEY                voir scripts/_env.py
   DRY_RUN=1        lit et affiche la comparaison, n'ecrit rien (defaut en manuel)
   ECHANTILLON=20   nombre de factures a traiter ; 0 = toutes
+  FILTRE_DOSSIER   restreint a un dossier, ex. « _DYNASSUR/ACHATS/2025 »
   SEUIL_ABERRANT   montant au-dela duquel une valeur est jugee fausse (1000000)
   ECRASER=1        ecrire aussi quand la base porte deja un montant different
 """
@@ -67,6 +68,11 @@ ECHANTILLON = int(os.environ.get("ECHANTILLON", "20") or 0)
 # (une facture DTX de 105 000 € a ete rejetee a tort au premier essai), quand
 # les 71 au-dessus du million viennent toutes d'un horodatage mal lu.
 SEUIL_ABERRANT = float(os.environ.get("SEUIL_ABERRANT", "1000000"))
+
+#: Restreint le lot a un dossier SharePoint, par exemple « _DYNASSUR/ACHATS/2025 ».
+#  Le chemin n'est pas stocke en base (la colonne `chemin` est vide sur 5 508
+#  lignes sur 5 509), mais l'URL le contient en entier : on filtre dessus.
+FILTRE_DOSSIER = os.environ.get("FILTRE_DOSSIER", "").strip()
 ECRASER = os.environ.get("ECRASER") == "1"
 # Une requete Claude accepte 32 Mo ; au-dela on passe son tour plutot que
 # d'echouer. Les factures depassant 20 Mo sont des scans tres lourds, rares.
@@ -217,6 +223,9 @@ def a_reprendre():
     - montant absent ;
     - montant manifestement faux (au-dela du seuil, ou qui est en realite une
       annee ou un numero de piece — voir montant_suspect) ;
+    - FOURNISSEUR absent. Sans lui, impossible de renommer le fichier depuis
+      la base — et le renommage est ce qui permet de retrouver une facture en
+      naviguant dans le dossier ;
     - DATE absente. 4 722 factures d'achat sur 7 588 au 04/11/2026, soit 62 %.
       Elles portent l'ancienne convention de nommage (« I0881 - Nubeo EUR
       139,65.pdf »), qui ne contient aucune date. Sans date, le rapprochement
@@ -224,7 +233,10 @@ def a_reprendre():
       Le code plus bas savait deja remplir la date depuis le PDF — ces lignes
       n'etaient simplement jamais choisies.
     """
-    filtre = f"or=(montant.is.null,montant.gte.{int(SEUIL_ABERRANT)},date_facture.is.null)"
+    filtre = (f"or=(montant.is.null,montant.gte.{int(SEUIL_ABERRANT)},"
+              f"date_facture.is.null,fournisseur.is.null)")
+    if FILTRE_DOSSIER:
+        filtre += "&url=like.*" + urllib.parse.quote(FILTRE_DOSSIER, safe="") + "*"
     lignes = supabase(
         "GET",
         f"factures_achat?select=id,fichier_id,nom,societe,montant,date_facture,fournisseur,numero"
