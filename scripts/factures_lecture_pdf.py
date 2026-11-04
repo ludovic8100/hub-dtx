@@ -44,6 +44,7 @@ import json
 import os
 import re
 import sys
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -88,8 +89,14 @@ Regles :
   porte obligatoirement. C'est la cle la plus sure pour identifier une
   entreprise : deux societes peuvent s'appeler pareil, aucune ne partage son
   numero. Rends-le sous la forme BE0123456789, sans points ni espaces.
-- `fournisseur` est celui qui EMET la facture, pas le destinataire (Dynassur,
-  DTX, LODE, Hexagroup et Privé sont les destinataires).
+- `fournisseur` est celui qui EMET la facture, pas le destinataire.
+- `destinataire` est celui A QUI la facture est adressee : le nom qui figure
+  dans le bloc « client », « facture a », « bill to », « livre a ». C'est
+  souvent Dynassur, DTX, LODE, Hexagroup — mais PAS toujours, et c'est tout
+  l'interet de le lire : un fichier range dans le dossier d'une societe peut
+  etre adresse a quelqu'un d'autre. Recopie ce qui est ecrit, sans corriger.
+  Pour un ticket de caisse sans client nomme, mets null.
+- `tva_destinataire` est le n° TVA du CLIENT, s'il figure sur la facture.
 - Si une information est absente ou illisible, mets null. N'invente rien,
   ne deduis pas un montant a partir d'un numero de document."""
 
@@ -101,14 +108,79 @@ SCHEMA = {
                             "description": "n° TVA de l'EMETTEUR, ex. BE0123456789 ; null si absent"},
         "date_facture": {"type": ["string", "null"], "description": "AAAA-MM-JJ"},
         "montant": {"type": ["number", "null"], "description": "total TTC en euros"},
+        "destinataire": {"type": ["string", "null"],
+                         "description": "nom du CLIENT facture, tel qu'ecrit ; null si aucun"},
+        "tva_destinataire": {"type": ["string", "null"],
+                             "description": "n° TVA du CLIENT, ex. BE0123456789 ; null si absent"},
         "numero": {"type": ["string", "null"]},
         "note_de_credit": {"type": "boolean"},
         "lisible": {"type": "boolean", "description": "false si le document est illisible ou n'est pas une facture"},
     },
     "required": ["fournisseur", "tva_fournisseur", "date_facture", "montant",
-                 "numero", "note_de_credit", "lisible"],
+                 "destinataire", "tva_destinataire", "numero", "note_de_credit",
+                 "lisible"],
     "additionalProperties": False,
 }
+
+
+# ── Le destinataire : la facture dit a qui elle est adressee ─────────────────
+#
+# Jusqu'ici la societe d'une facture venait du DOSSIER. Un fichier mal range
+# produisait une facture attribuee a la mauvaise societe, et depuis le
+# renommage un nom de fichier qui AFFIRME cette erreur : « 20250120 -
+# DYNASSUR - RETIF LIEGE » pour une facture adressee a un particulier.
+#
+# Un nom de fichier faux est pire qu'un nom moche. Un nom moche coute une
+# recherche ; un nom faux clot la question.
+
+SOCIETES_REF = {
+    "DYNASSUR":  ("BE0677519858", ("DYNASSUR",)),
+    "DTX":       ("BE0780791404", ("DTX",)),
+    "LODE":      ("BE1010062582", ("LODE",)),
+    "HEXAGROUP": ("BE1019092589", ("HEXAGROUP", "HEXA GROUP")),
+}
+
+
+def sans_accent(t: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFD", t or "")
+                   if unicodedata.category(c) != "Mn")
+
+
+def normaliser_tva(brut: str) -> str:
+    t = re.sub(r"[^0-9A-Za-z]", "", brut or "").upper()
+    if not re.fullmatch(r"(BE)?0?\d{9,10}", t or ""):
+        return ""
+    if not t.startswith("BE"):
+        t = "BE" + t
+    if len(t) == 11:                       # BE + 9 chiffres : le zero initial manque
+        t = "BE0" + t[2:]
+    return t
+
+
+def destinataire_etranger(societe, nom, tva):
+    """La facture est-elle adressee a quelqu'un d'autre que la societe du dossier ?
+
+    Ne rend True que lorsqu'on est SUR. Un doute ne vaut pas une alerte :
+    signaler a tort des factures justes, c'est apprendre a ignorer les
+    signalements — et alors les vraies passent aussi.
+    """
+    ref = SOCIETES_REF.get((societe or "").upper())
+    if not ref:
+        return False, ""                   # PRIVE, HOL : pas de personne morale
+    bce, noms = ref
+
+    # Le n° TVA tranche seul quand il est la : deux societes peuvent porter le
+    # meme nom, aucune ne partage son numero.
+    t = normaliser_tva(tva)
+    if t:
+        return (t != bce), (f"adressee au n° TVA {t}, pas a {societe}" if t != bce else "")
+
+    if not nom or not nom.strip():
+        return False, ""                   # ticket de caisse : aucun client nomme
+    hay = sans_accent(nom).upper()
+    if any(n in hay for n in noms):
+        return False, ""
+    return True, f"adressee a « {nom.strip()[:80]} », pas a {societe}"
 
 
 # ── Microsoft Graph (lecture seule) ───────────────────────────────────────────
@@ -241,13 +313,14 @@ def a_reprendre():
       n'etaient simplement jamais choisies.
     """
     filtre = (f"or=(montant.is.null,montant.gte.{int(SEUIL_ABERRANT)},"
-              f"date_facture.is.null,fournisseur.is.null)")
+              f"date_facture.is.null,fournisseur.is.null,destinataire.is.null)")
     if FILTRE_DOSSIER:
         filtre += "&url=like.*" + urllib.parse.quote(FILTRE_DOSSIER, safe="") + "*"
     lignes = supabase(
         "GET",
         f"factures_achat?select=id,fichier_id,nom,societe,montant,date_facture,"
-        f"fournisseur,numero,tva_fournisseur"
+        f"fournisseur,numero,tva_fournisseur,destinataire,tva_destinataire,"
+        f"a_verifier,nom_origine"
                 # « nullsfirst » et non « nullslast » : les factures SANS date passent en
         # tete. Ce sont elles qui bloquent le rapprochement, et avec l'ancien
         # tri un lot de 15 n'en atteignait aucune — l'essai du 04/11 n'a lu que
@@ -390,7 +463,7 @@ def main() -> int:
 
     lus = corriges = illisibles = ignores = 0
     refusees = 0
-    desaccords, dates_divergentes = [], []
+    desaccords, dates_divergentes, mal_rangees = [], [], []
     jetons_entree = jetons_sortie = 0
 
     for i, ligne in enumerate(lignes, 1):
@@ -485,6 +558,25 @@ def main() -> int:
         numero = (extrait.get("numero") or "").strip()
         if numero and numero not in ("-", "n/a", "N/A") and not ligne.get("numero"):
             charge["numero"] = numero[:60]
+
+        # A QUI la facture est adressee. On l'ecrit toujours, meme quand elle
+        # concorde : c'est la preuve qu'on a verifie, et sans elle on relirait
+        # le PDF a chaque passage.
+        destinataire = (extrait.get("destinataire") or "").strip()
+        tva_dest = normaliser_tva(extrait.get("tva_destinataire") or "")
+        if destinataire:
+            charge["destinataire"] = destinataire[:200]
+        if tva_dest:
+            charge["tva_destinataire"] = tva_dest
+
+        etranger, motif = destinataire_etranger(ligne.get("societe"), destinataire, tva_dest)
+        if etranger:
+            charge["a_verifier"] = True
+            charge["motif_verification"] = ("Mal rangee : " + motif)[:300]
+            # Le nom du fichier affirme une societe qui n'est pas la bonne.
+            # C'est le renommeur qui lui rendra son nom d'origine : il est le
+            # seul a ecrire dans SharePoint, et ca doit le rester.
+            mal_rangees.append((ligne["nom"], ligne.get("societe"), motif))
         # Meme regle pour la date que pour le montant : on comble un vide, on ne
         # remplace pas en silence. Les dates en base viennent du nom de fichier
         # et sont souvent justes a quelques jours pres ; les reecrire toutes
@@ -518,7 +610,15 @@ def main() -> int:
           f"{illisibles} illisible(s), {ignores} trop lourde(s), "
           f"{refusees} refusee(s) en base, "
           f"{len(desaccords)} desaccord(s) de montant, "
-          f"{len(dates_divergentes)} date(s) divergente(s).")
+          f"{len(dates_divergentes)} date(s) divergente(s), "
+          f"{len(mal_rangees)} mal rangee(s).")
+
+    if mal_rangees:
+        print(f"\n{len(mal_rangees)} facture(s) adressee(s) a quelqu'un d'autre que la")
+        print("societe de leur dossier. Marquees « a verifier » ; le renommage leur")
+        print("rendra leur nom d'origine. A toi de les deplacer :")
+        for nom, soc, motif in mal_rangees[:60]:
+            print(f"  [{soc}] {nom[:60]}\n      {motif}")
 
     if desaccords:
         print(f"\n{len(desaccords)} facture(s) ou le PDF contredit la base. Rien n'a ete")

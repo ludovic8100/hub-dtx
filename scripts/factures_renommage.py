@@ -233,6 +233,51 @@ def a_traiter():
     return lignes
 
 
+def a_rendre():
+    """Les factures renommees A TORT : marquees « a verifier » apres coup.
+
+    Cas type : une facture adressee a un tiers, deposee dans le dossier
+    d'une societe. Le renommage y a inscrit « DYNASSUR » parce qu'il lisait
+    le DOSSIER. La lecture du PDF a montre un autre destinataire.
+
+    On lui rend son nom d'origine. Un nom moche coute une recherche ; un nom
+    faux clot la question — il AFFIRME une societe qui n'est pas la bonne.
+    """
+    filtre = ("&a_verifier=is.true&renomme_le=not.is.null"
+              "&nom_origine=not.is.null&sens=eq.achat&fichier_id=like.01*")
+    if FILTRE_DOSSIER:
+        filtre += "&url=like.*" + urllib.parse.quote(FILTRE_DOSSIER, safe="") + "*"
+    lignes = supabase(
+        "GET",
+        "factures_achat?select=id,fichier_id,nom,nom_origine,societe,"
+        "motif_verification" + filtre) or []
+    return [l for l in lignes if (l.get("nom") or "") != (l.get("nom_origine") or "")]
+
+
+def rendre_les_noms(jeton, sid) -> int:
+    lignes = a_rendre()
+    if not lignes:
+        return 0
+    print(f"── RETOUR AU NOM D'ORIGINE ({len(lignes)}) " + "─" * 30, flush=True)
+    rendus = 0
+    for l in lignes:
+        print(f"  {l['nom'][:64]}\n   →  {l['nom_origine'][:64]}"
+              f"\n      ({l.get('motif_verification') or 'a verifier'})", flush=True)
+        if DRY_RUN:
+            rendus += 1
+            continue
+        try:
+            renommer_fichier(jeton, sid, l["fichier_id"], l["nom_origine"])
+            supabase("PATCH", f"factures_achat?id=eq.{l['id']}",
+                     {"nom": l["nom_origine"], "renomme_le": None},
+                     {"Prefer": "return=minimal"})
+            rendus += 1
+        except Exception as e:                     # noqa: BLE001
+            print(f"      REFUSE : {e}", flush=True)
+    print(flush=True)
+    return rendus
+
+
 def main() -> int:
     banniere("factures-renommage")
     for nom, val in (("GRAPH_TENANT_ID", TENANT), ("GRAPH_CLIENT_ID", CLIENT),
@@ -242,6 +287,10 @@ def main() -> int:
 
     jeton = jeton_graph()
     sid = site_id(jeton)
+
+    # D'abord defaire ce qui a ete mal fait, ensuite seulement renommer.
+    rendus = rendre_les_noms(jeton, sid)
+
     lignes = a_traiter()
     print(f"{len(lignes)} facture(s) candidate(s)"
           + (f" dans « {FILTRE_DOSSIER} »" if FILTRE_DOSSIER else "")
@@ -315,7 +364,8 @@ def main() -> int:
         renommes += 1
 
     print(f"\n{renommes} renomme(s), {inchanges} deja au bon nom, "
-          f"{a_verifier} a verifier, {erreurs} refuse(s).", flush=True)
+          f"{a_verifier} a verifier, {erreurs} refuse(s), "
+          f"{rendus} nom(s) d'origine rendu(s).", flush=True)
     if motifs:
         print("\nCe qui attend un humain :", flush=True)
         for m, n in sorted(motifs.items(), key=lambda x: -x[1]):
