@@ -1,0 +1,85 @@
+name: Factures — renommage
+
+# Renomme les factures d'achat dans SharePoint A PARTIR DE LA BASE.
+#
+# C'est le seul traitement du Hub qui ECRIT dans SharePoint, et il n'y fait
+# qu'une chose : changer un nom. Jamais de deplacement, jamais de suppression.
+#
+# La regle : on ne renomme que lorsqu'on est sur. Fournisseur, date et montant
+# doivent etre connus. Sinon le fichier garde son nom et part dans la liste a
+# verifier, ou un humain tranche.
+#
+#   Un fichier au vilain nom coute une recherche.
+#   Un fichier au MAUVAIS nom est introuvable.
+#
+# Pas de cron tant que le resultat n'a pas ete regarde sur un lot reel. On
+# lance a la main, par dossier, en commencant par un essai a blanc.
+
+on:
+  workflow_dispatch:
+    inputs:
+      filtre_dossier:
+        description: "Dossier a traiter, ex. _DYNASSUR/ACHATS/2025 (vide = partout)"
+        type: string
+        default: '_DYNASSUR/ACHATS/2025'
+      lot:
+        description: "Nombre maximum de fichiers a renommer (0 = tous)"
+        type: string
+        default: '20'
+      dry_run:
+        description: "Essai a blanc — affiche les renommages sans en faire aucun"
+        type: boolean
+        default: true
+      target:
+        description: "Environnement cible (base Supabase)"
+        type: choice
+        options: [test, production]
+        default: production
+
+concurrency:
+  group: factures-renommage
+  cancel-in-progress: false
+
+jobs:
+  renommer:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target }}
+    env:
+      APP_ENV: ${{ inputs.target }}
+      SUPABASE_URL: ${{ vars.SUPABASE_URL || (inputs.target == 'test' && 'https://lvdnzbhplnzuwdqtitdb.supabase.co' || '') }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      GRAPH_TENANT_ID: ${{ secrets.GRAPH_TENANT_ID }}
+      GRAPH_CLIENT_ID: ${{ secrets.GRAPH_CLIENT_ID }}
+      GRAPH_CLIENT_SECRET: ${{ secrets.GRAPH_CLIENT_SECRET }}
+      FILTRE_DOSSIER: ${{ inputs.filtre_dossier }}
+      LOT: ${{ inputs.lot }}
+      DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verifier les secrets
+        run: |
+          for s in GRAPH_TENANT_ID GRAPH_CLIENT_ID GRAPH_CLIENT_SECRET SUPABASE_SERVICE_KEY; do
+            if [ -z "${!s}" ]; then echo "::error::Secret $s manquant"; exit 1; fi
+          done
+          echo "Cible: $APP_ENV — Dossier: ${FILTRE_DOSSIER:-tous} — Lot: ${LOT:-tous} — Mode: ${DRY_RUN:+ESSAI A BLANC}${DRY_RUN:-RENOMMAGE REEL}"
+
+      - name: Journal - debut
+        id: journal
+        if: ${{ env.DRY_RUN == '' }}
+        run: echo "id=$(python scripts/job_journal.py debut factures-renommage manuel)" >> "$GITHUB_OUTPUT"
+
+      - name: Renommage
+        shell: bash
+        run: python scripts/factures_renommage.py | tee /tmp/renommage.log
+
+      - name: Journal - fin
+        if: ${{ always() && env.DRY_RUN == '' }}
+        run: |
+          LIGNES=$(grep -oP 'LIGNES_ECRITES=\K[0-9]+' /tmp/renommage.log | tail -1 || true)
+          python scripts/job_journal.py fin "${{ steps.journal.outputs.id }}" \
+            "${{ job.status == 'success' && 'succes' || 'echec' }}" "$LIGNES" \
+            "GitHub Action factures-renommage — ${{ job.status }}"
