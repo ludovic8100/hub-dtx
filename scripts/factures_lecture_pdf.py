@@ -84,6 +84,10 @@ Regles :
 - `montant` est le TOTAL A PAYER, TVA comprise, en euros. Pas le hors taxes, pas la TVA seule.
 - Pour une note de credit, mets le montant en POSITIF et `note_de_credit` a true.
 - `date_facture` est la date d'emission de la facture, pas l'echeance.
+- `tva_fournisseur` est le numero de TVA de l'EMETTEUR. Une facture belge le
+  porte obligatoirement. C'est la cle la plus sure pour identifier une
+  entreprise : deux societes peuvent s'appeler pareil, aucune ne partage son
+  numero. Rends-le sous la forme BE0123456789, sans points ni espaces.
 - `fournisseur` est celui qui EMET la facture, pas le destinataire (Dynassur,
   DTX, LODE, Hexagroup et Privé sont les destinataires).
 - Si une information est absente ou illisible, mets null. N'invente rien,
@@ -93,13 +97,16 @@ SCHEMA = {
     "type": "object",
     "properties": {
         "fournisseur": {"type": ["string", "null"]},
+        "tva_fournisseur": {"type": ["string", "null"],
+                            "description": "n° TVA de l'EMETTEUR, ex. BE0123456789 ; null si absent"},
         "date_facture": {"type": ["string", "null"], "description": "AAAA-MM-JJ"},
         "montant": {"type": ["number", "null"], "description": "total TTC en euros"},
         "numero": {"type": ["string", "null"]},
         "note_de_credit": {"type": "boolean"},
         "lisible": {"type": "boolean", "description": "false si le document est illisible ou n'est pas une facture"},
     },
-    "required": ["fournisseur", "date_facture", "montant", "numero", "note_de_credit", "lisible"],
+    "required": ["fournisseur", "tva_fournisseur", "date_facture", "montant",
+                 "numero", "note_de_credit", "lisible"],
     "additionalProperties": False,
 }
 
@@ -239,7 +246,8 @@ def a_reprendre():
         filtre += "&url=like.*" + urllib.parse.quote(FILTRE_DOSSIER, safe="") + "*"
     lignes = supabase(
         "GET",
-        f"factures_achat?select=id,fichier_id,nom,societe,montant,date_facture,fournisseur,numero"
+        f"factures_achat?select=id,fichier_id,nom,societe,montant,date_facture,"
+        f"fournisseur,numero,tva_fournisseur"
                 # « nullsfirst » et non « nullslast » : les factures SANS date passent en
         # tete. Ce sont elles qui bloquent le rapprochement, et avec l'ancien
         # tri un lot de 15 n'en atteignait aucune — l'essai du 04/11 n'a lu que
@@ -274,7 +282,8 @@ def lire_facture(client, pdf: bytes) -> dict | None:
     def appeler(avec_schema: bool):
         consigne = CONSIGNE if avec_schema else (
             CONSIGNE + "\n\nReponds uniquement par un objet JSON, sans texte autour, avec les cles :"
-            " fournisseur, date_facture, montant, numero, note_de_credit, lisible."
+            " fournisseur, tva_fournisseur, date_facture, montant, numero,"
+            " note_de_credit, lisible."
         )
         options = {"effort": "low"}
         if avec_schema:
@@ -423,6 +432,15 @@ def main() -> int:
         fournisseur = (extrait.get("fournisseur") or "").strip()
         if fournisseur and not ligne.get("fournisseur"):
             charge["fournisseur"] = fournisseur[:200]
+        # BE 0123.456.789 / BE0123456789 / 0123456789 -> BE0123456789
+        tva = re.sub(r"[^0-9A-Za-z]", "", (extrait.get("tva_fournisseur") or "")).upper()
+        if re.fullmatch(r"(BE)?0?\d{9,10}", tva or ""):
+            if not tva.startswith("BE"):
+                tva = "BE" + tva
+            if len(tva) == 11:                 # BE + 9 chiffres : le zero initial manque
+                tva = "BE0" + tva[2:]
+            if not ligne.get("tva_fournisseur"):
+                charge["tva_fournisseur"] = tva
         numero = (extrait.get("numero") or "").strip()
         if numero and numero not in ("-", "n/a", "N/A") and not ligne.get("numero"):
             charge["numero"] = numero[:60]
