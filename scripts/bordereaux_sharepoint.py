@@ -186,9 +186,27 @@ def supabase(methode: str, chemin: str, charge=None, entetes=None):
         },
         method=methode,
     )
-    with urllib.request.urlopen(requete, timeout=120) as reponse:
-        corps = reponse.read().decode().strip()
-        return json.loads(corps) if corps else None
+    try:
+        with urllib.request.urlopen(requete, timeout=120) as reponse:
+            corps = reponse.read().decode().strip()
+            return json.loads(corps) if corps else None
+    except urllib.error.HTTPError as e:
+        # Sans ce bloc, un refus de PostgREST remonte en « HTTP Error 400: Bad
+        # Request » et rien d'autre : on perd le seul renseignement utile, à
+        # savoir CE QU'IL REPROCHE. Deux relances ont été perdues faute de
+        # pouvoir lire cette ligne.
+        detail = ""
+        try:
+            detail = e.read().decode()[:1500]
+        except Exception:
+            pass
+        apercu = ""
+        if isinstance(charge, list) and charge:
+            apercu = f"\n  1re ligne envoyée : {json.dumps(charge[0], ensure_ascii=False)[:600]}"
+        raise SystemExit(
+            f"::error::Supabase a refusé {methode} {chemin} ({e.code}).\n"
+            f"  Réponse : {detail}{apercu}"
+        ) from None
 
 
 def table_compagnies():
