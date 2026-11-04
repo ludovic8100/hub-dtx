@@ -24,6 +24,28 @@ import { supabase } from '../../lib/supabase'
 
 const fmt = n => (n ?? 0).toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
 
+// ─── Proposition de nom court ──────────────────────────────────────────────
+//
+// Une suggestion, pas une décision. On retire ce qui n'aide personne à
+// reconnaître un fournisseur — forme juridique, pays, parenthèses :
+//
+//   « Radius Business Solutions (Belgium) NV »  →  « Radius Business Solutions »
+//   « NV Pluxee Belgium SA »                    →  « Pluxee »
+//
+// La machine s'arrête volontairement à mi-chemin : elle ne proposera jamais
+// « Partena » depuis « Partena Professional ». Le nom d'usage est un choix
+// humain, et le deviner serait se tromper avec aplomb.
+const FORMES = /\b(S\.?A\.?|N\.?V\.?|S\.?R\.?L\.?|SPRL|BVBA|BV|GIE|SCRL|SC|ASBL|VZW|LLC|LTD|LIMITED|INC|CORP|CORPORATION|GMBH|PLC|SAS|EURL|CVBA|AG|KG)\b/gi
+const PAYS   = /\b(BELGIUM|BELGIQUE|BELGIE|BELGI[ËE]|EUROPE|EU|INTERNATIONAL|FRANCE|NEDERLAND|IRELAND|OPERATIONS)\b/gi
+
+function proposerNomCourt(nom) {
+  let t = (nom || '').replace(/\([^)]*\)/g, ' ')
+  t = t.replace(FORMES, ' ').replace(PAYS, ' ').replace(/[,;/]/g, ' ')
+  t = t.replace(/\s+/g, ' ').replace(/^[-.&\s]+|[-.&\s]+$/g, '')
+  if (!t) t = (nom || '').trim()
+  return t.slice(0, 28).trim()
+}
+
 export default function GestionFournisseurs() {
   const [lignes, setLignes]   = useState(null)
   const [erreur, setErreur]   = useState(null)
@@ -60,6 +82,19 @@ export default function GestionFournisseurs() {
     setEdition(e => { const c = { ...e }; delete c[id]; return c })
     setSauve(s => ({ ...s, [id]: 'ok' }))
     setTimeout(() => setSauve(s => { const c = { ...s }; delete c[id]; return c }), 1500)
+  }
+
+  // Accepter en lot ce qui est affiché. Volontairement limité aux lignes
+  // VISIBLES : avec le filtre « à nommer » et la recherche, l'utilisateur voit
+  // exactement ce qu'il valide. Un bouton qui agirait sur les 230 d'un coup
+  // serait plus rapide et moins honnête.
+  async function accepterVisibles() {
+    const cibles = visibles.filter(l => !l.nom_court)
+    if (!cibles.length) return
+    if (!window.confirm(`Poser la proposition sur ${cibles.length} fournisseur(s) affiché(s) ? Vous pourrez corriger chacun ensuite.`)) return
+    for (const l of cibles) {
+      await enregistrer(l.id, proposerNomCourt(l.nom_officiel))
+    }
   }
 
   const visibles = useMemo(() => {
@@ -105,7 +140,14 @@ export default function GestionFournisseurs() {
             Donnez un nom court à chaque fournisseur — c'est lui qui nommera les fichiers
           </div>
         </div>
-        <button onClick={charger} style={{ padding: '7px 13px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Rafraîchir</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={accepterVisibles}
+            title="Pose la proposition sur toutes les lignes affichées qui n'ont pas encore de nom court"
+            style={{ padding: '7px 13px', borderRadius: 8, border: '1px solid #1A3A6B', background: '#1A3A6B', color: '#fff', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
+            Accepter les propositions affichées
+          </button>
+          <button onClick={charger} style={{ padding: '7px 13px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Rafraîchir</button>
+        </div>
       </div>
 
       {erreur && (
@@ -152,7 +194,7 @@ export default function GestionFournisseurs() {
 
             <input
               value={valeur}
-              placeholder="Nom court…"
+              placeholder={proposerNomCourt(l.nom_officiel) || 'Nom court…'}
               onChange={e => setEdition(ed => ({ ...ed, [l.id]: e.target.value }))}
               onKeyDown={e => { if (e.key === 'Enter') enregistrer(l.id, valeur); if (e.key === 'Escape') setEdition(ed => { const c = { ...ed }; delete c[l.id]; return c }) }}
               onBlur={() => { if (enCours && valeur !== (l.nom_court || '')) enregistrer(l.id, valeur) }}
@@ -160,6 +202,16 @@ export default function GestionFournisseurs() {
                        border: '1px solid ' + (etat === 'erreur' ? '#fecaca' : enCours ? '#1A3A6B' : '#e2e8f0'),
                        background: etat === 'ok' ? '#f0fdf4' : '#fff' }}
             />
+            {!l.nom_court && proposerNomCourt(l.nom_officiel) !== l.nom_officiel && (
+              <button
+                onClick={() => enregistrer(l.id, proposerNomCourt(l.nom_officiel))}
+                title={`Accepter « ${proposerNomCourt(l.nom_officiel)} »`}
+                style={{ padding: '6px 10px', borderRadius: 7, border: '1px solid #e2e8f0',
+                         background: '#f8fafc', color: '#64748b', fontSize: 11.5,
+                         fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                Accepter
+              </button>
+            )}
             <div style={{ width: 18, fontSize: 14, color: etat === 'ok' ? '#16a34a' : '#cbd5e1' }}>
               {etat === 'en_cours' ? '…' : etat === 'ok' ? '✓' : etat === 'erreur' ? '!' : ''}
             </div>
