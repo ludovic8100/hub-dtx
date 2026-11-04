@@ -48,6 +48,43 @@ SECRET = os.environ.get("GRAPH_CLIENT_SECRET", "").strip()
 
 CONFORME = re.compile(r"^(\d{4})\.(\d{2}) - ([A-Z]{2,4})(\s-\s.+)?\.pdf$", re.I)
 
+# LA PERIODE COUVERTE, PAS LE MOIS D'EDITION. « 2026.08 - PFQ.pdf » porte
+# « Periode 01/08/2026 - 31/08/2026, Etablie le 07/09/2026 » : le nom suit le
+# mois travaille, pas celui ou le secretariat social a edite le document.
+# Le nom de mois ecrit dans le fichier est donc la meilleure source, et il
+# l'emporte sur la date en tete, qui est une date d'edition.
+MOIS = {"JANV": 1, "JAN": 1, "FEVR": 2, "FEV": 2, "MARS": 3, "MAR": 3,
+        "AVRIL": 4, "AVR": 4, "MAI": 5, "JUIN": 6, "JUIL": 7,
+        "AOUT": 8, "AOU": 8, "SEPT": 9, "SEP": 9, "OCTO": 10, "OCT": 10,
+        "NOVE": 11, "NOV": 11, "DECE": 12, "DEC": 12}
+# Les cles les plus longues d'abord : JUIN et JUIL doivent se distinguer.
+MOIS_TRI = sorted(MOIS, key=len, reverse=True)
+MOTIF_MOIS = re.compile(
+    r"\b(JANVIER|JANV|FEVRIER|FEVR|MARS|AVRIL|AVR|MAI|JUIN|JUILLET|JUIL|AOUT|"
+    r"SEPTEMBRE|SEPT|OCTOBRE|OCTO|NOVEMBRER|NOVEMBRE|NOVE|DECEMBRE|DECE)\.?\s*"
+    r"(\d{4}|\d{2})\b")
+MOTIF_MM_AAAA = re.compile(r"\b(0[1-9]|1[0-2])[.\-_](20\d{2})\b")
+MOTIF_AAAA_MM = re.compile(r"\b(20\d{2})[.\-_]?(0[1-9]|1[0-2])\b")
+MOTIF_DATE_TETE = re.compile(r"^(20\d{2})(0[1-9]|1[0-2])[0-3]\d")
+
+# Une fiche de paie mensuelle et une prime de fin d'annee sont deux pieces
+# distinctes : le qualificatif doit survivre au renommage, sinon deux fichiers
+# du meme mois se marchent dessus.
+QUALIFS = [
+    (re.compile(r"PRIME.{0,4}FIN D.ANN", re.I),  "prime de fin d'année"),
+    (re.compile(r"CONG[EÉ] PAY", re.I),          "congé payé"),
+    (re.compile(r"P[EÉ]CULE", re.I),             "pécule de vacances"),
+    (re.compile(r"[EÉ]CO.?CH[EÈ]QUE", re.I),     "écochèque"),
+    (re.compile(r"\b13[EÈ]? MOIS\b", re.I),      "13e mois"),
+    (re.compile(r"\bSOLDE\b", re.I),            "solde"),
+]
+
+# Trigrammes mal tapes rencontres dans les noms existants. Une faute de frappe
+# n'est pas un employe : on la corrige, on ne cree pas de fiche.
+# PQF : PFQ mal tape. LDU : ancien code de Ludovic Detilloux, devenu LDE —
+# lu dans la fiche elle-meme (« DETILLOUX Ludovic », dirigeant, 01/2022).
+ALIAS = {"PQF": "PFQ", "LDU": "LDE"}
+
 
 def jeton_graph() -> str:
     corps = urllib.parse.urlencode({
@@ -122,6 +159,61 @@ def sans_accent(t):
                    if unicodedata.category(c) != "Mn")
 
 
+def lire_periode(base, hay):
+    """(annee, mois, motif). Le nom de mois gagne : c'est la periode couverte.
+
+    La date en tete d'un nom (« 20251114_… ») est la date d'EDITION. Une fiche
+    d'octobre editee le 14 novembre porterait 2025.11 — un mois faux. Elle ne
+    sert donc jamais seule.
+    """
+    m = MOTIF_MOIS.search(hay)
+    if m:
+        mot = m.group(1)
+        mois = next((MOIS[c] for c in MOIS_TRI if mot.startswith(c)), None)
+        if not mois:
+            return None, None, "mois illisible : " + mot
+        an = int(m.group(2))
+        if an < 100:
+            an += 2000
+        if 2015 <= an <= 2035:
+            return f"{an:04d}", f"{mois:02d}", ""
+
+    m = MOTIF_MM_AAAA.search(base)
+    if m:
+        return m.group(2), m.group(1), ""
+
+    # « 2025.11 - … » : deja le format cible. En revanche « 20251114… » est une
+    # date d'edition : on l'ecarte avant de chercher.
+    sans_tete = base[8:] if MOTIF_DATE_TETE.match(base) else base
+    m = MOTIF_AAAA_MM.search(sans_tete)
+    if m:
+        return m.group(1), m.group(2), ""
+
+    if MOTIF_DATE_TETE.match(base):
+        return None, None, ("date d'edition seule (" + base[:8] + ") : "
+                            "le mois de la periode n'est pas dans le nom")
+    if any(m.search(base) for m, _ in QUALIFS):
+        return None, None, ("document annuel (prime, pecule, conge paye) : "
+                            "le nom ne porte pas de mois")
+    return None, None, "aucune periode lisible dans le nom"
+
+
+def par_le_nom(hay, codes):
+    """Le trigramme deduit du NOM COMPLET ecrit dans le fichier.
+
+    « I0064 - Fiche de paie Ludovic Detilloux.pdf » ne porte pas de trigramme,
+    mais il porte mieux : le nom entier. On exige que TOUS les mots du nom
+    officiel soient presents — « Detilloux » seul ne suffirait pas a trancher
+    entre deux Detilloux, et deux employes ne doivent jamais se confondre.
+    """
+    gagnants = set()
+    for code, complet in codes.items():
+        mots = [m for m in re.split(r"[^A-Z]+", sans_accent(complet or "").upper()) if len(m) >= 3]
+        if len(mots) >= 2 and all(m in hay for m in mots):
+            gagnants.add(code)
+    return gagnants
+
+
 def analyser(nom, codes):
     """(nouveau_nom, motif) — nouveau_nom None quand on ne sait pas."""
     if CONFORME.match(nom):
@@ -131,22 +223,28 @@ def analyser(nom, codes):
     hay = sans_accent(base).upper()
 
     # Le trigramme : un mot isole du nom, qui existe dans la base.
-    trouve = [m for m in re.findall(r"[A-Z]{2,4}", hay) if m in codes]
-    # « FDP » n'est pas un employe meme s'il ressemble a un trigramme.
-    trouve = [m for m in trouve if m != "FDP"]
+    trouve = []
+    for m in re.findall(r"[A-Z]{2,4}", hay):
+        m = ALIAS.get(m, m)
+        if m in codes and m != "FDP":
+            trouve.append(m)
     if not trouve:
-        return None, "aucun trigramme connu dans le nom"
+        trouve = sorted(par_le_nom(hay, codes))
+    if not trouve:
+        return None, "ni trigramme ni nom complet reconnu dans le nom"
     if len(set(trouve)) > 1:
         return None, "plusieurs trigrammes possibles : " + ", ".join(sorted(set(trouve)))
     code = trouve[0]
 
-    # La periode : AAAAMM ou AAAA.MM ou AAAA-MM dans le nom.
-    m = re.search(r"(20\d{2})[.\-_/]?(0[1-9]|1[0-2])", base)
-    if not m:
-        return None, "aucune periode lisible dans le nom"
-    annee, mois = m.group(1), m.group(2)
+    annee, mois, motif = lire_periode(base, hay)
+    if not annee:
+        return None, motif
 
-    return f"{annee}.{mois} - {code}.pdf", ""
+    # Le qualificatif distingue deux pieces du meme mois.
+    qualif = next((q for motif_q, q in QUALIFS if motif_q.search(base)), None)
+    suffixe = f" - {qualif}" if qualif else ""
+
+    return f"{annee}.{mois} - {code}{suffixe}.pdf", ""
 
 
 def main():
@@ -171,6 +269,29 @@ def main():
             a_faire.append((it, chemin, nouveau))
         else:
             a_verifier.append((it, chemin, motif))
+
+    # DEUX FICHIERS NE PEUVENT PAS PORTER LE MEME NOM. Trois fiches visent
+    # « 2023.08 - TJA.pdf » : des corrections ou des doublons. Renommer la
+    # premiere et echouer sur les suivantes laisserait le dossier a moitie
+    # traite, sans dire lesquelles. On les ecarte toutes, et on les nomme.
+    pris = {}
+    for it, chemin in fichiers:
+        if CONFORME.match(it["name"]):
+            pris.setdefault(it["name"].lower(), []).append(it["name"])
+    for it, chemin, nouveau_nom in a_faire:
+        pris.setdefault(nouveau_nom.lower(), []).append(it["name"])
+
+    garde = []
+    for it, chemin, nouveau_nom in a_faire:
+        concurrents = pris.get(nouveau_nom.lower(), [])
+        if len(concurrents) > 1:
+            autres = [c for c in concurrents if c != it["name"]]
+            a_verifier.append((it, chemin,
+                               f"« {nouveau_nom} » serait aussi le nom de : "
+                               + ", ".join(sorted(autres)[:3])))
+        else:
+            garde.append((it, chemin, nouveau_nom))
+    a_faire = garde
 
     print(f"Deja conformes : {conformes}")
     print(f"Renommables    : {len(a_faire)}")
