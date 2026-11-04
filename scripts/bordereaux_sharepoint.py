@@ -27,7 +27,9 @@ Ce que le script fait :
   3. lecture de la période, du type, de la compagnie et du numéro dans le nom ;
   4. rattachement à `compagnies` quand le nom correspond à une compagnie connue
      ou à l'un de ses alias ;
-  5. upsert dans `bordereaux` sur `sharepoint_item_id`.
+  5. upsert dans `bordereaux` sur `sharepoint_item_id`. `cle_unique`, l'ancienne
+     identité fabriquée depuis le nom, n'est plus écrite du tout : rien ne la
+     lit, et la recalculer provoquait des collisions.
 
 L'ancrage sur l'identifiant SharePoint, et non sur le nom, est délibéré : le
 renommage automatique corrige régulièrement le nom d'un bordereau (« DYNASSUR »
@@ -160,16 +162,6 @@ def lire_nom(nom: str):
     return m.group("annee"), m.group("mois"), type_doc, compagnie.strip(), numero
 
 
-def cle(annee: str, mois: str, type_doc: str, compagnie: str, numero: str) -> str:
-    """Clé de déduplication — même forme que celle posée par l'ancien workflow,
-    pour que le scan retrouve les 4 687 lignes existantes au lieu de les
-    dupliquer."""
-    morceaux = [annee, mois, type_doc, compagnie]
-    if numero:
-        morceaux.append(numero)
-    return "-".join(morceaux)
-
-
 def normaliser(texte: str) -> str:
     """Pour comparer des noms de compagnie : sans accent, sans ponctuation,
     en majuscules."""
@@ -235,47 +227,37 @@ def documents_en_base():
         debut += pas
 
 
-def upsert(lignes, deja_connus):
+def upsert(lignes):
     """Upsert par paquets sur `sharepoint_item_id`.
 
-    Deux règles tiennent la casse :
+    `cle_unique` n'est JAMAIS écrite. C'était l'ancienne identité d'un
+    bordereau, fabriquée depuis le nom de fichier — celle-là même qui créait
+    une ligne fantôme à chaque renommage. Rien ne la lit : ni le front, ni les
+    fonctions Vercel, ni aucune fonction SQL. Elle reste sur les 4 617 lignes
+    historiques et vaut NULL sur les nouvelles.
 
-    - seules les colonnes d'identification du document sont envoyées. Les
-      colonnes financières (montant, commission, net, solde_releve,
-      paiement_precedent, date_cloture, extrait_le) et le lien
-      `transaction_id` ne figurent jamais dans la charge : ils survivent donc
-      à chaque passage ;
-    - `cle_unique` n'est posée qu'à la CRÉATION. Les 4 617 clés déjà en base
-      ont été fabriquées par l'ancien traitement, avec des règles de découpage
-      que ce script ne reproduit pas à l'identique (« BT- 116263 »,
-      « EUROP ASSITANCE -153582 », « TVM -7046484. - 1 »). Les réécrire
-      changerait des clés qui servent ailleurs, pour rien. PostgREST exigeant
-      des clés identiques au sein d'un même envoi, les lignes sont groupées
-      par jeu de colonnes.
+    Essayer de la reconstituer coûtait d'ailleurs un 409 : les règles de
+    découpage de l'ancien traitement ne sont pas reproductibles
+    (« BT- 116263 », « EUROP ASSITANCE -153582 », « TVM -7046484. - 1 »), donc
+    une clé recalculée tombait parfois sur une clé déjà prise.
+
+    Les colonnes financières (montant, commission, net, solde_releve,
+    paiement_precedent, date_cloture, extrait_le) et le lien `transaction_id`
+    ne figurent pas non plus dans la charge : ils survivent à chaque passage.
     """
-    groupes = {}
-    for ligne in lignes:
-        charge = {cle: valeur for cle, valeur in ligne.items() if valeur is not None}
-        if ligne["sharepoint_item_id"] in deja_connus:
-            charge.pop("cle_unique", None)
-        groupes.setdefault(tuple(sorted(charge)), []).append(charge)
-
     ecrites = 0
-    for colonnes, paquet_complet in sorted(groupes.items(), key=lambda g: -len(g[1])):
-        if "cle_unique" not in colonnes:
-            print(f"  {len(paquet_complet)} ligne(s) déjà connue(s) "
-                  f"(clé d'origine préservée)", flush=True)
-        else:
-            print(f"  {len(paquet_complet)} ligne(s) nouvelle(s)", flush=True)
-        for debut in range(0, len(paquet_complet), 500):
-            paquet = paquet_complet[debut:debut + 500]
-            supabase(
-                "POST",
-                "bordereaux?on_conflict=sharepoint_item_id",
-                paquet,
-                {"Prefer": "resolution=merge-duplicates,return=minimal"},
-            )
-            ecrites += len(paquet)
+    for debut in range(0, len(lignes), 500):
+        paquet = [
+            {cle: valeur for cle, valeur in ligne.items() if valeur is not None}
+            for ligne in lignes[debut:debut + 500]
+        ]
+        supabase(
+            "POST",
+            "bordereaux?on_conflict=sharepoint_item_id",
+            paquet,
+            {"Prefer": "resolution=merge-duplicates,return=minimal"},
+        )
+        ecrites += len(paquet)
     return ecrites
 
 
@@ -333,7 +315,6 @@ def parcourir(jeton: str, site_id: str, compagnies: dict):
 
             url = element.get("webUrl")
             lignes.append({
-                "cle_unique": cle(annee, mois, type_doc, compagnie, numero),
                 "nom_fichier": nom,
                 "type": type_doc,
                 "compagnie": compagnie,
@@ -383,7 +364,8 @@ def main() -> int:
     if DRY_RUN:
         print("\nDRY_RUN : rien n'a été écrit.", flush=True)
         for ligne in lignes[:5]:
-            print(f"  {ligne['cle_unique']}  ←  {ligne['nom_fichier']}", flush=True)
+            print(f"  {ligne['type']} {ligne['annee']}.{ligne['mois']} "
+                  f"{ligne['compagnie']}  ←  {ligne['nom_fichier']}", flush=True)
         print(f"LIGNES_ECRITES=0", flush=True)
         return 0
 
@@ -392,7 +374,7 @@ def main() -> int:
 
     connus, proteges = documents_en_base()
     print(f"\n{len(connus)} document(s) déjà en base", flush=True)
-    ecrites = upsert(lignes, connus)
+    ecrites = upsert(lignes)
     nouvelles = len({l["sharepoint_item_id"] for l in lignes} - connus)
     print(f"{ecrites} ligne(s) écrite(s), dont {nouvelles} nouvelle(s)", flush=True)
 
