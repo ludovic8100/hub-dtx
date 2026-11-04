@@ -67,9 +67,22 @@ jobs:
             if [ -z "${!s}" ]; then echo "::error::Secret $s manquant"; exit 1; fi
           done
 
+      # L'ANNEE EN COURS PAR DEFAUT, ET PAS « partout ».
+      #
+      # Sans filtre, ce passage horaire lirait 40 PDF de l'arriere par heure,
+      # soit pres de mille par jour, en silence et sans que personne l'ait
+      # demande. Le commentaire en tete disait « sert le flux courant » ; le
+      # code disait le contraire. C'est le code qui avait tort.
+      #
+      # L'arriere se rattrape avec factures-lecture-pdf, lance a la main,
+      # dossier par dossier, en regardant le resultat.
       - name: Annee a traiter
         id: an
-        run: echo "annee=${{ inputs.annee || '' }}" >> "$GITHUB_OUTPUT"
+        run: |
+          ANNEE="${{ inputs.annee }}"
+          [ -z "$ANNEE" ] && ANNEE="ACHATS/$(date +%Y)"
+          echo "annee=$ANNEE" >> "$GITHUB_OUTPUT"
+          echo "Dossier filtre : $ANNEE"
 
       - name: Journal - debut
         id: journal
