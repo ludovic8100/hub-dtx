@@ -46,6 +46,52 @@ function proposerNomCourt(nom) {
   return t.slice(0, 28).trim()
 }
 
+// Les factures d'un fournisseur. Chaque ligne ouvre le PDF DANS LE NAVIGATEUR :
+// l'URL SharePoint porte « ?web=1 », qui force la visionneuse en ligne au lieu
+// du téléchargement. Rien n'atterrit sur le disque.
+function ListeFactures({ lignes }) {
+  if (!lignes) {
+    return <div style={{ padding: '10px 13px 14px 13px', fontSize: 12, color: '#94a3b8' }}>Chargement…</div>
+  }
+  if (!lignes.length) {
+    return <div style={{ padding: '10px 13px 14px 13px', fontSize: 12, color: '#94a3b8' }}>Aucune facture.</div>
+  }
+  const lien = u => {
+    if (!u) return null
+    return u.includes('?') ? u : u + '?web=1'   // visionneuse en ligne, jamais de téléchargement
+  }
+  return (
+    <div style={{ background: '#f8fafc', borderTop: '1px solid #eef2f7', padding: '6px 13px 10px 13px' }}>
+      {lignes.map(f => {
+        const u = lien(f.url)
+        return (
+          <a key={f.id} href={u || undefined} target="_blank" rel="noopener noreferrer"
+             title={u ? 'Ouvrir dans le navigateur' : 'Lien indisponible'}
+             style={{ display: 'flex', gap: 10, alignItems: 'baseline', padding: '5px 6px',
+                      borderRadius: 6, textDecoration: 'none', color: 'inherit',
+                      cursor: u ? 'pointer' : 'default' }}
+             onMouseEnter={e => { e.currentTarget.style.background = '#eef4fb' }}
+             onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
+            <span style={{ fontSize: 11.5, color: '#64748b', width: 82, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+              {f.date_facture || '—'}
+            </span>
+            <span style={{ fontSize: 11.5, color: '#94a3b8', width: 62, flexShrink: 0 }}>{f.societe}</span>
+            <span style={{ fontSize: 12.5, color: '#1e293b', flex: 1, minWidth: 0,
+                           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {f.nom}
+            </span>
+            {f.a_verifier && <span style={{ fontSize: 10, fontWeight: 700, color: '#b45309', background: '#fef3c7', borderRadius: 4, padding: '1px 5px' }}>à vérifier</span>}
+            {f.transaction_id && <span style={{ fontSize: 10, fontWeight: 700, color: '#15803d', background: '#dcfce7', borderRadius: 4, padding: '1px 5px' }}>payée</span>}
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: '#1e293b', width: 92, textAlign: 'right', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+              {f.montant != null ? fmt(Number(f.montant)) : '—'}
+            </span>
+          </a>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function GestionFournisseurs() {
   const [lignes, setLignes]   = useState(null)
   const [erreur, setErreur]   = useState(null)
@@ -53,6 +99,8 @@ export default function GestionFournisseurs() {
   const [filtre, setFiltre]   = useState('a_nommer')   // a_nommer | tous | nommes
   const [edition, setEdition] = useState({})           // id -> valeur en cours de frappe
   const [sauve, setSauve]     = useState({})           // id -> 'en_cours' | 'ok' | 'erreur'
+  const [ouvert, setOuvert]   = useState(null)         // fournisseur dont on voit les factures
+  const [factures, setFactures] = useState({})         // id fournisseur -> liste
 
   const charger = useCallback(async () => {
     const { data, error } = await supabase
@@ -65,6 +113,25 @@ export default function GestionFournisseurs() {
   }, [])
 
   useEffect(() => { charger() }, [charger])
+
+  // Les factures d'un fournisseur, chargées au clic et gardées ensuite.
+  //
+  // Au CLIC et non au survol : une liste qui apparaît au survol disparaît dès
+  // qu'on bouge la souris pour aller cliquer dedans. On ne peut pas à la fois
+  // la révéler en passant et s'en servir.
+  async function voirFactures(fid) {
+    if (ouvert === fid) { setOuvert(null); return }
+    setOuvert(fid)
+    if (factures[fid]) return
+    const { data, error } = await supabase
+      .from('factures_achat')
+      .select('id,nom,montant,date_facture,numero,url,societe,transaction_id,a_verifier')
+      .eq('fournisseur_id', fid)
+      .order('date_facture', { ascending: false })
+      .limit(300)
+    if (error) { setErreur(error); return }
+    setFactures(f => ({ ...f, [fid]: data || [] }))
+  }
 
   async function enregistrer(id, valeur) {
     const propre = (valeur || '').trim()
@@ -179,14 +246,23 @@ export default function GestionFournisseurs() {
         const valeur  = enCours ? edition[l.id] : (l.nom_court || '')
         const etat    = sauve[l.id]
         return (
-          <div key={l.id} style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '10px 13px',
-                                   borderBottom: '1px solid #f1f5f9', background: '#fff' }}>
+          <div key={l.id} style={{ borderBottom: '1px solid #f1f5f9', background: '#fff' }}>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '10px 13px' }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13.5, color: '#1e293b', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {l.nom_officiel}
               </div>
               <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 2 }}>
-                {l.nb_factures} facture{l.nb_factures > 1 ? 's' : ''} · {fmt(Number(l.montant_total))}
+                <button onClick={() => voirFactures(l.id)}
+                  disabled={!l.nb_factures}
+                  title={l.nb_factures ? 'Voir les factures' : 'Aucune facture'}
+                  style={{ border: 'none', background: 'none', padding: 0, font: 'inherit',
+                           color: l.nb_factures ? '#1A3A6B' : '#cbd5e1',
+                           fontWeight: 700, cursor: l.nb_factures ? 'pointer' : 'default',
+                           textDecoration: l.nb_factures ? 'underline' : 'none' }}>
+                  {l.nb_factures} facture{l.nb_factures > 1 ? 's' : ''}
+                </button>
+                {' · '}{fmt(Number(l.montant_total))}
                 {l.tva ? <> · {l.tva}</> : <> · <span style={{ color: '#b45309' }}>pas de n° TVA</span></>}
                 {l.nb_alias > 1 && <> · {l.nb_alias} libellés</>}
               </div>
@@ -215,6 +291,8 @@ export default function GestionFournisseurs() {
             <div style={{ width: 18, fontSize: 14, color: etat === 'ok' ? '#16a34a' : '#cbd5e1' }}>
               {etat === 'en_cours' ? '…' : etat === 'ok' ? '✓' : etat === 'erreur' ? '!' : ''}
             </div>
+          </div>
+          {ouvert === l.id && <ListeFactures lignes={factures[l.id]} />}
           </div>
         )
       })}
