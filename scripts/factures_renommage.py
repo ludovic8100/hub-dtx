@@ -111,6 +111,31 @@ def renommer_fichier(jeton: str, sid: str, item_id: str, nouveau: str):
 
 # ── Construction du nom ───────────────────────────────────────────────────────
 
+#: Places de marche. Sur Amazon, AliExpress ou eBay, l'emetteur LEGAL de la
+#  facture est le vendeur, pas la plateforme : « 20251229 - DYNASSUR - AMAZON -
+#  DE5003GSBFQV3I » a pour emetteur « David Lurding ». Le PDF dit vrai, mais
+#  dans six mois « David Lurding » ne rappelle rien a personne, tandis
+#  qu'« Amazon » situe immediatement l'achat.
+#
+#  On nomme donc « Amazon — David Lurding » : juridiquement exact ET
+#  retrouvable. C'est la SEULE exception ou l'ancien nom de fichier sert
+#  encore de source — non pas comme donnee, mais comme indice de provenance,
+#  une information que le PDF ne porte pas.
+PLACES = {
+    "AMAZON": "Amazon", "AMZN": "Amazon",
+    "ALIEXPRESS": "AliExpress", "EBAY": "eBay",
+    "ETSY": "Etsy", "TEMU": "Temu",
+}
+
+
+def place_de_marche(ancien_nom: str) -> str | None:
+    cle = re.sub(r"[^A-Z]", "", (ancien_nom or "").upper())
+    for motif, libelle in PLACES.items():
+        if motif in cle:
+            return libelle
+    return None
+
+
 def nettoyer_fournisseur(nom_court, nom_officiel) -> str:
     """Le nom court saisi a la main prime. Sinon on degrossit l'officiel."""
     if nom_court and nom_court.strip():
@@ -142,6 +167,12 @@ def construire_nom(ligne) -> str | None:
     fournisseur = nettoyer_fournisseur(ligne.get("nom_court"), ligne.get("fournisseur"))
     if not fournisseur:
         return None
+
+    # Achat sur une place de marche : on prefixe, sauf si le vendeur EST la
+    # plateforme (« Amazon Business EU » n'a pas besoin de « Amazon — Amazon »).
+    place = place_de_marche(ligne.get("nom_origine") or ligne.get("nom"))
+    if place and place.upper() not in fournisseur.upper():
+        fournisseur = f"{place} — {fournisseur}"[:48]
     montant = fmt_montant(ligne.get("montant"))
     if not montant:
         return None
