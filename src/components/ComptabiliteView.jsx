@@ -5,6 +5,7 @@ import VueFactures from './VueFactures'
 import SelecteurFactureAchat from './SelecteurFactureAchat'
 import RentabiliteView from './RentabiliteView'
 import VentilationEditor from './VentilationEditor'
+import TraiterFactures from './TraiterFactures'
 
 const fmt = (v) => v === null || v === undefined ? '—'
   : new Intl.NumberFormat('fr-BE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 }).format(v)
@@ -717,6 +718,9 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
             }}>{lab}</button>
           ))}
         </div>
+        {/* Une facture deposee dans SharePoint n'attend plus le scan de 5h37 :
+            ce bouton enchaine scan, lecture, renommage et rapprochement. */}
+        <TraiterFactures color={color} />
       </div>
 
       {onglet === 'rentabilite' ? (
