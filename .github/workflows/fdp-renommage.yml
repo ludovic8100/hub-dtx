@@ -1,0 +1,54 @@
+name: Fiches de paie — renommage
+
+# Renomme les fiches de paie de COMPTA/DETAILS_EMPLOYES/FDP au format
+# « AAAA.MM - CODE.pdf » (2026.02 - GGO.pdf).
+#
+# Le trigramme vient de collaborateurs.code, jamais d'une deduction sur le
+# nom de l'employe. La periode vient du nom du fichier, jamais du contenu.
+# Ce qui n'est pas lisible n'est pas renomme : il part dans la liste a
+# verifier, affichee dans le journal.
+#
+# Seule ecriture dans SharePoint : le nom. Jamais de deplacement, jamais de
+# suppression. Lancement a la main, essai a blanc par defaut.
+
+on:
+  workflow_dispatch:
+    inputs:
+      lot:
+        description: "Nombre maximum de renommages (0 = tous)"
+        type: string
+        default: '0'
+      dry_run:
+        description: "Essai a blanc — affiche les renommages sans en faire aucun"
+        type: boolean
+        default: true
+      target:
+        description: "Environnement cible (base Supabase, pour les trigrammes)"
+        type: choice
+        options: [test, production]
+        default: production
+
+concurrency:
+  group: fdp-renommage
+  cancel-in-progress: false
+
+jobs:
+  renommer:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target }}
+    env:
+      APP_ENV: ${{ inputs.target }}
+      SUPABASE_URL: ${{ vars.SUPABASE_URL || (inputs.target == 'test' && 'https://lvdnzbhplnzuwdqtitdb.supabase.co' || '') }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      GRAPH_TENANT_ID: ${{ secrets.GRAPH_TENANT_ID }}
+      GRAPH_CLIENT_ID: ${{ secrets.GRAPH_CLIENT_ID }}
+      GRAPH_CLIENT_SECRET: ${{ secrets.GRAPH_CLIENT_SECRET }}
+      LOT: ${{ inputs.lot }}
+      DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python scripts/fdp_renommage.py
+        working-directory: scripts
