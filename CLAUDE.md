@@ -126,6 +126,39 @@ d'attribution — ni pour les chiffres, ni pour les objectifs, ni pour les commi
 **Règle** : ne pas rajouter de dépendance n8n. Ce qui doit tourner côté serveur passe par une
 fonction Edge Supabase + `pg_cron`, ou une fonction serverless Vercel.
 
+### Référence partagée, usage séparé
+
+Question posée le 04/11/2026 : les six sociétés sont séparées — faut-il séparer aussi
+les fournisseurs et les catégories ?
+
+**Non, et les chiffres le disent.** 55 fournisseurs sur 446 servent plusieurs sociétés,
+mais ils portent **732 factures sur 1 679, soit 44 % du volume**. Engie, Partena, ING et
+Proximus facturent à plusieurs entités. Séparer reviendrait à saisir Engie cinq fois —
+cinq numéros de TVA, cinq noms courts, cinq corrections à chaque changement d'adresse —
+et à n'avoir jamais qu'une vue partielle des doublons et des paiements en double.
+
+Le principe :
+
+> **Ce qui est un fait sur le monde est partagé. Ce qui est un fait sur une société lui appartient.**
+
+- Le numéro de TVA d'Engie, son adresse, son nom d'usage : un fait sur le monde →
+  une seule fiche dans `fournisseurs`.
+- « Dynassur a payé 1 240 € à Engie en mars » : un fait sur Dynassur →
+  reste porté par `factures_achat.societe`.
+
+Ce n'est pas une entorse à la séparation des sociétés, c'en est la condition : la
+comptabilité consolidée (`/groupe/comptabilite`) ne peut comparer les dépenses de LODE et
+de DTX chez un même fournisseur que si ce fournisseur est une seule et même fiche.
+
+**`categories` applique déjà ce motif** : 52 catégories, `societe` à null, et une colonne
+`entites` qui dit à quelles sociétés chacune s'applique. Une liste commune, une
+applicabilité par société. Rien à y changer — c'est le modèle à reprendre ailleurs.
+
+**Point ouvert** : une fiche partagée est visible de tous. Les factures restent sous les
+règles d'accès de leur société, mais un collaborateur DTX voit que Dynassur travaille avec
+tel fournisseur. Acceptable pour un groupe sous un même toit, mais à décider explicitement
+avec le chantier des droits (`docs/DROITS-ACCES.md`), pas à subir.
+
 ## Outils (`/tools`)
 
 Les six outils partagent depuis le 02/11/2026 un cadre commun : le registre `src/lib/outils.js`
