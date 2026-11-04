@@ -34,6 +34,9 @@ import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
+from io import BytesIO
+
+from pypdf import PdfReader
 
 from _env import DRY_RUN, SUPABASE_SERVICE_KEY, SUPABASE_URL, banniere
 
@@ -154,6 +157,55 @@ def parcourir(jeton, sid, racine):
                 yield el, chemin
 
 
+# ── Lire le document plutot que son nom ──────────────────────────────────────
+#
+# « Etabli en novembre mais valable pour octobre, c'est note dedans. »
+#
+# Le nom d'un fichier est un ouï-dire : quelqu'un l'a tape, parfois de travers
+# (« Audreay Lapaille », « Van Muyder »), parfois en confondant la date
+# d'edition et la periode couverte. La fiche, elle, porte les deux en clair.
+# C'est donc elle qui decide, et le nom ne sert plus que de secours.
+#
+# Aucun modele n'est appele : le texte du PDF suffit, une expression reguliere
+# le lit. Zero jeton, et le meme resultat a chaque passage.
+
+MOTIF_PERIODE = re.compile(
+    r"P[ée]riode\s*:?\s*(?:(\d{2})/(\d{2})/(\d{4}))?\s*[-–—]\s*(\d{2})/(\d{2})/(\d{4})")
+
+
+def telecharger(jeton, sid, item_id):
+    """Le contenu du fichier. Lecture seule : rien n'est ecrit dans SharePoint."""
+    url = f"{GRAPH}/sites/{sid}/drive/items/{item_id}/content"
+    req = urllib.request.Request(url, headers={"Authorization": "Bearer " + jeton})
+    try:
+        with urllib.request.urlopen(req, timeout=90) as r:
+            return r.read()
+    except Exception:                                   # noqa: BLE001
+        return None
+
+
+def texte_pdf(octets):
+    """Les deux premieres pages suffisent : l'entete y est."""
+    try:
+        lecteur = PdfReader(BytesIO(octets))
+        return " ".join((p.extract_text() or "") for p in lecteur.pages[:2])
+    except Exception:                                   # noqa: BLE001
+        return ""
+
+
+def periode_du_pdf(texte):
+    """(annee, mois) de la periode COUVERTE, lue dans la fiche."""
+    m = MOTIF_PERIODE.search(texte or "")
+    if not m:
+        return None, None
+    # Le debut quand il est la, sinon la fin : certaines pieces n'ont qu'une
+    # borne (« Periode - 30/11/2025 »).
+    mois, annee = (m.group(2), m.group(3)) if m.group(2) else (m.group(5), m.group(6))
+    if not (annee and mois and "01" <= mois <= "12"):
+        return None, None
+    return annee, mois
+
+
 def sans_accent(t):
     return "".join(c for c in unicodedata.normalize("NFD", t)
                    if unicodedata.category(c) != "Mn")
@@ -214,36 +266,52 @@ def par_le_nom(hay, codes):
     return gagnants
 
 
-def analyser(nom, codes):
-    """(nouveau_nom, motif) — nouveau_nom None quand on ne sait pas."""
+def analyser(nom, codes, texte=""):
+    """(nouveau_nom, motif) — nouveau_nom None quand on ne sait pas.
+
+    L'ordre compte : la FICHE d'abord, son nom ensuite. Le nom ne sert que
+    lorsque le document est muet (fiche scannee sans couche texte).
+    """
     if CONFORME.match(nom):
         return None, "deja conforme"
 
     base = nom[:-4] if nom.lower().endswith(".pdf") else nom
     hay = sans_accent(base).upper()
+    hay_pdf = sans_accent(texte or "").upper()
 
-    # Le trigramme : un mot isole du nom, qui existe dans la base.
-    trouve = []
+    # ── Qui ──────────────────────────────────────────────────────────────
+    du_pdf = sorted(par_le_nom(hay_pdf, codes)) if hay_pdf else []
+    du_nom = []
     for m in re.findall(r"[A-Z]{2,4}", hay):
         m = ALIAS.get(m, m)
         if m in codes and m != "FDP":
-            trouve.append(m)
+            du_nom.append(m)
+    du_nom = sorted(set(du_nom)) or sorted(par_le_nom(hay, codes))
+
+    if len(du_pdf) > 1:
+        return None, "plusieurs employes reconnus dans la fiche : " + ", ".join(du_pdf)
+    if du_pdf and du_nom and du_pdf != du_nom:
+        # Le nom du fichier designe quelqu'un d'autre que la fiche. Ce n'est
+        # pas une coquille a corriger en silence : c'est peut-etre une fiche
+        # rangee sous le mauvais employe.
+        return None, (f"la fiche est au nom de {du_pdf[0]}, le fichier dit "
+                      + ", ".join(du_nom))
+    trouve = du_pdf or du_nom
     if not trouve:
-        trouve = sorted(par_le_nom(hay, codes))
-    if not trouve:
-        return None, "ni trigramme ni nom complet reconnu dans le nom"
-    if len(set(trouve)) > 1:
-        return None, "plusieurs trigrammes possibles : " + ", ".join(sorted(set(trouve)))
+        return None, "ni trigramme ni nom complet reconnu"
+    if len(trouve) > 1:
+        return None, "plusieurs trigrammes possibles : " + ", ".join(trouve)
     code = trouve[0]
 
-    annee, mois, motif = lire_periode(base, hay)
+    # ── Quand ────────────────────────────────────────────────────────────
+    annee, mois = periode_du_pdf(texte)
     if not annee:
-        return None, motif
+        annee, mois, motif = lire_periode(base, hay)
+        if not annee:
+            return None, motif
 
-    # Le qualificatif distingue deux pieces du meme mois.
     qualif = next((q for motif_q, q in QUALIFS if motif_q.search(base)), None)
     suffixe = f" - {qualif}" if qualif else ""
-
     return f"{annee}.{mois} - {code}{suffixe}.pdf", ""
 
 
@@ -260,12 +328,19 @@ def main():
     fichiers = list(parcourir(jeton, sid, DOSSIER))
     print(f"{len(fichiers)} PDF dans {DOSSIER} et ses sous-dossiers.\n")
 
-    conformes, a_faire, a_verifier = 0, [], []
-    for it, chemin in fichiers:
-        nouveau, motif = analyser(it["name"], codes)
-        if motif == "deja conforme":
+    conformes, a_faire, a_verifier, muets = 0, [], [], 0
+    for i, (it, chemin) in enumerate(fichiers, 1):
+        if CONFORME.match(it["name"]):
             conformes += 1
-        elif nouveau:
+            continue
+        if i % 50 == 0:
+            print(f"  … {i}/{len(fichiers)}", flush=True)
+        octets = telecharger(jeton, sid, it["id"])
+        texte = texte_pdf(octets) if octets else ""
+        if not texte.strip():
+            muets += 1
+        nouveau, motif = analyser(it["name"], codes, texte)
+        if nouveau:
             a_faire.append((it, chemin, nouveau))
         else:
             a_verifier.append((it, chemin, motif))
@@ -294,6 +369,8 @@ def main():
     a_faire = garde
 
     print(f"Deja conformes : {conformes}")
+    if muets:
+        print(f"Sans couche texte : {muets} (le nom du fichier a servi de secours)")
     print(f"Renommables    : {len(a_faire)}")
     print(f"A verifier     : {len(a_verifier)}\n")
 
