@@ -620,7 +620,6 @@ export default function ConfigModule() {
         {tab === 'users' && !loading && (
           <div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 14, alignItems: 'center' }}>
-              <input value={uSearch} onChange={e => setUSearch(e.target.value)} placeholder="Rechercher (nom, email, code)…" style={{ ...inp, maxWidth: 230 }} />
               <select value={uRole} onChange={e => setURole(e.target.value)} style={{ ...inp, width: 'auto' }}>
                 <option value="tous">Rôle : tous</option>
                 <option value="admin">Administrateurs</option>
@@ -718,7 +717,22 @@ export default function ConfigModule() {
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,280px) 1fr', gap: 18, alignItems: 'start' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: '70vh', overflowY: 'auto' }}>
+            {/* La recherche est ICI, juste au-dessus de la liste qu'elle
+                filtre. Elle etait melangee aux filtres du haut, a trois
+                rangees de distance de son effet.
+
+                Et la liste ne defile plus dans sa propre fenetre : on voit
+                les 54 collaborateurs d'un coup, avec le defilement de la
+                page. Une barre de defilement interne, c'est une seconde
+                page cachee dans la premiere. */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <input value={uSearch} onChange={e => setUSearch(e.target.value)}
+                name="collab-rech" autoComplete="off"
+                placeholder="Rechercher (nom, prénom, email, code, n°)…"
+                style={{ ...inp, marginBottom: 6 }} />
+              <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 700, marginBottom: 2 }}>
+                {usersFiltres.length} / {users.length}
+              </div>
               {usersFiltres.map(u => (
                 <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input type="checkbox" checked={sel.has(u.id)} onChange={() => toggleSel(u.id)} style={{ width: 16, height: 16, cursor: 'pointer', flexShrink: 0 }} />
