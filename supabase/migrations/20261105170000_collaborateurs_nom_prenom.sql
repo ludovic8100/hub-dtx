@@ -1,55 +1,52 @@
 -- Collaborateurs : nom et prenom separes.
 --
 -- `collaborateurs` n'avait que `nom_complet`, un champ libre ou cohabitent
--- quatre conventions :
+-- quatre conventions : « NOM Prenom », « Prenom Nom », « Prenom NOM -
+-- Societe SRL », et des lignes qui ne designent pas des personnes (boites
+-- generiques, agences, comptes de test). On ne peut ni trier, ni rapprocher,
+-- ni afficher proprement.
 --
---     LAPAILLE Audrey                      NOM Prenom
---     Arnaud Petit                         Prenom Nom
---     Benedicte DE ROOCKER - Dynassur SRL  + suffixe societe
---     Homelinks / grace-hollogne / CSA     pas des personnes
---
--- On ne peut ni trier, ni rapprocher, ni afficher proprement.
+-- CE FICHIER NE CONTIENT AUCUN NOM. Le depot est public. Les 39 identites
+-- etablies le 05/11/2026 l'ont ete par une correction ponctuelle en base,
+-- pas par ce fichier : y lister le personnel reviendrait a le publier.
+-- Ce qui est reproductible, ce sont les REGLES ci-dessous.
 --
 -- ──────────────────────────────────────────────────────────────────────────
--- UNE ERREUR A EVITER DE REFAIRE : LE RAPPROCHEMENT PAR ADRESSE MAIL
+-- UNE ERREUR A NE PAS REFAIRE : LE RAPPROCHEMENT PAR ADRESSE MAIL
 -- ──────────────────────────────────────────────────────────────────────────
 --
 -- Premier jet : « la fiche CLIENT de meme adresse mail porte deja nom et
 -- prenom separes, prenons-les ». Quinze collaborateurs correspondaient. Le
 -- raisonnement etait faux, et il a ecrit de fausses identites en production
--- avant d'etre rattrape :
+-- avant d'etre rattrape : trois collaborateurs ont recu le nom d'un client,
+-- et deux lignes de societe ont recu un nom de personne.
 --
---     BDR  « Benedicte DE ROOCKER »  →  BRITO MALUENGA WILIAM
---     JFS  « Jean-Francois SIMONIS » →  WILKET SEBASTIEN
---     ICE  « Cezassur SPRL »         →  ENGLISH-BULLDOG-CLUB.BE
+-- LA CAUSE : l'adresse professionnelle d'un courtier figure sur les fiches
+-- des clients qu'il gere. Une adresse mail identifie un POINT DE CONTACT,
+-- pas une personne. Et comme le declencheur ci-dessous recompose
+-- `nom_complet`, le nom d'origine a ete ecrase du meme coup — la correction
+-- a donc du etre faite de memoire, a partir d'un releve pris avant.
 --
--- La cause : l'adresse professionnelle d'un courtier figure sur les fiches
--- des clients qu'il gere. `bdr@dynassur.be` est donc sur la fiche de
--- M. Brito Maluenga. L'adresse mail identifie un POINT DE CONTACT, pas une
--- personne. Et comme le declencheur recompose `nom_complet`, le nom d'origine
--- a ete ecrase du meme coup.
---
--- Ce qui a permis de le voir : le CODE a trois lettres est fait des
--- initiales. JFS ne peut pas etre Sebastien Wilket. Un controle gratuit,
--- qu'il aurait fallu faire avant d'ecrire et non apres.
+-- CE QUI A PERMIS DE LE VOIR : le CODE a trois lettres est fait des
+-- initiales. Un collaborateur « JFS » ne peut pas s'appeler Sebastien W.
+-- Un controle gratuit, qu'il fallait faire AVANT d'ecrire et non apres.
 --
 -- ──────────────────────────────────────────────────────────────────────────
--- LES SOURCES RETENUES, PAR FIABILITE DECROISSANTE
+-- LES SOURCES, PAR FIABILITE DECROISSANTE
 -- ──────────────────────────────────────────────────────────────────────────
 --
 --   1. `nom_sa_data` / `o365_display_name` — deja au format « NOM Prenom »,
---      et propres au collaborateur. 13 lignes.
---   2. le motif « nom en MAJUSCULES » dans `nom_complet`. 14 lignes.
---   3. le code a trois lettres, quand l'ordre est ambigu. 2 lignes.
---   4. rien. 15 lignes restent vides — et ce ne sont pas des personnes :
---      Homelinks, grace-hollogne, Info - Dynassur SRL, test.Microsoft…
+--      et propres au collaborateur.                                13 lignes
+--   2. le motif « nom en MAJUSCULES » dans `nom_complet`.          14 lignes
+--   3. le code a trois lettres, quand l'ordre est ambigu.           2 lignes
+--   4. une relecture humaine, apres l'erreur ci-dessus.             4 lignes
+--   5. rien — et ce ne sont pas des personnes.                     15 lignes
 --
--- Un champ vide se voit et se corrige. Un prenom range dans la case nom ne se
--- voit pas, et se propage partout ou l'on croit lire un nom.
+-- Deux cas que seul le code tranchait : un « Nom Prenom » en minuscules a
+-- inverser, et un nom a particule qu'aucun motif n'attrapait.
 --
--- `nom_complet` EST CONSERVE : il est utilise 36 fois dans cinq fichiers du
--- front. Un declencheur le recompose a partir de nom + prenom quand les deux
--- existent ; les lignes vides gardent leur valeur d'origine.
+-- Un champ vide se voit et se corrige. Un prenom range dans la case nom ne
+-- se voit pas, et se propage partout ou l'on croit lire un nom.
 
 begin;
 
@@ -62,9 +59,14 @@ comment on column public.collaborateurs.nom is
   'Nom de famille. Vide tant qu''il n''a pas ete etabli : on ne devine pas.';
 comment on column public.collaborateurs.source_identite is
   'D''ou viennent nom et prenom : nom_sa_data, majuscules, code_initiales, '
-  'restaure_manuel, saisie. Sans cette colonne, on ne sait plus six mois plus '
-  'tard ce qui a ete verifie et ce qui a ete deduit.';
+  'restaure_manuel, saisie. Sans cette colonne, on ne sait plus six mois '
+  'plus tard ce qui a ete verifie et ce qui a ete deduit.';
 
+-- ── Le declencheur ───────────────────────────────────────────────────────
+-- `nom_complet` EST CONSERVE : 36 usages dans cinq fichiers du front. Il est
+-- recompose a partir de nom + prenom quand les DEUX existent ; une ligne
+-- laissee vide garde exactement son libelle d'origine, aussi imparfait
+-- soit-il. Mieux vaut un nom bancal qu'un nom vide dans trente-six endroits.
 create or replace function public.collaborateurs_nom_complet()
 returns trigger language plpgsql as $$
 begin
@@ -81,78 +83,48 @@ create trigger trg_collaborateurs_nom_complet
   before insert or update on public.collaborateurs
   for each row execute function public.collaborateurs_nom_complet();
 
--- ── Les 39 identites, nommees une par une ────────────────────────────────
+-- ── La regle automatique, sur une base vierge ────────────────────────────
 --
--- Volontairement explicites plutot que calculees. Chaque ligne a ete lue et
--- verifiee contre le code a trois lettres. Une expression reguliere qui se
--- trompe sur une ligne se trompe en silence ; une liste se relit.
--- UPDATE et non INSERT ... ON CONFLICT : l'index unique sur `code` est
--- PARTIEL (where actif = true), donc inutilisable pour une inference de
--- conflit — et un INSERT creerait des lignes fantomes pour les codes absents.
+-- Elle ne traite que le cas sans ambiguite : un nom en MAJUSCULES, en tete
+-- ou en fin. Le reste est laisse vide, a completer dans Parametres.
+--
+-- TROIS PIEGES, TROUVES EN DEROULANT LA REGLE A BLANC AVANT DE L'ECRIRE :
+--   - une capture non gourmande coupait les noms composes en deux ;
+--   - les raisons sociales (SPRL, GIE…) devenaient des noms de famille ;
+--   - le suffixe « - Societe SRL » doit etre retire AVANT ce test, sinon
+--     toute personne qui le porte est prise pour une societe.
+with propre as (
+  select id, btrim(regexp_replace(nom_complet,
+           '\s*-\s*(Dynassur|DTX|Lode|Hexagroup).*$', '', 'i')) as n
+  from public.collaborateurs
+  where nom is null and nom_complet is not null
+), personnes as (
+  select * from propre
+   where n !~* '\m(SPRL|SRL|S\.?A\.?|GIE|ASBL|SCRL|BV|NV|SC)\M'
+)
 update public.collaborateurs co
-   set nom = v.nom, prenom = v.prenom, source_identite = v.src
-  from (values
-  ('ALA','LAPAILLE','Audrey','majuscules'),
-  ('BHU','HURARD','Béatrice','majuscules'),
-  ('BLA','LAMBERT','Benoit','majuscules'),
-  ('EGR','GROESMANS','Emilie','majuscules'),
-  ('FRO','ROBERT','Françoise','majuscules'),
-  ('JCL','LORANGE','Jean-Charles','majuscules'),
-  ('LFA','FAVAUGE','Laurence','majuscules'),
-  ('MTE','TERRANA','Michelangelo','majuscules'),
-  ('NGI','GINIS','Nadine','majuscules'),
-  ('PFQ','FERNANDEZ QUIROGA','Priscilla','majuscules'),
-  ('SRA','RAEPSAET','Stéphanie','majuscules'),
-  ('VBE','BERTRAND','Vanda','majuscules'),
-  ('GGO','GODFROID','Grégory','majuscules'),
-  ('LDE','DETILLOUX','Ludovic','majuscules'),
-  ('LLO','LORANGE','Ludivine','majuscules'),
-  ('OBA','BAUDELET','Olivier','majuscules'),
-  ('RCA','CARREA','Raphaël','majuscules'),
-  ('TJA','JAPSENNE','Thibaut','majuscules'),
-  ('APE','PETIT','Arnaud','nom_sa_data'),
-  ('DCO','COCO','Didier','nom_sa_data'),
-  ('FBL','BLAIRON','Fanny','nom_sa_data'),
-  ('FLA','LARUE','Frédéric','nom_sa_data'),
-  ('JCA','CARBONNE','Jonathan','nom_sa_data'),
-  ('KGO','GONCALVES','Kévin','nom_sa_data'),
-  ('MQU','QUENON','Maxime','nom_sa_data'),
-  ('VLR','LA ROSA','Vincenzo','nom_sa_data'),
-  ('VPE','PESSER','Vincent','nom_sa_data'),
-  ('YCH','CHOU','Youjin','nom_sa_data'),
-  ('LER','LERHO','Madeleine','nom_sa_data'),
-  -- RFI : « Ficarrotta Rosario » se lisait Nom Prenom. Le code dit
-  -- R(osario) FI(carrotta) — donc l'inverse.
-  ('RFI','FICARROTTA','Rosario','nom_sa_data'),
-  -- MVM : « Van Muylder » n'a pas deux majuscules d'affilee, aucun motif ne
-  -- l'attrapait. M(ichael) V(an) M(uylder).
-  ('MVM','VAN MUYLDER','Michaël','nom_sa_data'),
-  ('ICA','CAMPSTEIN','Ilenia','code_initiales'),
-  ('PDE','DEGRÉ','Pierre','code_initiales'),
-  -- Les quatre rattrapes apres le faux rapprochement par mail.
-  ('BDR','DE ROOCKER','Bénédicte','restaure_manuel'),
-  ('JFS','SIMONIS','Jean-François','restaure_manuel'),
-  ('FMZ','MAMMO ZAGARELLA','Fabrizio','restaure_manuel'),
-  ('LGM','GAEN MUNOZ','Luisa','restaure_manuel')
-) as v(code, nom, prenom, src)
- where upper(co.code) = v.code;
+   set nom    = btrim((regexp_match(p.n, '^([A-ZÀ-Þ][A-ZÀ-Þ''\- ]*[A-ZÀ-Þ])\s+(\S.*)$'))[1]),
+       prenom = btrim((regexp_match(p.n, '^([A-ZÀ-Þ][A-ZÀ-Þ''\- ]*[A-ZÀ-Þ])\s+(\S.*)$'))[2]),
+       source_identite = 'majuscules'
+  from personnes p
+ where co.id = p.id
+   and p.n ~ '^[A-ZÀ-Þ][A-ZÀ-Þ''\- ]*[A-ZÀ-Þ]\s+\S';
 
--- Les deux lignes sans code, reperees par leur adresse.
-update public.collaborateurs set nom='MINON', prenom='Gael',  source_identite='majuscules'
- where lower(email) = 'gael@dynassur.be';
-update public.collaborateurs set nom='HABAY', prenom='Rudy',  source_identite='majuscules'
- where lower(email) = 'rudy@rhassur.be';
-
--- Garde-fou : si le nombre d'identites etablies s'ecarte de ce qui a ete
--- verifie a la main, c'est que la table a change — on prefere echouer.
-do $$
-declare n integer;
-begin
-  select count(*) into n from public.collaborateurs where nom is not null;
-  if n < 30 then
-    raise exception 'Seulement % identites etablies, 39 attendues. Verifier avant de poursuivre.', n;
-  end if;
-  raise notice 'Identites etablies : %', n;
-end $$;
+with propre as (
+  select id, btrim(regexp_replace(nom_complet,
+           '\s*-\s*(Dynassur|DTX|Lode|Hexagroup).*$', '', 'i')) as n
+  from public.collaborateurs
+  where nom is null and nom_complet is not null
+), personnes as (
+  select * from propre
+   where n !~* '\m(SPRL|SRL|S\.?A\.?|GIE|ASBL|SCRL|BV|NV|SC)\M'
+)
+update public.collaborateurs co
+   set nom    = btrim((regexp_match(p.n, '^(\S.*?)\s+([A-ZÀ-Þ][A-ZÀ-Þ''\- ]*[A-ZÀ-Þ])$'))[2]),
+       prenom = btrim((regexp_match(p.n, '^(\S.*?)\s+([A-ZÀ-Þ][A-ZÀ-Þ''\- ]*[A-ZÀ-Þ])$'))[1]),
+       source_identite = 'majuscules'
+  from personnes p
+ where co.id = p.id
+   and p.n ~ '\s[A-ZÀ-Þ][A-ZÀ-Þ''\- ]*[A-ZÀ-Þ]$';
 
 commit;
