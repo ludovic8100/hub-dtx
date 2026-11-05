@@ -144,6 +144,22 @@ def main() -> int:
     except urllib.error.HTTPError as e:
         print(f"  Annuaire des utilisateurs : refuse ({e.code}). Tant mieux.")
 
+    # 5. POURRAI-JE REDONNER LE DROIT APRES ? Question vitale : si la reponse
+    #    est non, retirer les droits larges casse le Hub sans retour possible
+    #    depuis ici. Lire les permissions d'un site exige Sites.FullControl.All,
+    #    exactement comme en accorder une. Un refus ici = un refus la-bas.
+    print("\n── Puis-je accorder un droit Sites.Selected ? " + "─" * 25)
+    try:
+        perms = appel(f"{GRAPH}/sites/{site['id']}/permissions", jeton)
+        print(f"  OUI — lecture des permissions acceptee "
+              f"({len(perms.get('value', []))} entree(s)). La cle porte "
+              f"Sites.FullControl.All : je pourrai redonner le droit moi-meme.")
+    except urllib.error.HTTPError as e:
+        print(f"  NON — refuse ({e.code}). La cle n'a pas Sites.FullControl.All.")
+        print("  ::warning::Apres le passage a Sites.Selected, je ne pourrai PAS "
+              "redonner l'acces au site depuis ici. Il faudra que Ludovic accorde "
+              "lui-meme le droit sur ADMINISTRATION, sinon le Hub reste aveugle.")
+
     print("\nAccès SharePoint opérationnel — l'extraction des relevés peut être construite.")
     return 0
 
