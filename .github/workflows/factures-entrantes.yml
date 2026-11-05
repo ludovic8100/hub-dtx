@@ -85,6 +85,11 @@ jobs:
         with:
           python-version: '3.12'
 
+      # Sans ca, l'etape 2 s'arrete sur « Le paquet anthropic manque ». C'est
+      # exactement ce qui s'est passe au premier passage de nuit : scan fait,
+      # lecture, renommage et rapprochement jamais executes.
+      - run: pip install -r scripts/requirements.txt
+
       - name: Verifier les secrets
         run: |
           for s in GRAPH_TENANT_ID GRAPH_CLIENT_ID GRAPH_CLIENT_SECRET SUPABASE_SERVICE_KEY ANTHROPIC_API_KEY; do
