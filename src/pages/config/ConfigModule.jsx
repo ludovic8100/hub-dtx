@@ -60,6 +60,10 @@ export default function ConfigModule() {
   // confirmation. On ne savait jamais si c'etait parti.
   const [bureauxModifies, setBureauxModifies] = useState(new Set())
   const [resultatBureaux, setResultatBureaux] = useState(null)
+  // Combien de clients la fiche ouverte porte-t-elle ? C'est ce qui decide
+  // si on peut la supprimer : un collaborateur efface sans reattribution
+  // laisse ses clients rattaches a un code qui n'existe plus.
+  const [portefeuilleSel, setPortefeuilleSel] = useState(null)
   const [loading, setLoading] = useState(true)
   const [uSearch, setUSearch] = useState('')
   const [uStatut, setUStatut] = useState('tous')
@@ -213,8 +217,19 @@ export default function ConfigModule() {
     notify(`✓ ${ids.length} collaborateur(s) rattaché(s) au bureau`)
   }
 
+  async function chargerPortefeuille(code) {
+    if (!code) { setPortefeuilleSel({ gestionnaire: 0, sousAgent: 0 }); return }
+    setPortefeuilleSel(null)
+    const [g, sa] = await Promise.all([
+      supabase.from('clients').select('id', { count: 'exact', head: true }).ilike('gestionnaire_code', code),
+      supabase.from('clients').select('id', { count: 'exact', head: true }).ilike('sa_code', code),
+    ])
+    setPortefeuilleSel({ gestionnaire: g.count || 0, sousAgent: sa.count || 0 })
+  }
+
   function pick(u) {
     setResultatUser(null)
+    chargerPortefeuille(u.code)
     // On retient l'identite telle qu'elle a ete chargee : si elle est
     // corrigee a la main, `source_identite` doit le dire, sinon la fiche
     // continue d'annoncer « deduit » ce qu'un humain a verifie.
@@ -362,14 +377,18 @@ export default function ConfigModule() {
 
     setSaving(false)
     notify(avertissement ? '⚠ ' + avertissement : '✓ Enregistré')
-    setResultatUser(avertissement
-      ? { ok: false, message: avertissement }
-      : { ok: true, message: 'Enregistrement OK' })
+
     const { data: fresh } = await supabase.from('collaborateurs').select('*').eq('id', cid).single()
     if (fresh) {
       setUsers(prev => estNouveau ? [...prev, fresh] : prev.map(u => u.id === cid ? fresh : u))
       pick(fresh)
     }
+    // APRES pick(), pas avant : pick() remet le message a zero pour la fiche
+    // qu'on ouvre. Pose avant, la confirmation s'affichait quelques
+    // millisecondes puis disparaissait — et le bouton paraissait muet.
+    setResultatUser(avertissement
+      ? { ok: false, message: avertissement }
+      : { ok: true, message: 'Enregistrement OK' })
   }
 
   async function bulkAccesApply(grant) {
@@ -406,6 +425,30 @@ export default function ConfigModule() {
 
   async function deleteUser() {
     if (!selUser?.id) { setSelUser(null); return }
+
+    // ON NE SUPPRIME PAS QUELQU'UN QUI PORTE ENCORE DES CLIENTS.
+    //
+    // Sinon ils restent rattaches a un code qui n'existe plus : invisibles
+    // dans les filtres par gestionnaire, absents des chiffres de production,
+    // et personne ne sait a qui ils appartiennent.
+    //
+    // La reattribution ne peut PAS se faire ici : scripts/qlik_clients.py
+    // recalcule gestionnaire_code et sa_code a chaque synchronisation
+    // quotidienne, a partir des noms venus de Brio. Ce qu'on changerait dans
+    // le Hub serait efface le lendemain matin. Brio fait foi.
+    if (selUser.code) {
+      const [g, sa] = await Promise.all([
+        supabase.from('clients').select('id', { count: 'exact', head: true }).ilike('gestionnaire_code', selUser.code),
+        supabase.from('clients').select('id', { count: 'exact', head: true }).ilike('sa_code', selUser.code),
+      ])
+      const total = (g.count || 0) + (sa.count || 0)
+      if (total > 0) {
+        const m = `Impossible : ${(g.count || 0).toLocaleString('fr-BE')} client(s) comme gestionnaire et `
+                + `${(sa.count || 0).toLocaleString('fr-BE')} comme sous-agent portent encore le code ${selUser.code}. `
+                + `Réattribuez-les dans Brio — la synchronisation quotidienne écraserait une réattribution faite ici.`
+        notify('❌ Clients encore rattachés'); setResultatUser({ ok: false, message: m }); return
+      }
+    }
     // La fiche collaborateur porte aussi les données métier (code, commissions, portefeuille...) :
     // si elle a un rôle métier ou un code, on coupe seulement l'accès Hub sans supprimer la fiche.
     const aUnRoleMetier = selUser.code || selUser.est_commercial || selUser.est_gestionnaire || selUser.est_sous_agent || selUser.est_apporteur
@@ -713,6 +756,25 @@ export default function ConfigModule() {
               return (
               <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 20 }}>
 
+                {/* CE QUE CETTE PERSONNE PORTE. C'est ce qui decide si on
+                    peut la supprimer : effacee sans reattribution, ses
+                    clients restent rattaches a un code qui n'existe plus. */}
+                {selUser.code && portefeuilleSel && (portefeuilleSel.gestionnaire + portefeuilleSel.sousAgent) > 0 && (
+                  <div style={{
+                    marginBottom: 12, padding: '10px 13px', borderRadius: 9,
+                    background: '#fffaf0', border: '1px solid #f0c478', fontSize: 12.5, lineHeight: 1.5,
+                  }}>
+                    <strong style={{ color: '#b45309' }}>Portefeuille rattaché à ce code</strong><br />
+                    <span style={{ color: '#92400e' }}>
+                      {portefeuilleSel.gestionnaire > 0 && <>{portefeuilleSel.gestionnaire.toLocaleString('fr-BE')} client(s) comme <strong>gestionnaire</strong></>}
+                      {portefeuilleSel.gestionnaire > 0 && portefeuilleSel.sousAgent > 0 && ' · '}
+                      {portefeuilleSel.sousAgent > 0 && <>{portefeuilleSel.sousAgent.toLocaleString('fr-BE')} client(s) comme <strong>sous-agent</strong></>}
+                      . La suppression est bloquée tant qu'ils ne sont pas réattribués <strong>dans Brio</strong> —
+                      la synchronisation Qlik quotidienne réécrit ces codes et effacerait toute réattribution faite ici.
+                    </span>
+                  </div>
+                )}
+
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
                   <span style={{ flex: 1 }} />
                   <button onClick={deleteUser} disabled={saving} style={{ padding: '6px 12px', fontSize: 12, fontWeight: 700, borderRadius: 8, cursor: 'pointer', border: '1px solid #fecaca', background: '#fff', color: '#dc2626' }}>
@@ -726,9 +788,15 @@ export default function ConfigModule() {
                     {/* Prenom et NOM separes : « nom_complet » melangeait
                         quatre conventions et rendait tout tri impossible.
                         Il reste alimente automatiquement a partir des deux. */}
-                    <div style={{ minWidth: 170 }}><Lbl>Prénom</Lbl><input value={selUser.prenom || ''} onChange={e => setSelUser(u => ({ ...u, prenom: e.target.value }))} placeholder="Ludovic" style={inp} /></div>
-                    <div style={{ minWidth: 170 }}><Lbl>NOM</Lbl><input value={selUser.nom || ''} onChange={e => setSelUser(u => ({ ...u, nom: e.target.value.toUpperCase() }))} placeholder="DETILLOUX" style={{ ...inp, fontWeight: 700 }} /></div>
-                    <div style={{ minWidth: 220 }}><Lbl>Email</Lbl><input value={selUser.email || ''} onChange={e => setSelUser(u => ({ ...u, email: e.target.value }))} placeholder="prenom@dynassur.be" style={inp} /></div>
+                    {/* autoComplete="off" et des noms de champ que Chrome ne
+                        reconnait pas. Sans cela, sur une fiche de SOCIETE —
+                        donc sans prenom ni nom — le navigateur remplissait les
+                        cases vides avec l'identite de la personne connectee.
+                        On ouvrait la fiche « Cezassur SPRL » et on y lisait son
+                        propre nom. */}
+                    <div style={{ minWidth: 170 }}><Lbl>Prénom</Lbl><input name="collab-pr" autoComplete="off" data-lpignore="true" value={selUser.prenom || ''} onChange={e => setSelUser(u => ({ ...u, prenom: e.target.value }))} placeholder="(vide pour une société)" style={inp} /></div>
+                    <div style={{ minWidth: 170 }}><Lbl>NOM</Lbl><input name="collab-nm" autoComplete="off" data-lpignore="true" value={selUser.nom || ''} onChange={e => setSelUser(u => ({ ...u, nom: e.target.value.toUpperCase() }))} placeholder="(vide pour une société)" style={{ ...inp, fontWeight: 700 }} /></div>
+                    <div style={{ minWidth: 220 }}><Lbl>Email</Lbl><input name="collab-ml" autoComplete="off" data-lpignore="true" value={selUser.email || ''} onChange={e => setSelUser(u => ({ ...u, email: e.target.value }))} placeholder="prenom@dynassur.be" style={inp} /></div>
                     {/* Le bureau decide de quels clients la personne voit —
                         regle clients_bureau. 38 collaborateurs sur 54 n'en
                         avaient aucun, faute de pouvoir le saisir ici. */}
