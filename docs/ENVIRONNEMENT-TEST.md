@@ -1,6 +1,21 @@
 # Environnement de TEST — état et checklist
 
-Mis à jour le 30 octobre 2026. Complète `docs/ARCHITECTURE-ENVIRONNEMENTS.md` (phase 2).
+Mis à jour le **5 novembre 2026**. Complète `docs/ARCHITECTURE-ENVIRONNEMENTS.md` (phase 2)
+et `docs/COMMENT-TRAVAILLER.md` (la méthode de travail, et ce que veulent dire test / preview / production).
+
+> ## ⚠️ État au 05/11/2026 : l'environnement de test N'EST PAS EN SERVICE
+>
+> Le projet Vercel `hub-dtx-test` **n'a jamais été créé**. Nouvelle tentative le 05/11 :
+> `403 — You don't have permission to create the project`. Le jeton du connecteur Vercel sait
+> lire et déployer, pas créer. Ce n'est donc pas passager, et c'est le seul vrai blocage :
+> tout le reste du code est prêt, `APP_ENV=test` suffit.
+>
+> Fait le 05/11 : la branche `staging` a été alignée sur `main` (elle avait 233 commits de retard).
+>
+> **Non vérifiable depuis la session Claude** : le projet Supabase de test n'apparaît plus dans la
+> liste du connecteur et le réseau du conteneur bloque `*.supabase.co`. Un projet Supabase gratuit
+> se met en pause tout seul après une semaine sans trafic, et celui-ci n'a pas servi depuis le 29/10.
+> **À vérifier en premier**, avant de configurer quoi que ce soit côté Vercel.
 
 ## 1. Ce qui est en place
 
