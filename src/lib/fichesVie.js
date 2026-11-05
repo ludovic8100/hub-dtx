@@ -65,7 +65,7 @@ const COORDONNEES = {
     { id: 'numero_rue', libelle: 'N°', type: 'texte' },
     { id: 'code_postal', libelle: 'Code postal', type: 'texte' },
     { id: 'localite', libelle: 'Localité', type: 'texte' },
-    { id: 'date_naissance', libelle: 'Date de naissance', type: 'texte' },
+    { id: 'date_naissance', libelle: 'Date de naissance', type: 'date', aide: 'JJ/MM/AAAA' },
     { id: 'registre_national', libelle: 'N° registre national', type: 'texte' },
   ],
 }

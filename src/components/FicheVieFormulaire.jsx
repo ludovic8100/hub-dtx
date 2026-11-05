@@ -14,6 +14,61 @@ const C = {
   orange: '#b45309', orangeFond: '#fffaf0', orangeBord: '#f0c478',
 }
 
+/**
+ * Met en forme une date pendant la frappe : 01022022 devient 01/02/2022.
+ *
+ * On raisonne par GROUPES, pas sur le flux de chiffres, parce que les deux
+ * facons de taper doivent marcher :
+ *
+ *   01022022   — huit chiffres d'affilee, les barres s'ajoutent toutes seules
+ *   1/2/2022   — l'utilisateur separe lui-meme, et « 1 » doit devenir « 01 »
+ *
+ * Un premier jet reformatait a partir des seuls chiffres. Il rendait bien
+ * 01/02/2022 pour le premier cas, mais « 12/20/22 » pour le second : les
+ * barres tapees etaient jetees et les chiffres recoupes n'importe ou. Faux,
+ * et silencieusement faux.
+ *
+ * Un groupe est COMPLETE a deux chiffres seulement quand il est clos, c'est-a-
+ * dire suivi d'une barre. Sans ca, « 0 » deviendrait « 00 » des la frappe du
+ * premier chiffre. Le trop-plein d'un groupe deborde sur le suivant, ce qui
+ * fait que « 01/022 » donne « 01/02/2 » au lieu d'avaler le chiffre.
+ */
+export function formaterDateSaisie(valeur) {
+  const brut = String(valeur ?? '').slice(0, 24)
+  // Sans aucun chiffre, il n'y a pas de date a mettre en forme. Sans ce
+  // garde-fou, « abc » ressortait en « / » : une barre venue de nulle part.
+  if (!/\d/.test(brut)) return ''
+  const parts = brut.split(/\D+/)
+  const clos = i => parts.length > i + 1   // un groupe suivi d'une barre
+
+  let reste = ''
+  const prendre = (i, taille) => {
+    const g = (reste + (parts[i] ?? '')).replace(/\D/g, '')
+    reste = g.slice(taille)
+    const tete = g.slice(0, taille)
+    return clos(i) && tete.length === 1 ? '0' + tete : tete
+  }
+
+  const jour = prendre(0, 2)
+  const mois = prendre(1, 2)
+  const annee = prendre(2, 4)
+
+  if (annee) return `${jour}/${mois}/${annee}`
+  if (mois || clos(1)) return `${jour}/${mois}`
+  if (clos(0)) return `${jour}/`
+  return jour
+}
+
+/** Une date complete mais impossible (31/02, 45/13/2020) doit se voir. */
+export function dateValide(valeur) {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(valeur ?? ''))
+  if (!m) return null                       // incomplete : on ne juge pas encore
+  const [, j, mo, a] = m.map(Number)
+  if (mo < 1 || mo > 12 || j < 1) return false
+  const d = new Date(a, mo - 1, j)
+  return d.getFullYear() === a && d.getMonth() === mo - 1 && d.getDate() === j
+}
+
 export default function FicheVieFormulaire({ fiche, reponses, onChange, proposees = {} }) {
   if (!fiche) return null
   return (
@@ -34,13 +89,31 @@ function Coordonnees({ fiche, reponses, onChange, proposees }) {
     <section style={carte}>
       <h3 style={titreSection}>{fiche.coordonnees.titre}</h3>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 10 }}>
-        {fiche.coordonnees.champs.map(c => (
-          <label key={c.id} style={{ display: 'block' }}>
-            <span style={etiquette}>{c.libelle}</span>
-            <input value={reponses?.[c.id] ?? ''} onChange={e => onChange(c.id, e.target.value)}
-              style={{ ...champ, borderColor: proposees[c.id] !== undefined ? '#93c5fd' : C.bord }} />
-          </label>
-        ))}
+        {fiche.coordonnees.champs.map(c => {
+          const v = reponses?.[c.id] ?? ''
+          const estDate = c.type === 'date'
+          const valide = estDate ? dateValide(v) : null
+          return (
+            <label key={c.id} style={{ display: 'block' }}>
+              <span style={etiquette}>{c.libelle}</span>
+              <input
+                value={v}
+                placeholder={c.aide || ''}
+                inputMode={estDate ? 'numeric' : undefined}
+                onChange={e => onChange(c.id, estDate ? formaterDateSaisie(e.target.value) : e.target.value)}
+                style={{
+                  ...champ,
+                  borderColor: valide === false ? C.orangeBord
+                    : proposees[c.id] !== undefined ? '#93c5fd' : C.bord,
+                }} />
+              {valide === false && (
+                <span style={{ fontSize: 10.5, color: C.orange, display: 'block', marginTop: 2 }}>
+                  Cette date n'existe pas.
+                </span>
+              )}
+            </label>
+          )
+        })}
       </div>
     </section>
   )
