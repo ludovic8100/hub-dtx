@@ -46,7 +46,7 @@ export default function TraiterFactures({ color = '#0080BD' }) {
     try {
       const { data } = await supabase.auth.getSession()
       const token = data?.session?.access_token || ''
-      const r = await fetch('/api/traiter-factures', {
+      const r = await fetch('/api/declencher?workflow=factures', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       })

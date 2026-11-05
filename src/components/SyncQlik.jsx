@@ -18,7 +18,7 @@ export async function lancerSyncQlik() {
   try {
     const { data } = await supabase.auth.getSession()
     const token = data?.session?.access_token || ''
-    const r = await fetch('/api/reload-qlik', {
+    const r = await fetch('/api/declencher?workflow=qlik', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     })
