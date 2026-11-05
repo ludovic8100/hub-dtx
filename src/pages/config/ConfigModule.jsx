@@ -206,7 +206,13 @@ export default function ConfigModule() {
     if (!selUser) return
     const estNouveau = !selUser.id
     const email = (selUser.email || '').trim().toLowerCase()
-    const nom = (selUser.nom_complet || '').trim() || email || '(sans nom)'
+    // nom_complet se deduit de prenom + NOM quand les deux existent ; sinon
+    // on garde ce qui etait la. Le declencheur en base fait de meme : les
+    // deux doivent raconter la meme chose, sinon l'ecran et la base
+    // divergent sans que personne ne le voie.
+    const nomF = (selUser.nom || '').trim(), prenomF = (selUser.prenom || '').trim()
+    const nom = (nomF && prenomF) ? `${nomF} ${prenomF}`
+              : ((selUser.nom_complet || '').trim() || email || '(sans nom)')
     if (!email && !nom) { notify('❌ Le nom ou l\'email est obligatoire'); return }
     if (selUser.est_commercial || selUser.est_gestionnaire || selUser.est_sous_agent) {
       const manquants = CHAMPS_METIER_REQUIS.filter(([k]) => !String(selUser[k] ?? '').trim()).map(([, l]) => l)
@@ -380,7 +386,8 @@ export default function ConfigModule() {
   const bureauLabelOf = u => bureaux.find(b => b.id === u.bureau_id)?.libelle || null
   const usersFiltres = users.filter(u => {
     const q = uSearch.trim().toLowerCase()
-    if (q && !((u.nom_complet || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q) || (u.code || '').toLowerCase().includes(q))) return false
+    if (q && ![u.nom_complet, u.nom, u.prenom, u.email, u.code, String(u.numero ?? '')]
+          .some(v => (v || '').toLowerCase().includes(q))) return false
     if (uStatut === 'actifs' && !u.compte_hub_actif) return false
     if (uStatut === 'inactifs' && u.compte_hub_actif) return false
     if (uRole !== 'tous' && (u.est_admin ? 'admin' : 'user') !== uRole) return false
@@ -585,23 +592,24 @@ export default function ConfigModule() {
                     border: selUser?.id === u.id ? '2px solid #1e293b' : '1px solid #e2e8f0',
                     background: selUser?.id === u.id ? '#f8fafc' : '#fff',
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                      {u.user_id && <span style={{ fontSize: 9.5, fontWeight: 800, color: '#64748b', background: '#f1f5f9', borderRadius: 5, padding: '1px 5px', fontVariantNumeric: 'tabular-nums' }}>{u.user_id}</span>}
-                      <span style={{ fontWeight: 700, color: '#1e293b', fontSize: 14 }}>{u.nom_complet || u.email || u.code || '(sans nom)'}</span>
-                      {u.est_admin && <span style={{ fontSize: 10, fontWeight: 800, color: '#7c3aed', background: '#f5f3ff', borderRadius: 5, padding: '1px 6px' }}>ADMIN</span>}
-                      {!u.compte_hub_actif && <span style={{ fontSize: 10, fontWeight: 800, color: '#94a3b8', background: '#f1f5f9', borderRadius: 5, padding: '1px 6px' }}>SANS ACCÈS HUB</span>}
-                    </div>
-                    {u.email && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{u.email}</div>}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', marginTop: 5 }}>
-                      {u.est_admin
-                        ? <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: '#7c3aed', borderRadius: 5, padding: '2px 7px' }}>Toutes sociétés</span>
-                        : [...new Set([...(accesAll.get(u.id) || [])].map(c => c.split('|')[0]))]
-                            .sort((a, b) => socUi(a).ordre - socUi(b).ordre)
-                            .map(soc => <span key={soc} style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: socUi(soc).couleur, borderRadius: 5, padding: '2px 7px' }}>{socUi(soc).label}</span>)}
-                      {[['est_commercial','Commercial'],['est_gestionnaire','Gestionnaire'],['est_sous_agent','Sous-agent'],['est_apporteur','Apporteur']].filter(([k]) => u[k]).map(([k,l]) => (
-                        <span key={k} style={{ fontSize: 10, fontWeight: 700, color: '#475569', background: '#f1f5f9', borderRadius: 5, padding: '2px 7px' }}>{l}</span>
-                      ))}
-                      {(() => { const bl = bureauLabelOf(u); return bl ? <span style={{ fontSize: 10, color: '#64748b', background: '#f1f5f9', borderRadius: 5, padding: '2px 7px' }}>🏢 {bl}</span> : null })()}
+                    {/* UNE LIGNE PAR COLLABORATEUR : numero, prenom, nom,
+                        initiales. « 003 Ludovic Detilloux - LDE ».
+                        Tout le detail est a droite ; la gauche sert a
+                        trouver quelqu'un, pas a le decrire. */}
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, minWidth: 0 }}>
+                      <span style={{ fontSize: 11.5, fontWeight: 800, color: '#94a3b8',
+                                     fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                        {u.numero != null ? String(u.numero).padStart(3, '0') : '—'}
+                      </span>
+                      <span style={{ fontSize: 13.5, color: '#1e293b', flex: 1, minWidth: 0,
+                                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {u.prenom || u.nom
+                          ? <>{u.prenom ? u.prenom + ' ' : ''}<strong>{u.nom || ''}</strong></>
+                          : <span style={{ color: '#94a3b8' }}>{u.nom_complet || u.email || '(sans nom)'}</span>}
+                      </span>
+                      {u.code && <span style={{ fontSize: 11.5, fontWeight: 700, color: '#64748b', flexShrink: 0 }}>
+                        – {u.code}
+                      </span>}
                     </div>
                   </button>
                 </div>
@@ -623,8 +631,23 @@ export default function ConfigModule() {
                 {/* ── Coordonnées ── */}
                 <Section titre="Coordonnées">
                   <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
-                    <div style={{ flex: 1, minWidth: 220 }}><Lbl>Nom complet</Lbl><input value={selUser.nom_complet || ''} onChange={e => setSelUser(u => ({ ...u, nom_complet: e.target.value }))} placeholder="Prénom Nom" style={{ ...inp, fontWeight: 700 }} /></div>
+                    {/* Prenom et NOM separes : « nom_complet » melangeait
+                        quatre conventions et rendait tout tri impossible.
+                        Il reste alimente automatiquement a partir des deux. */}
+                    <div style={{ minWidth: 170 }}><Lbl>Prénom</Lbl><input value={selUser.prenom || ''} onChange={e => setSelUser(u => ({ ...u, prenom: e.target.value }))} placeholder="Ludovic" style={inp} /></div>
+                    <div style={{ minWidth: 170 }}><Lbl>NOM</Lbl><input value={selUser.nom || ''} onChange={e => setSelUser(u => ({ ...u, nom: e.target.value.toUpperCase() }))} placeholder="DETILLOUX" style={{ ...inp, fontWeight: 700 }} /></div>
                     <div style={{ minWidth: 220 }}><Lbl>Email</Lbl><input value={selUser.email || ''} onChange={e => setSelUser(u => ({ ...u, email: e.target.value }))} placeholder="prenom@dynassur.be" style={inp} /></div>
+                    {/* Le bureau decide de quels clients la personne voit —
+                        regle clients_bureau. 38 collaborateurs sur 54 n'en
+                        avaient aucun, faute de pouvoir le saisir ici. */}
+                    <div style={{ minWidth: 190 }}>
+                      <Lbl>Bureau</Lbl>
+                      <select value={selUser.bureau_id || ''} onChange={e => setSelUser(u => ({ ...u, bureau_id: e.target.value ? Number(e.target.value) : null }))} style={inp}>
+                        <option value="">— aucun —</option>
+                        {bureaux.map(b => <option key={b.id} value={b.id}>{b.libelle}</option>)}
+                      </select>
+                    </div>
+                    <div style={{ minWidth: 150 }}><Lbl>N° producteur</Lbl><input value={selUser.numero ?? ''} onChange={e => setSelUser(u => ({ ...u, numero: e.target.value }))} placeholder="3" style={inp} /></div>
                   </div>
                   <Grid>
                     <F label="Titre / fonction" value={selUser.titre} onChange={v => setSelUser(u => ({ ...u, titre: v }))} />
