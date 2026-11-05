@@ -56,6 +56,10 @@ export default function ConfigModule() {
   // sections. On cliquait, on regardait en bas, on ne voyait rien, et on en
   // concluait que le bouton ne marchait pas.
   const [resultatUser, setResultatUser] = useState(null)
+  // Les bureaux s'enregistraient A LA SORTIE DU CHAMP, sans bouton et sans
+  // confirmation. On ne savait jamais si c'etait parti.
+  const [bureauxModifies, setBureauxModifies] = useState(new Set())
+  const [resultatBureaux, setResultatBureaux] = useState(null)
   const [loading, setLoading] = useState(true)
   const [uSearch, setUSearch] = useState('')
   const [uStatut, setUStatut] = useState('tous')
@@ -135,15 +139,38 @@ export default function ConfigModule() {
   }
 
   // ── Bureaux (adresse complète — devoirs d'information, courriers clients) ──
-  async function majBureauChamp(id, champ, val) {
+  function majBureauChamp(id, champ, val) {
     setBureaux(list => list.map(b => b.id === id ? { ...b, [champ]: val } : b))
+    setBureauxModifies(prev => new Set(prev).add(id))
+    setResultatBureaux(null)
   }
-  async function saveBureauRow(id) {
-    const row = bureaux.find(b => b.id === id)
-    if (!row) return
-    const { id: _id, ...payload } = row
-    const { error } = await supabase.from('ref_bureaux').update(payload).eq('id', id)
-    if (error) notify('❌ ' + error.message)
+  async function saveBureaux() {
+    const ids = [...bureauxModifies]
+    if (!ids.length) return
+    setSaving(true); setResultatBureaux(null)
+    try {
+      for (const id of ids) {
+        const row = bureaux.find(b => b.id === id)
+        if (!row) continue
+        const { id: _id, ...payload } = row
+        // `.select()` : un UPDATE refuse par RLS ne renvoie pas d'erreur, il
+        // touche zero ligne et repond « succes ». Jusqu'au 05/11, ref_bureaux
+        // n'avait AUCUNE regle d'ecriture — modifier un bureau ne faisait
+        // rien, en silence, et personne ne pouvait le voir.
+        const { data, error } = await supabase.from('ref_bureaux')
+          .update(payload).eq('id', id).select('id')
+        if (error) throw new Error(error.message)
+        if (!data || !data.length) {
+          throw new Error("Aucune ligne modifiée — l'écriture sur les bureaux est réservée aux administrateurs.")
+        }
+      }
+      setBureauxModifies(new Set())
+      setResultatBureaux({ ok: true, message: `Enregistrement OK — ${ids.length} bureau(x)` })
+      notify('✓ Bureaux enregistrés')
+    } catch (e) {
+      const m = String(e?.message || e)
+      setResultatBureaux({ ok: false, message: m }); notify('❌ ' + m)
+    } finally { setSaving(false) }
     // Pas besoin de resynchroniser `users` : bureauLabelOf() relit `bureaux` à chaque rendu.
   }
   async function ajouterBureau() {
@@ -214,7 +241,21 @@ export default function ConfigModule() {
     })
   }
 
+  // Enveloppe : sans elle, la moindre exception laissait le bouton muet.
+  // Pas de message vert, pas de message rouge, rien — et l'utilisateur en
+  // conclut, a raison, que le bouton ne fonctionne pas.
   async function saveUser() {
+    try { await saveUserInterne() }
+    catch (e) {
+      setSaving(false)
+      const m = String(e?.message || e)
+      notify('❌ ' + m)
+      setResultatUser({ ok: false, message: `Erreur inattendue : ${m}` })
+      console.error('saveUser', e)
+    }
+  }
+
+  async function saveUserInterne() {
     if (!selUser) return
     const estNouveau = !selUser.id
     const email = (selUser.email || '').trim().toLowerCase()
@@ -579,16 +620,31 @@ export default function ConfigModule() {
                 </div>
                 {bureaux.map(b => (
                   <div key={b.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr 60px 70px 90px 1fr 32px', gap: 8, marginBottom: 6 }}>
-                    <input style={inp} value={b.libelle || ''} onChange={e => majBureauChamp(b.id, 'libelle', e.target.value)} onBlur={() => saveBureauRow(b.id)} placeholder="Nom du bureau" />
-                    <input style={inp} value={b.rue || ''} onChange={e => majBureauChamp(b.id, 'rue', e.target.value)} onBlur={() => saveBureauRow(b.id)} placeholder="Rue" />
-                    <input style={inp} value={b.numero || ''} onChange={e => majBureauChamp(b.id, 'numero', e.target.value)} onBlur={() => saveBureauRow(b.id)} placeholder="N°" />
-                    <input style={inp} value={b.boite || ''} onChange={e => majBureauChamp(b.id, 'boite', e.target.value)} onBlur={() => saveBureauRow(b.id)} placeholder="Bte" />
-                    <input style={inp} value={b.code_postal || ''} onChange={e => majBureauChamp(b.id, 'code_postal', e.target.value)} onBlur={() => saveBureauRow(b.id)} placeholder="CP" />
-                    <input style={inp} value={b.ville || ''} onChange={e => majBureauChamp(b.id, 'ville', e.target.value)} onBlur={() => saveBureauRow(b.id)} placeholder="Ville" />
+                    <input style={inp} value={b.libelle || ''} onChange={e => majBureauChamp(b.id, 'libelle', e.target.value)} placeholder="Nom du bureau" />
+                    <input style={inp} value={b.rue || ''} onChange={e => majBureauChamp(b.id, 'rue', e.target.value)} placeholder="Rue" />
+                    <input style={inp} value={b.numero || ''} onChange={e => majBureauChamp(b.id, 'numero', e.target.value)} placeholder="N°" />
+                    <input style={inp} value={b.boite || ''} onChange={e => majBureauChamp(b.id, 'boite', e.target.value)} placeholder="Bte" />
+                    <input style={inp} value={b.code_postal || ''} onChange={e => majBureauChamp(b.id, 'code_postal', e.target.value)} placeholder="CP" />
+                    <input style={inp} value={b.ville || ''} onChange={e => majBureauChamp(b.id, 'ville', e.target.value)} placeholder="Ville" />
                     <button onClick={() => supprimerBureau(b.id)} title="Retirer" style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 16 }}>✕</button>
                   </div>
                 ))}
-                <button onClick={ajouterBureau} style={{ ...btn('#1e293b'), marginTop: 6, padding: '7px 14px', fontSize: 13 }}>➕ Ajouter un bureau</button>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 8, flexWrap: 'wrap' }}>
+                  <button onClick={ajouterBureau} style={{ ...btn('#64748b'), padding: '7px 14px', fontSize: 13 }}>➕ Ajouter un bureau</button>
+                  <button onClick={saveBureaux} disabled={saving || !bureauxModifies.size}
+                    style={{ ...btn('#1e293b'), padding: '7px 16px', fontSize: 13,
+                             opacity: (saving || !bureauxModifies.size) ? .45 : 1 }}>
+                    💾 Enregistrer{bureauxModifies.size ? ` (${bureauxModifies.size})` : ''}
+                  </button>
+                </div>
+                {resultatBureaux && (
+                  <div style={{
+                    marginTop: 9, padding: '8px 12px', borderRadius: 8, fontSize: 12.5, fontWeight: 600,
+                    border: `1px solid ${resultatBureaux.ok ? '#86efac' : '#fecaca'}`,
+                    background: resultatBureaux.ok ? '#f0fdf4' : '#fef2f2',
+                    color: resultatBureaux.ok ? '#15803d' : '#b91c1c',
+                  }}>{resultatBureaux.ok ? '✓ ' : '✕ '}{resultatBureaux.message}</div>
+                )}
               </div>
             )}
 
