@@ -10,6 +10,13 @@ name: Factures SharePoint → Supabase
 # Lancement manuel en DRY_RUN par défaut : on vérifie ce qui serait écrit avant
 # d'écrire quoi que ce soit.
 
+# Portee du jeton GitHub de ce workflow. Aucun de nos workflows n'ecrit
+# dans le depot : ils lisent le code et parlent a Supabase, SharePoint ou
+# Qlik. Sans cette ligne, le jeton porte les droits par defaut du depot,
+# qui peuvent inclure l'ecriture.
+permissions:
+  contents: read
+
 on:
   schedule:
     - cron: '37 5 * * *'

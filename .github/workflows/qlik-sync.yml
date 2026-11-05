@@ -5,6 +5,13 @@ name: Qlik BRIO → Supabase
 # (06:30 UTC = 08:30 Bruxelles). Lançable aussi à la main, avec un mode DRY_RUN
 # par défaut pour valider l'extraction SANS rien écrire dans Supabase.
 
+# Portee du jeton GitHub de ce workflow. Aucun de nos workflows n'ecrit
+# dans le depot : ils lisent le code et parlent a Supabase, SharePoint ou
+# Qlik. Sans cette ligne, le jeton porte les droits par defaut du depot,
+# qui peuvent inclure l'ecriture.
+permissions:
+  contents: read
+
 on:
   schedule:
     - cron: '30 6 * * *'

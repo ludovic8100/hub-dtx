@@ -15,6 +15,13 @@ name: Factures — renommage
 # Pas de cron tant que le resultat n'a pas ete regarde sur un lot reel. On
 # lance a la main, par dossier, en commencant par un essai a blanc.
 
+# Portee du jeton GitHub de ce workflow. Aucun de nos workflows n'ecrit
+# dans le depot : ils lisent le code et parlent a Supabase, SharePoint ou
+# Qlik. Sans cette ligne, le jeton porte les droits par defaut du depot,
+# qui peuvent inclure l'ecriture.
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
     inputs:
