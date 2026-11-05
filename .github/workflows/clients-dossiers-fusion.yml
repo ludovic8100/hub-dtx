@@ -1,0 +1,80 @@
+name: Dossiers clients — fusion vers ADMINISTRATION
+
+# Copie DYNASSUR/DATA_CLIENT vers ADMINISTRATION/CLIENTS.
+#
+# AUCUN RENOMMAGE : les dossiers gardent leur nom actuel. La regle de nommage
+# est un second chantier, volontairement separe — deplacer et renommer d'un
+# coup, c'est ne plus savoir laquelle des deux operations a casse quelque
+# chose.
+#
+# CE SCRIPT NE SUPPRIME RIEN. ADMINISTRATION et DYNASSUR sont deux sites, donc
+# deux espaces de stockage : Graph ne sait pas deplacer entre eux, il faut
+# copier puis supprimer. Seule la copie est faite ici. Tant que la source n'a
+# pas ete supprimee a la main, les deux arborescences coexistent et rien n'est
+# perdu.
+#
+# Conflit : DYNASSUR gagne, au niveau du FICHIER. Un fichier qui n'existe que
+# dans ADMINISTRATION reste intact.
+#
+# ESSAI A BLANC PAR DEFAUT.
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Essai a blanc — liste ce qui serait copie, ne copie rien"
+        type: boolean
+        default: true
+      lot:
+        description: "Nombre maximum de dossiers traites (0 = tous)"
+        type: string
+        default: '20'
+      depuis:
+        description: "Reprendre a partir de ce nom de dossier (reprise sur incident)"
+        type: string
+        default: ''
+
+concurrency:
+  group: clients-dossiers-fusion
+  cancel-in-progress: false
+
+jobs:
+  fusionner:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    environment: production
+    env:
+      GRAPH_TENANT_ID: ${{ secrets.GRAPH_TENANT_ID }}
+      GRAPH_CLIENT_ID: ${{ secrets.GRAPH_CLIENT_ID }}
+      GRAPH_CLIENT_SECRET: ${{ secrets.GRAPH_CLIENT_SECRET }}
+      DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
+      LOT: ${{ inputs.lot }}
+      DEPUIS: ${{ inputs.depuis }}
+    steps:
+      # Une copie reelle ne se lance que depuis main. Ralentisseur, pas
+      # serrure : la serrure est GitHub > Settings > Environments > production.
+      - name: Refuser une copie reelle depuis une branche
+        if: ${{ github.ref != 'refs/heads/main' && !inputs.dry_run }}
+        run: |
+          echo "::error::Copie REELLE demandee depuis ${{ github.ref }}."
+          echo "::error::Fusionne dans main, ou relance en essai a blanc."
+          exit 1
+
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verifier les secrets
+        run: |
+          for s in GRAPH_TENANT_ID GRAPH_CLIENT_ID GRAPH_CLIENT_SECRET; do
+            if [ -z "${!s}" ]; then echo "::error::Secret $s manquant"; exit 1; fi
+          done
+          echo "Mode : ${DRY_RUN:+ESSAI A BLANC}${DRY_RUN:-COPIE REELLE} — lot ${LOT:-tous}"
+
+      - name: Fusion
+        working-directory: scripts
+        run: python clients_dossiers_fusion.py
