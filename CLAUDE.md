@@ -287,6 +287,17 @@ Ce qui continue d'exiger un accord explicite, parce que ce n'est pas réversible
 `git revert` : les écritures massives en base de production, les suppressions, et tout
 geste qui sort du dépôt (envoi de courrier, publication, appel à une API tierce qui écrit).
 
+### Plafond des fonctions serverless : 12 sur 12
+
+`api/` contient **exactement 12 fonctions** pour une limite de 12 sur le plan Vercel
+gratuit. **La treizième casse tous les déploiements de production** — c'est ce qui s'est
+produit les 4 et 5/11. Un environnement de test ne protège pas de ça : le plafond est une
+limite du projet de production, pas du code.
+
+**Ne pas ajouter de fichier dans `api/` sans arbitrage humain** (plan Pro, ou fusion des
+quatre routes d'envoi de mail — `cotisation-rappel`, `cotisation-send`, `devis-send`,
+`facture-send` — qui font toutes la même chose).
+
 ## Environnements & configuration (depuis le 29/10/2026)
 
 - **Aucune URL/clé en dur** dans le code : tout passe par `src/config/env.js` (front, variables `VITE_*`),
@@ -300,8 +311,13 @@ geste qui sort du dépôt (envoi de courrier, publication, appel à une API tier
 - Plan complet (test/prod, couche applicative, migrations, CI) : `docs/ARCHITECTURE-ENVIRONNEMENTS.md`.
 - Sécurité phase 0 appliquée : `execute_raw_sql` et `tickets_rappels_echeance` ne sont plus exécutables
   par `anon` (`sql/security_phase0_revoke_rpc_anon.sql`).
-- **Environnement TEST (phase 2, 29/10/2026)** : projet Supabase `lvdnzbhplnzuwdqtitdb` (schéma =
-  `supabase/migrations/20261029120000_baseline_prod.sql`, données anonymisées via `scripts/seed_test.py`),
-  projet Vercel `hub-dtx-test` sur `staging`. Checklist et variables : `docs/ENVIRONNEMENT-TEST.md`.
+- **Environnement TEST : PAS ENCORE EN SERVICE** (vérifié le 05/11/2026). Le projet Supabase
+  `lvdnzbhplnzuwdqtitdb` existe (schéma = `supabase/migrations/20261029120000_baseline_prod.sql`,
+  données anonymisées via `scripts/seed_test.py`) — mais **le projet Vercel `hub-dtx-test` n'a
+  jamais été créé** : le jeton du connecteur Vercel ne peut pas créer de projet (403, constaté le
+  30/10 et reconfirmé le 05/11). La branche `staging` est alignée sur `main` et prête.
+  Ne pas dire au Hub qu'il a un environnement de test tant que `hub-dtx-test.vercel.app` ne répond pas.
+  Méthode de travail et différence test / preview / production : `docs/COMMENT-TRAVAILLER.md`.
+  Checklist et variables : `docs/ENVIRONNEMENT-TEST.md`.
   En test : mails redirigés (`api/_lib/mail.js`), webhooks n8n suffixés `-test`, SharePoint sous `_TEST`.
 - Workflows Qlik : entrée `target` (test/production) = environnement GitHub ; le cron vise la prod.
