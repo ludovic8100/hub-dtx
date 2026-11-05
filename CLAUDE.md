@@ -264,6 +264,29 @@ est l'instance n8n, lisible via le connecteur (option « Available in MCP » coc
 - Ne jamais committer de secret (clé API, service_role). Le repo est public.
 - Toute écriture en base de prod (Supabase MCP) : lecture d'abord, écriture ciblée, jamais de delete massif sans validation humaine.
 
+### Fusion des PR : autonome depuis le 05/11/2026
+
+Ludovic : « *tu peux fusionner tous les PR existants, ne me demande plus et prévois-le* ».
+**Ne plus demander l'autorisation de fusionner.** Ouvrir la PR, la vérifier, la fusionner,
+et dire ce qui a été fait.
+
+Autonome ne veut pas dire les yeux fermés. Avant chaque fusion :
+
+1. `npm run build` passe ;
+2. lire le diff — une PR vieille de plusieurs jours peut avoir été dépassée par le reste ;
+3. après la fusion, **vérifier le déploiement, pas seulement la fusion**.
+
+Ce troisième point n'est pas théorique : entre le 04 et le 05/11, six PR ont été fusionnées
+dans `main` pendant que **tous les déploiements de production échouaient** (13 fonctions
+serverless pour une limite de 12). Elles ont été annoncées comme faites. Elles ne l'étaient
+pas. « Fusionné » et « en ligne » sont deux choses différentes, et c'est la seconde qui
+intéresse l'utilisateur. Contrôler l'état du déploiement Vercel **et son alias**
+(`hub-dtx.vercel.app`, `aliasError: null`) avant d'annoncer quoi que ce soit.
+
+Ce qui continue d'exiger un accord explicite, parce que ce n'est pas réversible d'un
+`git revert` : les écritures massives en base de production, les suppressions, et tout
+geste qui sort du dépôt (envoi de courrier, publication, appel à une API tierce qui écrit).
+
 ## Environnements & configuration (depuis le 29/10/2026)
 
 - **Aucune URL/clé en dur** dans le code : tout passe par `src/config/env.js` (front, variables `VITE_*`),
