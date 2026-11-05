@@ -49,6 +49,13 @@ export default function ConfigModule() {
   const [selUser, setSelUser] = useState(null) // form user courant
   const [saving, setSaving] = useState(false)
   const [flash, setFlash] = useState(null)
+  // Le resultat de l'enregistrement, affiche SOUS le bouton.
+  //
+  // Il existait bien un message, mais en haut A DROITE de l'ecran et pendant
+  // 2,5 secondes — alors que le bouton est en bas d'un formulaire de six
+  // sections. On cliquait, on regardait en bas, on ne voyait rien, et on en
+  // concluait que le bouton ne marchait pas.
+  const [resultatUser, setResultatUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [uSearch, setUSearch] = useState('')
   const [uStatut, setUStatut] = useState('tous')
@@ -180,7 +187,12 @@ export default function ConfigModule() {
   }
 
   function pick(u) {
-    setSelUser({ ...u, noms_repris_str: (u.noms_repris || []).join(', ') })
+    setResultatUser(null)
+    // On retient l'identite telle qu'elle a ete chargee : si elle est
+    // corrigee a la main, `source_identite` doit le dire, sinon la fiche
+    // continue d'annoncer « deduit » ce qu'un humain a verifie.
+    setSelUser({ ...u, noms_repris_str: (u.noms_repris || []).join(', '),
+                 _identiteChargee: `${u.nom || ''}|${u.prenom || ''}` })
     setSelTaux({ ...(taux[u.id] || {}) })
     setAccesSel(new Set(accesAll.get(u.id) || []))
     setShowFrais(false)
@@ -213,16 +225,23 @@ export default function ConfigModule() {
     const nomF = (selUser.nom || '').trim(), prenomF = (selUser.prenom || '').trim()
     const nom = (nomF && prenomF) ? `${nomF} ${prenomF}`
               : ((selUser.nom_complet || '').trim() || email || '(sans nom)')
-    if (!email && !nom) { notify('❌ Le nom ou l\'email est obligatoire'); return }
+    setResultatUser(null)
+    if (!email && !nom) { const m = 'Le nom ou l\'email est obligatoire'; notify('❌ ' + m); setResultatUser({ ok: false, message: m }); return }
     if (selUser.est_commercial || selUser.est_gestionnaire || selUser.est_sous_agent) {
       const manquants = CHAMPS_METIER_REQUIS.filter(([k]) => !String(selUser[k] ?? '').trim()).map(([, l]) => l)
-      if (manquants.length) { notify(`❌ Champs obligatoires (rôle métier) : ${manquants.join(', ')}`); return }
+      if (manquants.length) { const m = `Champs obligatoires (rôle métier) : ${manquants.join(', ')}`; notify('❌ ' + m); setResultatUser({ ok: false, message: m }); return }
     }
     setSaving(true)
 
-    const { id, created_at, updated_at, _nouveau, noms_repris_str, personne_id, ...rest } = selUser
+    const { id, created_at, updated_at, _nouveau, noms_repris_str, personne_id,
+            _identiteChargee, ...rest } = selUser
+    const identiteCorrigee = _identiteChargee !== undefined
+      && _identiteChargee !== `${nomF}|${prenomF}` && (nomF || prenomF)
+
     const payload = {
       ...rest,
+      // Corrigee a la main : la fiche ne doit plus annoncer « deduit ».
+      ...(identiteCorrigee ? { source_identite: 'saisie' } : {}),
       email: email || null,
       nom_complet: nom,
       numero: (rest.numero === '' || rest.numero == null) ? null : Number(rest.numero),
@@ -246,15 +265,29 @@ export default function ConfigModule() {
       payload.type = payload.type || 'physique'
       payload.actif = payload.actif ?? true
       const { data, error } = await supabase.from('collaborateurs').insert(payload).select().single()
-      if (error) { setSaving(false); notify('❌ ' + (error.code === '23505' ? 'Un compte existe déjà avec cet email' : error.message)); return }
+      if (error) { const m = error.code === '23505' ? 'Un compte existe déjà avec cet email' : error.message
+                   setSaving(false); notify('❌ ' + m); setResultatUser({ ok: false, message: m }); return }
       cid = data.id
     } else {
-      const { error } = await supabase.from('collaborateurs').update(payload).eq('id', id)
-      if (error) { setSaving(false); notify('❌ ' + error.message); return }
+      // `.select()` n'est pas decoratif : sous RLS, un UPDATE refuse ne
+      // renvoie AUCUNE erreur. Il touche zero ligne et repond « succes ».
+      // Pour un non-administrateur, le bouton paraissait donc fonctionner
+      // sans rien enregistrer. On compte les lignes revenues.
+      const { data: maj, error } = await supabase.from('collaborateurs')
+        .update(payload).eq('id', id).select('id')
+      if (error) { setSaving(false); notify('❌ ' + error.message); setResultatUser({ ok: false, message: error.message }); return }
+      if (!maj || maj.length === 0) {
+        const m = "Aucune ligne modifiée — les droits d'écriture sur les collaborateurs sont réservés aux administrateurs."
+        setSaving(false); notify('❌ ' + m); setResultatUser({ ok: false, message: m }); return
+      }
     }
 
+    // Cette ecriture n'etait pas verifiee : un refus de droits passait
+    // inapercu et la fiche `personnes` divergeait en silence.
+    let avertissement = null
     if (pid) {
-      await supabase.from('personnes').update(champsPersonne).eq('id', pid)
+      const { error: ep } = await supabase.from('personnes').update(champsPersonne).eq('id', pid)
+      if (ep) avertissement = `collaborateur enregistré, mais la fiche personne n'a pas suivi : ${ep.message}`
     } else {
       const { data: np } = await supabase.from('personnes').insert(champsPersonne).select('id').single()
       if (np) { pid = np.id; await supabase.from('collaborateurs').update({ personne_id: pid }).eq('id', cid) }
@@ -287,7 +320,10 @@ export default function ConfigModule() {
     setAccesAll(m => { const nm = new Map(m); nm.set(cid, new Set(accesSel)); return nm })
 
     setSaving(false)
-    notify('✓ Enregistré')
+    notify(avertissement ? '⚠ ' + avertissement : '✓ Enregistré')
+    setResultatUser(avertissement
+      ? { ok: false, message: avertissement }
+      : { ok: true, message: 'Enregistrement OK' })
     const { data: fresh } = await supabase.from('collaborateurs').select('*').eq('id', cid).single()
     if (fresh) {
       setUsers(prev => estNouveau ? [...prev, fresh] : prev.map(u => u.id === cid ? fresh : u))
@@ -800,8 +836,24 @@ export default function ConfigModule() {
                   )}
                 </Section>
 
-                <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 12, borderTop: '1px solid #f1f5f9', paddingTop: 14 }}>
-                  <button onClick={saveUser} disabled={saving} style={{ ...btn('#1e293b'), padding: '10px 20px', fontSize: 14, opacity: saving ? .6 : 1 }}>{saving ? '…' : (selUser.id ? '💾 Enregistrer' : '➕ Créer')}</button>
+                <div style={{ marginTop: 16, borderTop: '1px solid #f1f5f9', paddingTop: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <button onClick={saveUser} disabled={saving} style={{ ...btn('#1e293b'), padding: '10px 20px', fontSize: 14, opacity: saving ? .6 : 1 }}>{saving ? '…' : (selUser.id ? '💾 Enregistrer' : '➕ Créer')}</button>
+                  </div>
+                  {/* Le resultat SOUS le bouton, la ou se trouve le regard.
+                      Il reste affiche jusqu'au prochain enregistrement ou
+                      changement de fiche : un message qui s'efface tout seul
+                      au bout de deux secondes n'est pas une confirmation. */}
+                  {resultatUser && (
+                    <div style={{
+                      marginTop: 10, padding: '9px 13px', borderRadius: 9, fontSize: 13, fontWeight: 600,
+                      border: `1px solid ${resultatUser.ok ? '#86efac' : '#fecaca'}`,
+                      background: resultatUser.ok ? '#f0fdf4' : '#fef2f2',
+                      color: resultatUser.ok ? '#15803d' : '#b91c1c',
+                    }}>
+                      {resultatUser.ok ? '✓ ' : '✕ '}{resultatUser.message}
+                    </div>
+                  )}
                 </div>
               </div>
               )
