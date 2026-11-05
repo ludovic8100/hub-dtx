@@ -731,7 +731,11 @@ export default function ToolQuestionnaire() {
         funds: funds,
         horizon_years: horizonYears,
         purpose: purposeFromType(selectedContrat?.type_production),
-        source: sansEpargne ? 'sans_epargne' : source,
+        // `source` dit COMMENT le document a ete produit, et la colonne est
+        // bornee a generated / uploaded. « Sans epargne » est une autre
+        // dimension : elle a sa propre colonne.
+        source,
+        sans_epargne: sansEpargne,
         version_fiche: versionActive || null,
         date_effet: dateEffet.date ? dateEffet.date.toISOString().slice(0, 10) : null,
         source_date: versionChoisie ? 'manuel' : (dateEffet.source || null),
@@ -1666,8 +1670,19 @@ export default function ToolQuestionnaire() {
               </div>
             )}
             <div style={{ fontSize: 13, color: '#64748b', marginBottom: 14 }}>
-              Questionnaire pour <strong>{clientActif?.nom} {clientActif?.prenom}</strong> — Profil : <strong>{profile || 'non etabli'}</strong>{score != null ? ` (score ${score}/100)` : ''}
+              Questionnaire pour <strong>{clientActif?.nom} {clientActif?.prenom}</strong> — Profil :{' '}
+              <strong>{profile || 'non établi'}</strong>{score != null ? ` (score ${score}/100)` : ''}
               {horizonYears !== null && <> — Horizon : <strong>{horizonYears} ans</strong></>}
+              {/* Un profil calcule sur deux questions repondues sur quatre a
+                  exactement la meme tete qu'un profil complet. Il faut le dire :
+                  c'est une conclusion qu'on porte dans la fiche du client. */}
+              {profile && !calculProfil.complet && (
+                <div style={{ color: '#b45309', marginTop: 4, fontWeight: 600 }}>
+                  Profil établi sur {calculProfil.repondues} question
+                  {calculProfil.repondues > 1 ? 's' : ''} sur {calculProfil.total} —
+                  complétez la section « comportement face au risque » pour qu'il soit fiable.
+                </div>
+              )}
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button style={btnPrimary} onClick={handleDownload}>
