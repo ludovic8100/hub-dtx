@@ -184,6 +184,46 @@ def map_code(name, code_map):
     return None
 
 
+def charger_attributions():
+    """Les dossiers reattribues DANS LE HUB, qui priment sur Brio.
+
+    SANS CETTE LECTURE, LA REATTRIBUTION NE SERVIRAIT A RIEN. Cette synchro
+    recalcule gestionnaire_code et sa_code a partir des NOMS venus de Brio, a
+    chaque passage. Un gestionnaire remplace dans le Hub le soir reprenait donc
+    ses clients le lendemain matin, sans que personne ne comprenne pourquoi.
+
+    Une ligne retiree de clients_attribution rend simplement le dossier a Brio.
+    """
+    url = (f"{SUPA_URL}/rest/v1/clients_attribution"
+           "?select=dossier,gestionnaire_code,sa_code")
+    req = urllib.request.Request(url, headers={
+        "apikey": SUPA_KEY, "Authorization": f"Bearer {SUPA_KEY}"})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            lignes = json.loads(r.read().decode())
+    except Exception as e:                      # noqa: BLE001
+        # On prefere ARRETER : ecrire en ignorant les exceptions reecrirait en
+        # silence des attributions decidees a la main.
+        sys.exit(f"::error::Lecture de clients_attribution impossible ({e}). "
+                 "Arret : poursuivre ecraserait les reattributions du Hub.")
+    return {l["dossier"]: l for l in lignes}
+
+
+def appliquer_attributions(rows, attributions):
+    """Le Hub a le dernier mot sur les dossiers qu'il a reattribues."""
+    touches = 0
+    for r in rows:
+        a = attributions.get(r.get("dossier"))
+        if not a:
+            continue
+        if a.get("gestionnaire_code"):
+            r["gestionnaire_code"] = a["gestionnaire_code"]
+        if a.get("sa_code"):
+            r["sa_code"] = a["sa_code"]
+        touches += 1
+    return touches
+
+
 def upsert(rows):
     url = f"{SUPA_URL}/rest/v1/clients?on_conflict=dossier"
     headers = {"apikey": SUPA_KEY, "Authorization": f"Bearer {SUPA_KEY}",
@@ -210,6 +250,13 @@ def main():
         r["gestionnaire_code"] = map_code(r.get("gestionnaire_nom"), cm)
         r["sa_code"] = map_code(r.get("sa_nom"), cm)
         mapped_g += bool(r["gestionnaire_code"]); mapped_s += bool(r["sa_code"])
+    # Les reattributions du Hub ecrasent ce que Brio dit, et seulement pour
+    # les dossiers concernes.
+    if SUPA_KEY:
+        attributions = charger_attributions()
+        n = appliquer_attributions(rows, attributions)
+        print(f"  reattributions du Hub respectees : {n}/{len(attributions)} dossier(s)")
+
     if DRY_RUN:
         print(f"  codes gestionnaire mappés : {mapped_g}/{len(rows)} | sous-agent : {mapped_s}/{len(rows)}")
         print("  Exemples (dossier | nom | prénom | cp | localité | gest -> code) :")
