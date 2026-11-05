@@ -112,6 +112,54 @@ def main() -> int:
         print(f"::error::Site accessible mais dossier {DOSSIER} illisible ({e.code}).")
         return 1
 
+    # 4. JUSQU'OU VA CETTE CLE ? Lecture seule, rien n'est modifie.
+    #
+    # On a dit a Ludovic que l'application voit TOUT SharePoint. C'etait
+    # deduit, pas verifie : les 739 renommages prouvent l'ecriture sur
+    # ADMINISTRATION, pas sur le reste du tenant. Avant de lui faire demonter
+    # des droits sur une deduction, on regarde.
+    print("\n── Portee reelle de la cle " + "─" * 46)
+    try:
+        tous = appel(f"{GRAPH}/sites?search=*&$top=50", jeton)
+        sites = tous.get("value", [])
+        noms = [x.get("webUrl", "") for x in sites]
+        autres = [u for u in noms if "/sites/ADMINISTRATION" not in u]
+        print(f"  Sites visibles par la cle : {len(sites)}")
+        if autres:
+            print("  ::warning::La cle voit des sites AUTRES qu'ADMINISTRATION :")
+            for u in autres[:12]:
+                print(f"    {u}")
+            print("  => portee a l'echelle du tenant (Sites.Read.All / Sites.ReadWrite.All).")
+        else:
+            print("  Aucun autre site visible : la cle semble deja limitee.")
+    except urllib.error.HTTPError as e:
+        print(f"  Recherche de sites refusee ({e.code}) : la cle est probablement "
+              f"deja limitee a des sites designes (Sites.Selected).")
+
+    # Le courrier : l'application en a-t-elle le droit ? Lecture d'une seule
+    # boite, sans rien ouvrir.
+    try:
+        appel(f"{GRAPH}/users?$top=1&$select=mail", jeton)
+        print("  ::warning::La cle peut lister les utilisateurs du tenant (User.Read.All).")
+    except urllib.error.HTTPError as e:
+        print(f"  Annuaire des utilisateurs : refuse ({e.code}). Tant mieux.")
+
+    # 5. POURRAI-JE REDONNER LE DROIT APRES ? Question vitale : si la reponse
+    #    est non, retirer les droits larges casse le Hub sans retour possible
+    #    depuis ici. Lire les permissions d'un site exige Sites.FullControl.All,
+    #    exactement comme en accorder une. Un refus ici = un refus la-bas.
+    print("\n── Puis-je accorder un droit Sites.Selected ? " + "─" * 25)
+    try:
+        perms = appel(f"{GRAPH}/sites/{site['id']}/permissions", jeton)
+        print(f"  OUI — lecture des permissions acceptee "
+              f"({len(perms.get('value', []))} entree(s)). La cle porte "
+              f"Sites.FullControl.All : je pourrai redonner le droit moi-meme.")
+    except urllib.error.HTTPError as e:
+        print(f"  NON — refuse ({e.code}). La cle n'a pas Sites.FullControl.All.")
+        print("  ::warning::Apres le passage a Sites.Selected, je ne pourrai PAS "
+              "redonner l'acces au site depuis ici. Il faudra que Ludovic accorde "
+              "lui-meme le droit sur ADMINISTRATION, sinon le Hub reste aveugle.")
+
     print("\nAccès SharePoint opérationnel — l'extraction des relevés peut être construite.")
     return 0
 
