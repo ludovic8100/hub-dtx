@@ -145,6 +145,33 @@ de commercial ou de sous-agent au fil de sa vie.
 foi.** Le code lu dans le bordereau n'est conservé qu'à titre d'information, jamais comme clé
 d'attribution — ni pour les chiffres, ni pour les objectifs, ni pour les commissions.
 
+#### Attribution d'un client : portefeuille, puis gestionnaire (05/11/2026)
+
+Règle métier donnée par Ludovic : **on se base d'abord sur le portefeuille, ensuite sur le
+gestionnaire. C'est le gestionnaire qui détermine le commercial.** La correspondance
+gestionnaire → commercial doit être paramétrable dans le Hub, surtout pour Juprelle.
+
+**Rien de tout cela n'existe en base aujourd'hui.** Ce qui existe :
+
+| | |
+|---|---|
+| `clients.bureau_id` | Juprelle 4 847 clients et **6 gestionnaires**, Spa 1 144, Eghezée 779, Ertezée 608, Beauraing 284, Tinlot 234, Beyne-Heusay 154, et **2 254 clients sans bureau** |
+| `clients.gestionnaire_code`, `clients.sa_code` | renseignés |
+| `ref_portefeuilles` | 3 lignes — Professionnel, VIP, Particulier — et **aucun collaborateur rattaché** |
+| colonne « commercial » sur `clients` | **n'existe pas** |
+
+Il manque donc les deux bouts de la chaîne : la notion de portefeuille au sens « à qui
+appartient le client », et la table de correspondance gestionnaire → commercial.
+
+**Question ouverte, à trancher avant de coder** : « portefeuille » désigne-t-il
+`ref_portefeuilles` (Particulier / Professionnel / VIP — qui est un *segment*, pas un
+propriétaire), le bureau, ou une troisième notion ? Juprelle ayant six gestionnaires pour
+un seul bureau, le bureau seul ne suffit pas à attribuer.
+
+**Ne pas confondre avec le code du bordereau** (section ci-dessus) : ce code reste
+interdit comme clé d'attribution. La règle du portefeuille ne change pas cela — elle dit
+d'où vient le commercial, pas que le bordereau redevient une source.
+
 **Règle** : ne pas rajouter de dépendance n8n. Ce qui doit tourner côté serveur passe par une
 fonction Edge Supabase + `pg_cron`, ou une fonction serverless Vercel.
 
