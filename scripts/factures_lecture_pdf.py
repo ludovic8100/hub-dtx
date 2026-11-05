@@ -313,14 +313,14 @@ def a_reprendre():
       n'etaient simplement jamais choisies.
     """
     filtre = (f"or=(montant.is.null,montant.gte.{int(SEUIL_ABERRANT)},"
-              f"date_facture.is.null,fournisseur.is.null,destinataire.is.null)")
+              f"date_facture.is.null,fournisseur.is.null,lu_le.is.null)")
     if FILTRE_DOSSIER:
         filtre += "&url=like.*" + urllib.parse.quote(FILTRE_DOSSIER, safe="") + "*"
     lignes = supabase(
         "GET",
         f"factures_achat?select=id,fichier_id,nom,societe,montant,date_facture,"
         f"fournisseur,numero,tva_fournisseur,destinataire,tva_destinataire,"
-        f"a_verifier,nom_origine"
+        f"a_verifier,nom_origine,lu_le"
                 # « nullsfirst » et non « nullslast » : les factures SANS date passent en
         # tete. Ce sont elles qui bloquent le rapprochement, et avec l'ancien
         # tri un lot de 15 n'en atteignait aucune — l'essai du 04/11 n'a lu que
@@ -589,8 +589,12 @@ def main() -> int:
                 dates_divergentes.append((ligne["nom"], str(ligne["date_facture"]), date_pdf))
                 if ECRASER:
                     charge["date_facture"] = date_pdf
-        if not charge:
-            continue                      # rien de neuf a ecrire sur cette facture
+        # TOUJOURS dater la lecture, meme quand elle n'apprend rien. Deduire
+        # « lue » de fournisseur ou destinataire est faux : ces colonnes ont
+        # le droit d'etre vides sur une facture parfaitement lue (un ticket
+        # de caisse n'a pas de client nomme). On l'a appris en annoncant a
+        # tort que PRIVE n'avait ete lu qu'a 19 %.
+        charge["lu_le"] = "now()"
 
         if DRY_RUN:
             corriges += 1
