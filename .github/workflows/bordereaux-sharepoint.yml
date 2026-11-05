@@ -59,6 +59,23 @@ jobs:
       # fichier déplacé dans SharePoint n'est pas un fichier disparu.
       PURGE: ${{ (github.event_name == 'workflow_dispatch' && inputs.purge) && '1' || '0' }}
     steps:
+      # GARDE-FOU : la production ne se lance que depuis main.
+      #
+      # Le 05/11, j'ai pousse une branche non fusionnee et lance un
+      # workflow dessus : il a tourne avec les secrets de PRODUCTION.
+      # Ce pas aurait arrete ca.
+      #
+      # C'est un ralentisseur, pas une serrure : qui peut ecrire dans le
+      # depot peut retirer ces lignes dans sa propre branche. La serrure,
+      # c'est GitHub > Settings > Environments > production >
+      # Deployment branches > main. Celle-ci attrape les accidents.
+      - name: Refuser la production depuis une branche
+        if: ${{ github.ref != 'refs/heads/main' && (inputs.target == 'production' || inputs.target == '') }}
+        run: |
+          echo "::error::Ce workflow vise la PRODUCTION mais tourne sur ${{ github.ref }}."
+          echo "::error::Fusionne dans main, ou relance avec target=test."
+          exit 1
+      
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
