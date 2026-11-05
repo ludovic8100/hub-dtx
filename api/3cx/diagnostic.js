@@ -80,8 +80,21 @@ export default async function handler(req, res) {
     })
   }
 
+  // ECHEANCE GLOBALE. Chaque appel est deja borne a 4 s cote threecx.js, mais
+  // huit sondes a 4 s feraient 32 s — et Vercel tue la fonction a 10 s, ce qui
+  // rendait un 500 opaque au lieu du rapport. On s'arrete a 7 s et on dit
+  // franchement ce qui n'a pas ete teste : un rapport partiel et lisible vaut
+  // mieux qu'une page d'erreur.
+  const echeance = Date.now() + 7000
   const resultats = []
   for (const s of SONDES) {
+    if (Date.now() > echeance) {
+      resultats.push({
+        chemin: s.chemin, pour: s.pour, repond: false, status: null, forme: null,
+        detail: 'Non teste : delai global atteint. Relancez pour sonder la suite.',
+      })
+      continue
+    }
     const r = await lire3cx(s.chemin)
     resultats.push({
       chemin: s.chemin,

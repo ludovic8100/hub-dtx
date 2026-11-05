@@ -41,11 +41,40 @@ async function demanderJeton(mode) {
     corps.client_secret = THREECX_CLIENT_SECRET
   }
 
-  const r = await fetch(`${THREECX_URL}/connect/token`, {
+  const r = await avecDelai(`${THREECX_URL}/connect/token`, {
     method: 'POST', headers: entetes, body: new URLSearchParams(corps),
   })
   const txt = await r.text()
   return { ok: r.ok, status: r.status, txt }
+}
+
+/**
+ * fetch avec garde-temps.
+ *
+ * SANS LUI, LE DIAGNOSTIC RENVOYAIT UN 500 OPAQUE. `fetch` n'a aucune limite
+ * par defaut : un central injoignable laissait la requete pendante, les neuf
+ * appels du diagnostic s'empilaient, et Vercel tuait la fonction au bout de
+ * dix secondes — FUNCTION_INVOCATION_FAILED. L'ecran etait pourtant construit
+ * pour expliquer chaque echec ; il n'en avait simplement plus le temps.
+ *
+ * Quatre secondes suffisent largement a un PBX qui repond. Celui qui ne repond
+ * pas en quatre secondes ne repondra pas en trente.
+ */
+const DELAI_MS = 4000
+
+async function avecDelai(url, options = {}, ms = DELAI_MS) {
+  const ctrl = new AbortController()
+  const minuteur = setTimeout(() => ctrl.abort(), ms)
+  try {
+    return await fetch(url, { ...options, signal: ctrl.signal })
+  } catch (e) {
+    if (e?.name === 'AbortError') {
+      throw new Error(`Le central n'a pas repondu en ${ms / 1000} s (${url.replace(/\?.*$/, '')})`)
+    }
+    throw e
+  } finally {
+    clearTimeout(minuteur)
+  }
 }
 
 export async function jeton3cx() {
@@ -81,7 +110,7 @@ export const modeAuth = () => cache.mode || null
 export async function lire3cx(chemin) {
   try {
     const t = await jeton3cx()
-    const r = await fetch(`${THREECX_URL}${chemin}`, {
+    const r = await avecDelai(`${THREECX_URL}${chemin}`, {
       headers: { Authorization: `Bearer ${t}`, Accept: 'application/json' },
     })
     const txt = await r.text()

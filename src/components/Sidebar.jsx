@@ -91,19 +91,29 @@ function ClientSearch({ accentLight }) {
   const [q, setQ] = useState('')
   const [res, setRes] = useState([])
   const [searching, setSearching] = useState(false)
+  // Une recherche qui ECHOUE et une recherche qui ne TROUVE RIEN affichaient
+  // le meme « Aucun resultat ». Session expiree, panne reseau, droit refuse :
+  // tout ressortait identique a un nom mal orthographie. On ne pouvait ni le
+  // voir ni le diagnostiquer.
+  const [erreur, setErreur] = useState(null)
 
   useEffect(() => {
     const term = q.trim()
-    if (term.length < 2) { setRes([]); setSearching(false); return }
+    if (term.length < 2) { setRes([]); setErreur(null); setSearching(false); return }
     setSearching(true)
     const t = setTimeout(async () => {
-      const { data, error } = await supabase.rpc('search_clients_dynassur', { q: term, lim: 8 })
-      setRes(error ? [] : (data || [])); setSearching(false)
+      try {
+        const { data, error } = await supabase.rpc('search_clients_dynassur', { q: term, lim: 8 })
+        if (error) throw error
+        setRes(data || []); setErreur(null)
+      } catch (e) {
+        setRes([]); setErreur(e?.message || String(e))
+      } finally { setSearching(false) }
     }, 300)
     return () => clearTimeout(t)
   }, [q])
 
-  const go = d => { if (!d) return; navigate(`/dynassur/clients?dossier=${encodeURIComponent(d)}`); setQ(''); setRes([]) }
+  const go = d => { if (!d) return; navigate(`/dynassur/clients?dossier=${encodeURIComponent(d)}`); setQ(''); setRes([]); setErreur(null) }
 
   return (
     <div style={{ margin: '12px 4px 4px', padding: '11px 11px 12px', borderRadius: 10,
@@ -118,11 +128,16 @@ function ClientSearch({ accentLight }) {
           style={{ width: '100%', boxSizing: 'border-box', padding: '8px 26px 8px 11px', borderRadius: 7,
             border: '1.5px solid rgba(255,255,255,0.7)', background: 'rgba(255,255,255,0.14)',
             color: '#fff', fontSize: 13, fontFamily: "'Source Sans Pro', sans-serif", outline: 'none', fontWeight: 500 }} />
-        {q && <button onClick={() => { setQ(''); setRes([]) }} style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 15 }}>✕</button>}
+        {q && <button onClick={() => { setQ(''); setRes([]); setErreur(null) }} style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 15 }}>✕</button>}
       </div>
       {q.trim().length >= 2 && (
         <div style={{ marginTop: 6, maxHeight: 340, overflowY: 'auto' }}>
           {searching ? <div style={{ padding: '8px 4px', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Recherche…</div>
+            : erreur ? <div style={{ padding: '8px 9px', fontSize: 11.5, lineHeight: 1.45, color: '#fff',
+                background: 'rgba(220,38,38,0.35)', border: '1px solid rgba(255,255,255,0.35)', borderRadius: 7 }}>
+                <strong>La recherche n'a pas abouti.</strong><br />{erreur}<br />
+                <span style={{ opacity: 0.85 }}>Recharge la page (Ctrl+Maj+R). Si ça persiste, envoie-moi ce message.</span>
+              </div>
             : !res.length ? <div style={{ padding: '8px 4px', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Aucun résultat</div>
               : res.map((c, i) => (
                 <div key={c.dossier || i} onClick={() => go(c.dossier)} style={{ padding: '7px 9px', borderRadius: 7, cursor: 'pointer', marginBottom: 3, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}
