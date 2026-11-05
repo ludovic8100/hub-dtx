@@ -48,6 +48,14 @@ const fmtPct = (n, d) => d ? `${Math.round((n / d) * 100)} %` : '—'
 // libellé du poste de service, sinon le numéro nu.
 const quiPoste = r => r.collaborateur || r.poste_libelle || (r.extension ? `Poste ${r.extension}` : '—')
 
+// Un appel qui n'a jamais atteint un humain : menu vocal, file d'attente,
+// message hors horaires, messagerie. Leur duree n'est pas une conversation —
+// un repondeur de 45 secondes gonflerait la duree moyenne sans que personne
+// n'ait parle. Memes categories que le bloc « dehors » plus bas, pour que les
+// deux comptages racontent la meme chose.
+const CATEGORIES_MACHINE = ['svi', 'file', 'hors_horaires', 'messagerie']
+const estMachine = r => CATEGORIES_MACHINE.includes(r.poste_categorie)
+
 export default function DynassurAppels() {
   const navigate = useNavigate()
   const [rows, setRows] = useState(null)
