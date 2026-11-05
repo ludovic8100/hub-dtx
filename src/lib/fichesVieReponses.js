@@ -47,6 +47,24 @@ function trancheHorizon(annees) {
  * Tout ce qui n'est pas déductible reste VIDE : une case non cochée se voit,
  * une case cochée au hasard ne se voit pas.
  */
+/**
+ * La fiche est un document papier francais : les dates s'y ecrivent
+ * JJ/MM/AAAA. En base elles sont en ISO. Sans cette conversion, la fiche d'un
+ * client du portefeuille affichait « 1975-01-25 » la ou celle d'un nouveau
+ * client affichait « 25/01/1975 » — deux formats sur le meme formulaire.
+ */
+function enDateFR(v) {
+  const t = String(v || '').trim()
+  // 1 209 clients portent 1900-01-01 : un bouche-trou qui veut dire
+  // « inconnue ». L'imprimer sur la fiche serait affirmer une date de
+  // naissance fausse. Un champ vide se voit et se corrige ; une date fausse
+  // ne se voit pas.
+  if (t === '1900-01-01' || t === '01/01/1900') return ''
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t)
+  if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`
+  return t
+}
+
 export function proposerReponses(fiche, ctx = {}) {
   const {
     scoreRisque = 50, horizonYears = null, montant = null,
@@ -65,7 +83,7 @@ export function proposerReponses(fiche, ctx = {}) {
   r.numero_rue = [client.num_maison, client.boite].filter(Boolean).join(' ')
   r.code_postal = client.cp || ''
   r.localite = client.localite || ''
-  r.date_naissance = client.date_naissance || ''
+  r.date_naissance = enDateFR(client.date_naissance)
   r.registre_national = client.registre_national || ''
 
   // ── Le produit proposé : lu dans le contrat ───────────────────────────

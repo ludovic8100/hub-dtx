@@ -6,6 +6,7 @@ import * as pdfjsLib from 'pdfjs-dist'
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.js?url'
 import Tesseract from 'tesseract.js'
 import FicheVieFormulaire from '../../components/FicheVieFormulaire'
+import { formaterDateSaisie } from '../../components/FicheVieFormulaire'
 import { FICHES, versionPourDate, SEUIL_VERSION } from '../../lib/fichesVie'
 import { construireFichePDF } from '../../lib/fichesViePdf'
 import { proposerReponses, profilDepuisReponses, profilDepuisScoreRisque } from '../../lib/fichesVieReponses'
@@ -653,6 +654,60 @@ export default function ToolQuestionnaire() {
     setStep('questionnaire')
   }
 
+  // ─── Ce client existe-t-il deja ? ───
+  //
+  // Taper « Dupont » comme nouveau client alors qu'il est au portefeuille
+  // cree un doublon, et un profil rattache a personne. On cherche donc
+  // pendant la frappe.
+  //
+  // LA DATE DE NAISSANCE DEPARTAGE, MAIS AVEC UNE RESERVE : 1 209 clients
+  // portent 1900-01-01, un bouche-trou qui veut dire « inconnue ». La
+  // traiter comme une vraie date ferait correspondre n'importe qui avec
+  // n'importe qui. Elle est donc ignoree.
+  const DATE_BOUCHE_TROU = '1900-01-01'
+
+  const [doublons, setDoublons] = useState([])
+
+  const chercherDoublon = useCallback(async (nom, prenom, naissance) => {
+    const n = (nom || '').trim()
+    if (n.length < 2) { setDoublons([]); return }
+    try {
+      const { data } = await supabase
+        .from('clients')
+        .select('id,dossier,nom,prenom,date_naissance,rue,num_maison,boite,cp,localite')
+        .ilike('nom', `%${n}%`)
+        .not('dossier', 'is', null)
+        .order('nom')
+        .limit(40)
+
+      // On classe : meme date de naissance d'abord, puis meme prenom.
+      const iso = (() => {
+        const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(naissance || '')
+        return m ? `${m[3]}-${m[2]}-${m[1]}` : null
+      })()
+      const p = (prenom || '').trim().toLowerCase()
+
+      const note = (c) => {
+        let pts = 0
+        if (iso && c.date_naissance === iso && iso !== DATE_BOUCHE_TROU) pts += 10
+        if (p && (c.prenom || '').toLowerCase().includes(p)) pts += 3
+        return pts
+      }
+      const liste = (data || [])
+        .map(c => ({ ...c, pts: note(c) }))
+        .sort((a, b) => b.pts - a.pts)
+        .slice(0, 5)
+      setDoublons(liste)
+    } catch { setDoublons([]) }
+  }, [])
+
+  useEffect(() => {
+    if (!clientLibre?.nom) { setDoublons([]); return }
+    const t = setTimeout(() => chercherDoublon(
+      clientLibre.nom, clientLibre.prenom, clientLibre.date_naissance), 350)
+    return () => clearTimeout(t)
+  }, [clientLibre?.nom, clientLibre?.prenom, clientLibre?.date_naissance, chercherDoublon])
+
   // ─── Fiche sans epargne existante ───
   //
   // Un nouveau client, ou un client du portefeuille sans contrat Vie. Il n'y
@@ -949,13 +1004,19 @@ export default function ToolQuestionnaire() {
                   Nom<br />
                   <input value={clientLibre?.nom || ''} placeholder="Dupont"
                     onChange={e => setClientLibre({ ...(clientLibre || {}), nom: e.target.value })}
-                    style={{ ...inputStyle, width: 190, marginTop: 3 }} />
+                    style={{ ...inputStyle, width: 170, marginTop: 3 }} />
                 </label>
                 <label style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>
                   Prénom<br />
                   <input value={clientLibre?.prenom || ''} placeholder="Jean"
                     onChange={e => setClientLibre({ ...(clientLibre || {}), prenom: e.target.value })}
-                    style={{ ...inputStyle, width: 190, marginTop: 3 }} />
+                    style={{ ...inputStyle, width: 150, marginTop: 3 }} />
+                </label>
+                <label style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>
+                  Date de naissance<br />
+                  <input value={clientLibre?.date_naissance || ''} placeholder="JJ/MM/AAAA" inputMode="numeric"
+                    onChange={e => setClientLibre({ ...(clientLibre || {}), date_naissance: formaterDateSaisie(e.target.value) })}
+                    style={{ ...inputStyle, width: 130, marginTop: 3 }} />
                 </label>
                 <button
                   disabled={!clientLibre?.nom}
@@ -968,6 +1029,52 @@ export default function ToolQuestionnaire() {
                   Commencer la fiche
                 </button>
               </div>
+
+              {/* Ce client est peut-etre deja au portefeuille. Le creer une
+                  seconde fois donnerait un profil rattache a personne : pas de
+                  client_id, pas de dossier, invisible depuis sa fiche. */}
+              {doublons.length > 0 && (
+                <div style={{
+                  marginTop: 12, padding: '10px 12px', borderRadius: 8,
+                  background: '#fffaf0', border: '1px solid #f0c478',
+                }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: '#b45309', marginBottom: 2 }}>
+                    {doublons.some(d => d.pts >= 10)
+                      ? 'Ce client est déjà au portefeuille'
+                      : 'Des clients portent un nom proche'}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: '#92400e', marginBottom: 7, lineHeight: 1.5 }}>
+                    Si c'est lui, pars de sa fiche : le profil sera rattaché à son dossier.
+                    Sinon, continue — tu crées bien un nouveau client.
+                  </div>
+                  {doublons.map(d => (
+                    <div key={d.id}
+                      onClick={() => { setClientLibre(null); setDoublons([]); selectClient(d) }}
+                      style={{
+                        padding: '7px 10px', borderRadius: 6, cursor: 'pointer', background: '#fff',
+                        border: d.pts >= 10 ? '1px solid #f0c478' : '1px solid #e2e8f0', marginBottom: 5,
+                      }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 700, color: '#1e293b' }}>
+                        {d.nom} {d.prenom}
+                        {d.pts >= 10 && (
+                          <span style={{
+                            marginLeft: 7, fontSize: 9.5, fontWeight: 700, color: '#b45309',
+                            background: '#fdf0d8', border: '1px solid #f0c478',
+                            borderRadius: 4, padding: '1px 5px',
+                          }}>même date de naissance</span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 1 }}>
+                        Dossier {d.dossier}
+                        {d.date_naissance && d.date_naissance !== '1900-01-01'
+                          ? ` — né(e) le ${d.date_naissance.split('-').reverse().join('/')}`
+                          : ' — date de naissance inconnue'}
+                        {d.localite ? ` — ${d.localite}` : ''}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
