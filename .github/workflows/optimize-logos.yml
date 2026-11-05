@@ -11,6 +11,12 @@ on:
 jobs:
   run:
     runs-on: ubuntu-latest
+    # Un workflow SANS environnement puise dans les secrets du DEPOT, et
+    # la politique « production = main uniquement » ne s'y applique pas.
+    # Mesure le 05/11 : lance depuis une branche non fusionnee, celui-ci
+    # a recu les cles et affiche les droits SharePoint. En le rattachant
+    # a l'environnement production, GitHub refuse desormais.
+    environment: production
     env:
       SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
     steps:
