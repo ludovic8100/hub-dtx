@@ -9,7 +9,8 @@ import FicheVieFormulaire from '../../components/FicheVieFormulaire'
 import { FICHES, versionPourDate, SEUIL_VERSION } from '../../lib/fichesVie'
 import { construireFichePDF } from '../../lib/fichesViePdf'
 import { proposerReponses, profilDepuisReponses, profilDepuisScoreRisque } from '../../lib/fichesVieReponses'
-import { risqueFonds, lectureComposition, profilDepuisScore } from '../../lib/fondsRisque'
+import { risqueFonds, lectureComposition, profilDepuisScore, chargerFonds,
+         chargerCompagniesSansFonds, compagnieSansFonds, enregistrerFonds } from '../../lib/fondsRisque'
 
 // Configure pdf.js worker via Vite ?url import
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
@@ -333,6 +334,12 @@ export default function ToolQuestionnaire() {
   // Manual fund entry state (fallback for scanned PDFs)
   const [manualMode, setManualMode] = useState(false)
   const [manualFunds, setManualFunds] = useState([{ name: '', pct: '' }])
+  // La table des fonds vient de la base, plus du code : elle se corrige sans
+  // deploiement. `null` tant qu'elle n'est pas chargee — on ne bloque pas
+  // l'ecran si la base ne repond pas, on retombe sur la liste de secours.
+  const [tableFonds, setTableFonds] = useState(null)
+  const [sansFonds, setSansFonds] = useState([])
+  const [ajoutFonds, setAjoutFonds] = useState(null)
 
   // Quelle fiche d'intermediation ? Avant ou apres 2025 — c'est la date
   // d'effet qui tranche, et le choix manuel reste possible avec une alerte.
@@ -403,7 +410,9 @@ export default function ToolQuestionnaire() {
         .from('contrats')
         .select('*')
         .eq('dossier', dossier)
-        .eq('domaine', 'Vie')
+        // La valeur en base est « Vie et placements ». « Vie » seul ne
+        // correspondait a aucune ligne : cette liste etait toujours vide.
+        .in('domaine', ['Vie et placements', 'Vie'])
       // Get contracts that already have a profile
       const { data: profiles } = await supabase
         .from('profils_investisseur')
@@ -433,6 +442,14 @@ export default function ToolQuestionnaire() {
     } finally {
       setSearching(false)
     }
+  }, [])
+
+  useEffect(() => {
+    let vivant = true
+    Promise.all([chargerFonds(supabase), chargerCompagniesSansFonds(supabase)])
+      .then(([table, cies]) => { if (vivant) { setTableFonds(table); setSansFonds(cies) } })
+      .catch(e => console.error('chargement fonds', e))
+    return () => { vivant = false }
   }, [])
 
   useEffect(() => {
@@ -600,7 +617,7 @@ export default function ToolQuestionnaire() {
 
     // Le niveau de risque vient de la composition reelle des fonds. Il sert a
     // PROPOSER des reponses — plus a forcer un profil decide d'avance.
-    const lecture = lectureComposition(funds)
+    const lecture = lectureComposition(funds, tableFonds)
     const riskScore = lecture.score ?? 50
     const montant = Object.keys(funds).length ? null : null
 
@@ -991,6 +1008,26 @@ export default function ToolQuestionnaire() {
                 </div>
               )}
 
+              {/* La compagnie ne propose pas de fonds : rien a analyser */}
+              {(() => {
+                const cie = compagnieSansFonds(selectedContrat?.compagnie, sansFonds)
+                if (!cie) return null
+                return (
+                  <div style={{
+                    marginTop: 12, padding: '11px 14px', borderRadius: 8,
+                    background: '#f0fdf4', border: '1px solid #86efac',
+                  }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#15803d' }}>
+                      {cie.nom} ne propose pas de produits à fonds
+                    </div>
+                    <div style={{ fontSize: 11.5, color: '#3f6212', marginTop: 3, lineHeight: 1.5 }}>
+                      Aucune analyse de risque investisseur à mener sur ce contrat : il n'y a pas
+                      de risque de marché. L'analyse des exigences et besoins reste requise.
+                    </div>
+                  </div>
+                )
+              })()}
+
               {/* Extracted funds display */}
               {Object.keys(funds).length > 0 && !manualMode && (
                 <div style={{ marginTop: 14 }}>
@@ -1001,7 +1038,7 @@ export default function ToolQuestionnaire() {
                     {Object.entries(funds).map(([name, pct]) => {
                       // Le risque vient de src/lib/fondsRisque.js — un seul
                       // endroit de verite, partage avec le calcul du profil.
-                      const { risque: riskVal, source } = risqueFonds(name)
+                      const { risque: riskVal, source } = risqueFonds(name, tableFonds)
                       const fundProfile = source === 'branche23' ? 'Fonds a preciser'
                         : riskVal == null ? 'Fonds non reconnu'
                         : profilDepuisScore(riskVal)
@@ -1025,15 +1062,85 @@ export default function ToolQuestionnaire() {
                             }}>
                               {fundProfile}{riskVal != null ? ` (${riskVal})` : ''}
                             </span>
+                            {source === 'inconnu' && (
+                              <button onClick={() => setAjoutFonds({ nom: name, sri: '' })}
+                                style={{
+                                  border: '1px solid #f0c478', background: '#fffaf0', color: '#b45309',
+                                  borderRadius: 5, padding: '2px 8px', fontSize: 10.5, fontWeight: 700,
+                                  cursor: 'pointer', fontFamily: 'inherit',
+                                }}>
+                                enregistrer
+                              </button>
+                            )}
                           </span>
                         </div>
                       )
                     })}
                   </div>
 
+                  {/* Enregistrer un fonds rencontre : la table se remplit par
+                      l'usage, pas par un catalogue importe puis perime. */}
+                  {ajoutFonds && (
+                    <div style={{
+                      marginTop: 10, padding: '12px 14px', borderRadius: 8,
+                      background: '#fff', border: '1px solid #f0c478',
+                    }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 700, color: '#b45309', marginBottom: 6 }}>
+                        Enregistrer « {ajoutFonds.nom} »
+                      </div>
+                      <div style={{ fontSize: 11.5, color: '#92400e', lineHeight: 1.5, marginBottom: 8 }}>
+                        Le SRI (1 à 7) figure dans le document d'informations clés du fonds.
+                        C'est l'indicateur publié par la compagnie — à préférer à une estimation.
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                        <label style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>
+                          Compagnie<br />
+                          <input value={ajoutFonds.compagnie ?? (selectedContrat?.compagnie || '')}
+                            onChange={e => setAjoutFonds({ ...ajoutFonds, compagnie: e.target.value })}
+                            style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid #dce4ec',
+                                     fontSize: 12, fontFamily: 'inherit', width: 210 }} />
+                        </label>
+                        <label style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>
+                          SRI (1-7)<br />
+                          <input type="number" min={1} max={7} value={ajoutFonds.sri}
+                            onChange={e => setAjoutFonds({ ...ajoutFonds, sri: e.target.value })}
+                            style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid #dce4ec',
+                                     fontSize: 12, fontFamily: 'inherit', width: 80 }} />
+                        </label>
+                        <button
+                          disabled={!ajoutFonds.sri}
+                          onClick={async () => {
+                            try {
+                              await enregistrerFonds(supabase, {
+                                compagnie: ajoutFonds.compagnie ?? (selectedContrat?.compagnie || ''),
+                                nom: ajoutFonds.nom,
+                                sri: parseInt(ajoutFonds.sri, 10),
+                              })
+                              setTableFonds(await chargerFonds(supabase))
+                              setAjoutFonds(null)
+                            } catch (e) { setError(`Enregistrement du fonds impossible : ${e.message}`) }
+                          }}
+                          style={{
+                            padding: '6px 14px', borderRadius: 6, border: 'none', background: '#1A3A6B',
+                            color: '#fff', fontSize: 12, fontWeight: 700, fontFamily: 'inherit',
+                            cursor: ajoutFonds.sri ? 'pointer' : 'not-allowed',
+                            opacity: ajoutFonds.sri ? 1 : 0.5,
+                          }}>
+                          Enregistrer
+                        </button>
+                        <button onClick={() => setAjoutFonds(null)}
+                          style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #dce4ec',
+                                   background: '#fff', color: '#64748b', fontSize: 12,
+                                   fontFamily: 'inherit', cursor: 'pointer' }}>
+                          Annuler
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Ce que la composition permet de dire — y compris « rien » */}
                   {(() => {
-                    const l = lectureComposition(funds)
+                    const l = lectureComposition(funds, tableFonds)
                     const couleurs = {
                       'Défensif': '#16a34a', 'Conservateur': '#22c55e',
                       'Neutre / Équilibré': '#f59e0b', 'Dynamique': '#ea580c', 'Offensif': '#dc2626',

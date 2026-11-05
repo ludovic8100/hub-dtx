@@ -86,12 +86,24 @@ const MOTIFS = [
  * Risque d'un fonds.
  * @returns {{risque: number|null, source: 'table'|'motif'|'inconnu', garanti: boolean}}
  */
-export function risqueFonds(nom) {
+export function risqueFonds(nom, table = null) {
   const cle = normaliser(nom)
   if (!cle) return { risque: null, source: 'inconnu', garanti: false }
 
   const garanti = MOTIF_GARANTI.test(cle)
   if (MOTIF_BR23.test(cle)) return { risque: null, source: 'branche23', garanti: false }
+
+  // La table de `fonds_investissement` prime : c'est elle qui se corrige sans
+  // deploiement. La liste ci-dessous n'est qu'un filet si la base ne repond pas.
+  const deBase = table?.[cle]
+  if (deBase) {
+    return {
+      risque: deBase.risque ?? null,
+      sri: deBase.sri ?? null,
+      source: 'base',
+      garanti: deBase.categorie === 'garanti' || garanti,
+    }
+  }
 
   const deTable = FONDS_RISQUE[cle]
   if (deTable !== undefined) return { risque: deTable, source: 'table', garanti: garanti || deTable === 0 }
@@ -110,7 +122,7 @@ export function risqueFonds(nom) {
  * été reconnu, pour l'afficher. `fiable` est faux dès qu'il manque quelque
  * chose — c'est à l'écran de le dire, pas au calcul de le masquer.
  */
-export function compositionRisque(funds = {}) {
+export function compositionRisque(funds = {}, table = null) {
   let totalPct = 0, reconnuPct = 0, pondere = 0, garantiPct = 0
   const inconnus = []
   const aPreciser = []
@@ -119,7 +131,7 @@ export function compositionRisque(funds = {}) {
     const pct = Number(pctBrut)
     if (!Number.isFinite(pct) || pct <= 0) continue
     totalPct += pct
-    const { risque, garanti, source } = risqueFonds(nom)
+    const { risque, garanti, source } = risqueFonds(nom, table)
     if (source === 'branche23') { aPreciser.push(nom); continue }
     if (risque == null) { inconnus.push(nom); continue }
     reconnuPct += pct
@@ -159,8 +171,8 @@ export function profilDepuisScore(score) {
  *  - 'inconnu' : rien de reconnu, aucun profil possible.
  *  - 'partiel' : une partie seulement est reconnue.
  */
-export function lectureComposition(funds = {}) {
-  const c = compositionRisque(funds)
+export function lectureComposition(funds = {}, table = null) {
+  const c = compositionRisque(funds, table)
   if (c.totalPct === 0) return { ...c, profil: null, motif: 'inconnu' }
   if (c.aPreciser.length) return { ...c, profil: null, motif: 'branche23_a_preciser' }
   if (c.reconnuPct === 0) return { ...c, profil: null, motif: 'inconnu' }
@@ -172,4 +184,71 @@ export function lectureComposition(funds = {}) {
     profil: profilDepuisScore(c.score),
     motif: c.inconnus.length ? 'partiel' : null,
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Lecture et alimentation de la table `fonds_investissement`
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * Charge les fonds actifs en un objet indexe par nom normalise.
+ *
+ * La normalisation est faite ici, en JavaScript, avec la meme regle que
+ * `normaliser_nom_fonds()` en SQL. Les deux doivent rester d'accord : sinon
+ * l'ecran ne retrouve pas ce que la base contient.
+ */
+export async function chargerFonds(supabase) {
+  const { data, error } = await supabase
+    .from('fonds_investissement')
+    .select('compagnie, nom, nom_normalise, sri, risque, categorie, source')
+    .eq('actif', true)
+  if (error) throw error
+  const table = {}
+  for (const f of data || []) {
+    table[f.nom_normalise || normaliser(f.nom)] = f
+  }
+  return table
+}
+
+/** Enregistre un fonds rencontre dans un dossier. */
+export async function enregistrerFonds(supabase, { compagnie, nom, sri, categorie = 'fonds', commentaire }) {
+  const { data, error } = await supabase
+    .from('fonds_investissement')
+    .insert({
+      compagnie: compagnie || 'INCONNUE',
+      nom,
+      nom_normalise: normaliser(nom),
+      sri: sri ?? null,
+      categorie,
+      source: 'saisie',
+      commentaire: commentaire || null,
+    })
+    .select('compagnie, nom, nom_normalise, sri, risque, categorie, source')
+    .single()
+  if (error) throw error
+  return data
+}
+
+/**
+ * Les compagnies qui ne proposent pas de fonds. Sur leurs contrats, il n'y a
+ * pas de risque de marche, donc pas d'analyse de risque a mener.
+ * `propose_branche_23` est renseigne a la main : c'est une connaissance
+ * metier, pas une donnee synchronisee depuis Qlik.
+ */
+export async function chargerCompagniesSansFonds(supabase) {
+  const { data, error } = await supabase
+    .from('compagnies')
+    .select('code, nom, nom_court, propose_branche_23')
+    .eq('propose_branche_23', false)
+  if (error) throw error
+  return data || []
+}
+
+/** La compagnie d'un contrat propose-t-elle des fonds ? null = non tranche. */
+export function compagnieSansFonds(nomCompagnie, liste = []) {
+  const c = normaliser(nomCompagnie)
+  if (!c) return null
+  return liste.find(x =>
+    c.includes(normaliser(x.nom_court)) || c.includes(normaliser(x.nom)) || c.includes(normaliser(x.code))
+  ) || null
 }
