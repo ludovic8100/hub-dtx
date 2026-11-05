@@ -520,13 +520,20 @@ export default function ConfigModule() {
     if (uModule !== 'tous' && !(u.est_admin || sesAcces?.has(uModule))) return false
     return true
   }).sort((a, b) => {
-    const nomA = a.nom_complet || a.email || '', nomB = b.nom_complet || b.email || ''
     if (triBureau) {
       const blA = bureauLabelOf(a) || 'zzz', blB = bureauLabelOf(b) || 'zzz'
       const cmp = blA.localeCompare(blB, 'fr', { sensitivity: 'base' })
       if (cmp) return cmp
     }
-    return nomA.localeCompare(nomB, 'fr', { sensitivity: 'base' })
+    // Tri sur le NOM DE FAMILLE, pas sur nom_complet.
+    //
+    // nom_complet melange « NOM Prenom » et « Prenom Nom » : trier dessus
+    // rangeait Arnaud Petit a la lettre A et LAPAILLE Audrey a la lettre L.
+    // La liste paraissait melangee parce qu'elle l'etait. On trie sur ce
+    // qu'on affiche en gras — le nom — puis sur le prenom.
+    const clef = u => [(u.nom || '').trim(), (u.prenom || '').trim()]
+      .filter(Boolean).join(' ') || u.nom_complet || u.email || 'zzz'
+    return clef(a).localeCompare(clef(b), 'fr', { sensitivity: 'base' })
   })
 
   const TABS = [['societes', '🏢 Sociétés'], ['documents', '📄 Documents'], ['users', '👥 Utilisateurs & acteurs métier'], ['categories', '🏷️ Catégories compta'], ['fournisseurs', '🚚 Fournisseurs']]

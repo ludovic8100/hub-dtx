@@ -30,6 +30,56 @@ const fmtMois = v => { const d=parseDate(v); return d?d.toLocaleDateString('fr-B
 // Horodatage d'un contact : certaines sources envoient la date sans offset → on force UTC
 const tsContact = iso => { if(!iso) return 0; const d=new Date(String(iso).length<=19?iso+'Z':iso); return isNaN(d)?0:d.getTime() }
 const fmtAppel = iso => { if(!iso) return '—'; const d=new Date(String(iso).replace(' ','T')); return isNaN(d)?'—':d.toLocaleString('fr-BE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) }
+// ── Tri d'un tableau de clients ───────────────────────────────────────────
+//
+// Les colonnes sont decrites une fois : le titre de l'en-tete et la valeur de
+// la cellule viennent de la meme ligne. Un tableau ou l'en-tete et la cellule
+// sont ecrits a deux endroits finit toujours par trier sur une colonne et
+// afficher l'autre.
+//
+// `val` sert au tri, pas a l'affichage : le numero de dossier se compare comme
+// un nombre (14 avant 102), le reste comme du texte accentue.
+const COLS_KPI = showAlerte => ([
+  { cle:'dossier',      titre:'N° Dossier',        val:c=>c.dossier, num:true },
+  { cle:'nom',          titre:'Nom & Prénom',      val:c=>`${c.nom||''} ${c.prenom||''}` },
+  { cle:'localite',     titre:'Localité',          val:c=>`${c.localite||''} ${c.cp||''}` },
+  { cle:'gestionnaire', titre:'Gestionnaire / SA', val:c=>c.gestionnaire_nom||c.gestionnaire_code||'' },
+  { cle:'bureau',       titre:'Bureau',            val:c=>c.bureau||'' },
+  { cle:'contact',      titre:showAlerte?'Alerte':'Contact',
+    val:c=>showAlerte?(c.alerte||''):(c.gsm||c.tel_fixe||c.email||'') },
+])
+
+// Vide en dernier, quel que soit le sens : une ligne sans bureau n'est pas
+// « avant A », elle est absente. La remonter en tete au premier clic ferait
+// passer le tri pour cassé.
+const comparer = (a, b, num) => {
+  const va = a == null ? '' : String(a).trim()
+  const vb = b == null ? '' : String(b).trim()
+  if (!va && !vb) return 0
+  if (!va) return 1
+  if (!vb) return -1
+  if (num) {
+    const na = Number(String(va).replace(/[^\d.-]/g,''))
+    const nb = Number(String(vb).replace(/[^\d.-]/g,''))
+    if (Number.isFinite(na) && Number.isFinite(nb) && na !== nb) return na - nb
+  }
+  return va.localeCompare(vb, 'fr', { sensitivity:'base', numeric:true })
+}
+
+function trierKpi(rows, tri, showAlerte) {
+  const col = COLS_KPI(showAlerte).find(c => c.cle === tri?.col)
+  if (!col) return rows
+  const sens = tri.sens < 0 ? -1 : 1
+  // Copie : `rows` vient de l'etat, le trier en place ne redeclencherait pas
+  // le rendu et casserait la comparaison de React.
+  return [...rows].sort((a, b) => {
+    const r = comparer(col.val(a), col.val(b), col.num)
+    // Depart egal : on retombe sur le nom, pour que l'ordre soit stable d'un
+    // affichage a l'autre plutot que dependant de l'ordre d'arrivee.
+    return (r || comparer(`${a.nom||''} ${a.prenom||''}`, `${b.nom||''} ${b.prenom||''}`)) * sens
+  })
+}
+
 const ilYa = jours => {
   if(jours==null) return ''
   if(jours<31) return `il y a ${jours} j`
@@ -114,6 +164,14 @@ const ESSENTIELS=[
   {label:'Accidents',             icon:'🩹', kw:['ACCIDENT','CORPO']},
 ]
 // Texte de couverture à partir d'une liste de contrats (domaine + type + compagnie)
+// Le texte sur lequel on reconnait le type d'un contrat. La compagnie en fait
+// partie volontairement : « D.A.S » suffit a identifier une protection
+// juridique quand le domaine ne le dit pas.
+// Cette fonction et `coverBlob` doivent lire les MEMES champs, sinon une
+// pastille s'allume sur un contrat que le filtre ne retrouve pas.
+const texteContrat = c => `${c?.domaine||''} ${c?.type_production||c?.raw?.type_production||''} ${c?.compagnie||''}`.toUpperCase()
+const estDuType = (c, e) => !!e && e.kw.some(k => texteContrat(c).includes(k))
+
 const coverBlob = contrats => (contrats||[]).filter(c=>c.situation==='En cours').map(c=>`${c.domaine||''} ${c.type_production||''} ${c.compagnie||''}`).join(' | ').toUpperCase()
 // Quels types de relation propagent une couverture (foyer + sociétés liées)
 const PROPAGE = lib => { const t=(lib||'').toLowerCase(); return ['conjoint','cohabitant','concubin','gérant','gerant','administrateur','coopérateur','cooperateur','firme','parent','enfant'].some(k=>t.includes(k)) }
@@ -210,7 +268,7 @@ function Primes({ dossier }) {
 }
 
 // ══ Analyse 360 — couvertures du client + accessibles via les relations ══
-function Analyse360({ client, contrats }) {
+function Analyse360({ client, contrats, typeSel, onType }) {
   const [ext,setExt]=useState({})      // label couvert -> { via, type } (via une relation)
   const [loadExt,setLoadExt]=useState(true)
 
@@ -303,13 +361,19 @@ function Analyse360({ client, contrats }) {
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(165px,1fr))',gap:7}}>
         {couv.map((e,i)=>{
           const s=STY[e.etat]
+          // Seules les couvertures DIRECTES sont cliquables : filtrer sur une
+          // couverture « via relation » ou absente ne renverrait aucun contrat
+          // de ce client. Un filtre qui vide l'ecran passe pour une panne.
+          const cliquable = e.etat==='direct' && typeof onType==='function'
+          const actif = typeSel?.label===e.label
           return(
-            <div key={i} title={e.etat==='relation'?`Couvert via ${e.src.via} (${e.src.type})`:e.etat==='direct'?'Couvert par un contrat du client':'Non couvert — opportunité'}
-              style={{display:'flex',alignItems:'center',gap:6,padding:'6px 11px',borderRadius:10,fontSize:12,fontWeight:600,background:s.bg,color:s.col,border:`1px solid ${s.bd}`}}>
+            <div key={i} onClick={cliquable?()=>onType(actif?null:e):undefined}
+              title={e.etat==='relation'?`Couvert via ${e.src.via} (${e.src.type})`:e.etat==='direct'?(actif?'Retirer le filtre':'Ne montrer que les contrats et objets de ce type'):'Non couvert — opportunité'}
+              style={{display:'flex',alignItems:'center',gap:6,padding:'6px 11px',borderRadius:10,fontSize:12,fontWeight:600,background:actif?s.col:s.bg,color:actif?'#fff':s.col,border:`1px solid ${actif?s.col:s.bd}`,cursor:cliquable?'pointer':'default',boxShadow:actif?`0 2px 8px ${s.col}44`:'none'}}>
               <span style={{fontSize:14,filter:e.etat==='absent'?'grayscale(1)':'none',opacity:e.etat==='absent'?0.6:1}}>{e.icon}</span>
               {e.label}
               {e.etat==='relation'&&<span style={{fontSize:9,background:'#dbeafe',padding:'1px 5px',borderRadius:8}}>via relation</span>}
-              <i className={`ti ${s.ic}`} style={{fontSize:13}}/>
+              <i className={`ti ${actif?'ti-filter-filled':s.ic}`} style={{fontSize:13}}/>
             </div>
           )
         })}
@@ -560,7 +624,7 @@ const objetCle = (o) => {
 }
 
 // ── Couvertures par objet (cross-dossier) : pour chaque objet du client, TOUS les contrats qui le couvrent ──
-function VueContrats({ client, objets, contratsClient, garantiesParPolice, cies, onOpenDossier, loadF, previewContrat, openContrat, leaveContrat }) {
+function VueContrats({ client, objets, contratsClient, garantiesParPolice, cies, onOpenDossier, loadF, previewContrat, openContrat, leaveContrat, typeSel, onType }) {
   const [rows,setRows]=useState(null); const [loading,setLoading]=useState(true)
   const [liesFam,setLiesFam]=useState(new Set()); const [relsFam,setRelsFam]=useState([])
   const [manuels,setManuels]=useState([]); const [preneurs,setPreneurs]=useState({})
@@ -654,6 +718,11 @@ function VueContrats({ client, objets, contratsClient, garantiesParPolice, cies,
   })
   const objsOf=pol=> mapPolObjs[pol]?[...mapPolObjs[pol]]:[]
 
+  // Changer de type remet l'objet selectionne a zero : garde d'un filtre
+  // precedent, il ne correspondrait a rien dans la nouvelle liste et viderait
+  // l'ecran sans que rien ne dise pourquoi.
+  useEffect(()=>{ setSelObj(null) },[typeSel])
+
   const persoList=(contratsClient||[]).map(c=>({police:c.police,compagnie:c.compagnie,domaine:c.domaine,situation:c.situation,enc:c.situation==='En cours',gars:(garantiesParPolice&&garantiesParPolice[c.police])?[...garantiesParPolice[c.police]]:[],objs:objsOf(c.police),dossier:client.dossier,externe:false,cat:'perso',raw:c}))
   const persoPol=new Set(persoList.map(p=>p.police))
   const polMap={}
@@ -664,9 +733,17 @@ function VueContrats({ client, objets, contratsClient, garantiesParPolice, cies,
   const crossList=Object.values(polMap).map(p=>({...p,gars:[...p.gars],objs:[...p.objs],enc:p.situation==='En cours',externe:true,cat:catOf(p.dossier)}))
   const allC=[...persoList,...crossList]
 
-  const objetsList=Object.values(objMap).map(g=>({...g,enc:allC.filter(c=>c.enc&&c.objs.includes(g.key)).length,tot:allC.filter(c=>c.objs.includes(g.key)).length})).sort((a,b)=>(b.enc-a.enc)||(b.tot-a.tot))
-  const nbTermines=allC.filter(c=>!c.enc).length
-  let visC=allC.filter(c=>showTermines||c.enc); if(selObj) visC=visC.filter(c=>c.objs.includes(selObj))
+  // ── Filtre par type de couverture (pastilles de l'Analyse 360) ─────────
+  // Il s'applique AUX DEUX listes. Ne filtrer que les contrats laisserait a
+  // l'ecran des objets de risque qui ne sont plus couverts par rien de
+  // visible : on croirait a une incoherence des donnees.
+  const typeC = typeSel ? allC.filter(c=>estDuType(c,typeSel)) : allC
+  const clesDuType = typeSel ? new Set(typeC.flatMap(c=>c.objs)) : null
+
+  const baseObjets = typeSel ? Object.values(objMap).filter(g=>clesDuType.has(g.key)) : Object.values(objMap)
+  const objetsList=baseObjets.map(g=>({...g,enc:typeC.filter(c=>c.enc&&c.objs.includes(g.key)).length,tot:typeC.filter(c=>c.objs.includes(g.key)).length})).sort((a,b)=>(b.enc-a.enc)||(b.tot-a.tot))
+  const nbTermines=typeC.filter(c=>!c.enc).length
+  let visC=typeC.filter(c=>showTermines||c.enc); if(selObj) visC=visC.filter(c=>c.objs.includes(selObj))
 
   const CATS=[
     {key:'perso',label:'Contrats personnels',col:'#7c3aed',bg:'#f5f3ff',bd:'#e9d5ff'},
@@ -683,6 +760,22 @@ function VueContrats({ client, objets, contratsClient, garantiesParPolice, cies,
 
   return (
     <div style={{display:'flex',flexDirection:'column',gap:14}}>
+      {typeSel&&(
+        <div style={{display:'flex',alignItems:'center',gap:9,flexWrap:'wrap',background:'#f5f3ff',border:'1px solid #e9d5ff',borderRadius:9,padding:'8px 12px'}}>
+          <i className="ti ti-filter-filled" style={{fontSize:15,color:'#7c3aed'}}/>
+          <span style={{fontSize:12,color:'#1e293b'}}>
+            Filtré sur <strong>{typeSel.icon} {typeSel.label}</strong> — {typeC.length} contrat{typeC.length>1?'s':''} et {objetsList.length} objet{objetsList.length>1?'s':''} de risque.
+          </span>
+          <button onClick={()=>onType&&onType(null)} style={{marginLeft:'auto',fontSize:11,fontWeight:700,padding:'4px 10px',borderRadius:6,cursor:'pointer',border:'1px solid #c4b5fd',background:'#fff',color:'#7c3aed'}}>
+            <i className="ti ti-x" style={{marginRight:4}}/>Tout afficher
+          </button>
+        </div>
+      )}
+      {typeSel&&!typeC.length&&(
+        <div style={{fontSize:12,color:'#92400e',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:9,padding:'8px 12px'}}>
+          Aucun contrat de ce type sur ce dossier. La couverture vient peut-être d'une relation (voir l'Analyse 360).
+        </div>
+      )}
       {objetsList.length>0&&(
         <div>
           <div style={{fontSize:SEC,fontWeight:800,letterSpacing:.3,textTransform:'uppercase',color:'#7c3aed',marginBottom:6}}>Objets de risque</div>
@@ -1118,6 +1211,13 @@ function Fiche({ client, onClose, onOpenDossier }) {
   })
   const SIT={  'En cours':{bg:'#dcfce7',col:'#16a34a'},'Résilié':{bg:'#fee2e2',col:'#dc2626'},'Terminé':{bg:'#fee2e2',col:'#dc2626'},'Suspendu':{bg:'#fef3c7',col:'#92400e'} }
 
+  // Le type de couverture sur lequel on filtre. Il vit ici, et pas dans
+  // Analyse360, parce qu'il est choisi dans un composant et appliqué dans
+  // l'autre.
+  const [typeSel,setTypeSel]=useState(null)
+  // Changer de dossier remet le filtre a zero : ouvrir une fiche sur une vue
+  // partielle, sans l'avoir demande, se lit comme des donnees manquantes.
+  useEffect(()=>{ setTypeSel(null) },[client.dossier])
   const [openSec,setOpenSec]=useState('contrats')
   const [pinnedContrat,setPinnedContrat]=useState(null)
   const [hoverContrat,setHoverContrat]=useState(null)
@@ -1213,7 +1313,7 @@ function Fiche({ client, onClose, onOpenDossier }) {
         </div>
       )
     )},
-    { key:'contrats', icon:'ti-file-text', title:'Contrats', col:BLUE, count:contrats.length, body:(<div><Analyse360 client={client} contrats={contrats}/><div style={{marginTop:14}}><VueContrats client={client} objets={objets} contratsClient={contrats} garantiesParPolice={garantiesParPolice} cies={cies} onOpenDossier={onOpenDossier} loadF={loadF} previewContrat={previewContrat} openContrat={openContrat} leaveContrat={leaveContrat}/></div></div>) },
+    { key:'contrats', icon:'ti-file-text', title:'Contrats', col:BLUE, count:contrats.length, body:(<div><Analyse360 client={client} contrats={contrats} typeSel={typeSel} onType={setTypeSel}/><div style={{marginTop:14}}><VueContrats client={client} objets={objets} contratsClient={contrats} garantiesParPolice={garantiesParPolice} cies={cies} onOpenDossier={onOpenDossier} loadF={loadF} previewContrat={previewContrat} openContrat={openContrat} leaveContrat={leaveContrat} typeSel={typeSel} onType={setTypeSel}/></div></div>) },
     { key:'primes', icon:'ti-cash', title:'Primes & commissions', col:'#16a34a', count:null, body:(<Primes dossier={client.dossier}/>) },
   ]
   const active = SECTIONS.find(s=>s.key===openSec) || SECTIONS.find(s=>s.key==='contrats') || SECTIONS[0]
@@ -1406,6 +1506,9 @@ export default function DynassurClients() {
   const [selected,setSelected] = useState(null)
   const [contactFilter,setContactFilter] = useState('tous')   // tous | m1 | m3 | m6 | m12 | a2 | a2p
   const [relance,setRelance]   = useState(null)               // null = pas encore chargé
+  // Tri du tableau KPI : la colonne cliquée, et le sens.
+  // Par défaut le nom, parce qu'une liste de clients se parcourt par nom.
+  const [kpiTri,setKpiTri] = useState({col:'nom',sens:1})
   const [kpiModal,setKpiModal] = useState(null)               // { titre, rows } | 'loading' | null
   const [recentsPerso,setRecentsPerso] = useState(null)   // vos derniers clients consultés
   const [recentsBureau,setRecentsBureau] = useState(null) // ceux de votre bureau (hors vous)
@@ -1681,14 +1784,27 @@ export default function DynassurClients() {
                   <div style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Recherche des clients concernés…</div>
                 ):(
                   <table style={{width:'100%',borderCollapse:'collapse',fontSize:12.5}}>
+                    {/* LES COLONNES SONT DES DONNÉES, pas du balisage recopié.
+                        L'en-tête et la cellule viennent de la même ligne : on
+                        ne peut plus trier sur une colonne et afficher l'autre. */}
                     <thead><tr style={{background:'#f8fafc',position:'sticky',top:0}}>
-                      {['N° Dossier','Nom & Prénom','Localité','Gestionnaire / SA',kpiModal.showAlerte?'Alerte':'Contact'].map(h=>(
-                        <th key={h} style={{textAlign:'left',padding:'8px 12px',fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',whiteSpace:'nowrap'}}>{h}</th>
-                      ))}
+                      {COLS_KPI(kpiModal.showAlerte).map(col=>{
+                        const actif = kpiTri.col===col.cle
+                        return (
+                          <th key={col.cle} onClick={()=>setKpiTri(t=>({col:col.cle,sens:t.col===col.cle?-t.sens:1}))}
+                            title="Trier sur cette colonne"
+                            style={{textAlign:'left',padding:'8px 12px',fontSize:10,fontWeight:700,
+                                    color:actif?NAVY:'#94a3b8',textTransform:'uppercase',whiteSpace:'nowrap',
+                                    cursor:'pointer',userSelect:'none'}}>
+                            {col.titre}
+                            <span style={{marginLeft:5,opacity:actif?1:.25}}>{actif&&kpiTri.sens<0?'▾':'▴'}</span>
+                          </th>
+                        )
+                      })}
                     </tr></thead>
                     <tbody>
-                      {!kpiModal.rows.length?(<tr><td colSpan={5} style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Aucun client.</td></tr>)
-                      :kpiModal.rows.slice(0,500).map((c,i)=>(
+                      {!kpiModal.rows.length?(<tr><td colSpan={6} style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Aucun client.</td></tr>)
+                      :trierKpi(kpiModal.rows,kpiTri,kpiModal.showAlerte).slice(0,500).map((c,i)=>(
                         <tr key={c.id} onClick={()=>{openDossier(c.dossier);setKpiModal(null)}} style={{cursor:'pointer',borderBottom:'1px solid #f1f5f9',background:i%2===0?'#fff':'#fafafe'}}
                           onMouseEnter={e=>e.currentTarget.style.background='#f0f9ff'}
                           onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'#fff':'#fafafe'}>
@@ -1696,6 +1812,7 @@ export default function DynassurClients() {
                           <td style={{padding:'7px 12px',fontWeight:600,color:'#1e293b'}}>{c.nom} {c.prenom}</td>
                           <td style={{padding:'7px 12px',color:'#64748b'}}>{c.cp} {c.localite||'—'}</td>
                           <td style={{padding:'7px 12px',color:'#64748b'}}>{c.gestionnaire_nom||c.gestionnaire_code||'—'}{c.sa_nom?` · ${c.sa_nom}`:''}</td>
+                          <td style={{padding:'7px 12px',color:'#64748b'}}>{c.bureau||'—'}</td>
                           <td style={{padding:'7px 12px',color:kpiModal.showAlerte?'#dc2626':'#64748b'}}>{kpiModal.showAlerte?(c.alerte||'—'):(c.gsm||c.tel_fixe||c.email||'—')}</td>
                         </tr>
                       ))}
