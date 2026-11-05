@@ -377,14 +377,18 @@ export default function ConfigModule() {
 
     setSaving(false)
     notify(avertissement ? '⚠ ' + avertissement : '✓ Enregistré')
-    setResultatUser(avertissement
-      ? { ok: false, message: avertissement }
-      : { ok: true, message: 'Enregistrement OK' })
+
     const { data: fresh } = await supabase.from('collaborateurs').select('*').eq('id', cid).single()
     if (fresh) {
       setUsers(prev => estNouveau ? [...prev, fresh] : prev.map(u => u.id === cid ? fresh : u))
       pick(fresh)
     }
+    // APRES pick(), pas avant : pick() remet le message a zero pour la fiche
+    // qu'on ouvre. Pose avant, la confirmation s'affichait quelques
+    // millisecondes puis disparaissait — et le bouton paraissait muet.
+    setResultatUser(avertissement
+      ? { ok: false, message: avertissement }
+      : { ok: true, message: 'Enregistrement OK' })
   }
 
   async function bulkAccesApply(grant) {
