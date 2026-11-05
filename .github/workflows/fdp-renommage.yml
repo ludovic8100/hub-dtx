@@ -75,6 +75,9 @@ jobs:
         with:
           python-version: '3.12'
 
+      # fdp_renommage.py lit la periode DANS la fiche : il lui faut pypdf.
+      - run: pip install -r scripts/requirements.txt
+
       - name: Verifier les secrets
         run: |
           for s in GRAPH_TENANT_ID GRAPH_CLIENT_ID GRAPH_CLIENT_SECRET SUPABASE_SERVICE_KEY; do
