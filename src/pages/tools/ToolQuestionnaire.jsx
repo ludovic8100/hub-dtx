@@ -314,6 +314,13 @@ function horizonCategory(years) {
 
 export default function ToolQuestionnaire() {
   const [step, setStep] = useState('search')
+  // Fiche sans epargne existante : un nouveau client, ou un client du
+  // portefeuille qui n'a encore aucun contrat Vie. Il n'y a alors ni contrat
+  // ni fonds a lire — et c'est le cas NORMAL, pas une degradation : les
+  // reponses sont recueillies aupres du client, pas reconstituees.
+  const [sansEpargne, setSansEpargne] = useState(false)
+  // Un prospect n'existe pas encore dans `clients`. On saisit son nom.
+  const [clientLibre, setClientLibre] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [searching, setSearching] = useState(false)
@@ -371,7 +378,12 @@ export default function ToolQuestionnaire() {
   // La date d'effet vient du PDF de proposition quand il a pu etre lu, sinon
   // de la date de creation du contrat. Quand aucune des deux n'existe, on ne
   // devine pas : on demande.
+  // Le client du dossier, ou le prospect saisi a la main.
+  const clientActif = selectedClient || clientLibre
+
   const dateEffet = (() => {
+    // Sans epargne : la fiche applicable est celle d'aujourd'hui.
+    if (sansEpargne) return { date: new Date(), source: 'nouveau' }
     const duPdf = pdfDates?.dateDebut ? parseDateDMY(pdfDates.dateDebut) : null
     if (duPdf) return { date: duPdf, source: 'pdf' }
     if (selectedContrat?.date_creation) return { date: new Date(selectedContrat.date_creation), source: 'contrat' }
@@ -461,6 +473,10 @@ export default function ToolQuestionnaire() {
   // ─── Load contrats for selected client ───
   async function selectClient(client) {
     setSelectedClient(client)
+    // Choisir un client du portefeuille annule le mode « sans epargne » et le
+    // nom saisi a la main : c'est le client choisi qui fait foi.
+    setSansEpargne(false)
+    setClientLibre(null)
     setSelectedContrat(null)
     setFunds({})
     setPdfFile(null)
@@ -604,7 +620,8 @@ export default function ToolQuestionnaire() {
       setError(`Incohérence : le contrat sélectionné (dossier ${selectedContrat.dossier}) ne correspond pas au client ${selectedClient.nom} (dossier ${selectedClient.dossier}). Veuillez recommencer.`)
       return
     }
-    if (Object.keys(funds).length === 0 && !manualMode) {
+    // Sans epargne, il n'y a aucun fonds a lire : c'est le cas normal.
+    if (!sansEpargne && Object.keys(funds).length === 0 && !manualMode) {
       setError('Veuillez d\'abord uploader un PDF ou encoder les fonds manuellement.')
       return
     }
@@ -625,13 +642,45 @@ export default function ToolQuestionnaire() {
       scoreRisque: riskScore,
       horizonYears,
       montant,
-      client: selectedClient || {},
+      client: clientActif || {},
       contrat: selectedContrat || null,
       funds,
     })
 
     setProposees(propo)
     setAnswers(propo)
+    setError(null)
+    setStep('questionnaire')
+  }
+
+  // ─── Fiche sans epargne existante ───
+  //
+  // Un nouveau client, ou un client du portefeuille sans contrat Vie. Il n'y
+  // a ni contrat ni fonds, et c'est normal.
+  //
+  // CE QUI EST PRE-REMPLI, ET CE QUI NE L'EST PAS. On reprend l'identite du
+  // client, parce que c'est un fait qu'on connait. On ne pre-remplit RIEN
+  // d'autre : sans contrat, un objectif d'investissement ou une preference de
+  // risque proposee serait une reponse inventee, affichee avec un badge
+  // « propose » qui lui donnerait l'air d'etre deduite de quelque chose.
+  // C'est exactement ce qu'on a retire de cet outil.
+  const CHAMPS_IDENTITE = ['nom', 'prenom', 'adresse', 'numero_rue', 'code_postal',
+                           'localite', 'date_naissance', 'registre_national']
+
+  function demarrerSansEpargne(client) {
+    const version = versionChoisie || versionPourDate(new Date())
+    if (!version) { setError("Impossible de determiner la version de la fiche."); return }
+
+    const propo = proposerReponses(FICHES[version], { client: client || {}, funds: {} })
+    const identite = {}
+    for (const c of CHAMPS_IDENTITE) if (propo[c]) identite[c] = propo[c]
+
+    setSansEpargne(true)
+    setSelectedContrat(null)
+    setFunds({})
+    setManualMode(false)
+    setProposees(identite)
+    setAnswers(identite)
     setError(null)
     setStep('questionnaire')
   }
@@ -649,10 +698,13 @@ export default function ToolQuestionnaire() {
     // Dynassur, pas une rubrique du document FSMA. Il va a l'ecran et dans la
     // fiche du client, jamais dans le PDF remis.
     const doc = construireFichePDF(fiche, answers, {
-      client: selectedClient || {},
+      client: clientActif || {},
       contrat: selectedContrat || null,
       logoB64: LOGO_DYNASSUR,
-      mentionReconstitution:
+      // Sans epargne existante, les reponses sont recueillies aupres du
+      // client, maintenant. Porter la mention de reconstitution reviendrait a
+      // ecrire sur le document une chose fausse.
+      mentionReconstitution: sansEpargne ? null :
         'Document reconstitue a partir des elements du contrat. Les reponses proposees '
         + 'automatiquement ont ete reprises et validees par le conseiller ; elles n ont pas '
         + 'ete recueillies aupres du client a la date d effet.',
@@ -672,14 +724,14 @@ export default function ToolQuestionnaire() {
         client_id: selectedClient?.id || null,
         contrat_id: selectedContrat?.id || null,
         dossier: selectedClient?.dossier || null,
-        nom_client: [selectedClient?.nom, selectedClient?.prenom].filter(Boolean).join(' '),
+        nom_client: [clientActif?.nom, clientActif?.prenom].filter(Boolean).join(' '),
         profil: prof,
         score: sc,
         answers: ans,
         funds: funds,
         horizon_years: horizonYears,
         purpose: purposeFromType(selectedContrat?.type_production),
-        source, // 'generated' or 'uploaded'
+        source: sansEpargne ? 'sans_epargne' : source,
         version_fiche: versionActive || null,
         date_effet: dateEffet.date ? dateEffet.date.toISOString().slice(0, 10) : null,
         source_date: versionChoisie ? 'manuel' : (dateEffet.source || null),
@@ -750,13 +802,20 @@ export default function ToolQuestionnaire() {
     const url = URL.createObjectURL(pdfBlob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `Questionnaire_${selectedClient?.nom || 'Client'}_${selectedClient?.prenom || ''}.pdf`
+    a.download = `Questionnaire_${clientActif?.nom || 'Client'}_${clientActif?.prenom || ''}.pdf`
     a.click()
     URL.revokeObjectURL(url)
   }
 
   function handleReset() {
     setStep('search')
+    // Sans ca, le mode « sans epargne » et le nom saisi a la main survivent
+    // au dossier suivant : la fiche d'un client se remplirait avec le nom du
+    // precedent.
+    setSansEpargne(false)
+    setClientLibre(null)
+    setVersionChoisie(null)
+    setProposees({})
     setSearchTerm('')
     setSearchResults([])
     setSelectedClient(null)
@@ -867,6 +926,45 @@ export default function ToolQuestionnaire() {
             {searchTerm.length >= 2 && !searching && searchResults.length === 0 && (
               <div style={{ fontSize: 13, color: '#94a3b8', marginTop: 10 }}>Aucun client trouvé</div>
             )}
+
+            {/* Un prospect n'est pas encore dans le portefeuille, et un client
+                du portefeuille peut n'avoir aucune epargne. Dans les deux cas
+                la fiche se fait quand meme : elle ne depend pas d'un contrat. */}
+            <div style={{
+              marginTop: 16, paddingTop: 14, borderTop: '1px solid #e2e8f0',
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>
+                Nouveau client, pas encore d'épargne
+              </div>
+              <div style={{ fontSize: 12, color: '#64748b', margin: '3px 0 9px', lineHeight: 1.5 }}>
+                La fiche se remplit avec le client. Aucun contrat ni fonds n'est nécessaire —
+                c'est la version {SEUIL_VERSION ? 'en vigueur aujourd\u2019hui' : 'courante'} qui s'applique.
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                <label style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>
+                  Nom<br />
+                  <input value={clientLibre?.nom || ''} placeholder="Dupont"
+                    onChange={e => setClientLibre({ ...(clientLibre || {}), nom: e.target.value })}
+                    style={{ ...inputStyle, width: 190, marginTop: 3 }} />
+                </label>
+                <label style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>
+                  Prénom<br />
+                  <input value={clientLibre?.prenom || ''} placeholder="Jean"
+                    onChange={e => setClientLibre({ ...(clientLibre || {}), prenom: e.target.value })}
+                    style={{ ...inputStyle, width: 190, marginTop: 3 }} />
+                </label>
+                <button
+                  disabled={!clientLibre?.nom}
+                  onClick={() => demarrerSansEpargne(clientLibre)}
+                  style={{
+                    ...btnPrimary, padding: '9px 16px', fontSize: 13,
+                    opacity: clientLibre?.nom ? 1 : 0.5,
+                    cursor: clientLibre?.nom ? 'pointer' : 'not-allowed',
+                  }}>
+                  Commencer la fiche
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -925,6 +1023,26 @@ export default function ToolQuestionnaire() {
                   ))}
                 </div>
               )}
+
+              {!loadingContrats && contrats.length === 0 && (
+                <div style={{ fontSize: 13, color: '#64748b', marginTop: 8 }}>
+                  Aucun contrat Vie pour ce client.
+                </div>
+              )}
+
+              {/* Un client du portefeuille peut n'avoir aucune epargne — ou en
+                  ouvrir une dont le contrat n'existe pas encore. La fiche ne
+                  depend pas d'un contrat. */}
+              <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: 12.5, color: '#64748b', marginBottom: 8, lineHeight: 1.5 }}>
+                  Pas d'épargne existante, ou un contrat qui n'est pas encore créé ?
+                  La fiche se remplit avec le client, sans contrat ni fonds.
+                </div>
+                <button onClick={() => demarrerSansEpargne(selectedClient)}
+                  style={{ ...btnSecondary, padding: '8px 15px', fontSize: 12.5 }}>
+                  Faire une fiche sans épargne
+                </button>
+              </div>
             </div>
           </>
         )}
@@ -937,12 +1055,18 @@ export default function ToolQuestionnaire() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>
-                    {selectedClient.nom} {selectedClient.prenom}
+                    {clientActif.nom} {clientActif.prenom}
                   </div>
-                  <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
-                    {selectedContrat.compagnie} — {selectedContrat.type_production}
-                    {selectedContrat.police ? ` — N° ${selectedContrat.police}` : ''}
-                  </div>
+                  {selectedContrat ? (
+                    <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                      {selectedContrat.compagnie} — {selectedContrat.type_production}
+                      {selectedContrat.police ? ` — N° ${selectedContrat.police}` : ''}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 12, color: '#15803d', marginTop: 2, fontWeight: 600 }}>
+                      Sans épargne existante — les réponses sont recueillies auprès du client
+                    </div>
+                  )}
                 </div>
                 <button style={{ ...btnSecondary, padding: '6px 14px', fontSize: 12 }} onClick={() => setStep('select')}>
                   Changer de contrat
@@ -1371,19 +1495,25 @@ export default function ToolQuestionnaire() {
         )}
 
         {/* ═══ STEP 4: Questionnaire éditable ═══ */}
-        {step === 'questionnaire' && selectedClient && selectedContrat && (
+        {step === 'questionnaire' && clientActif && (selectedContrat || sansEpargne) && (
           <>
             {/* Client + contrat + funds summary */}
             <div style={cardStyle}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>
-                    {selectedClient.nom} {selectedClient.prenom}
+                    {clientActif.nom} {clientActif.prenom}
                   </div>
-                  <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
-                    {selectedContrat.compagnie} — {selectedContrat.type_production}
-                    {selectedContrat.police ? ` — N° ${selectedContrat.police}` : ''}
-                  </div>
+                  {selectedContrat ? (
+                    <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                      {selectedContrat.compagnie} — {selectedContrat.type_production}
+                      {selectedContrat.police ? ` — N° ${selectedContrat.police}` : ''}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 12, color: '#15803d', marginTop: 2, fontWeight: 600 }}>
+                      Sans épargne existante — les réponses sont recueillies auprès du client
+                    </div>
+                  )}
                   {Object.keys(funds).length > 0 && (
                     <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>
                       Fonds : {Object.entries(funds).map(([n, p]) => `${n} (${p}%)`).join(', ')}
@@ -1536,7 +1666,7 @@ export default function ToolQuestionnaire() {
               </div>
             )}
             <div style={{ fontSize: 13, color: '#64748b', marginBottom: 14 }}>
-              Questionnaire pour <strong>{selectedClient?.nom} {selectedClient?.prenom}</strong> — Profil : <strong>{profile}</strong> ({score}/42)
+              Questionnaire pour <strong>{clientActif?.nom} {clientActif?.prenom}</strong> — Profil : <strong>{profile || 'non etabli'}</strong>{score != null ? ` (score ${score}/100)` : ''}
               {horizonYears !== null && <> — Horizon : <strong>{horizonYears} ans</strong></>}
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
