@@ -6,6 +6,8 @@ import Layout from '../../components/Layout'
 import { ENTITES } from '../../lib/entites'
 import { StatBanner } from '../../components/ui/AccountableUI'
 import { getCompagnies, resolveCie } from '../../lib/cie'
+import { trierLignes } from '../../lib/tri'
+import EnTetesTriables from '../../components/EnTetesTriables'
 
 const BLUE  = '#0080BD'
 const NAVY  = '#0D2F5E'
@@ -30,17 +32,11 @@ const fmtMois = v => { const d=parseDate(v); return d?d.toLocaleDateString('fr-B
 // Horodatage d'un contact : certaines sources envoient la date sans offset → on force UTC
 const tsContact = iso => { if(!iso) return 0; const d=new Date(String(iso).length<=19?iso+'Z':iso); return isNaN(d)?0:d.getTime() }
 const fmtAppel = iso => { if(!iso) return '—'; const d=new Date(String(iso).replace(' ','T')); return isNaN(d)?'—':d.toLocaleString('fr-BE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) }
-// ── Tri d'un tableau de clients ───────────────────────────────────────────
-//
-// Les colonnes sont decrites une fois : le titre de l'en-tete et la valeur de
-// la cellule viennent de la meme ligne. Un tableau ou l'en-tete et la cellule
-// sont ecrits a deux endroits finit toujours par trier sur une colonne et
-// afficher l'autre.
-//
-// `val` sert au tri, pas a l'affichage : le numero de dossier se compare comme
-// un nombre (14 avant 102), le reste comme du texte accentue.
+// Les colonnes du tableau de clients : le titre de l'en-tete et la valeur de
+// tri viennent de la meme ligne. La mecanique de tri, elle, est partagee
+// (src/lib/tri.js) — « on doit pouvoir faire ca partout ce genre de tri ».
 const COLS_KPI = showAlerte => ([
-  { cle:'dossier',      titre:'N° Dossier',        val:c=>c.dossier, num:true },
+  { cle:'dossier',      titre:'N° Dossier',        val:c=>c.dossier, type:'nombre' },
   { cle:'nom',          titre:'Nom & Prénom',      val:c=>`${c.nom||''} ${c.prenom||''}` },
   { cle:'localite',     titre:'Localité',          val:c=>`${c.localite||''} ${c.cp||''}` },
   { cle:'gestionnaire', titre:'Gestionnaire / SA', val:c=>c.gestionnaire_nom||c.gestionnaire_code||'' },
@@ -49,36 +45,29 @@ const COLS_KPI = showAlerte => ([
     val:c=>showAlerte?(c.alerte||''):(c.gsm||c.tel_fixe||c.email||'') },
 ])
 
-// Vide en dernier, quel que soit le sens : une ligne sans bureau n'est pas
-// « avant A », elle est absente. La remonter en tete au premier clic ferait
-// passer le tri pour cassé.
-const comparer = (a, b, num) => {
-  const va = a == null ? '' : String(a).trim()
-  const vb = b == null ? '' : String(b).trim()
-  if (!va && !vb) return 0
-  if (!va) return 1
-  if (!vb) return -1
-  if (num) {
-    const na = Number(String(va).replace(/[^\d.-]/g,''))
-    const nb = Number(String(vb).replace(/[^\d.-]/g,''))
-    if (Number.isFinite(na) && Number.isFinite(nb) && na !== nb) return na - nb
-  }
-  return va.localeCompare(vb, 'fr', { sensitivity:'base', numeric:true })
-}
+// Les clients consultes recemment, et la relance : memes lignes, autres colonnes.
+const COLS_CONSULTES = showWho => ([
+  { cle:'client',   titre:'Client',      val:c=>`${c.nom||''} ${c.prenom||''}` },
+  { cle:'dossier',  titre:'N° Dossier',  val:c=>c.dossier, type:'nombre' },
+  { cle:'localite', titre:'Localité',    val:c=>c.localite||'' },
+  { cle:'consulte', titre:'Consulté le', val:c=>c.consulte_at||'', type:'date' },
+  ...(showWho?[{ cle:'par', titre:'Par', val:c=>c.consultant_code||'' }]:[]),
+])
 
-function trierKpi(rows, tri, showAlerte) {
-  const col = COLS_KPI(showAlerte).find(c => c.cle === tri?.col)
-  if (!col) return rows
-  const sens = tri.sens < 0 ? -1 : 1
-  // Copie : `rows` vient de l'etat, le trier en place ne redeclencherait pas
-  // le rendu et casserait la comparaison de React.
-  return [...rows].sort((a, b) => {
-    const r = comparer(col.val(a), col.val(b), col.num)
-    // Depart egal : on retombe sur le nom, pour que l'ordre soit stable d'un
-    // affichage a l'autre plutot que dependant de l'ordre d'arrivee.
-    return (r || comparer(`${a.nom||''} ${a.prenom||''}`, `${b.nom||''} ${b.prenom||''}`)) * sens
-  })
-}
+const COLS_RELANCE = [
+  { cle:'client',       titre:'Client',           val:c=>`${c.nom||''} ${c.prenom||''}` },
+  { cle:'dossier',      titre:'N° Dossier',       val:c=>c.dossier, type:'nombre' },
+  { cle:'localite',     titre:'Localité',         val:c=>c.localite||'' },
+  // On trie sur le NOMBRE DE JOURS, pas sur le texte « il y a 3 mois » : en
+  // texte, « il y a 3 mois » se range avant « il y a 3 j ».
+  // « Jamais contacte » vaut Infinity en memoire. Ce n'est pas une valeur
+  // manquante — c'est la plus ancienne de toutes, et donc la premiere a
+  // relancer. On la rend finie pour qu'elle se trie dans les deux sens.
+  { cle:'contact',      titre:'Dernier contact',  val:c=>Number.isFinite(c.jours)?c.jours:999999, type:'nombre' },
+  { cle:'gestionnaire', titre:'Gestionnaire',     val:c=>c.gestionnaire_nom||c.gestionnaire_code||'' },
+]
+
+const parNom = c => `${c.nom||''} ${c.prenom||''}`
 
 const ilYa = jours => {
   if(jours==null) return ''
@@ -1451,6 +1440,10 @@ function Fiche({ client, onClose, onOpenDossier }) {
 // ══════════════════════════
 // ── Bloc « derniers consultés » (réutilisé pour perso + bureau) ──
 function RecentsBlock({ title, icon, rows, onOpen, showWho, empty }) {
+  // Par defaut la date de consultation, la plus recente en haut : c'est pour
+  // cela qu'on ouvre cette liste.
+  const [tri,setTri]=useState({col:'consulte',sens:-1})
+  const cols=COLS_CONSULTES(showWho)
   return (
     <div style={{padding:'4px 0'}}>
       <div style={{display:'flex',alignItems:'center',gap:7,padding:'12px 16px 6px'}}>
@@ -1465,13 +1458,9 @@ function RecentsBlock({ title, icon, rows, onOpen, showWho, empty }) {
       ) : (
         <div style={{overflowX:'auto'}}>
           <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-            <thead><tr style={{background:'#f8fafc'}}>
-              {['Client','N° Dossier','Localité','Consulté le'].concat(showWho?['Par']:[]).map(h=>(
-                <th key={h} style={{textAlign:'left',padding:'9px 16px',fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',whiteSpace:'nowrap',borderBottom:'1px solid #e2e8f0'}}>{h}</th>
-              ))}
-            </tr></thead>
+            <thead><EnTetesTriables cols={cols} tri={tri} onTri={setTri} couleur="#0d9488"/></thead>
             <tbody>
-              {rows.map((c,i)=>(
+              {trierLignes(rows,cols,tri,parNom).map((c,i)=>(
                 <tr key={c.dossier} onClick={()=>onOpen(c.dossier)} style={{cursor:'pointer',borderBottom:'1px solid #f1f5f9',background:i%2===0?'#fff':'#fafafe'}}
                   onMouseEnter={e=>e.currentTarget.style.background='#f0fdfa'}
                   onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'#fff':'#fafafe'}>
@@ -1509,6 +1498,9 @@ export default function DynassurClients() {
   // Tri du tableau KPI : la colonne cliquée, et le sens.
   // Par défaut le nom, parce qu'une liste de clients se parcourt par nom.
   const [kpiTri,setKpiTri] = useState({col:'nom',sens:1})
+  // La relance se lit par anciennete du dernier contact : le plus ancien en
+  // tete, puisque c'est lui qu'il faut rappeler.
+  const [triRelance,setTriRelance] = useState({col:'contact',sens:-1})
   const [kpiModal,setKpiModal] = useState(null)               // { titre, rows } | 'loading' | null
   const [recentsPerso,setRecentsPerso] = useState(null)   // vos derniers clients consultés
   const [recentsBureau,setRecentsBureau] = useState(null) // ceux de votre bureau (hors vous)
@@ -1686,7 +1678,7 @@ export default function DynassurClients() {
   let relanceView = relanceBase
   if(relanceActif) relanceView = relanceView.filter(c=>c.tranche===contactFilter)
   if(q.length>=2){ const s=q.toLowerCase(); relanceView = relanceView.filter(c=>`${c.nom} ${c.prenom} ${c.dossier}`.toLowerCase().includes(s)) }
-  const relanceShow = relanceView.slice(0,500)
+  const relanceShow = trierLignes(relanceView,COLS_RELANCE,triRelance,parNom).slice(0,500)
   const modeRecents = q.length<2 && contactFilter==='tous'   // vue par défaut = derniers clients consultés du bureau
 
   return(
@@ -1743,11 +1735,7 @@ export default function DynassurClients() {
               ):(
                 <div style={{overflowX:'auto'}}>
                   <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-                    <thead><tr style={{background:'#f8fafc'}}>
-                      {['Client','N° Dossier','Localité','Dernier contact','Gestionnaire'].map(h=>(
-                        <th key={h} style={{textAlign:'left',padding:'9px 16px',fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',whiteSpace:'nowrap',borderBottom:'1px solid #e2e8f0'}}>{h}</th>
-                      ))}
-                    </tr></thead>
+                    <thead><EnTetesTriables cols={COLS_RELANCE} tri={triRelance} onTri={setTriRelance} couleur={NAVY}/></thead>
                     <tbody>
                       {relanceShow.map((c,i)=>{
                         const col=TRANCHE_COL[c.tranche]||'#64748b'
@@ -1787,24 +1775,12 @@ export default function DynassurClients() {
                     {/* LES COLONNES SONT DES DONNÉES, pas du balisage recopié.
                         L'en-tête et la cellule viennent de la même ligne : on
                         ne peut plus trier sur une colonne et afficher l'autre. */}
-                    <thead><tr style={{background:'#f8fafc',position:'sticky',top:0}}>
-                      {COLS_KPI(kpiModal.showAlerte).map(col=>{
-                        const actif = kpiTri.col===col.cle
-                        return (
-                          <th key={col.cle} onClick={()=>setKpiTri(t=>({col:col.cle,sens:t.col===col.cle?-t.sens:1}))}
-                            title="Trier sur cette colonne"
-                            style={{textAlign:'left',padding:'8px 12px',fontSize:10,fontWeight:700,
-                                    color:actif?NAVY:'#94a3b8',textTransform:'uppercase',whiteSpace:'nowrap',
-                                    cursor:'pointer',userSelect:'none'}}>
-                            {col.titre}
-                            <span style={{marginLeft:5,opacity:actif?1:.25}}>{actif&&kpiTri.sens<0?'▾':'▴'}</span>
-                          </th>
-                        )
-                      })}
-                    </tr></thead>
+                    <thead style={{position:'sticky',top:0}}>
+                      <EnTetesTriables cols={COLS_KPI(kpiModal.showAlerte)} tri={kpiTri} onTri={setKpiTri} couleur={NAVY} style={{padding:'8px 12px'}}/>
+                    </thead>
                     <tbody>
                       {!kpiModal.rows.length?(<tr><td colSpan={6} style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Aucun client.</td></tr>)
-                      :trierKpi(kpiModal.rows,kpiTri,kpiModal.showAlerte).slice(0,500).map((c,i)=>(
+                      :trierLignes(kpiModal.rows,COLS_KPI(kpiModal.showAlerte),kpiTri,parNom).slice(0,500).map((c,i)=>(
                         <tr key={c.id} onClick={()=>{openDossier(c.dossier);setKpiModal(null)}} style={{cursor:'pointer',borderBottom:'1px solid #f1f5f9',background:i%2===0?'#fff':'#fafafe'}}
                           onMouseEnter={e=>e.currentTarget.style.background='#f0f9ff'}
                           onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'#fff':'#fafafe'}>
