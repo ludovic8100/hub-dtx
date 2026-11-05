@@ -9,6 +9,7 @@ import FicheVieFormulaire from '../../components/FicheVieFormulaire'
 import { FICHES, versionPourDate, SEUIL_VERSION } from '../../lib/fichesVie'
 import { construireFichePDF } from '../../lib/fichesViePdf'
 import { proposerReponses, profilDepuisReponses, profilDepuisScoreRisque } from '../../lib/fichesVieReponses'
+import { risqueFonds, lectureComposition, profilDepuisScore } from '../../lib/fondsRisque'
 
 // Configure pdf.js worker via Vite ?url import
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
@@ -16,78 +17,6 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 // Logo Dynassur, partage par l'ancien rendu et par le nouveau moteur de
 // fiches (src/lib/fichesViePdf.js).
 const LOGO_DYNASSUR = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAE0AAABQCAYAAABcQfj1AAAhSElEQVR42tV8eZxcVbX12ecW1OPGYEQCH7iQOKM8kAfLwRREBAUv2plUMQBngMiPEFxoLpEEBV8+MCJBw6IIl0BFRVwgCQMgn7gHERmyNAhUyc91HTP2fv749xbVZ2BhCQo3t8vv1Qq1bdvrbvX2mvvfc4lbPVQQgmEMskep5YKa/c68FgpdB+lIq8B054AuojZgc2oQtaBzZOk7hFy7n7jdCnL+gfqn3jbct30tENqsHQxAYcIyqQAFP9iB20VMJACQHT+T0/2uf6Pa5TZT40FqYOKD9+VGDAWZCxgDNRYAAqKGyCVESgeIcIfWdw9qE/cO+fxHz/w8GWXNSb9qtIii3lrFMWigEj/RUELgM0unpkffsURV0nv9OPhYmjcEAAAExFz+HYMAKREBiAoiFWZAIKBjUBRHhpFABGoNgZS/xgxfssSL8pWR+8cO+Owv1FnpLWicLGgXJZ/EdASSg5fYeyee93g+mYcjdpYg5gsiI1S+DgxAURQAkDhdQJceJ8JUFVioyAWhRKMMYiyQDYXfr466on4r0b8ItL6L/OrV9+z8dyjR9qXoozBxfxcBHAyaENDBgMDPjrvx19yu+/7Ma2OhWhyTZCKBwhKxEm0BdCQAscgYoAAZW6dmdhAiRJAWQKYDLXGIJsDohzIN0HNxiomvZ1886aeRu3W9aceuLxNYWXguQPgljSNMp++9sWIuvbxnDlI2SxQNq9CoacAYmhcB7z3IICYGESUUDJEW3gBcDsSicykqAwfYVWGAiRgYkRZRr4rYFsbH7MS/yYj/idd3t381CmvfHxSBFZAKOKfpoG0PR/KfWrhHJ/vWuCj7FEgXqC57mnKDMR1kHifAMJgps1oGsINRElkMiPRRhBTiEJQqokCIiCKDOe6EDEhqo1Vrfi7LGRh1jVvWvHOly+fpIGoAAMD8o/MwlsGrVRizJtHWDqDMHiI77yjXaWrZzazu7/em8xxaszrUeieAgDarAKAA4GJLG8KXKAuh38n2hiA444o5DQaFQRhMDKWTZTvgjUGtjY+GolfFPl4qGt85Jb73//a9el1zV+0yC5ZfIigTPKciDSUSgwcwpi3RjEw4NO3C5+8fo96b9+RsHYAbOdLV28WPgbihhIZD6hRY2hzfWsDR4YDlZOIDNQO7wEEC2hEKpYINopMptCNDABbn1hlFT+LXO3aGV897fYlS5a4lL7FCqgyAElt0z8HtEkJVgkVcEKLFoA9pRteWOud+lZh+3aNMq9Erhto1ABxPkkMZpK+pTRN9A8dVAa3o46YYAFkCDBEahkSESOKsiab74KNG7C++ZdI5YfRhlUL/9/J//bg5Ojb9cmDduqnUwCXQlNaKED5L916cJzJnqhk36qFnhlQhcY1AHAEMmBDm+lbi8rUBi6hMhMjgiJigiGCJUJE0IhILBFn812UzeXAE6N1C7olG0981/zxmluWlMt1ACgOqZlbhJZp11CXdhn8KYXLC1z6Vve5QzMaM2Yd66PoXWrtwZrvBhpVwIsnJlJm3qa+JcAZYkSkiIhgOAWOQwQCEjFJxlqbK/QgUoFp1B6I1H0vN7L6+zedtP8T6U0uVsCVAfLPDdA6z1kcYhSLQMfF5S/65YGu0HOyt/ZtUuiZQaLQZi3YBmYGgdpatom+JRpoCYgIsB2gRUSI0uhjBPqCKZcrcC6XA1fHRiPvbzD1xhU/O+55d7cvUUxlgHYo6z5D0JRQGmz/TLn89AV3St8OT9VVun5mY/ruRbG5U5DN7y82AzQmAIUDwxAzta2KadM2obAFkGHAECfAESJmRIQAHiOACYglkqyNbKGrB1yfgFX/K9usf/X6o+fcmF53cUjNM428bYNWHDKYu5QwOOi3aCZVCYOLDe5fo6gUt56xSsqYB0qjTwHKfeX2w+Ns16nK9mjt7o1QrwLiHRliTcuLzmxKBE4iLkOd+kbB03W8tgl1Q/YlyRBxobuXIii4Ufsdu+al/k17DlUAr6o0CND2ah49rUYNDmonUFNPLPVqNLNPsgVjxp9y2Y219cM/K1c3AxnAVgFMQe7Qvq5L73pJM597v+foRO3qmaauAXKxVwaBDLcsypb0jQiWCZmEqglNYZmRAVogZkCwpD4ionyhh7PGQusT93LcuOiaI2ZdDwBFVVOhbUcdbTW6KsFOTD35awdqlDlWmP8dgucD6AOBoeJBtB5KjxL5e9jFv6Z1j/123Y1fGttOAAlDQ4xiUZHc4Xzpx7P87nuc4qL8+9Ddu494BzRrHsQEw5xmVSKCQapvnGhdW+Mso4OyjEwagQiARlCxZDRf6DKRYUi9+qt43YpP/rD4snuhmrpx3V7QCKUSoVyWKSd/+XWanXIeiN+IKAeIh3oHaKqdgTbEFmAD+BjqGsugehuk8WP41Ys3fre8YXMAt1DybELdqaWv9I7OOvBEzeQ/LIXeuSoeaNQ9mAhs+On0LZMkCdvxugVasCqtfydZV/M9fcbVa7HWxga//6a9LgyXpLw1utJmIl8uS98pXx+kTNdnYCPWRlUBeBAIilAegcL3VlKQKjTpSFrLZDMB4GZ9GNBfkrrrzZpHFk+KwFLJAtjcdG5C3Tknl3IrDzrqeJ/NnaldfS9VL0Bc9+BQ53ICQkrTiNNoamudNYGaUQdwmfTnmBCBYUi8MdZke6aguXHtjSNP/e7dPz/x6JHi0JCpdBj4TUELNqEy4Pve883vUNfUk7U+LlDRpHWxnckVAkAAZZiIKUoAjOvLoHoTGNfte9/X77zvvvji1o2aP2iweNMko4RSG7y5c4uZhz768RN8tutj2tUzT10TcLEDwxhiSmloOKEpGJEh2JSOzC0wUwAthyojpbQhVQb5TN9UG4+N/GXsiYeO+ckpBz2+JeCoU8P6TvnGpdQz/QytjsYgte3KeoeqBQWRhyrDRkw2C/gm4OO/sW/cyHU3tPb7p/9+G/QlDCmntJ1dPDO/6ogT36OZnrN9d98c1MdB4r1hYzKksEnF0PJvHRk1JIvJNI1AyCQWxSamGSIu09NvfXXs0fryhw6rvOvAxzalKqWATX33ZUXpmjGkcS2GarSLDa8AEFIxZLPEbKGNcUDkLuPlh95v/PH673+i3fKZX7I4ZBJ9J4HXW/rfqbXnHXSWz2TPlEJ3gapjPgI4MkQGDGsoAaSDpoxWho02SQyZBGiTGGcVcZnuPhtXxx6QVY8ffO0J+6/DYBgyhYtRpSkDX+iVvmn3w+b2gGtq6OPsovKACNDggUkAUhWFCCksR5nA/kZ1I0l8C8XN7+dW/ulXTyz5br1le+6fRx3RRygtatG2+yu3z61PnX6R7+l/MzWbiFzDR8aYlg1B+LsFUgJmp7aFRIGWHpokWlXEZfum2fr6Vbdee9VHDy8ODaGCYNIJAPpO+dp/Uff0i7U25kBkd3U3gDTkiyB3AFTDTEbVQxUENhxlQN4DzfqDpO6HqE9cO3zDpx6YFH1LBj1AumnCiK76wym+u/dLlC1My9TGnGW2pgUWJ4CEKErFP1AXLY3LMGBb+gYwEVQ1zvdPj8aHHy9f9+bnDabVA80tljIr+mb/AVFhP8QNBWFHo6ytQ+lIQDW4s8SmqCpYEzBVA3jhbyUVIVEiGzFzBG1UG6T+FvbNb8189JGb77vvirijQlGUy4KSMgYBEEnPpT99QXXGC79DvVNfm5kYcZZS4DrrUyBjeAs2ZLIVsQlwRFBiI8SsjbXLXj30tpf9qTh0naG+d31lAXJ9t4Yv9oxr0XDnoSa4zpAACOoDWMqAcgpOGywkYCVTQQlRmIyOhVSEAMs2C4hAXH2pivt2trHhmsd++nmn2skrMc0ltSiT2/eI07NPHv+fV2HqzBOj6gZniKzdQlKItujfEpqmHi6hOFR81N1vmhue+vUPjtjrDSVVpv73fOMLyPWeo3HNA9tpL1QFREyZfMDZNQBxPnS1LZPJBPvmGoBrKik8QRkgphZAIQpJJaFuiMxW9EFVVAWCJHostFFdQ5DvYGLjN5fdcsEjAbyiQaUSsjSgRKTR9/52OfVP+1A0MeoMk22D1K4eWv4t0bJMZ1ZNLIohwDBBVSXKFbi2dvn8obe86HYrzAeEu060fXGmnqKcgY+BxsQt5P2NUPcn8s0RiCPD0VQxdp4q/QeReR3bzBwykdW4Cbi6ksJD1RBALJKAFShMCECqBrcMhSEAiJsi2hCwmQGTO1sK/J97vuXCK/za4S+sqly2BsUhk9gb0iE1zQH6cPa7f+r3U/c4kcY3eEfGEAAHDR2oJLpjBkgoKWuTmwgKN5I4ea1gQDiTJZPv+SCA26n3vVcuIxvNhjjdpi9T9ZQtGMS1P1JcPX3k2x++8+k+vsfRpYL0TztQCMcQmSOIoxeRsaBmAypNHyINTCota6satK8dea3fHWJP4Qlk2eagrrYMjY2nrbj5wptDoii7pHakfT/yP9Gyfzv8TtPd82pbr4o1hlNKtjJqGoGY7OM2oylBjc2Qj+sb4hWPvIT63ndlHWyy0G304kSFcgVGY/xWs/rut6678VtjKA4ZrF5KmDlPMXdpOMH986j1XqXtpOcWi5l15qB/ZzJFgI7mKDubAGg6BhSQUjIJTTJsml8CkGhRV8PhyUQWKkr1kZNX/OKi77Womgy9uy6/dZ6buc+9lihjRCgyRGnm3GJLiTalaVpmAYYgUb7A8cjaU6jvfVcqtmXLFAIbEfnm47ry3v03/vzrIyiVLMplt11d3NVLCUvan/0/h328rzFlyhuYM+9Q0BspyvWId9C4EegLNWmgIYm8NBsHLJNoFPFgw6QqqI0evPLWi+5uAbdokcWCBS77rd9/ETNnnx1NbHSG2EatjIqOVtImvi2xKO0GJ8GQ+lxXLzc2rrvGhltKtK2uLzET1SZO37D9gIVv1462ACCARysDGwEsBLBwn+POn+M1fitgj2cyB5DNWHENqHNew8CP06ShKVitKCQDF3u1WaM2+825c4uvvr8yFANEWLxYoErmv2/57zjXc5qLTA+JV6dMBAEhadOlCYkInDRvSIGgaEmiAgMKci4mZn449b3vygmwKWydnuopkzeoj92z4arTDurstW0zykqloJHlQZ3cT1NCscKYW9TO4e5ex15wsHJ0kgJvhc3NgITog6poWFVCresUnRRxJsoZ3xgbWPWrCyotfUtoaq/+yw+of7fjo+pGZ5ls53yhM9I2peok7wZoJoqIfXOEoToe6Lk11EiJGEbiq4M4LaVt0NGEBSsIBrRclpaLn1+yrXtZGfAok6BU4uR9LPvJp+5Y/qNzTvO1kXnaGP+AusY9xIYoyptgNdVBIRCBqkAlsS4g1ZByTwAAzJwXvsuMGQRVotjd5FXgRMmrwmnIpE4VHorw3uZ/vCJ8Nsk+zgucl34L6AiIZ6Z9xck1oyhAFrUJh3p9UUfxveX2eLksaRTOKJa68z430yM2phGtfZJoBICb5K3CcEZa5ywWDVDEqsrAGgDfAPCNvY4qHywUvwfAcWyzveJiqHceGpwCoIAIw8XESq/Yd9/Tsw9XBhoACIsPESwgxeV3/lWrY+qImUSUWCn1CiSUSHpK04SeRHDhhgSaioJZAGKyAK0G0YsS+rRajFAFCZSMIdXak7u53z66rj2B2nxoEmjGs4+/ZEBgToLiFZ51GiHHYrFhdvGS+yF+YW34gavXVZLMuynNKxUPVNp9tiVlv+znpTsA3LH7gv8a1GzXSaDoZGOzL9BQKQgUygomL1DBjPredjoexgqgRMAgAMBOVFe7vrgqmVyX96qsClIKvo0EpMkEUYGAS/BxxASCBH1TwARcmgyV4TD40WDtkgU8LAKCVzCBRR+9v1JphoHwJhmjOGRQJtnrbZ+dt+cJl92BTM+1bHNHMfGeBMqpIqNEM2Gzh1C2+/L8nvPu2+vo0htRGfCtHtoWJCHJtopi0aA4ZFYtuuSJlbd89gKsXvYKNMbfqXH9bsMRW84aiKiK9yCNuKnZ1mkGBxUATM7FBIqhgIciVsCLQDrpN4mW2qKvUyAOn1PHBk5knSXQstZiFAhYUnkTqKoaJah3a1oebDNKDvg931b+N5+behNzNFXrE46gpOGGhvOKQuNYFFDY6AWa6/3F7kd++p2rKgPXtGi9taMVfSXGfPDwknIVwDUArtnz0E++ScAfAfERZCJoXBsHoZYgphgcDFbQRz0q0gXxUFUIEZyiVb5xMnSlpJlASbQliyTSPxqxJVV5mCH+cVJJSotQzqgKIEmIBn0LyzpXdyaBEqMMzHzzBbtppu8GJp6qjQlHgFWF0TD8I1KlpHoxAKw0G169qMn2fXu3N37yAJTLErRsW0dZkugLyQZKK2678OaVt33uTfDjh5Fr3MUqte91K9a1GlPzwk12XT1zkMlF8F7CPVQ4ELwqZNPEoIBXhZcQbWkExlD1bBA7fy9blcfIxSARBnzLdTPahpKA+uZjvnkElMXkowtNVJilzVoMwIpIMKPabv+kjl7CuQy8E7C1Jpu/PCSFufqMWlCVgdBdKRYNSiVeufjLty6/7XMHozH69vvvr8Stz82YQUlSe51GOUBUkDBJVAJNVROaaouqLqFtGzhAFNxs1BA36r9k4+Mn4JtNBQiSiGTawhEFicKQbWxGy8qA3+e48+cw2RO0MaEAbKtmFG0BljYdVQSUnA8gI82aJ5N/zR4bX3woUJat69vTHJWK74hUXX73126fpLmLF4sCJBQdC9cM0y6V1icEARzRoG9eJUQZUk0L/x9DRTI5ajRqj4088cQdXGuMrITIeganDcEAqyhYBaQCjev5SRe7ODQqY2MP5yifE/GS0DEBJQEKIfy13WxMXL0kgxdWWHvs5tTfAfAAmkTzoSGDclnyly56HXJdr0Z9QgA16feDhOvyIMQJcL4VaW1aelE4EZFsHuLioT+fffgEj1bKI6y6gtgACiVRkEpo1WjIory1QYvQywMOpNQqb7TVqVBRkAhY0vckBQxQJfWOoPqScCMGd2r5U6BtpX2OpYGazWyhJCYK2tAKwtY1QFTgQEnEdZpbwCsQq6iw4cbYhrqMrLsi3T6hJP5RAoPUK6m0oyxx3BBfmHR5qeOG6SNVawGWXFdaH6abeCbVjG26koqHCvVtaxnAM18rt8iivMBFF996vHZPOwwTY56gBmnrXdvyAwUECqfBzIoqnHSAJ+o138tufONV9773gEeLQ2FfDiD+AQNABCHVpYMQBUg8SLR3ElgJlUil2tmFSCOMknTeAgsdVZpIKyBJCQqd2HRr0U4dxSGD8gLX/6mFc0Z7pl2mrilJ3Q3ipAWgkm63ad1In/x2goKI4FVAIOFMzsSja5+yG1cNolTiytJBDRt1nPwN4sDqibWzFe2JRMDEPUndOelLifgH0NG+2Vy7OiNQE8A0pb4SkZK6h8OXrez82LCkjMrb/W4nfalrbNbeCzVbmIZGLbFiQS7QeRM7NFxV4VqJIWiaV4jYDLnRkQ8/eNqCtZg3j1AuCwOAkebfqVENXVRJ2yW+NfwQ1b52twLAIaFWpHrj19KsiSoYSXbcXLuS6GoB1mpvk4oncs1bdjoRtEo5lrnF8zJrDjp4oe/qfXWylYg7gQqanQ7PUoq2rZEHpX4tlt4p1q0dvuzJd79qIRYtsunCbAaAaGLkMXi3noiJ1CuLJL16UKhOdArmz7et+rRcFpRKvOKW8p81rv/a2CxD1WEL2hXMckr1kGRUvIAto1F9wq9d+VNACUvKfucAI5lz8nm5B//jyBuka8oRmBh1SjDo8ItpOx3JbCLViRBt4aWHIhbE0t0fyZoVN61+12fPxJAaLDikdX0MVXry5xeNkOjDTAzSMFdLIoYgAij69s0fUpg83kx6k67+MWnWm0ps1KeCNTm62hqpUPFKIG9giKR51lN/vmYioeaO6dlQqH2nnX1lz4pXH/lTX+g7isY2OCKyIXr8JKOdYkTSeWMnSUgsPf2RbFhzW+Ghu4rQIUFx8p4ExiGDJhhS92cmkyS2Dlcf6rW+CYv+cFeTNbfBVPLymz/3F43HTiFiImMZIjG8SCuDtsLfK9Q7BpOxuUhq6y9cseiLN4SKYMDvcJYcGPD5D102a2TWi251ua7DML7BAbCQTu3aFLjEDnVGWnAJDt39kRlZ+8cpD97+5uHyaVUMDtKmmb0lvixyn2obrOROEFRARDliM22LprJYNMM3f+4HWh89DuJWU5SPlExoUYsK1AtElGDImLwFqC7VdWevXHLxpyb11XbQVmTOuXa/xvNfuVhyPa/B+AanUJtGUGq028ln0mStHRhQQMWhe4q161f/aJ8ffO2Y4fJp1UD7zZsJjJn3KwBI7P8gcR2kiWtG644IyEKUdttip6NS8SgOmeFbzv8Rja3aX5sTXyJxj5ICZC2TyTKTIXg/rM3at7g59pqVSy6+OJRiOwdY7jOVg91uey2RTP5FlK5DUQlrDFPgtD3fnhRVqdKIKECOuvusHRn+TnzKS9/28C8ub4Tuy5ZXQlpUhgQgZKsbH2hYu4ZMNEMlDlVR+AXCMEyqs7ea5SoDHsWiWVG5bDmAc+bMP/m8OLPniwlmTxawxPHqaGT470/86bsbWh3a8g4Jf2vVUO68H7097pv5HTEmh9q4hzGWRMPyefFhSatSe26ULgwAJ/uwCBCvylYo123t+uGL3amvOZs61ods7SJCRiyV+NFyeeOst1z0F4rsoRI3JRmjJSGugGLOtuu/MDB5ojJQB/DH5M+my+t1hwArlRgYBMrkMuWfn9XsmXKJigDNhoDIhDWEbZDCygmTdqDT3c5QCAgmZHBjibI5E61Z+Ynm6Qd9AUNqtmcfqe0owIXU3w3QoQC0Pd1uFdh7Ty6httJxrcC3JlEtKleASkV2WPCLQwblAa8oky3fdHncN/1D2piQsHTDsKbTqXQNTpKINRnVpWvjUuCgXpDJMRO8GVn1nuZHDr46JBXy25PFbScQ5Nwd6pogUW5Nt0UI3gOgvbdUFWy1eN7SLGEn9KvvhM9PMfu98nvSPe0oVEcdCAbMlA5EtBVdHeURJJkXcbqwGlDxmusyrLrBjjx1QvPsw27GIrVYQG77NaKj7ttj/lnTqXf6Q2Dbr+I0mTMKsWWN6w/PWr1ibrJOjPCP2MmbZsgzrnyRmzZ7oRT6X4L6qAMZm27Cbe3go/ZWSEq2CbU26LJJdc1pV4/lRnVZbsPqY6vnHvmHdBL/TC6LW7QqlXh4yZfXqrrfg01oMAWzR+pjqGK3td2907ZgcJ+NgzCkBuUFLnvODw930/e+UzL5l6A66gCyaGXHTuugk6xEZ5MgtO/FaaHPmur4fb3LHzi4eu6Rf0DpmQM2yaeljUV492tKB4HB4JOKKBH3NKLM7EkG91mJrlKoFQfI23OvP73ZO/0mITMd9apHhwdr2we0tJc6p++tFZeiUHXo6rN2fP3P+v5+96EbLjjpiVBJPHPAJoOWFOEQ9wttVhUipuXqvQqzhYruOwngXX0k3dYiEUfn/eSrvn/m/6j3BN8MqbDl6KldcLf6czoJuKTGVIIRyvdYOzL8zfiM1x6z/rIzRlFSxsDADte6dpNtiDRcv+vPe9AhD8Dk9oNrSljBKJrsp37Rs6pfAwtc/kNfmHX9jJd+T7v6D9XqqIOqmbTaPFlyCmGAU6Oa5Mx0Qg6Cihe1GeYoY3hk5bnxJ464iErKwCDt7MMBeFLGm18yWLLEqcjPmE2oodIOhRcosN+2bccOGdbg8M+6+rWN3V5xl+R7D9VqUkPSFhYattw92jRt6RnCc0OiPBNQNSMr3+E+ccRFQSOT9SU7eUymWVJSQepDEtcUKiapITlsJsMLAaTr+nedfpUXuOhTC9/bnDLrNrGZfVAb8wA//dL8zrY12q1riHcodBkTN1bkNg6/Pv7MMde1Pdiuaalv7QFN2OOwT9/DJvea8GAmYRATxG3Q0XUvGL7virU73Z5O1rjNB+ydn7nxy9LVf7o264B42e7NH+led06+CsGhq9+a+sbf2ZUPvr3xlQ88nkbxrlSSze/m/EGDJXDkm9+AyR8QDCMI4pXJ9Gt3174A1qI4wIn73/GC+9Rv7n3nrNlX+67++aiOhRXaz2S3jCYpUjT0nPN91oytu27mk795z/AV5SqG1GCA3K6W380vcEnZA0o6uuE6bY4/lvTIhFQ9cwSj9mWhcJ+7Y8/0SAYf2XN+8IbmXs/7jc/3zkd1owNgtqhf2zrECcgQRTljRp8633/68HcMX1EObZ2dfCrC9oMGKIoVHr7viipc41xDhgjwpKokgIoesMP1I4XFfPbTP/p4s2fGL4TNnqiNb1u/nma1OaIcM7RmR1a/05eOPg+qDFV6Nh+fs2UqJK2elXd8+TppbPxqZAsRKaDScIDuD+CZ9fRLiywqA77nnRdO48GfV3zvjItUPOAS/7VDhzjkewy7+LHsyMoF8eePuwalRTYsOHt2n3bFT9PqCcOT2y/5sK9vuJiIIiZrCeYVsw/84PNDyirxdmRHRnmBy33smtdN7Puqu6XQ93+1NuaSTXW8A9GlADwV+i3XRm/LLf/r62qXvOu3z4bgP4PsucVsqnsfdPprYbKnEmcWaHPs/CfvuezKp100nCwSBgD7mRvOkmzPRcI2QlxP6scdoqOADVM2Bzux4fLXfvaYM5cArvN3PUdAAzoX3s2Zf3LON2xh+T1Xrd9Wd7Xwwct3r8983le10Hec1icAEdnxvaTiEOUtia/b2shH4guK/xu2MIZ99/gHHtufrZJFxE/bSOyIvMwnfniky0/5huS79kJtzEF3MDsmHh/5Hsv18Uey4xtOqn3xHfckdNyupuE/D7TNf0YnReK8QcIA+T2OPrWw+lVHXyDZ7o8qAMQNv+NirwIQId9DtrrxJ7l1D71//LIz1vwj9WtXgbbVI3vuwgVxvudSyXW/DLUx2WGxD4A52Kwl9WqaE59xn33LBZtG8z/r2Mmt10ooDZpM9YXP84WeM5tR4QPKFqilzcIdYmPoUxd6LdcnHotq697f+Pzxt4YNHYNA+Z8L2E6CpgQF+j64W8/4jJ4f+elz5mHdyhiIeYf3wat6GGsokzOmtvG63NqHTm/TkRyeI8fOP6mPSLMfu/b5cXf/VdrVN19rY2FaDZjtfq6HqgcRId/NVK+us42Jj8cXvPWq5wodd72mJcDtv//+0R+POu88jfIfk1x3DvWJUBcmnejJmbO9rA9MBtkCyDtwXL/Orll2buPyUx9LNvXrc/F53rsmEXT4uMw51+7nu/rOVDLHaZSbplDAuzD1TpuFbAATHuxEzWqTIL+KGqOXNi54x683NcbPxYN26bk6ntKS+/h393bZ/mOF+HAovVyZdlcyllSUoGtBZin5+HaeGL0xvuTE+wL4qdg/dx92DgD/H7hq6gD08AUxAAAAAElFTkSuQmCC'
-
-// ═══════════════════════════════════════════════════════════════════════
-// FUND RISK DATABASE — ajouter les fonds par compagnie ici
-// ═══════════════════════════════════════════════════════════════════════
-const FUND_RISK = {
-  // AG Insurance
-  'pension life': 0, 'ag life stability': 10, 'ag life income': 15,
-  'ag life balanced': 50, 'ag life growth': 75, 'ag life dynamic': 85,
-  'ag life equities': 90, 'top rendement': 5, 'capital branch 21': 0,
-  // Baloise
-  'r-valor fund': 85, 'megatrends fund': 80, 'infrastructure fund': 55,
-  'bgf world technology fund': 90, 'jpm global focus fund': 75,
-  'c-quadrat arts balanced fund': 50,
-  'bfi global equity select': 85, 'bfi megatrends select': 80,
-  'bfi multi asset select': 45, 'bfi positive impact select': 65,
-  'bfi real estate and infrastructure select': 55,
-  'compte branche 21': 0, 'compte branche 21 - 0%': 0,
-  'european bonds': 10, 'balanced': 50, 'growth': 75, 'equities': 90,
-  'branche 21': 0, 'branche 26': 0, 'invest 1': 30, 'invest 2': 50,
-  'invest 3': 70,
-  // NN
-  'nn life star fund': 70, 'nn life star fund - eur': 70,
-  'fng sustainable impact': 60, 'fng patrimonial balanced': 45,
-  'fng patrimonial defensive': 20, 'fng growth': 70,
-  'nn life strategy defensive': 15, 'nn life strategy balanced': 45,
-  'nn life strategy dynamic': 80, 'branche 21 nn': 0,
-  // AXA
-  'axa b pension stability': 10, 'axa b pension balanced': 45,
-  'axa b pension dynamic': 80, 'crest 21': 0, 'crest 26': 5,
-  'venture 1': 30, 'venture 2': 55, 'venture 3': 75,
-  // Allianz
-  'strategy balanced': 50, 'strategy dynamic': 80,
-  'strategy defensive': 15, 'allianz branche 21': 0,
-}
-
-// Les quatorze questions inventees et leur bareme ont ete retires le
-// 05/11/2026 : elles ne figuraient sur aucune fiche d'intermediation reelle.
-// Les vraies fiches vivent dans src/lib/fichesVie.js.
-
-// ═══════════════════════════════════════════════════════════════════════
-// MOTEUR DE PROFIL — basé sur les fonds d'investissement
-// ═══════════════════════════════════════════════════════════════════════
-
-function computeRiskScore(funds) {
-  let totalPct = 0, weightedRisk = 0
-  for (const [name, pct] of Object.entries(funds)) {
-    const key = name.toLowerCase().trim()
-    let risk = FUND_RISK[key]
-    if (risk === undefined) {
-      if (/branche\s*21|garanti|taux\s*garanti/i.test(key)) risk = 0
-      else if (/equity|equities|action|growth|dynamic|technolog/i.test(key)) risk = 80
-      else if (/balanced|mixte|multi\s*asset/i.test(key)) risk = 50
-      else if (/bond|obligation|defensive|stability|income/i.test(key)) risk = 15
-      else if (/infrastructure|real\s*estate|immobil/i.test(key)) risk = 55
-      else if (/impact|sustainable|esg/i.test(key)) risk = 60
-      else if (/megatrend|thematic/i.test(key)) risk = 75
-      else if (/star\s*fund/i.test(key)) risk = 70
-      else risk = 50
-    }
-    weightedRisk += risk * pct
-    totalPct += pct
-  }
-  return totalPct > 0 ? weightedRisk / totalPct : 50
-}
-
-function riskToProfile(score) {
-  if (score < 10) return 'Défensif'
-  if (score < 30) return 'Conservateur'
-  if (score < 55) return 'Neutre / Équilibré'
-  if (score < 75) return 'Dynamique'
-  return 'Offensif'
-}
 
 // ═══════════════════════════════════════════════════════════════════════
 // PURPOSE helper from type_production
@@ -671,7 +600,8 @@ export default function ToolQuestionnaire() {
 
     // Le niveau de risque vient de la composition reelle des fonds. Il sert a
     // PROPOSER des reponses — plus a forcer un profil decide d'avance.
-    const riskScore = computeRiskScore(funds)
+    const lecture = lectureComposition(funds)
+    const riskScore = lecture.score ?? 50
     const montant = Object.keys(funds).length ? null : null
 
     const propo = proposerReponses(FICHES[versionActive], {
@@ -1069,24 +999,16 @@ export default function ToolQuestionnaire() {
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     {Object.entries(funds).map(([name, pct]) => {
-                      // Compute the effective risk for this fund (same logic as computeRiskScore)
-                      const key = name.toLowerCase().trim()
-                      let riskVal = FUND_RISK[key]
-                      if (riskVal === undefined) {
-                        if (/branche\s*21|garanti|taux\s*garanti/i.test(key)) riskVal = 0
-                        else if (/equity|equities|action|growth|dynamic|technolog/i.test(key)) riskVal = 80
-                        else if (/balanced|mixte|multi\s*asset/i.test(key)) riskVal = 50
-                        else if (/bond|obligation|defensive|stability|income/i.test(key)) riskVal = 15
-                        else if (/infrastructure|real\s*estate|immobil/i.test(key)) riskVal = 55
-                        else if (/impact|sustainable|esg/i.test(key)) riskVal = 60
-                        else if (/megatrend|thematic/i.test(key)) riskVal = 75
-                        else if (/star\s*fund/i.test(key)) riskVal = 70
-                        else riskVal = 50
-                      }
-                      const fundProfile = riskToProfile(riskVal)
+                      // Le risque vient de src/lib/fondsRisque.js — un seul
+                      // endroit de verite, partage avec le calcul du profil.
+                      const { risque: riskVal, source } = risqueFonds(name)
+                      const fundProfile = source === 'branche23' ? 'Fonds a preciser'
+                        : riskVal == null ? 'Fonds non reconnu'
+                        : profilDepuisScore(riskVal)
                       const classColors = {
                         'Défensif': '#16a34a', 'Conservateur': '#22c55e',
                         'Neutre / Équilibré': '#f59e0b', 'Dynamique': '#ea580c', 'Offensif': '#dc2626',
+                        'Fonds a preciser': '#b45309', 'Fonds non reconnu': '#b45309',
                       }
                       return (
                         <div key={name} style={{
@@ -1101,7 +1023,7 @@ export default function ToolQuestionnaire() {
                               padding: '1px 6px', borderRadius: 4,
                               background: `${classColors[fundProfile] || '#64748b'}15`,
                             }}>
-                              {fundProfile} ({riskVal})
+                              {fundProfile}{riskVal != null ? ` (${riskVal})` : ''}
                             </span>
                           </span>
                         </div>
@@ -1109,16 +1031,67 @@ export default function ToolQuestionnaire() {
                     })}
                   </div>
 
-                  {/* Computed profile from funds */}
+                  {/* Ce que la composition permet de dire — y compris « rien » */}
                   {(() => {
-                    const rs = computeRiskScore(funds)
-                    const pr = riskToProfile(rs)
-                    const profileColors = {
-                      'Défensif': '#16a34a',
-                      'Conservateur': '#22c55e',
-                      'Neutre / Équilibré': '#f59e0b',
-                      'Dynamique': '#ea580c',
-                      'Offensif': '#dc2626',
+                    const l = lectureComposition(funds)
+                    const couleurs = {
+                      'Défensif': '#16a34a', 'Conservateur': '#22c55e',
+                      'Neutre / Équilibré': '#f59e0b', 'Dynamique': '#ea580c', 'Offensif': '#dc2626',
+                    }
+                    // 100 % a capital garanti : il n'y a pas de risque de
+                    // marche, donc pas de profil de risque a etablir. Mieux
+                    // vaut le dire que d'afficher « Neutre » par defaut.
+                    if (l.motif === 'capital_garanti') {
+                      return (
+                        <div style={{
+                          marginTop: 10, padding: '10px 14px', borderRadius: 8,
+                          background: '#f0fdf4', border: '1px solid #86efac',
+                        }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: '#15803d' }}>
+                            Capital garanti à 100 % — pas de profil de risque à établir
+                          </div>
+                          <div style={{ fontSize: 11.5, color: '#3f6212', marginTop: 3, lineHeight: 1.5 }}>
+                            La valeur du contrat n'est pas exposée aux fluctuations des marchés.
+                            Le bulletin financier (connaissances, situation financière, tolérance
+                            au risque) ne s'applique pas. L'analyse des exigences et besoins,
+                            elle, reste requise.
+                          </div>
+                        </div>
+                      )
+                    }
+                    if (l.motif === 'branche23_a_preciser') {
+                      return (
+                        <div style={{
+                          marginTop: 10, padding: '10px 14px', borderRadius: 8,
+                          background: '#fffaf0', border: '1px solid #f0c478',
+                        }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: '#b45309' }}>
+                            Quel fonds ? « {l.aPreciser.join(' , ')} » ne suffit pas
+                          </div>
+                          <div style={{ fontSize: 11.5, color: '#92400e', marginTop: 3, lineHeight: 1.5 }}>
+                            La branche 23 est une famille, pas un fonds : le risque va d'un fonds
+                            obligataire défensif à 100 % actions. Indiquez le nom du fonds pour
+                            que le profil veuille dire quelque chose.
+                          </div>
+                        </div>
+                      )
+                    }
+                    if (l.profil == null) {
+                      return (
+                        <div style={{
+                          marginTop: 10, padding: '10px 14px', borderRadius: 8,
+                          background: '#fffaf0', border: '1px solid #f0c478',
+                        }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: '#b45309' }}>
+                            Aucun fonds reconnu — pas de profil calculable
+                          </div>
+                          <div style={{ fontSize: 11.5, color: '#92400e', marginTop: 3, lineHeight: 1.5 }}>
+                            {l.inconnus.length ? `Non reconnu : ${l.inconnus.join(' , ')}.` : ''} Le
+                            profil se construit à partir des réponses du client, pas d'une valeur
+                            par défaut.
+                          </div>
+                        </div>
+                      )
                     }
                     return (
                       <div style={{
@@ -1126,12 +1099,18 @@ export default function ToolQuestionnaire() {
                         background: 'linear-gradient(135deg, #eff6ff 0%, #fff 100%)',
                         border: '1px solid #93c5fd',
                       }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: profileColors[pr] || '#475569' }}>
-                          Profil calculé : {pr}
+                        <div style={{ fontSize: 13, fontWeight: 700, color: couleurs[l.profil] || '#475569' }}>
+                          Orientation de la composition : {l.profil}
                         </div>
                         <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
-                          Score de risque pondéré : {Math.round(rs * 10) / 10} / 100
+                          Score de risque pondéré : {Math.round(l.score * 10) / 10} / 100
+                          {l.reconnuPct < l.totalPct && ` — sur ${Math.round(l.reconnuPct)} % de la composition seulement`}
                         </div>
+                        {l.inconnus.length > 0 && (
+                          <div style={{ fontSize: 11.5, color: '#b45309', marginTop: 4, lineHeight: 1.5 }}>
+                            Non reconnu, donc exclu du calcul : {l.inconnus.join(' , ')}.
+                          </div>
+                        )}
                       </div>
                     )
                   })()}
