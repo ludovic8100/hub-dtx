@@ -1,0 +1,81 @@
+name: Dossiers clients — inventaire
+
+# Compare les deux arborescences de dossiers clients avant toute fusion :
+#
+#   ADMINISTRATION/CLIENTS      ← destination retenue
+#   DYNASSUR/DATA_CLIENT        ← source a fusionner
+#
+# CE WORKFLOW N'ECRIT RIEN DANS SHAREPOINT. Le script qu'il lance ne contient
+# aucune fonction d'ecriture : ni PATCH, ni POST, ni DELETE. Il produit un CSV
+# telechargeable, qu'on relit avant qu'un seul dossier ne bouge.
+#
+# Ce qu'il repond : combien de dossiers de chaque cote, combien sont aux deux,
+# combien de FICHIERS seraient reellement ecrases par la fusion, et combien
+# n'existent que dans ADMINISTRATION — ceux-la seraient perdus si on ecrasait
+# au niveau du dossier au lieu du fichier.
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      fichiers:
+        description: "Descendre dans les dossiers pour compter les conflits (lent)"
+        type: boolean
+        default: true
+      target:
+        description: "Environnement cible (base Supabase, pour la liste des clients)"
+        type: choice
+        options: [test, production]
+        default: production
+
+concurrency:
+  group: clients-dossiers-inventaire
+  cancel-in-progress: false
+
+jobs:
+  inventorier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    environment: ${{ inputs.target }}
+    env:
+      APP_ENV: ${{ inputs.target }}
+      SUPABASE_URL: ${{ vars.SUPABASE_URL || (inputs.target == 'test' && 'https://lvdnzbhplnzuwdqtitdb.supabase.co' || '') }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      GRAPH_TENANT_ID: ${{ secrets.GRAPH_TENANT_ID }}
+      GRAPH_CLIENT_ID: ${{ secrets.GRAPH_CLIENT_ID }}
+      GRAPH_CLIENT_SECRET: ${{ secrets.GRAPH_CLIENT_SECRET }}
+      FICHIERS: ${{ inputs.fichiers && '1' || '0' }}
+      SORTIE: inventaire_dossiers.csv
+    steps:
+      # La production ne se lance que depuis main. Ralentisseur, pas serrure :
+      # la serrure est GitHub > Settings > Environments > production.
+      - name: Refuser la production depuis une branche
+        if: ${{ github.ref != 'refs/heads/main' && (inputs.target == 'production' || inputs.target == '') }}
+        run: |
+          echo "::error::Ce workflow vise la PRODUCTION mais tourne sur ${{ github.ref }}."
+          echo "::error::Fusionne dans main, ou relance avec target=test."
+          exit 1
+
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verifier les secrets
+        run: |
+          for s in GRAPH_TENANT_ID GRAPH_CLIENT_ID GRAPH_CLIENT_SECRET SUPABASE_SERVICE_KEY; do
+            if [ -z "${!s}" ]; then echo "::error::Secret $s manquant"; exit 1; fi
+          done
+
+      - name: Inventaire
+        working-directory: scripts
+        run: python clients_dossiers_inventaire.py
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: inventaire-dossiers-clients
+          path: scripts/inventaire_dossiers.csv
+          retention-days: 30
