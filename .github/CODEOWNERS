@@ -1,0 +1,25 @@
+# Qui doit relire quoi.
+#
+# Le depot est PUBLIC et plusieurs intervenants externes y travaillent. Le code
+# applicatif peut etre relu par n'importe qui ; les quatre dossiers ci-dessous,
+# non — ce sont ceux par lesquels on atteint les cles, la base et la production.
+#
+# Le danger n'est pas le code de l'ecran Comptabilite. C'est une Action ajoutee
+# discretement qui affiche SUPABASE_SERVICE_KEY dans son journal, ou une
+# migration qui ouvre une regle d'acces. Ces fichiers-la demandent une relecture.
+
+# Par defaut, personne n'est requis : le code applicatif se relit normalement.
+
+# Les traitements automatiques : ils portent les secrets de production.
+/.github/            @ludovic8100
+/scripts/            @ludovic8100
+
+# Les fonctions serveur : elles tiennent les cles et parlent au monde exterieur.
+/api/                @ludovic8100
+
+# Le schema et les regles d'acces de la base.
+/supabase/           @ludovic8100
+/sql/                @ludovic8100
+
+# Les regles du projet elles-memes.
+/CLAUDE.md           @ludovic8100
