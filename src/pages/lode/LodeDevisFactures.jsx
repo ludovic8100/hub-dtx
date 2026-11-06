@@ -109,10 +109,12 @@ function Editeur({ type, doc, onClose, onSaved }) {
     objet: '', notes: '', remise_pct: 0,
     date_devis: todayISO(), date_validite: addDays(todayISO(), 30),
     date_facture: todayISO(), date_echeance: addDays(todayISO(), DELAI_PAIEMENT_JOURS),
-    statut: 'brouillon', langue: 'fr', type: 'facture', responsable: '', total_projet_ttc: '', facture_origine_id: null, ...(doc || {}),
+    statut: 'brouillon', langue: 'fr', type: 'facture', responsable: '', total_projet_ttc: '', facture_origine_id: null, montant_paye: '', ...(doc || {}),
   })
   const [lignes, setLignes] = useState([{ titre: '', descriptif: '', description: '', quantite: 1, prix_unitaire: 0, remise_pct: 0, tva_pct: 21, tva_categorie: 'S', photos: [] }])
   const [afficherTVAC, setAfficherTVAC] = useState(false)
+  const [acomptePct, setAcomptePct] = useState('')
+  const [dejaFacture, setDejaFacture] = useState(0)   // sur le meme projet (devis)
   const [acomptesDispo, setAcomptesDispo] = useState([])
   const [acomptesSel, setAcomptesSel] = useState(doc?._preselAcomptes || [])
   const [acLignes, setAcLignes] = useState({})
@@ -260,6 +262,24 @@ function Editeur({ type, doc, onClose, onSaved }) {
     }
   }, [doc])
 
+  // Ce qui a DEJA ete facture sur le meme projet. Le projet, c'est le devis :
+  // c'est lui qui porte l'engagement initial. Sans devis lie, on ne peut pas
+  // le savoir, et on le dit plutot que de l'inventer.
+  useEffect(() => {
+    let vivant = true
+    if (isDevis || !f.devis_id) { setDejaFacture(0); return }
+    supabase.from('lode_factures').select('id,total_ttc')
+      .eq('devis_id', f.devis_id).neq('type', 'note_credit')
+      .then(({ data }) => {
+        if (!vivant) return
+        const somme = (data || [])
+          .filter(x => x.id !== doc?.id)
+          .reduce((a, x) => a + (Number(x.total_ttc) || 0), 0)
+        setDejaFacture(Math.round(somme * 100) / 100)
+      })
+    return () => { vivant = false }
+  }, [isDevis, f.devis_id, doc?.id])
+
   // Charge les acomptes du client a deduire (uniquement pour un SOLDE en creation)
   useEffect(() => {
     if (isDevis || f.type !== 'solde' || doc?.id || !f.client_id) { setAcomptesDispo([]); return }
@@ -343,6 +363,55 @@ function Editeur({ type, doc, onClose, onSaved }) {
 
   const tot = calcTotaux([...lignes, ...lignesDeduction], f.remise_pct)
   const totDeduction = lignesDeduction.length ? calcTotaux(lignesDeduction, 0).ttc : 0
+
+  // ── Acompte deja paye, et montant reellement du ────────────────────────
+  // Deduit du TTC, pas du HT : la TVA est due sur la totalite, l'acompte
+  // n'est qu'un paiement anticipe.
+  // LE POURCENTAGE S'APPLIQUE AU HT, TAUX PAR TAUX — jamais au TTC d'un bloc.
+  // Ainsi la TVA de l'acompte est exactement celle du projet : 30 % de
+  // 2 746,39 HTVA a 6 % donne 823,92 + 49,44 = 873,36. Calculer 30 % du TTC
+  // puis en deduire un HT donnerait une base imposable a plus de deux
+  // decimales, donc une TVA infalsifiable a l'euro pres.
+  const appliquerPourcentage = () => {
+    const pct = Number(acomptePct) || 0
+    if (pct <= 0 || pct > 100) { alert('Donne un pourcentage entre 0 et 100.'); return }
+    const groupes = {}
+    for (const l of lignes) {
+      if (l._deduction) continue
+      const ht = (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * (1 - (Number(l.remise_pct) || 0) / 100)
+      const taux = Number(l.tva_pct) || 0
+      const cat = l.tva_categorie || (taux > 0 ? 'S' : 'AE')
+      groupes[taux + '|' + cat] = (groupes[taux + '|' + cat] || 0) + ht
+    }
+    const articles = lignes.filter(l => !l._deduction).map(l => l.titre || l.description).filter(Boolean)
+    const nouvelles = Object.entries(groupes)
+      .filter(([, ht]) => Math.abs(ht) > 0.004)
+      .map(([k, ht]) => {
+        const [taux, cat] = k.split('|')
+        return {
+          titre: 'Acompte de ' + pct + ' % sur le projet',
+          // On garde la trace de ce qui a ete convenu : le client doit
+          // reconnaitre sa commande sur la facture d'acompte.
+          descriptif: articles.length ? ('Articles initialement convenus : ' + articles.join(', ')) : '',
+          description: 'Acompte de ' + pct + ' % sur le projet',
+          quantite: 1, prix_unitaire: Math.round(ht * pct) / 100,
+          remise_pct: 0, tva_pct: Number(taux), tva_categorie: cat, photos: [], optionnelle: false,
+        }
+      })
+    if (!nouvelles.length) { alert('Ajoute d\'abord les lignes du projet : le pourcentage se calcule dessus.'); return }
+    setLignes(nouvelles)
+    if (!f.objet) set('objet', 'Acompte de ' + pct + ' % sur le projet')
+  }
+
+  // « Il reste X a facturer sur ce projet ». On ne l'affiche que si on peut
+  // le calculer : sans total de projet, on ne devine pas.
+  const projetTTC = Number(f.total_projet_ttc) || 0
+  const resteAFacturer = projetTTC > 0
+    ? Math.round((projetTTC - dejaFacture - tot.ttc) * 100) / 100
+    : null
+
+  const acomptePaye = Math.max(0, Number(f.montant_paye) || 0)
+  const montantDu = Math.round((tot.ttc - acomptePaye) * 100) / 100
   const set = (k, v) => setF(p => ({ ...p, [k]: v }))
   const setLigne = (i, k, v) => setLignes(p => p.map((l, j) => j === i ? { ...l, [k]: v } : l))
   // Compresse/redimensionne une image avant upload (max 1400px, qualité 82%)
@@ -405,6 +474,11 @@ function Editeur({ type, doc, onClose, onSaved }) {
       }
       if (isDevis) { payload.date_devis = f.date_devis; payload.date_validite = f.date_validite }
       else { payload.date_facture = f.date_facture; payload.date_echeance = f.date_echeance; if (f.devis_id) payload.devis_id = f.devis_id }
+      // L'acompte DEJA PAYE se deduit APRES la TVA : ce n'est pas une ligne de
+      // facture, c'est un paiement deja recu. Verifie sur le document de
+      // reference : 2 746,39 HTVA + 164,78 de TVA = 2 911,17, moins 500 recus
+      // = 2 411,17 dus. En faire une ligne negative fausserait la TVA declaree.
+      if (!isDevis) payload.montant_paye = Number(f.montant_paye) || 0
       if (!isDevis) { payload.type = f.type || 'facture'; if (f.total_projet_ttc !== undefined && f.total_projet_ttc !== null && f.total_projet_ttc !== '') payload.total_projet_ttc = Number(f.total_projet_ttc); if (f.type === 'solde' && acomptesSel[0]) payload.facture_origine_id = acomptesSel[0]; else if (f.facture_origine_id) payload.facture_origine_id = f.facture_origine_id }
 
       if (docId) {
@@ -525,6 +599,25 @@ function Editeur({ type, doc, onClose, onSaved }) {
           </>}
         </div>
 
+        {/* ACOMPTE DÉJÀ PAYÉ — disponible sur toute facture, pas seulement
+            sur un solde. C'est le cas courant : le client a versé une somme
+            à la commande, elle se déduit du montant dû. */}
+        {!isDevis && (
+          <div style={{ display: 'grid', gridTemplateColumns: mobE ? '1fr' : '1fr 2fr', gap: 10, marginBottom: 16, alignItems: 'end' }}>
+            <div>
+              <label style={lbl}>Acompte déjà payé</label>
+              <input type="number" step="0.01" min="0" style={inp}
+                value={f.montant_paye === 0 ? '0' : (f.montant_paye || '')}
+                onChange={e => set('montant_paye', e.target.value)} placeholder="0,00" />
+            </div>
+            <div style={{ fontSize: 11.5, color: COUL.texteDoux, paddingBottom: 9, lineHeight: 1.5 }}>
+              Somme déjà reçue du client. Elle se déduit <strong>après la TVA</strong> et
+              donne le « Montant dû » — la TVA reste due sur la totalité.
+              {acomptePaye > 0 && <> Il restera <strong>{eur(montantDu)}</strong> à payer.</>}
+            </div>
+          </div>
+        )}
+
         {/* Type de facture + responsable */}
         <div style={{ display: 'grid', gridTemplateColumns: mobE ? '1fr' : (isDevis ? '1fr' : '1fr 1fr'), gap: 10, marginBottom: 16 }}>
           {!isDevis && (
@@ -553,7 +646,32 @@ function Editeur({ type, doc, onClose, onSaved }) {
             <div style={{ display: 'grid', gridTemplateColumns: mobE ? '1fr' : '1fr 1fr', gap: 10 }}>
               <div><label style={lbl}>Total projet TTC (pour mémoire)</label>
                 <input type="number" step="0.01" style={inp} value={f.total_projet_ttc || ''} onChange={e => set('total_projet_ttc', e.target.value)} placeholder="ex: 10000.00" /></div>
+              {f.type === 'acompte' && (
+                <div><label style={lbl}>Acompte en % du projet</label>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <input type="number" step="1" min="1" max="100" style={{ ...inp, flex: 1 }}
+                      value={acomptePct} onChange={e => setAcomptePct(e.target.value)} placeholder="ex: 30" />
+                    <button type="button" onClick={appliquerPourcentage}
+                      style={{ padding: '0 14px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 700,
+                               border: 'none', background: ORANGE, color: COUL.blanc, whiteSpace: 'nowrap' }}>
+                      Calculer
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
+            {f.type === 'acompte' && (
+              <div style={{ fontSize: 11.5, color: COUL.texteDoux, marginTop: 8, lineHeight: 1.5 }}>
+                Saisis d'abord les lignes du projet, puis le pourcentage : le calcul remplace
+                les lignes par l'acompte, <strong>taux de TVA par taux de TVA</strong>, et garde
+                la liste des articles convenus en descriptif.
+                {resteAFacturer !== null && (
+                  <div style={{ marginTop: 6, fontWeight: 700, color: ORANGE }}>
+                    Il reste {eur(resteAFacturer)} à facturer sur ce projet{dejaFacture > 0 ? ' (' + eur(dejaFacture) + ' déjà facturé)' : ''}.
+                  </div>
+                )}
+              </div>
+            )}
             {f.type === 'solde' && !doc?.id && (
               <div style={{ marginTop: 10 }}>
                 <div style={{ fontSize: 12, fontWeight: 800, color: ORANGE, marginBottom: 6 }}>Acomptes déjà facturés à déduire</div>
@@ -699,7 +817,10 @@ function Editeur({ type, doc, onClose, onSaved }) {
             {totDeduction < 0 && (
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '2px 0', color: COUL.alerte }}><span>Acomptes déduits</span><span>{eur(totDeduction)}</span></div>
             )}
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 800, color: ORANGE, padding: '8px 0', borderTop: '2px solid #f1f5f9', marginTop: 4 }}><span>Total TTC</span><span>{eur(tot.ttc)}</span></div>
+            {acomptePaye > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0', color: COUL.alerte }}><span>Acompte déjà payé</span><span>− {eur(acomptePaye)}</span></div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 800, color: ORANGE, padding: '8px 0', borderTop: '2px solid #f1f5f9', marginTop: 4 }}><span>{acomptePaye > 0 ? 'Montant dû' : 'Total TTC'}</span><span>{eur(acomptePaye > 0 ? montantDu : tot.ttc)}</span></div>
           </div>
         </div>
 
@@ -974,12 +1095,21 @@ async function exportPDF(type, doc, lignes, opts = {}) {
     d.setTextColor(...O); d.setFont(undefined, 'bold'); d.text(`${L.totalTVA} ${t}%`, labelX, y)
     d.setTextColor(...DARK); d.setFont(undefined, 'normal'); d.text(eurPDF(v), valX, y, { align: 'right' }); y += 6.5
   })
+  // Acompte deja recu : il apparait AVANT le total, et le total devient le
+  // montant reellement du. Un PDF qui reclame la somme entiere alors que le
+  // client a deja paye est pire qu'un PDF moche.
+  const dejaPaye = Math.max(0, Number(doc.montant_paye) || 0)
+  if (!isDevis && dejaPaye > 0) {
+    d.setTextColor(...O); d.setFont(undefined, 'bold'); d.text('Acompte déjà payé', labelX, y)
+    d.setTextColor(...DARK); d.setFont(undefined, 'normal')
+    d.text('- ' + eurPDF(dejaPaye), valX, y, { align: 'right' }); y += 6.5
+  }
   // Ligne séparatrice + Montant dû
   y += 1
   d.setDrawColor(...O); d.setLineWidth(0.4); d.line(labelX, y, valX, y); y += 7
   d.setFont(undefined, 'bold'); d.setFontSize(13); d.setTextColor(...O)
   d.text(isDevis ? L.totalTTC : (L.montantDu || L.totalTTC), labelX, y)
-  d.setTextColor(...DARK); d.text(eurPDF(tot.ttc), valX, y, { align: 'right' })
+  d.setTextColor(...DARK); d.text(eurPDF(tot.ttc - dejaPaye), valX, y, { align: 'right' })
 
   // ---- Options au choix (non comptées dans le total) ----
   if (lignesOptions.length) {
@@ -1218,7 +1348,10 @@ async function exportWord(type, doc, lignes) {
     new Paragraph({ spacing: { before: 200 }, alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${L.totalHT} : ${eurW(tot.ht)}`, size: 20 })] }),
     ...Object.entries(tot.parTaux).filter(([, v]) => v > 0).map(([tx, v]) =>
       new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `TVA ${tx}% : ${eurW(v)}`, size: 18, color: GREY })] })),
-    new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${isDevis ? L.totalTTC : L.montantDu} : ${eurW(tot.ttc)}`, bold: true, size: 26, color: O })] }),
+    ...((!isDevis && Number(doc.montant_paye) > 0)
+      ? [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `Acompte déjà payé : - ${eurW(Number(doc.montant_paye))}`, size: 20 })] })]
+      : []),
+    new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${isDevis ? L.totalTTC : L.montantDu} : ${eurW(tot.ttc - (isDevis ? 0 : (Number(doc.montant_paye) || 0)))}`, bold: true, size: 26, color: O })] }),
   ]
 
   // Options
@@ -1404,7 +1537,13 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
               <div style={{ minWidth: 220 }}>
                 <Row2 l="Sous-total HTVA" v={eur(doc.total_ht)} />
                 <Row2 l="TVA" v={eur(doc.total_tva)} />
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: `2px solid ${color}`, paddingTop: 6, marginTop: 4, fontWeight: 800, color }}><span>Montant</span><span>{eur(doc.total_ttc)}</span></div>
+                {/* L'acompte deja recu doit figurer sur le document ENVOYE AU
+                    CLIENT, pas seulement dans l'editeur : sinon on lui reclame
+                    une somme qu'il a deja versee. */}
+                {Number(doc.montant_paye) > 0 && (
+                  <Row2 l="Acompte déjà payé" v={'− ' + eur(Number(doc.montant_paye))} />
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: `2px solid ${color}`, paddingTop: 6, marginTop: 4, fontWeight: 800, color }}><span>{Number(doc.montant_paye) > 0 ? 'Montant dû' : 'Montant'}</span><span>{eur(Number(doc.total_ttc) - (Number(doc.montant_paye) || 0))}</span></div>
               </div>
             </div>
             {doc.notes && <><div style={{ fontSize: 9, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', marginTop: 18 }}>Notes &amp; commentaires</div><div style={{ color: COUL.texteMoyen }}>{doc.notes}</div></>}
