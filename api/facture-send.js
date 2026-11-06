@@ -6,12 +6,18 @@ import { SUPABASE_URL as SB_URL, SUPABASE_ANON_KEY as SB_KEY } from './_lib/env.
 import { redirigerEnTest } from './_lib/mail.js'
 
 const ENTITES = {
-  lode: { from: 'info@lode-group.be', cc: 'contact@lode-group.be', nom: 'LODE' },
-  dtx:  { from: 'info@dtx-group.be',  cc: null,                     nom: 'DTX' },
-  dyn:  { from: 'info@dynassur.be',   cc: null,                     nom: 'Dynassur' },
+  lode: { from: 'info@lode-group.be', cc: 'contact@lode-group.be', bcc: 'info@lode-group.be', nom: 'LODE' },
+  dtx:  { from: 'info@dtx-group.be',  cc: null, bcc: null,          nom: 'DTX' },
+  dyn:  { from: 'info@dynassur.be',   cc: null, bcc: null,          nom: 'Dynassur' },
 }
 
 const esc = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+// « a@x.be, b@y.be ; c@z.be » -> liste de destinataires Graph.
+// Une chaine vide donne une liste vide : l'appelant peut effacer le champ.
+const destinataires = (v) => String(v || '')
+  .split(/[,;]+/).map(x => x.trim()).filter(Boolean)
+  .map(address => ({ emailAddress: { address } }))
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'method' })
@@ -23,7 +29,7 @@ export default async function handler(req, res) {
     if (!u.ok) return res.status(401).json({ ok: false, error: 'invalid session' })
   } catch (e) { return res.status(401).json({ ok: false, error: 'auth failed' }) }
 
-  const { entite, client_email, cc, subject, body, numero, fileName, pdfBase64 } = req.body || {}
+  const { entite, client_email, cc, bcc, subject, body, numero, fileName, pdfBase64 } = req.body || {}
   if (!client_email || !numero || !pdfBase64) return res.status(400).json({ ok: false, error: 'champs manquants' })
 
   const E = ENTITES[entite] || ENTITES.lode
@@ -40,10 +46,13 @@ export default async function handler(req, res) {
     const tj = await tr.json()
     if (!tj.access_token) return res.status(500).json({ ok: false, error: 'token graph', detail: tj.error_description || tj.error })
 
+    const destinatairesTo = destinataires(client_email)
+    if (!destinatairesTo.length) return res.status(400).json({ ok: false, error: 'destinataire invalide' })
+
     const message = {
       subject: subject || `Facture ${E.nom} ${numero}`,
       body: { contentType: 'HTML', content: htmlBody },
-      toRecipients: [{ emailAddress: { address: client_email } }],
+      toRecipients: destinatairesTo,
       attachments: [{
         '@odata.type': '#microsoft.graph.fileAttachment',
         name: fileName || `Facture ${numero}.pdf`,
@@ -51,8 +60,12 @@ export default async function handler(req, res) {
         contentBytes: pdfBase64,
       }],
     }
-    const ccAddr = (cc && String(cc).trim()) ? String(cc).trim() : (cc === undefined ? E.cc : null)
-    if (ccAddr) message.ccRecipients = [{ emailAddress: { address: ccAddr } }]
+    // Champ absent du corps -> valeur par defaut de l'entite. Champ present
+    // mais vide -> l'utilisateur l'a efface, on n'ajoute rien.
+    const ccList  = destinataires(cc  === undefined ? E.cc  : cc)
+    const bccList = destinataires(bcc === undefined ? E.bcc : bcc)
+    if (ccList.length)  message.ccRecipients  = ccList
+    if (bccList.length) message.bccRecipients = bccList
 
     redirigerEnTest(message)  // en TEST : tout mail part vers MAIL_REDIRECT_TO
 

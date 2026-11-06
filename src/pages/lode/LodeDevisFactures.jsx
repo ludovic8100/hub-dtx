@@ -116,7 +116,11 @@ function Editeur({ type, doc, onClose, onSaved }) {
     statut: 'brouillon', langue: 'fr', type: 'facture', responsable: '', total_projet_ttc: '', facture_origine_id: null, montant_paye: '', ...(doc || {}),
   })
   const [lignes, setLignes] = useState([{ titre: '', descriptif: '', description: '', quantite: 1, prix_unitaire: 0, remise_pct: 0, tva_pct: 21, tva_categorie: 'S', photos: [] }])
-  const [afficherTVAC, setAfficherTVAC] = useState(false)
+  const [vue, setVue] = useState('editeur')        // 'editeur' | 'pdf'
+  const [pdfUrl, setPdfUrl] = useState(null)
+  const [pdfErr, setPdfErr] = useState('')
+  const [articleOuvert, setArticleOuvert] = useState(null)  // index de la ligne en cours d'edition
+  const [clientOuvert, setClientOuvert] = useState(false)
   const [acomptePct, setAcomptePct] = useState('')
   const [dejaFacture, setDejaFacture] = useState(0)   // sur le meme projet (devis)
   const [acomptesDispo, setAcomptesDispo] = useState([])
@@ -533,336 +537,692 @@ function Editeur({ type, doc, onClose, onSaved }) {
     } finally { setSaving(false) }
   }
 
+  // Une colonne « remise » qui ne sert a rien encombre le document : on ne
+  // l'affiche que si au moins un article porte une remise.
+  const hasRemiseDoc = lignes.some(l => Number(l.remise_pct) > 0)
+  const soldeProjet = estAcompte ? Math.round(((totProjet?.ttc || 0) - (tot.ttc - acomptePaye)) * 100) / 100 : 0
+
+  // Apercu PDF : on genere le vrai document, pas une imitation. Un apercu qui
+  // ment ne sert a rien ; celui-ci sort de la meme fonction que l'envoi.
+  useEffect(() => {
+    if (vue !== 'pdf') return
+    let annule = false
+    let urlLocale = null
+    setPdfUrl(null); setPdfErr('')
+    ;(async () => {
+      try {
+        const b64 = await exportPDF(type, { ...f, numero: f.numero || 'BROUILLON', total_ttc: tot.ttc }, lignes, { save: false })
+        if (annule) return
+        const bin = atob(b64)
+        const buf = new Uint8Array(bin.length)
+        for (let k = 0; k < bin.length; k++) buf[k] = bin.charCodeAt(k)
+        urlLocale = URL.createObjectURL(new Blob([buf], { type: 'application/pdf' }))
+        setPdfUrl(urlLocale)
+      } catch (e) {
+        // Un script CDN qui ne charge pas rejette avec un Event, pas une Error :
+        // sans ce garde-fou l'utilisateur lit « Aperçu impossible : undefined ».
+        const motif = (e && e.message) ? e.message
+          : (e instanceof Event ? 'jsPDF n’a pas pu être chargé (connexion ?)' : String(e))
+        if (!annule) setPdfErr('Aperçu impossible — ' + motif)
+      }
+    })()
+    return () => { annule = true; if (urlLocale) URL.revokeObjectURL(urlLocale) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vue])
+
+
   const inp = { padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' }
   const lbl = { fontSize: 11, fontWeight: 700, color: COUL.texteDoux, marginBottom: 3, display: 'block' }
 
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: mobE ? 8 : 20, overflowY: 'auto' }}>
-      <div style={{ background: COUL.blanc, borderRadius: 14, maxWidth: 880, width: '100%', padding: mobE ? 16 : 24, fontFamily: "'Source Sans Pro', sans-serif" }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-          <h2 style={{ fontSize: 18, fontWeight: 800, color: NAVY, margin: 0 }}>
-            {doc?.id ? 'Modifier' : 'Nouveau'} {isDevis ? 'devis' : 'facture'} {doc?.numero ? `· ${doc.numero}` : ''}
-          </h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: COUL.texteFaible }}>×</button>
-        </div>
+  // ── Styles du document ───────────────────────────────────────────────
+  // Un champ du document ne ressemble pas a un champ de formulaire : il
+  // ressemble au texte imprime, et ne se revele qu'au survol. C'est toute la
+  // difference entre « remplir un formulaire » et « ecrire son document ».
+  const champDoc = {
+    border: '1px solid transparent', background: 'transparent', borderRadius: 5,
+    padding: '2px 5px', margin: '-2px -5px', fontFamily: 'inherit', fontSize: 'inherit',
+    fontWeight: 'inherit', color: 'inherit', width: '100%', boxSizing: 'border-box',
+    outline: 'none', transition: 'background .12s, border-color .12s',
+  }
+  const surDoc = {
+    onFocus: e => { e.target.style.background = COUL.blanc; e.target.style.borderColor = ORANGE },
+    onBlur: e => { e.target.style.background = 'transparent'; e.target.style.borderColor = 'transparent' },
+    onMouseEnter: e => { if (document.activeElement !== e.target) e.target.style.background = COUL.fondDoux },
+    onMouseLeave: e => { if (document.activeElement !== e.target) e.target.style.background = 'transparent' },
+  }
+  const thDoc = { padding: '7px 8px', fontSize: 11, fontWeight: 800, color: COUL.blanc, textAlign: 'left', whiteSpace: 'nowrap' }
+  const tdDoc = { padding: '9px 8px', fontSize: 12.5, verticalAlign: 'top', borderBottom: '1px solid #f1f5f9' }
 
-        {verrouille && (
-          <div style={{ background: COUL.dangerFondDoux, border: '1px solid #fecaca', color: COUL.dangerFonce, borderRadius: 10, padding: '10px 14px', marginBottom: 14, fontSize: 13, fontWeight: 600 }}>
-            🔒 Facture déjà émise — lecture seule. Une facture émise ne peut jamais être modifiée ni supprimée : pour la corriger, créez une note de crédit.
+  // Une ligne du tableau du document. Le clic ouvre la modale d'article :
+  // c'est la seule facon d'avoir un document lisible ET tous les reglages.
+  const RangeeDoc = ({ l, idx, cliquable }) => {
+    const ht = (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * (1 - (Number(l.remise_pct) || 0) / 100)
+    return (
+      <tr
+        onClick={cliquable ? () => setArticleOuvert(idx) : undefined}
+        style={{ cursor: cliquable ? 'pointer' : 'default', background: l.optionnelle ? COUL.alerteFondDoux : 'transparent' }}
+        onMouseEnter={e => { if (cliquable) e.currentTarget.style.background = COUL.orangeFond }}
+        onMouseLeave={e => { if (cliquable) e.currentTarget.style.background = l.optionnelle ? COUL.alerteFondDoux : 'transparent' }}
+      >
+        <td style={tdDoc}>
+          <div style={{ fontWeight: 700, color: NAVY }}>
+            {l.titre || l.description || <span style={{ color: COUL.texteFaible, fontWeight: 500 }}>Article sans nom</span>}
+            {l.optionnelle && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 800, color: COUL.alerte }}>OPTION</span>}
           </div>
-        )}
-
-        {/* Client */}
-        <div style={{ fontSize: 13, fontWeight: 800, color: ORANGE, marginBottom: 8 }}>Client</div>
-        <div style={{ marginBottom: 10, position: 'relative' }}>
-          <label style={lbl}>Rechercher un client encodé (nom, prénom, dossier, ville, email, TVA…)</label>
-          <input style={inp} value={clientQuery} placeholder="Tapez au moins 2 caractères — ou saisie manuelle ci-dessous" onChange={e => setClientQuery(e.target.value)} />
-          {clientQuery.trim().length >= 2 && (
-            <div style={{ position: 'absolute', zIndex: 20, left: 0, right: 0, background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 8, marginTop: 4, maxHeight: 280, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,.12)' }}>
-              {searching && <div style={{ padding: 10, fontSize: 13, color: COUL.texteDoux }}>Recherche…</div>}
-              {!searching && clientResults.length === 0 && <div style={{ padding: 10, fontSize: 13, color: COUL.texteDoux }}>Aucun client trouvé</div>}
-              {clientResults.map(c => {
-                const L = labelClient(c)
-                return (
-                  <div key={c.id} onClick={() => choisirClient(c)} style={{ padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = COUL.fond} onMouseLeave={e => e.currentTarget.style.background = COUL.blanc}>
-                    <div style={{ fontSize: 13, fontWeight: 700 }}>{L.icon} {L.nom}</div>
-                    {L.sub && <div style={{ fontSize: 11, color: COUL.texteDoux }}>{L.sub}</div>}
-                  </div>
-                )
-              })}
-            </div>
+          {l.descriptif && <div style={{ fontSize: 11.5, color: COUL.texteDoux, marginTop: 2, whiteSpace: 'pre-wrap' }}>{l.descriptif}</div>}
+          {!!(l.photos || []).length && <div style={{ fontSize: 10.5, color: COUL.texteFaible, marginTop: 3 }}>📷 {l.photos.length} photo(s)</div>}
+        </td>
+        <td style={{ ...tdDoc, textAlign: 'right', whiteSpace: 'nowrap' }}>{eur(l.prix_unitaire)}</td>
+        <td style={{ ...tdDoc, textAlign: 'center', whiteSpace: 'nowrap' }}>{Number(l.tva_pct) || 0}%</td>
+        {hasRemiseDoc && <td style={{ ...tdDoc, textAlign: 'center' }}>{Number(l.remise_pct) ? `−${l.remise_pct}%` : ''}</td>}
+        <td style={{ ...tdDoc, textAlign: 'center' }}>{l.quantite}</td>
+        <td style={{ ...tdDoc, textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>{eur(ht)}</td>
+        <td style={{ ...tdDoc, width: 22, textAlign: 'center' }}>
+          {cliquable && (
+            <span onClick={e => { e.stopPropagation(); delLigne(idx) }} title="Supprimer" style={{ color: COUL.texteFaible, cursor: 'pointer', fontSize: 15 }}>×</span>
           )}
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: mobE ? '1fr' : '2fr 1fr', gap: 10, marginBottom: 8 }}>
-          <div><label style={lbl}>Nom / société *</label><input style={inp} value={f.client_nom} onChange={e => set('client_nom', e.target.value)} /></div>
-          <div><label style={lbl}>N° TVA</label><input style={inp} value={f.client_tva} onChange={e => set('client_tva', e.target.value)} /></div>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: mobE ? '1fr' : '2fr 1fr 1fr', gap: 10, marginBottom: 8 }}>
-          <div><label style={lbl}>Adresse</label><input style={inp} value={f.client_adresse} onChange={e => set('client_adresse', e.target.value)} /></div>
-          <div><label style={lbl}>Code postal</label><input style={inp} value={f.client_cp} onChange={e => set('client_cp', e.target.value)} /></div>
-          <div><label style={lbl}>Ville</label><input style={inp} value={f.client_ville} onChange={e => set('client_ville', e.target.value)} /></div>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: mobE ? '1fr' : '1fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
-          <div><label style={lbl}>Email</label><input style={inp} value={f.client_email} onChange={e => set('client_email', e.target.value)} /></div>
-          <div><label style={lbl}>Téléphone</label><input style={inp} value={f.client_telephone} onChange={e => set('client_telephone', e.target.value)} /></div>
-          <div><label style={lbl}>Pays</label><input style={inp} value={f.client_pays || ''} onChange={e => set('client_pays', e.target.value)} /></div>
+        </td>
+      </tr>
+    )
+  }
+
+  const EnteteDoc = () => (
+    <thead>
+      <tr style={{ background: ORANGE }}>
+        <th style={thDoc}>Description</th>
+        <th style={{ ...thDoc, textAlign: 'right' }}>P.U. HTVA</th>
+        <th style={{ ...thDoc, textAlign: 'center' }}>TVA</th>
+        {hasRemiseDoc && <th style={{ ...thDoc, textAlign: 'center' }}>Rem.</th>}
+        <th style={{ ...thDoc, textAlign: 'center' }}>Qté</th>
+        <th style={{ ...thDoc, textAlign: 'right' }}>Total HTVA</th>
+        <th style={{ ...thDoc, width: 22 }}></th>
+      </tr>
+    </thead>
+  )
+
+  const LigneTotal = ({ label, valeur, fort, couleur }) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 24, padding: fort ? '9px 0 0' : '3px 0', fontSize: fort ? 16 : 12.5, fontWeight: fort ? 800 : 500, color: couleur || (fort ? ORANGE : COUL.texteDoux), borderTop: fort ? `2px solid ${COUL.bord}` : 'none', marginTop: fort ? 6 : 0 }}>
+      <span>{label}</span><span style={{ color: fort ? NAVY : 'inherit' }}>{valeur}</span>
+    </div>
+  )
+
+  const blocPanneau = { borderBottom: `1px solid ${COUL.bord}`, padding: '16px 18px' }
+  const titrePanneau = { fontSize: 11, fontWeight: 800, color: COUL.texteFaible, letterSpacing: .6, textTransform: 'uppercase', marginBottom: 10 }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: COUL.fond, zIndex: 1000, display: 'flex', flexDirection: 'column', fontFamily: "'Source Sans Pro', sans-serif" }}>
+
+      {/* ── Barre du haut : identite du document, bascule, actions ── */}
+      <div style={{ background: COUL.blanc, borderBottom: `1px solid ${COUL.bord}`, padding: mobE ? '10px 12px' : '11px 20px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+        <button onClick={onClose} title="Fermer" style={{ background: 'none', border: 'none', fontSize: 19, cursor: 'pointer', color: COUL.texteDoux, padding: 0, lineHeight: 1 }}>←</button>
+        <div style={{ fontSize: 15, fontWeight: 800, color: NAVY }}>
+          {doc?.id ? 'Modifier' : 'Créer'} {isDevis ? 'un devis' : (f.type === 'note_credit' ? 'une note de crédit' : 'une facture')}
+          {f.numero && <span style={{ color: ORANGE, marginLeft: 8 }}>{f.numero}</span>}
         </div>
 
-        {/* Création / liaison du client en base */}
-        <div style={{ marginBottom: 16 }}>
-          {f.client_id ? (
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', borderRadius: 8, padding: '6px 12px', fontSize: 13, fontWeight: 700 }}>
-              ✓ Client encodé — lié à la base
-              <button onClick={() => set('client_id', null)} title="Détacher pour ressaisir un autre client" style={{ background: 'none', border: 'none', color: '#047857', cursor: 'pointer', fontSize: 12, textDecoration: 'underline', padding: 0 }}>détacher</button>
+        <div style={{ display: 'flex', background: COUL.fondDoux, borderRadius: 9, padding: 3, marginLeft: mobE ? 0 : 'auto', marginRight: mobE ? 0 : 'auto' }}>
+          {[['editeur', 'Éditeur'], ['pdf', 'PDF']].map(([v, lab]) => (
+            <button key={v} type="button" onClick={() => setVue(v)}
+              style={{ padding: '6px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700,
+                       background: vue === v ? COUL.blanc : 'transparent', color: vue === v ? NAVY : COUL.texteDoux,
+                       boxShadow: vue === v ? '0 1px 3px rgba(0,0,0,.12)' : 'none' }}>{lab}</button>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
+          <button onClick={onClose} style={{ background: COUL.blanc, border: `1px solid ${COUL.bord}`, borderRadius: 9, padding: '8px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: COUL.texteMoyen }}>Annuler</button>
+          <button onClick={save} disabled={saving || verrouille} style={{ background: verrouille ? COUL.bordFort : ORANGE, border: 'none', borderRadius: 9, padding: '8px 20px', cursor: (saving || verrouille) ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700, color: COUL.blanc }}>
+            {verrouille ? '🔒 Verrouillée' : (saving ? 'Enregistrement…' : 'Enregistrer')}
+          </button>
+        </div>
+      </div>
+
+      {verrouille && (
+        <div style={{ background: COUL.dangerFondDoux, borderBottom: `1px solid ${COUL.dangerBord}`, color: COUL.dangerFonce, padding: '9px 20px', fontSize: 12.5, fontWeight: 600 }}>
+          🔒 Facture déjà émise — lecture seule. Une facture émise ne peut jamais être modifiée ni supprimée : pour la corriger, créez une note de crédit.
+        </div>
+      )}
+
+      <div style={{ flex: 1, display: 'flex', minHeight: 0, flexDirection: mobE ? 'column' : 'row' }}>
+
+        {/* ══════════ LE DOCUMENT ══════════ */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: mobE ? 12 : '26px 20px', minWidth: 0 }}>
+          {vue === 'pdf' ? (
+            <div style={{ maxWidth: 860, margin: '0 auto' }}>
+              {pdfUrl ? <>
+                <iframe title="Aperçu PDF" src={pdfUrl} style={{ width: '100%', height: '78vh', border: `1px solid ${COUL.bord}`, borderRadius: 10, background: COUL.blanc }} />
+                {/* Repli : certains navigateurs refusent d'afficher un PDF dans
+                    un cadre. L'apercu serait alors blanc, sans rien pour s'en sortir. */}
+                <div style={{ textAlign: 'center', marginTop: 8 }}>
+                  <a href={pdfUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12.5, fontWeight: 700, color: ORANGE }}>
+                    Cadre vide ? Ouvrir le PDF dans un onglet
+                  </a>
+                </div>
+              </> : <div style={{ padding: 40, textAlign: 'center', color: COUL.texteDoux, fontSize: 14 }}>{pdfErr || 'Génération de l’aperçu…'}</div>}
             </div>
           ) : (
-            <button onClick={creerClient} disabled={creatingClient || !f.client_nom.trim()}
-              style={{ background: f.client_nom.trim() ? ORANGE : COUL.bordFort, color: COUL.blanc, border: 'none', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 700, cursor: (f.client_nom.trim() && !creatingClient) ? 'pointer' : 'not-allowed' }}>
-              {creatingClient ? 'Création…' : '➕ Créer ce client dans la base'}
-            </button>
-          )}
-          <div style={{ fontSize: 11, color: COUL.texteFaible, marginTop: 5 }}>
-            {f.client_id
-              ? 'Ce client est enregistré dans ta base — réutilisable pour tes prochains devis et factures.'
-              : 'Client pas encore encodé. Crée-le pour le retrouver ensuite via la recherche.'}
-          </div>
-        </div>
+          <div style={{ maxWidth: 860, margin: '0 auto', background: COUL.blanc, borderRadius: 12, boxShadow: '0 1px 3px rgba(15,23,42,.08), 0 8px 28px rgba(15,23,42,.06)', padding: mobE ? 18 : 38 }}>
 
-        {/* Objet + dates */}
-        <div style={{ display: 'grid', gridTemplateColumns: mobE ? '1fr' : '2fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
-          <div><label style={lbl}>Objet</label><input style={inp} value={f.objet} onChange={e => set('objet', e.target.value)} placeholder="ex: Installation porte sectionnelle" /></div>
-          {isDevis ? <>
-            <div><label style={lbl}>Date devis</label><input type="date" style={inp} value={f.date_devis} onChange={e => set('date_devis', e.target.value)} /></div>
-            <div><label style={lbl}>Validité jusqu'au</label><input type="date" style={inp} value={f.date_validite} onChange={e => set('date_validite', e.target.value)} /></div>
-          </> : <>
-            <div><label style={lbl}>Date facture</label><input type="date" style={inp} value={f.date_facture} onChange={e => set('date_facture', e.target.value)} /></div>
-            <div><label style={lbl}>Échéance</label><input type="date" style={inp} value={f.date_echeance} onChange={e => set('date_echeance', e.target.value)} /></div>
-          </>}
-        </div>
-
-        {/* ACOMPTE DÉJÀ PAYÉ — disponible sur toute facture, pas seulement
-            sur un solde. C'est le cas courant : le client a versé une somme
-            à la commande, elle se déduit du montant dû. */}
-        {!isDevis && (
-          <div style={{ display: 'grid', gridTemplateColumns: mobE ? '1fr' : '1fr 2fr', gap: 10, marginBottom: 16, alignItems: 'end' }}>
-            <div>
-              <label style={lbl}>Acompte déjà payé</label>
-              <input type="number" step="0.01" min="0" style={inp}
-                value={f.montant_paye === 0 ? '0' : (f.montant_paye || '')}
-                onChange={e => set('montant_paye', e.target.value)} placeholder="0,00" />
-            </div>
-            <div style={{ fontSize: 11.5, color: COUL.texteDoux, paddingBottom: 9, lineHeight: 1.5 }}>
-              Somme déjà reçue du client. Elle se déduit <strong>après la TVA</strong> et
-              donne le « Montant dû » — la TVA reste due sur la totalité.
-              {acomptePaye > 0 && <> Il restera <strong>{eur(montantDu)}</strong> à payer.</>}
-            </div>
-          </div>
-        )}
-
-        {/* Type de facture + responsable */}
-        <div style={{ display: 'grid', gridTemplateColumns: mobE ? '1fr' : (isDevis ? '1fr' : '1fr 1fr'), gap: 10, marginBottom: 16 }}>
-          {!isDevis && (
-            <div><label style={lbl}>Type de facture</label>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {[['facture', 'Facture'], ['acompte', 'Acompte'], ['solde', 'Solde'], ['note_credit', 'Note de crédit']].map(([v, lab]) => {
-                  const on = (f.type || 'facture') === v
-                  return (<button key={v} type="button" onClick={() => set('type', v)} style={{ flex: mobE ? '1 1 45%' : 1, padding: '9px 10px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 700, border: on ? '1.5px solid #ea580c' : '1.5px solid #e2e8f0', background: on ? '#fff7ed' : COUL.blanc, color: on ? '#ea580c' : COUL.texteDoux, transition: 'all .12s' }}>{lab}</button>)
-                })}
+            {/* Titre + dates */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 20, flexWrap: 'wrap', marginBottom: 26 }}>
+              <div style={{ fontSize: mobE ? 22 : 27, fontWeight: 800, color: ORANGE, letterSpacing: -.5 }}>
+                {isDevis ? 'DEVIS' : (f.type === 'note_credit' ? 'NOTE DE CRÉDIT' : 'FACTURE')}
+                <span style={{ marginLeft: 10, color: f.numero ? NAVY : COUL.texteFaible, fontWeight: 700 }}>{f.numero || 'n° à l’enregistrement'}</span>
+              </div>
+              <div style={{ minWidth: 212, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                {(isDevis
+                  ? [['Date', 'date_devis'], ['Valable jusqu’au', 'date_validite']]
+                  : [['Date', 'date_facture'], ['Échéance', 'date_echeance']]
+                ).map(([lab, k]) => (
+                  <div key={k} style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 11, color: COUL.texteFaible, fontWeight: 700, textTransform: 'uppercase', letterSpacing: .4 }}>{lab}</span>
+                    <input type="date" value={f[k] || ''} onChange={e => set(k, e.target.value)} {...surDoc}
+                      style={{ ...champDoc, width: 142, fontSize: 13, fontWeight: 600, color: NAVY, textAlign: 'right' }} />
+                  </div>
+                ))}
               </div>
             </div>
-          )}
-          <div><label style={lbl}>Responsable</label>
-            <select style={inp} value={f.responsable || ''} onChange={e => set('responsable', e.target.value)}>
-              <option value="">—</option>
-              <option value="LDE">LDE — Ludovic Detilloux</option>
-              <option value="JCL">JCL — Jean-Charles Lorange</option>
-              <option value="LLO">LLO — Ludivine Lorange</option>
-            </select>
-          </div>
-        </div>
 
-        {/* Acompte / Solde : total projet + deduction des acomptes */}
-        {!isDevis && (f.type === 'acompte' || f.type === 'solde') && (
-          <div style={{ border: '1px solid #fed7aa', background: COUL.orangeFond, borderRadius: 10, padding: 12, marginBottom: 14 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: mobE ? '1fr' : '1fr 1fr', gap: 10 }}>
-              <div><label style={lbl}>Total projet TTC (pour mémoire)</label>
-                <input type="number" step="0.01" style={inp} value={f.total_projet_ttc || ''} onChange={e => set('total_projet_ttc', e.target.value)} placeholder="ex: 10000.00" /></div>
-              {f.type === 'acompte' && (
-                <div><label style={lbl}>Acompte en % du projet</label>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <input type="number" step="1" min="1" max="100" style={{ ...inp, flex: 1 }}
-                      value={acomptePct} onChange={e => setAcomptePct(e.target.value)} placeholder="ex: 30" />
-                    <button type="button" onClick={appliquerPourcentage}
-                      style={{ padding: '0 14px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 700,
-                               border: 'none', background: ORANGE, color: COUL.blanc, whiteSpace: 'nowrap' }}>
-                      Calculer
-                    </button>
+            {/* De / À */}
+            <div style={{ display: 'grid', gridTemplateColumns: mobE ? '1fr' : '1fr 1fr', gap: 18, background: COUL.fond, borderRadius: 10, padding: 16, marginBottom: 22 }}>
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 800, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: .5, marginBottom: 6 }}>De</div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: ORANGE }}>{LODE.raison_sociale}</div>
+                <div style={{ fontSize: 12, color: COUL.texteMoyen, lineHeight: 1.55 }}>
+                  {LODE.adresse}<br />{LODE.cp} {LODE.ville}<br />TVA {LODE.tva}
+                </div>
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                  <span style={{ fontSize: 10.5, fontWeight: 800, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: .5 }}>À</span>
+                  <button type="button" onClick={() => setClientOuvert(true)}
+                    style={{ background: 'none', border: 'none', color: ORANGE, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, padding: 0, textDecoration: 'underline' }}>
+                    {f.client_nom ? 'modifier' : 'choisir un client'}
+                  </button>
+                  {f.client_id && <span title="Client lié à la base" style={{ fontSize: 11, color: COUL.succesFonce, fontWeight: 700 }}>✓ lié</span>}
+                </div>
+                {f.client_nom ? (
+                  <div onClick={() => setClientOuvert(true)} style={{ cursor: 'pointer' }}>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: NAVY }}>{f.client_nom}</div>
+                    <div style={{ fontSize: 12, color: COUL.texteMoyen, lineHeight: 1.55 }}>
+                      {f.client_adresse && <>{f.client_adresse}<br /></>}
+                      {(f.client_cp || f.client_ville) && <>{f.client_cp} {f.client_ville}<br /></>}
+                      {f.client_tva && <>TVA {f.client_tva}<br /></>}
+                      {f.client_email && <span style={{ color: COUL.texteFaible }}>{f.client_email}</span>}
+                    </div>
+                  </div>
+                ) : (
+                  <div onClick={() => setClientOuvert(true)} style={{ cursor: 'pointer', fontSize: 13, color: COUL.texteFaible, fontStyle: 'italic' }}>Aucun client — cliquez pour en choisir un</div>
+                )}
+              </div>
+            </div>
+
+            {/* Objet */}
+            <div style={{ marginBottom: 20 }}>
+              <span style={{ fontSize: 13, fontWeight: 800, color: NAVY }}>Objet : </span>
+              <input value={f.objet || ''} onChange={e => set('objet', e.target.value)} {...surDoc}
+                placeholder="ex : Installation porte sectionnelle"
+                style={{ ...champDoc, width: 'auto', minWidth: 300, fontSize: 13, fontWeight: 700, color: NAVY }} />
+            </div>
+
+            {/* ── Tableau 1 : le projet (facture d'acompte seulement) ── */}
+            {estAcompte && (
+              <div style={{ marginBottom: 26 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 800, color: ORANGE }}>Répartition du projet</div>
+                <div style={{ fontSize: 11.5, color: COUL.texteDoux, marginBottom: 8 }}>Articles initialement convenus — rappelés au client, non facturés ici</div>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <EnteteDoc />
+                  <tbody>{lignes.map((l, i) => l.bloc === 'projet' ? <RangeeDoc key={i} l={l} idx={i} cliquable={!verrouille} /> : null)}</tbody>
+                </table>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                  <div style={{ minWidth: 260 }}>
+                    <LigneTotal label="Total du projet (hors TVA)" valeur={eur(totProjet?.ht)} />
+                    <LigneTotal label="Total du projet (TVA incl.)" valeur={eur(totProjet?.ttc)} />
                   </div>
                 </div>
-              )}
+              </div>
+            )}
+
+            {/* ── Tableau 2 : ce qu'on facture ── */}
+            {estAcompte && <div style={{ fontSize: 13.5, fontWeight: 800, color: ORANGE, marginBottom: 8 }}>À payer avec cette facture</div>}
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <EnteteDoc />
+              <tbody>
+                {lignes.map((l, i) => l.bloc === 'projet' ? null : <RangeeDoc key={i} l={l} idx={i} cliquable={!verrouille} />)}
+                {!lignesFacture.length && (
+                  <tr><td colSpan={hasRemiseDoc ? 7 : 6} style={{ ...tdDoc, color: COUL.texteFaible, fontStyle: 'italic', textAlign: 'center', padding: 18 }}>Aucun article</td></tr>
+                )}
+              </tbody>
+            </table>
+
+            {!verrouille && (
+              <button onClick={() => { addLigne(); setArticleOuvert(lignes.length) }}
+                style={{ width: '100%', marginTop: 10, background: COUL.blanc, border: `1px dashed ${COUL.bordFort}`, borderRadius: 9, padding: '11px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: ORANGE }}>
+                ＋ Ajouter un article
+              </button>
+            )}
+
+            {/* Totaux */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 22 }}>
+              <div style={{ minWidth: 290 }}>
+                <LigneTotal label="Total hors TVA" valeur={eur(tot.ht)} />
+                {Object.entries(tot.parTaux).filter(([, v]) => v > 0).map(([t, v]) => (
+                  <LigneTotal key={t} label={`TVA ${t}%`} valeur={eur(v)} />
+                ))}
+                {totDeduction < 0 && <LigneTotal label="Acomptes déjà facturés" valeur={eur(totDeduction)} couleur={COUL.alerte} />}
+                {acomptePaye > 0 && <LigneTotal label="Acompte déjà payé" valeur={'− ' + eur(acomptePaye)} couleur={COUL.alerte} />}
+                <LigneTotal fort label={acomptePaye > 0 ? 'Montant dû' : (isDevis ? 'Total TVA comprise' : 'Montant dû')} valeur={eur(acomptePaye > 0 ? montantDu : tot.ttc)} />
+                {estAcompte && soldeProjet > 0.004 && (
+                  <LigneTotal label="Solde restant sur le projet, à payer plus tard" valeur={eur(soldeProjet)} couleur={COUL.texteDoux} />
+                )}
+              </div>
             </div>
-            {f.type === 'acompte' && (
-              <div style={{ fontSize: 11.5, color: COUL.texteDoux, marginTop: 8, lineHeight: 1.5 }}>
-                Saisis d'abord les lignes du projet, puis le pourcentage : le calcul remplace
-                les lignes par l'acompte, <strong>taux de TVA par taux de TVA</strong>, et garde
-                la liste des articles convenus en descriptif.
-                {resteAFacturer !== null && (
-                  <div style={{ marginTop: 6, fontWeight: 700, color: ORANGE }}>
-                    Il reste {eur(resteAFacturer)} à facturer sur ce projet{dejaFacture > 0 ? ' (' + eur(dejaFacture) + ' déjà facturé)' : ''}.
+
+            {/* Pied : paiement */}
+            <div style={{ marginTop: 26, paddingTop: 16, borderTop: `1px solid ${COUL.bord}`, fontSize: 11.5, color: COUL.texteDoux, lineHeight: 1.6 }}>
+              Paiement par virement : <strong style={{ color: NAVY }}>{LODE.iban}</strong> ({LODE.bic}) — communication : {f.numero || 'n° du document'}
+              {f.notes && <div style={{ marginTop: 8, whiteSpace: 'pre-wrap' }}>{f.notes}</div>}
+            </div>
+          </div>
+          )}
+        </div>
+
+        {/* ══════════ PANNEAU DÉTAILS ══════════ */}
+        <div style={{ width: mobE ? '100%' : 340, flexShrink: 0, background: COUL.blanc, borderLeft: mobE ? 'none' : `1px solid ${COUL.bord}`, borderTop: mobE ? `1px solid ${COUL.bord}` : 'none', overflowY: 'auto' }}>
+          <div style={{ padding: '13px 18px', borderBottom: `1px solid ${COUL.bord}`, fontSize: 13.5, fontWeight: 800, color: NAVY }}>Détails</div>
+
+          {/* Type / responsable / langue / statut */}
+          <div style={blocPanneau}>
+            {!isDevis && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={titrePanneau}>Type de document</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                  {[['facture', 'Facture'], ['acompte', 'Acompte'], ['solde', 'Solde'], ['note_credit', 'Note de crédit']].map(([v, lab]) => {
+                    const on = (f.type || 'facture') === v
+                    return <button key={v} type="button" onClick={() => set('type', v)} style={{ padding: '8px 6px', borderRadius: 8, cursor: 'pointer', fontSize: 12.5, fontWeight: 700, border: `1.5px solid ${on ? ORANGE : COUL.bord}`, background: on ? COUL.orangeFond : COUL.blanc, color: on ? ORANGE : COUL.texteDoux }}>{lab}</button>
+                  })}
+                </div>
+              </div>
+            )}
+            <div style={{ display: 'grid', gap: 10 }}>
+              <div><label style={lbl}>Responsable</label>
+                <select style={inp} value={f.responsable || ''} onChange={e => set('responsable', e.target.value)}>
+                  <option value="">—</option>
+                  <option value="LDE">LDE — Ludovic Detilloux</option>
+                  <option value="JCL">JCL — Jean-Charles Lorange</option>
+                  <option value="LLO">LLO — Ludivine Lorange</option>
+                </select>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div><label style={lbl}>Langue</label>
+                  <select style={inp} value={f.langue || 'fr'} onChange={e => set('langue', e.target.value)}>
+                    {LANGUES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
+                  </select>
+                </div>
+                <div><label style={lbl}>Statut</label>
+                  <select style={inp} value={f.statut} onChange={e => set('statut', e.target.value)}>
+                    {Object.entries(isDevis ? STATUTS_DEVIS : STATUTS_FACT).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Acompte */}
+          {!isDevis && (
+            <div style={blocPanneau}>
+              <div style={titrePanneau}>Acompte</div>
+              <div style={{ display: 'grid', gap: 10 }}>
+                <div>
+                  <label style={lbl}>Acompte déjà payé par le client</label>
+                  <input type="number" step="0.01" min="0" style={inp}
+                    value={f.montant_paye === 0 ? '0' : (f.montant_paye || '')}
+                    onChange={e => set('montant_paye', e.target.value)} placeholder="0,00" />
+                  <div style={{ fontSize: 11, color: COUL.texteFaible, marginTop: 4, lineHeight: 1.5 }}>
+                    Déduit <strong>après la TVA</strong> : la TVA reste due sur la totalité.
+                    {acomptePaye > 0 && <> Il restera <strong>{eur(montantDu)}</strong> à payer.</>}
+                  </div>
+                </div>
+                <div>
+                  <label style={lbl}>Facturer un % du projet</label>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <input type="number" step="1" min="1" max="100" style={{ ...inp, flex: 1 }}
+                      value={acomptePct} onChange={e => setAcomptePct(e.target.value)} placeholder="ex : 30" />
+                    <button type="button" onClick={appliquerPourcentage}
+                      style={{ padding: '0 14px', borderRadius: 8, cursor: 'pointer', fontSize: 12.5, fontWeight: 700, border: 'none', background: ORANGE, color: COUL.blanc, whiteSpace: 'nowrap' }}>Calculer</button>
+                  </div>
+                  <div style={{ fontSize: 11, color: COUL.texteFaible, marginTop: 4, lineHeight: 1.5 }}>
+                    Saisis d’abord les articles du projet. Le calcul garde ces articles en rappel et ajoute la ligne d’acompte, <strong>taux de TVA par taux de TVA</strong>.
+                  </div>
+                </div>
+                {(f.type === 'acompte' || f.type === 'solde') && (
+                  <div>
+                    <label style={lbl}>Total projet TTC (pour mémoire)</label>
+                    <input type="number" step="0.01" style={inp} value={f.total_projet_ttc || ''} onChange={e => set('total_projet_ttc', e.target.value)} placeholder="ex : 10000.00" />
+                    {resteAFacturer !== null && (
+                      <div style={{ fontSize: 11.5, color: ORANGE, fontWeight: 700, marginTop: 5 }}>
+                        Il reste {eur(resteAFacturer)} à facturer{dejaFacture > 0 ? ` (${eur(dejaFacture)} déjà facturé)` : ''}.
+                      </div>
+                    )}
+                  </div>
+                )}
+                {f.type === 'solde' && !doc?.id && (
+                  <div>
+                    <label style={lbl}>Acomptes déjà facturés à déduire</label>
+                    {!f.client_id && <div style={{ fontSize: 11.5, color: COUL.alerte }}>Lie d’abord le client pour retrouver ses acomptes.</div>}
+                    {f.client_id && acomptesDispo.length === 0 && <div style={{ fontSize: 11.5, color: COUL.texteDoux }}>Aucun acompte trouvé pour ce client.</div>}
+                    {acomptesDispo.map(ac => (
+                      <label key={ac.id} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, padding: '4px 0', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={acomptesSel.includes(ac.id)} onChange={e => setAcomptesSel(p => e.target.checked ? [...p, ac.id] : p.filter(x => x !== ac.id))} />
+                        <span style={{ fontWeight: 700 }}>{ac.numero}</span>
+                        <span style={{ marginLeft: 'auto', fontWeight: 700 }}>{eur(ac.total_ttc)}</span>
+                      </label>
+                    ))}
                   </div>
                 )}
               </div>
-            )}
-            {f.type === 'solde' && !doc?.id && (
-              <div style={{ marginTop: 10 }}>
-                <div style={{ fontSize: 12, fontWeight: 800, color: ORANGE, marginBottom: 6 }}>Acomptes déjà facturés à déduire</div>
-                {!f.client_id && <div style={{ fontSize: 12, color: COUL.alerte }}>Lie d'abord le client (bouton plus haut) pour retrouver ses acomptes.</div>}
-                {f.client_id && acomptesDispo.length === 0 && <div style={{ fontSize: 12, color: COUL.texteDoux }}>Aucun acompte trouvé pour ce client.</div>}
-                {acomptesDispo.map(ac => (
-                  <label key={ac.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, padding: '4px 0', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={acomptesSel.includes(ac.id)} onChange={e => setAcomptesSel(p => e.target.checked ? [...p, ac.id] : p.filter(x => x !== ac.id))} />
-                    <span style={{ fontWeight: 700 }}>{ac.numero}</span>
-                    <span style={{ color: COUL.texteDoux }}>{(ac.date_facture || '').slice(0, 10)}{ac.objet ? ' · ' + ac.objet : ''}</span>
-                    <span style={{ marginLeft: 'auto', fontWeight: 700 }}>{eur(ac.total_ttc)}</span>
-                  </label>
-                ))}
-              </div>
-            )}
-            {f.type === 'solde' && doc?.id && (
-              <div style={{ fontSize: 11, color: COUL.texteFaible, marginTop: 8 }}>Solde existant : les lignes « Acompte déjà facturé » sont modifiables directement dans les lignes ci-dessous.</div>
-            )}
-          </div>
-        )}
+            </div>
+          )}
 
-        {/* Note de credit : facture a crediter */}
-        {!isDevis && f.type === 'note_credit' && (
-          <div style={{ border: '1px solid #fecaca', background: COUL.dangerFondDoux, borderRadius: 10, padding: 12, marginBottom: 14 }}>
-            <div style={{ fontSize: 12, fontWeight: 800, color: COUL.danger, marginBottom: 6 }}>Note de crédit — facture à créditer</div>
-            {!f.client_id && <div style={{ fontSize: 12, color: COUL.alerte }}>Lie d'abord le client pour retrouver ses factures.</div>}
-            {f.client_id && (
-              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                <div style={{ flex: 1, minWidth: 220 }}>
-                  <label style={lbl}>Facture d'origine</label>
+          {/* Note de credit */}
+          {!isDevis && f.type === 'note_credit' && (
+            <div style={{ ...blocPanneau, background: COUL.dangerFondDoux }}>
+              <div style={{ ...titrePanneau, color: COUL.danger }}>Facture à créditer</div>
+              {!f.client_id && <div style={{ fontSize: 11.5, color: COUL.alerte }}>Lie d’abord le client pour retrouver ses factures.</div>}
+              {f.client_id && (
+                <div style={{ display: 'grid', gap: 8 }}>
                   <select style={inp} value={f.facture_origine_id || ''} onChange={e => set('facture_origine_id', e.target.value)}>
                     <option value="">—</option>
                     {origines.map(o => <option key={o.id} value={o.id}>{o.numero} · {eur(o.total_ttc)} · {(o.date_facture || '').slice(0, 10)}</option>)}
                   </select>
+                  <button type="button" disabled={!f.facture_origine_id} onClick={reprendreLignesNegatif}
+                    style={{ background: f.facture_origine_id ? COUL.danger : COUL.bordFort, color: COUL.blanc, border: 'none', borderRadius: 8, padding: '9px 12px', fontSize: 12, fontWeight: 700, cursor: f.facture_origine_id ? 'pointer' : 'not-allowed' }}>↩ Reprendre les lignes en négatif</button>
                 </div>
-                <button type="button" disabled={!f.facture_origine_id} onClick={reprendreLignesNegatif} style={{ background: f.facture_origine_id ? '#dc2626' : COUL.bordFort, color: COUL.blanc, border: 'none', borderRadius: 8, padding: '9px 14px', fontSize: 12, fontWeight: 700, cursor: f.facture_origine_id ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap' }}>↩ Reprendre les lignes en négatif</button>
-              </div>
-            )}
-            <div style={{ fontSize: 11, color: COUL.texteFaible, marginTop: 6 }}>La note de crédit annule tout ou partie de la facture sélectionnée (montants négatifs).</div>
-          </div>
-        )}
-
-        {/* Import PDF fournisseur (glisser-déposer) */}
-        <div
-          onDragOver={e => { e.preventDefault(); setImportPDF(p => ({ ...p, drag: true })) }}
-          onDragLeave={e => { e.preventDefault(); setImportPDF(p => ({ ...p, drag: false })) }}
-          onDrop={e => { e.preventDefault(); const fs = [...e.dataTransfer.files].filter(x => x.type === 'application/pdf'); if (fs.length) importerPDFs(fs) }}
-          style={{ border: `2px dashed ${importPDF.drag ? ORANGE : COUL.bordFort}`, background: importPDF.drag ? '#FFF7ED' : '#fafafa', borderRadius: 10, padding: '14px 16px', marginBottom: 14, textAlign: 'center', transition: 'all .15s' }}
-        >
-          <div style={{ fontSize: 13, fontWeight: 700, color: NAVY, marginBottom: 4 }}>📄 Importer un devis fournisseur (SDA / Marquise)</div>
-          <div style={{ fontSize: 12, color: COUL.texteFaible, marginBottom: 8 }}>Glissez vos PDF ici, ou cliquez pour parcourir — les lignes seront pré-remplies</div>
-          <label style={{ display: 'inline-block', background: COUL.blanc, border: `1px solid ${ORANGE}`, color: ORANGE, borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
-            {importPDF.loading ? 'Lecture en cours…' : 'Parcourir…'}
-            <input type="file" accept="application/pdf" multiple style={{ display: 'none' }} onChange={e => { const fs = [...e.target.files]; if (fs.length) importerPDFs(fs); e.target.value = '' }} />
-          </label>
-          {importPDF.msg && <div style={{ marginTop: 8, fontSize: 12, fontWeight: 600, color: importPDF.msg.startsWith('✓') ? '#16a34a' : importPDF.msg.startsWith('⚠') ? '#b45309' : COUL.danger }}>{importPDF.msg}</div>}
-        </div>
-
-        {/* Lignes */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 10 }}>
-          <div style={{ fontSize: 13, fontWeight: 800, color: ORANGE }}>Lignes</div>
-          <button type="button" onClick={() => setAfficherTVAC(v => !v)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: afficherTVAC ? ORANGE : COUL.fondDoux, color: afficherTVAC ? '#fff' : COUL.texteDoux, border: 'none', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>💶 {afficherTVAC ? 'Prix TVAC affichés' : 'Afficher prix TVA comprise'}</button>
-        </div>
-        <div style={{ marginBottom: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {lignes.map((l, i) => {
-            const totLigne = (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * (1 - (Number(l.remise_pct) || 0) / 100)
-            const totTTC = totLigne * (1 + (Number(l.tva_pct) || 0) / 100)
-            return (
-              <div key={i} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 10, background: l.optionnelle ? '#FFFBEB' : COUL.blanc }}>
-                {/* Rangée 1 : titre + chiffres */}
-                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', flexWrap: mobE ? 'wrap' : 'nowrap' }}>
-                  <div style={{ flex: 1, minWidth: mobE ? '100%' : 180 }}>
-                    <input style={{ ...inp, fontWeight: 700, padding: '7px 9px' }} placeholder="Titre / objet (ex: Porte sectionnelle)" value={l.titre || ''} onChange={e => setLigne(i, 'titre', e.target.value)} />
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                    <ChampL label="Qté"><input type="number" style={{ ...inp, width: 52, padding: '6px', textAlign: 'center' }} value={l.quantite} onChange={e => setLigne(i, 'quantite', e.target.value)} /></ChampL>
-                    <ChampL label="P.U. €">
-                      <input type="number" step="0.01" style={{ ...inp, width: 82, padding: '6px', textAlign: 'right' }} value={l.prix_unitaire} onChange={e => setLigne(i, 'prix_unitaire', e.target.value)} />
-                      {afficherTVAC && <div style={{ fontSize: 10, color: ORANGE, textAlign: 'right', marginTop: 2, fontWeight: 700 }}>{eur((Number(l.prix_unitaire) || 0) * (1 + (Number(l.tva_pct) || 0) / 100))} TVAC</div>}
-                    </ChampL>
-                    <ChampL label="Rem.%"><input type="number" style={{ ...inp, width: 50, padding: '6px', textAlign: 'center' }} value={l.remise_pct} onChange={e => setLigne(i, 'remise_pct', e.target.value)} /></ChampL>
-                    <ChampL label="TVA">
-                      <select style={{ ...inp, width: 64, padding: '6px' }} value={l.tva_pct} onChange={e => setLigne(i, 'tva_pct', e.target.value)}>
-                        {TVA_TAUX.map(t => <option key={t.val} value={t.val}>{t.val}%</option>)}
-                      </select>
-                    </ChampL>
-                    {(Number(l.tva_pct) || 0) === 0 && (
-                      <ChampL label="Cat.">
-                        <select style={{ ...inp, width: 60, padding: '6px' }} value={l.tva_categorie || 'AE'} onChange={e => setLigne(i, 'tva_categorie', e.target.value)}>
-                          <option value="AE">AE</option>
-                          <option value="Z">Z</option>
-                          <option value="E">E</option>
-                          <option value="K">K</option>
-                          <option value="G">G</option>
-                        </select>
-                      </ChampL>
-                    )}
-                    <ChampL label="HT"><div style={{ minWidth: 78, textAlign: 'right', fontWeight: 700, color: NAVY, padding: '7px 0' }}>{eur(totLigne)}</div></ChampL>
-                    <ChampL label="TTC"><div style={{ minWidth: 82, textAlign: 'right', fontWeight: 700, color: ORANGE, padding: '7px 0' }}>{eur(totTTC)}</div></ChampL>
-                    <button onClick={() => delLigne(i)} title="Supprimer la ligne" style={{ background: 'none', border: 'none', color: COUL.danger, cursor: 'pointer', fontSize: 18, alignSelf: 'center', marginTop: 12 }}>×</button>
-                  </div>
-                </div>
-                {/* Rangée 2 : descriptif + photos à côté */}
-                <div style={{ display: 'flex', gap: 10, marginTop: 8, flexWrap: mobE ? 'wrap' : 'nowrap' }}>
-                  <textarea style={{ ...inp, flex: 1, minHeight: 54, fontSize: 12, color: COUL.texteMoyen, resize: 'vertical', minWidth: mobE ? '100%' : 200 }} placeholder="Descriptif détaillé (dimensions, coloris, options…)" value={l.descriptif || ''} onChange={e => setLigne(i, 'descriptif', e.target.value)} />
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                    {(l.photos || []).map((ph, pi) => (
-                      <div key={pi} style={{ width: 76, height: 76, borderRadius: 8, overflow: 'hidden', position: 'relative', border: '1px solid #e2e8f0', background: COUL.fondDoux }}>
-                        <img src={ph.url || ph} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        <span onClick={() => setLigne(i, 'photos', (l.photos || []).filter((_, j) => j !== pi))} style={{ position: 'absolute', top: 2, right: 3, background: 'rgba(0,0,0,.5)', color: COUL.blanc, borderRadius: '50%', width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 12 }}>×</span>
-                      </div>
-                    ))}
-                    <label style={{ width: 76, height: 76, borderRadius: 8, border: `1px dashed ${ORANGE}`, background: COUL.orangeFond, color: ORANGE, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 11 }}>
-                      <span style={{ fontSize: 18 }}>＋</span>photo
-                      <input type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={e => ajouterPhotos(i, [...e.target.files])} />
-                    </label>
-                  </div>
-                </div>
-                {/* Option : ligne optionnelle (non additionnée) */}
-                <div style={{ marginTop: 6 }}>
-                  <label style={{ fontSize: 11, color: COUL.texteDoux, display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
-                    <input type="checkbox" checked={!!l.optionnelle} onChange={e => setLigne(i, 'optionnelle', e.target.checked)} />
-                    Option au choix (non comptée dans le total)
-                  </label>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-        <button onClick={addLigne} style={{ background: COUL.fond, border: '1px dashed #cbd5e1', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: COUL.texteDoux, marginBottom: 16 }}>+ Ajouter une ligne</button>
-
-        {/* Totaux + remise globale */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-          <div style={{ width: 280 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <span style={{ fontSize: 12, color: COUL.texteDoux }}>Remise globale %</span>
-              <input type="number" style={{ ...inp, width: 70, padding: '5px', textAlign: 'center' }} value={f.remise_pct} onChange={e => set('remise_pct', e.target.value)} />
+              )}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0' }}><span style={{ color: COUL.texteDoux }}>Total HT</span><span style={{ fontWeight: 600 }}>{eur(tot.ht)}</span></div>
-            {Object.entries(tot.parTaux).filter(([, v]) => v > 0).map(([t, v]) => (
-              <div key={t} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '2px 0', color: COUL.texteDoux }}><span>TVA {t}%</span><span>{eur(v)}</span></div>
-            ))}
-            {totDeduction < 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '2px 0', color: COUL.alerte }}><span>Acomptes déduits</span><span>{eur(totDeduction)}</span></div>
-            )}
-            {acomptePaye > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0', color: COUL.alerte }}><span>Acompte déjà payé</span><span>− {eur(acomptePaye)}</span></div>
-            )}
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 800, color: ORANGE, padding: '8px 0', borderTop: '2px solid #f1f5f9', marginTop: 4 }}><span>{acomptePaye > 0 ? 'Montant dû' : 'Total TTC'}</span><span>{eur(acomptePaye > 0 ? montantDu : tot.ttc)}</span></div>
+          )}
+
+          {/* Remise globale */}
+          <div style={blocPanneau}>
+            <div style={titrePanneau}>Remise globale</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input type="number" step="0.01" style={{ ...inp, width: 90 }} value={f.remise_pct} onChange={e => set('remise_pct', e.target.value)} />
+              <span style={{ fontSize: 13, color: COUL.texteDoux, fontWeight: 600 }}>% sur tout le document</span>
+            </div>
+          </div>
+
+          {/* Import PDF fournisseur */}
+          <div style={blocPanneau}>
+            <div style={titrePanneau}>Importer un devis fournisseur</div>
+            <div
+              onDragOver={e => { e.preventDefault(); setImportPDF(p => ({ ...p, drag: true })) }}
+              onDragLeave={e => { e.preventDefault(); setImportPDF(p => ({ ...p, drag: false })) }}
+              onDrop={e => { e.preventDefault(); const fs = [...e.dataTransfer.files].filter(x => x.type === 'application/pdf'); if (fs.length) importerPDFs(fs) }}
+              style={{ border: `2px dashed ${importPDF.drag ? ORANGE : COUL.bordFort}`, background: importPDF.drag ? COUL.orangeFond : COUL.fond, borderRadius: 9, padding: '14px 12px', textAlign: 'center' }}>
+              <div style={{ fontSize: 11.5, color: COUL.texteDoux, marginBottom: 8, lineHeight: 1.5 }}>SDA / Marquise — glissez le PDF ici, les articles seront pré-remplis</div>
+              <label style={{ display: 'inline-block', background: COUL.blanc, border: `1px solid ${ORANGE}`, color: ORANGE, borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+                {importPDF.loading ? 'Lecture…' : 'Parcourir…'}
+                <input type="file" accept="application/pdf" multiple style={{ display: 'none' }} onChange={e => { const fs = [...e.target.files]; if (fs.length) importerPDFs(fs); e.target.value = '' }} />
+              </label>
+              {importPDF.msg && <div style={{ marginTop: 8, fontSize: 11.5, fontWeight: 600, color: importPDF.msg.startsWith('✓') ? COUL.succes : importPDF.msg.startsWith('⚠') ? COUL.alerte : COUL.danger }}>{importPDF.msg}</div>}
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div style={blocPanneau}>
+            <div style={titrePanneau}>Note de bas de document</div>
+            <textarea style={{ ...inp, minHeight: 64, resize: 'vertical' }} value={f.notes || ''} onChange={e => set('notes', e.target.value)} placeholder="Visible sous le total, sur le document." />
           </div>
         </div>
+      </div>
 
-        {/* Notes + statut */}
-        <div style={{ display: 'grid', gridTemplateColumns: mobE ? '1fr' : '2fr 1fr 1fr', gap: 10, marginBottom: 18 }}>
-          <div><label style={lbl}>Notes (optionnel)</label><textarea style={{ ...inp, minHeight: 50, resize: 'vertical' }} value={f.notes} onChange={e => set('notes', e.target.value)} /></div>
-          <div><label style={lbl}>Langue du document</label>
-            <select style={inp} value={f.langue || 'fr'} onChange={e => set('langue', e.target.value)}>
-              {LANGUES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
-            </select>
-          </div>
-          <div><label style={lbl}>Statut</label>
-            <select style={inp} value={f.statut} onChange={e => set('statut', e.target.value)}>
-              {Object.entries(isDevis ? STATUTS_DEVIS : STATUTS_FACT).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-            </select>
-          </div>
+      {/* ── Modale d'article ── */}
+      {articleOuvert !== null && lignes[articleOuvert] && (
+        <ModalArticle
+          l={lignes[articleOuvert]} i={articleOuvert} setLigne={setLigne}
+          delLigne={delLigne} ajouterPhotos={ajouterPhotos} mobE={mobE}
+          clientTva={f.client_tva} clientPays={f.client_pays}
+          onClose={() => setArticleOuvert(null)}
+        />
+      )}
+
+      {/* ── Modale client ── */}
+      {clientOuvert && (
+        <ModalClient
+          f={f} set={set} mobE={mobE}
+          clientQuery={clientQuery} setClientQuery={setClientQuery}
+          clientResults={clientResults} searching={searching}
+          choisirClient={c => { choisirClient(c); setClientOuvert(false) }}
+          creerClient={creerClient} creatingClient={creatingClient}
+          onClose={() => setClientOuvert(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════
+//  MODALE ARTICLE — un article s'edite dans sa fiche, pas dans une
+//  rangee de douze champs serres. Le document reste lisible, et tous
+//  les reglages (TVA, categorie, remise, photos, option) tiennent ici.
+// ════════════════════════════════════════════════════════════════
+function ModalArticle({ l, i, setLigne, delLigne, ajouterPhotos, onClose, mobE, clientTva, clientPays }) {
+  const taux = Number(l.tva_pct) || 0
+  const pu = Number(l.prix_unitaire) || 0
+  const [tvac, setTvac] = useState(false)
+  const [remiseOuverte, setRemiseOuverte] = useState(Number(l.remise_pct) > 0)
+  // Le prix saisi TVAC est reconverti en HTVA a 2 decimales : c'est le prix
+  // HTVA qui est stocke, imprime et multiplie par la quantite. Garder plus de
+  // decimales ferait un total qui ne colle pas au prix unitaire affiche.
+  const prixAffiche = tvac ? Math.round(pu * (1 + taux / 100) * 100) / 100 : pu
+  const majPrix = (v) => {
+    const n = Number(String(v).replace(',', '.')) || 0
+    setLigne(i, 'prix_unitaire', tvac ? Math.round((n / (1 + taux / 100)) * 100) / 100 : n)
+  }
+  const ht = (Number(l.quantite) || 0) * pu * (1 - (Number(l.remise_pct) || 0) / 100)
+  const ttc = ht * (1 + taux / 100)
+  // Un numero de TVA qui ne commence pas par BE, ou un pays autre que la
+  // Belgique : on signale, on ne decide pas. La regle depend de la prestation
+  // (un chantier immobilier en Belgique reste taxe en Belgique), et c'est au
+  // comptable de trancher, pas au logiciel.
+  const tvaCl = String(clientTva || '').replace(/[^A-Za-z]/g, '').toUpperCase()
+  const paysCl = String(clientPays || '').trim().toLowerCase()
+  const etranger = (tvaCl && !tvaCl.startsWith('BE')) || (!!paysCl && !['belgique', 'belgium', 'be', 'belgie', 'belgië'].includes(paysCl))
+
+  const inp2 = { padding: '9px 11px', border: `1px solid ${COUL.bord}`, borderRadius: 9, fontSize: 13.5, fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' }
+  const lbl2 = { fontSize: 11.5, fontWeight: 700, color: COUL.texteDoux, marginBottom: 4, display: 'block' }
+  const pas = (d) => setLigne(i, 'quantite', Math.max(0, (Number(l.quantite) || 0) + d))
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', zIndex: 9500, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '5vh 14px', overflowY: 'auto' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: COUL.blanc, borderRadius: 14, width: '100%', maxWidth: 520, boxShadow: '0 20px 60px rgba(0,0,0,.25)', overflow: 'hidden' }}>
+        <div style={{ padding: '15px 20px', borderBottom: `1px solid ${COUL.bord}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: NAVY }}>Éditer l’article</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 21, cursor: 'pointer', color: COUL.texteFaible }}>×</button>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-          <button onClick={onClose} style={{ background: COUL.fondDoux, border: 'none', borderRadius: 9, padding: '10px 20px', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: COUL.texteDoux }}>Annuler</button>
-          <button onClick={save} disabled={saving || verrouille} style={{ background: verrouille ? '#cbd5e1' : ORANGE, border: 'none', borderRadius: 9, padding: '10px 24px', cursor: (saving || verrouille) ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700, color: COUL.blanc }}>{verrouille ? '🔒 Verrouillée' : (saving ? 'Enregistrement…' : 'Enregistrer')}</button>
+        <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <label style={lbl2}>Nom</label>
+            <input autoFocus style={inp2} value={l.titre || ''} onChange={e => setLigne(i, 'titre', e.target.value)} placeholder="ex : Porte sectionnelle" />
+          </div>
+          <div>
+            <label style={lbl2}>Description <span style={{ fontWeight: 500, color: COUL.texteFaible }}>(optionnel)</span></label>
+            <textarea style={{ ...inp2, minHeight: 64, resize: 'vertical', fontSize: 12.5 }} value={l.descriptif || ''} onChange={e => setLigne(i, 'descriptif', e.target.value)} placeholder="Dimensions, coloris, options…" />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: mobE ? '1fr' : '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={lbl2}>Quantité</label>
+              <div style={{ display: 'flex', alignItems: 'center', border: `1px solid ${COUL.bord}`, borderRadius: 9, overflow: 'hidden' }}>
+                <button type="button" onClick={() => pas(-1)} style={{ width: 36, height: 38, border: 'none', background: COUL.fondDoux, cursor: 'pointer', fontSize: 17, color: COUL.texteMoyen }}>−</button>
+                <input type="number" step="0.01" value={l.quantite} onChange={e => setLigne(i, 'quantite', e.target.value)}
+                  style={{ flex: 1, border: 'none', textAlign: 'center', fontSize: 14, fontWeight: 700, fontFamily: 'inherit', outline: 'none', width: '100%', minWidth: 0 }} />
+                <button type="button" onClick={() => pas(1)} style={{ width: 36, height: 38, border: 'none', background: COUL.fondDoux, cursor: 'pointer', fontSize: 17, color: COUL.texteMoyen }}>＋</button>
+              </div>
+            </div>
+            <div>
+              <label style={lbl2}>Taux de TVA</label>
+              <select style={inp2} value={l.tva_pct} onChange={e => setLigne(i, 'tva_pct', e.target.value)}>
+                {TVA_TAUX.map(t => <option key={t.val} value={t.val}>{t.val}%{t.label ? ' — ' + t.label : ''}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {etranger && taux > 0 && (
+            <div style={{ background: COUL.alerteFond, border: `1px solid ${COUL.alerteVif}`, borderRadius: 9, padding: '10px 13px', fontSize: 11.5, color: COUL.alerteFonce, lineHeight: 1.55 }}>
+              <strong>Client hors Belgique ({String(clientTva || clientPays || '').trim()})</strong> — un taux de TVA belge est appliqué.
+              Selon la nature de la prestation, c’est peut-être l’autoliquidation qui s’applique
+              (TVA à 0 %, catégorie AE). À vérifier avant d’émettre.
+            </div>
+          )}
+
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <label style={{ ...lbl2, marginBottom: 0 }}>Prix unitaire</label>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 700, color: tvac ? ORANGE : COUL.texteDoux, cursor: 'pointer' }}>
+                <input type="checkbox" checked={tvac} onChange={e => setTvac(e.target.checked)} />
+                TVA comprise
+              </label>
+            </div>
+            <input type="number" step="0.01" style={inp2} value={prixAffiche} onChange={e => majPrix(e.target.value)} />
+            <div style={{ fontSize: 11, color: COUL.texteFaible, marginTop: 4 }}>
+              {tvac ? `Soit ${eur(pu)} hors TVA` : `Soit ${eur(pu * (1 + taux / 100))} TVA comprise`}
+            </div>
+          </div>
+
+          {taux === 0 && (
+            <div>
+              <label style={lbl2}>Catégorie TVA (exonération)</label>
+              <select style={inp2} value={l.tva_categorie || 'AE'} onChange={e => setLigne(i, 'tva_categorie', e.target.value)}>
+                <option value="AE">AE — autoliquidation</option>
+                <option value="Z">Z — taux zéro</option>
+                <option value="E">E — exonéré</option>
+                <option value="K">K — intracommunautaire</option>
+                <option value="G">G — exportation</option>
+              </select>
+            </div>
+          )}
+
+          {/* Remise, repliee tant qu'elle vaut zero */}
+          {remiseOuverte ? (
+            <div>
+              <label style={lbl2}>Remise sur cet article</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input type="number" step="0.01" style={{ ...inp2, width: 110 }} value={l.remise_pct} onChange={e => setLigne(i, 'remise_pct', e.target.value)} />
+                <span style={{ fontSize: 13, color: COUL.texteDoux, fontWeight: 600 }}>%</span>
+                <button type="button" onClick={() => { setLigne(i, 'remise_pct', 0); setRemiseOuverte(false) }} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: COUL.texteFaible, cursor: 'pointer', fontSize: 12, textDecoration: 'underline' }}>retirer</button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" onClick={() => setRemiseOuverte(true)} style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: ORANGE, cursor: 'pointer', fontSize: 12.5, fontWeight: 700, padding: 0 }}>＋ Ajouter une remise</button>
+          )}
+
+          {/* Photos */}
+          <div>
+            <label style={lbl2}>Photos</label>
+            <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+              {(l.photos || []).map((ph, pi) => (
+                <div key={pi} style={{ width: 70, height: 70, borderRadius: 8, overflow: 'hidden', position: 'relative', border: `1px solid ${COUL.bord}`, background: COUL.fondDoux }}>
+                  <img src={ph.url || ph} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <span onClick={() => setLigne(i, 'photos', (l.photos || []).filter((_, j) => j !== pi))} style={{ position: 'absolute', top: 2, right: 3, background: 'rgba(0,0,0,.55)', color: COUL.blanc, borderRadius: '50%', width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 12 }}>×</span>
+                </div>
+              ))}
+              <label style={{ width: 70, height: 70, borderRadius: 8, border: `1px dashed ${ORANGE}`, background: COUL.orangeFond, color: ORANGE, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 10.5 }}>
+                <span style={{ fontSize: 17 }}>＋</span>photo
+                <input type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={e => ajouterPhotos(i, [...e.target.files])} />
+              </label>
+            </div>
+          </div>
+
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: COUL.texteMoyen, cursor: 'pointer' }}>
+            <input type="checkbox" checked={!!l.optionnelle} onChange={e => setLigne(i, 'optionnelle', e.target.checked)} />
+            Option au choix — proposée au client, non comptée dans le total
+          </label>
+
+          <div style={{ background: COUL.fond, borderRadius: 9, padding: '11px 14px', display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+            <span style={{ color: COUL.texteDoux, fontWeight: 600 }}>Total hors TVA</span><span style={{ fontWeight: 700, color: NAVY }}>{eur(ht)}</span>
+          </div>
+          <div style={{ background: COUL.orangeFond, borderRadius: 9, padding: '11px 14px', display: 'flex', justifyContent: 'space-between', fontSize: 14.5 }}>
+            <span style={{ color: ORANGE, fontWeight: 700 }}>Total TVA comprise</span><span style={{ fontWeight: 800, color: ORANGE }}>{eur(ttc)}</span>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between', marginTop: 2 }}>
+            <button onClick={() => { delLigne(i); onClose() }} style={{ background: 'none', border: `1px solid ${COUL.dangerBord}`, color: COUL.danger, borderRadius: 9, padding: '9px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>Supprimer</button>
+            <button onClick={onClose} style={{ background: ORANGE, border: 'none', color: COUL.blanc, borderRadius: 9, padding: '9px 26px', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>Terminé</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════
+//  MODALE CLIENT — recherche dans la base, ou saisie manuelle.
+// ════════════════════════════════════════════════════════════════
+function ModalClient({ f, set, clientQuery, setClientQuery, clientResults, searching, choisirClient, creerClient, creatingClient, onClose, mobE }) {
+  const inp2 = { padding: '9px 11px', border: `1px solid ${COUL.bord}`, borderRadius: 9, fontSize: 13.5, fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' }
+  const lbl2 = { fontSize: 11.5, fontWeight: 700, color: COUL.texteDoux, marginBottom: 4, display: 'block' }
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', zIndex: 9500, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '5vh 14px', overflowY: 'auto' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: COUL.blanc, borderRadius: 14, width: '100%', maxWidth: 620, boxShadow: '0 20px 60px rgba(0,0,0,.25)', overflow: 'hidden' }}>
+        <div style={{ padding: '15px 20px', borderBottom: `1px solid ${COUL.bord}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: NAVY }}>Client</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 21, cursor: 'pointer', color: COUL.texteFaible }}>×</button>
+        </div>
+        <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 13 }}>
+          <div style={{ position: 'relative' }}>
+            <label style={lbl2}>Rechercher dans la base (nom, dossier, ville, email, TVA…)</label>
+            <input autoFocus style={inp2} value={clientQuery} placeholder="Tapez au moins 2 caractères" onChange={e => setClientQuery(e.target.value)} />
+            {clientQuery.trim().length >= 2 && (
+              <div style={{ position: 'absolute', zIndex: 20, left: 0, right: 0, background: COUL.blanc, border: `1px solid ${COUL.bord}`, borderRadius: 9, marginTop: 4, maxHeight: 260, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,.12)' }}>
+                {searching && <div style={{ padding: 10, fontSize: 13, color: COUL.texteDoux }}>Recherche…</div>}
+                {!searching && clientResults.length === 0 && <div style={{ padding: 10, fontSize: 13, color: COUL.texteDoux }}>Aucun client trouvé</div>}
+                {clientResults.map(c => {
+                  const L = labelClient(c)
+                  return (
+                    <div key={c.id} onClick={() => choisirClient(c)} style={{ padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9' }}
+                      onMouseEnter={e => e.currentTarget.style.background = COUL.fond} onMouseLeave={e => e.currentTarget.style.background = COUL.blanc}>
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>{L.icon} {L.nom}</div>
+                      {L.sub && <div style={{ fontSize: 11, color: COUL.texteDoux }}>{L.sub}</div>}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          <div style={{ height: 1, background: COUL.bord, margin: '2px 0' }} />
+
+          <div style={{ display: 'grid', gridTemplateColumns: mobE ? '1fr' : '2fr 1fr', gap: 10 }}>
+            <div><label style={lbl2}>Nom / société *</label><input style={inp2} value={f.client_nom} onChange={e => set('client_nom', e.target.value)} /></div>
+            <div><label style={lbl2}>N° TVA</label><input style={inp2} value={f.client_tva} onChange={e => set('client_tva', e.target.value)} /></div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: mobE ? '1fr' : '2fr 1fr 1fr', gap: 10 }}>
+            <div><label style={lbl2}>Adresse</label><input style={inp2} value={f.client_adresse} onChange={e => set('client_adresse', e.target.value)} /></div>
+            <div><label style={lbl2}>Code postal</label><input style={inp2} value={f.client_cp} onChange={e => set('client_cp', e.target.value)} /></div>
+            <div><label style={lbl2}>Ville</label><input style={inp2} value={f.client_ville} onChange={e => set('client_ville', e.target.value)} /></div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: mobE ? '1fr' : '1fr 1fr 1fr', gap: 10 }}>
+            <div><label style={lbl2}>Email</label><input style={inp2} value={f.client_email} onChange={e => set('client_email', e.target.value)} /></div>
+            <div><label style={lbl2}>Téléphone</label><input style={inp2} value={f.client_telephone} onChange={e => set('client_telephone', e.target.value)} /></div>
+            <div><label style={lbl2}>Pays</label><input style={inp2} value={f.client_pays || ''} onChange={e => set('client_pays', e.target.value)} /></div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            {f.client_id ? (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: COUL.succesFond, color: COUL.succesFonce, border: `1px solid ${COUL.succesBord}`, borderRadius: 8, padding: '7px 12px', fontSize: 12.5, fontWeight: 700 }}>
+                ✓ Client lié à la base
+                <button onClick={() => set('client_id', null)} title="Détacher pour ressaisir un autre client" style={{ background: 'none', border: 'none', color: COUL.succesFonce, cursor: 'pointer', fontSize: 12, textDecoration: 'underline', padding: 0 }}>détacher</button>
+              </div>
+            ) : (
+              <button onClick={creerClient} disabled={creatingClient || !f.client_nom.trim()}
+                style={{ background: f.client_nom.trim() ? ORANGE : COUL.bordFort, color: COUL.blanc, border: 'none', borderRadius: 8, padding: '9px 16px', fontSize: 12.5, fontWeight: 700, cursor: (f.client_nom.trim() && !creatingClient) ? 'pointer' : 'not-allowed' }}>
+                {creatingClient ? 'Création…' : '➕ Créer ce client dans la base'}
+              </button>
+            )}
+            <button onClick={onClose} style={{ marginLeft: 'auto', background: ORANGE, border: 'none', color: COUL.blanc, borderRadius: 9, padding: '9px 26px', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>Terminé</button>
+          </div>
         </div>
       </div>
     </div>
@@ -1041,21 +1401,48 @@ async function exportPDF(type, doc, lignes, opts = {}) {
     d.text('Répartition du projet', M_L, yr); yr += 4.6
     d.setFontSize(8); d.setFont(undefined, 'normal'); d.setTextColor(...GREY)
     d.text('Articles initialement convenus', M_L, yr); yr += 5
-    d.setFontSize(8.5); d.setTextColor(...DARK)
+
+    // Memes colonnes que le tableau de la facture : le client compare deux
+    // tableaux identiques, pas une liste face a un tableau. C'est la seule
+    // facon de voir d'un coup d'oeil quelle part du projet il paie aujourd'hui.
+    yr = dessinerEnteteColonnes(yr)
+    let altProjet = false
     for (const l of lignesProjetPdf) {
-      if (yr > BOTTOM - 24) { d.addPage(); yr = 20 }
       const htL = (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * (1 - (Number(l.remise_pct) || 0) / 100)
-      d.text(String(l.titre || l.description || '').slice(0, 70), M_L + 2, yr)
-      d.text(eurPDF(htL), PW - M_R - 2, yr, { align: 'right' })
-      yr += 4.4
+      const ttcL = htL * (1 + (Number(l.tva_pct) || 0) / 100)
+      d.setFontSize(9); d.setFont(undefined, 'normal')
+      const titreLn = d.splitTextToSize(String(l.titre || l.description || ''), wDesc)
+      const hL = Math.max(8, titreLn.length * 4.2 + 3.6)
+      if (yr + hL > BOTTOM) { d.addPage(); yr = dessinerEnteteColonnes(20); altProjet = false }
+      if (altProjet) { d.setFillColor(252, 247, 243); d.rect(M_L, yr, tableW, hL, 'F') }
+      altProjet = !altProjet
+      let ty = yr + 5
+      d.setFontSize(9); d.setTextColor(...DARK); d.setFont(undefined, 'normal')
+      titreLn.forEach(ln => { d.text(ln, M_L + 2, ty); ty += 4.2 })
+      d.setFontSize(8.5)
+      const yc = yr + 5
+      let cx = xChiffresStart
+      d.text(eurPDF(l.prix_unitaire), cx + wPU - 1, yc, { align: 'right' }); cx += wPU
+      d.text(`${l.tva_pct}%`, cx + wTVA / 2, yc, { align: 'center' }); cx += wTVA
+      if (hasRemiseLigne) { d.text(`${l.remise_pct || 0}%`, cx + wRem / 2, yc, { align: 'center' }); cx += wRem }
+      d.text(String(l.quantite), cx + wQte / 2, yc, { align: 'center' }); cx += wQte
+      d.text(eurPDF(htL), cx + wHT - 1, yc, { align: 'right' }); cx += wHT
+      d.setTextColor(...O); d.text(eurPDF(ttcL), cx + wTTC - 1, yc, { align: 'right' })
+      d.setTextColor(...DARK)
+      yr += hL
+      d.setDrawColor(235, 235, 235); d.setLineWidth(0.2); d.line(M_L, yr, PW - M_R, yr)
     }
-    yr += 1.5
-    d.setDrawColor(235, 235, 235); d.setLineWidth(0.2); d.line(M_L, yr, PW - M_R, yr); yr += 4.5
-    d.setFontSize(8.5); d.setTextColor(...GREY)
+    yr += 5.5
+    d.setFontSize(8.5); d.setFont(undefined, 'normal'); d.setTextColor(...GREY)
     d.text('Total du projet (hors TVA)', PW - 70, yr)
     d.setTextColor(...DARK); d.text(eurPDF(totProjetPdf.ht), PW - M_R - 2, yr, { align: 'right' }); yr += 4.6
     d.setTextColor(...GREY); d.text('Total du projet (TVA incl.)', PW - 70, yr)
-    d.setTextColor(...DARK); d.text(eurPDF(totProjetPdf.ttc), PW - M_R - 2, yr, { align: 'right' }); yr += 8
+    d.setTextColor(...DARK); d.setFont(undefined, 'bold')
+    d.text(eurPDF(totProjetPdf.ttc), PW - M_R - 2, yr, { align: 'right' })
+    d.setFont(undefined, 'normal'); yr += 11
+
+    // Le titre du second tableau ne doit jamais finir seul en bas de page.
+    if (yr > BOTTOM - 26) { d.addPage(); yr = 20 }
     d.setFontSize(10); d.setFont(undefined, 'bold'); d.setTextColor(...O)
     d.text('À payer avec cette facture', M_L, yr); yr += 4.5
     d.setFont(undefined, 'normal'); d.setTextColor(...DARK)
@@ -1376,7 +1763,9 @@ async function exportWord(type, doc, lignes) {
     shading: { type: ShadingType.SOLID, color: O, fill: O },
     children: [new Paragraph({ alignment: align || AlignmentType.LEFT, children: [new TextRun({ text: txt, bold: true, color: 'FFFFFF', size: 16 })] })],
   })
-  const headRow = new TableRow({ tableHeader: true, children: [
+  // Une TableRow docx ne peut pas servir dans deux tables : on en fabrique une
+  // a chaque appel plutot que de partager la meme instance.
+  const headRow2 = () => new TableRow({ tableHeader: true, children: [
     th(L.description), th('P.U.', AlignmentType.RIGHT), th('TVA', AlignmentType.CENTER),
     ...(hasRem ? [th('%', AlignmentType.CENTER)] : []),
     th(L.qte, AlignmentType.CENTER), th(L.totalHT, AlignmentType.RIGHT), th('TTC', AlignmentType.RIGHT),
@@ -1411,9 +1800,41 @@ async function exportWord(type, doc, lignes) {
     ] }))
   }
 
+  // ── RAPPEL DU PROJET (facture d'acompte) ───────────────────────────────
+  // Meme tableau, memes colonnes que la facture : deux tableaux identiques,
+  // pour que le client voie quelle part du projet il paie aujourd'hui.
+  const projetPara = []
+  if (lignesProjetW.length) {
+    const totProjetW = calcTotaux(lignesProjetW.map(l => ({ ...l, bloc: null })), doc.remise_pct)
+    const cellP = (children) => new TableCell({ borders: cellBorder, children })
+    const txtP = (txt, align, bold) => cellP([new Paragraph({ alignment: align, children: [new TextRun({ text: txt, size: 18, bold })] })])
+    const rowsProjet = lignesProjetW.map(l => {
+      const t = (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * (1 - (Number(l.remise_pct) || 0) / 100)
+      const ttc = t * (1 + (Number(l.tva_pct) || 0) / 100)
+      return new TableRow({ children: [
+        cellP([new Paragraph({ children: [new TextRun({ text: l.titre || l.description || '', size: 19, color: DARK })] })]),
+        txtP(eurW(l.prix_unitaire), AlignmentType.RIGHT),
+        txtP(`${l.tva_pct}%`, AlignmentType.CENTER),
+        ...(hasRem ? [txtP(`${l.remise_pct || 0}%`, AlignmentType.CENTER)] : []),
+        txtP(String(l.quantite), AlignmentType.CENTER),
+        txtP(eurW(t), AlignmentType.RIGHT),
+        txtP(eurW(ttc), AlignmentType.RIGHT),
+      ] })
+    })
+    projetPara.push(
+      new Paragraph({ spacing: { before: 200 }, children: [new TextRun({ text: 'Répartition du projet', bold: true, size: 22, color: O })] }),
+      new Paragraph({ spacing: { after: 100 }, children: [new TextRun({ text: 'Articles initialement convenus', size: 16, color: GREY })] }),
+      new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headRow2(), ...rowsProjet] }),
+      new Paragraph({ spacing: { before: 120 }, alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `Total du projet (hors TVA) : ${eurW(totProjetW.ht)}`, size: 18, color: GREY })] }),
+      new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `Total du projet (TVA incl.) : ${eurW(totProjetW.ttc)}`, size: 20, bold: true })] }),
+      new Paragraph({ spacing: { before: 280 }, children: [new TextRun({ text: 'À payer avec cette facture', bold: true, size: 22, color: O })] }),
+      new Paragraph({ text: '', spacing: { after: 60 } }),
+    )
+  }
+
   const tableLignes = new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
-    rows: [headRow, ...bodyRows],
+    rows: [headRow2(), ...bodyRows],
   })
 
   // Totaux
@@ -1426,6 +1847,15 @@ async function exportWord(type, doc, lignes) {
       : []),
     new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${isDevis ? L.totalTTC : L.montantDu} : ${eurW(tot.ttc - (isDevis ? 0 : (Number(doc.montant_paye) || 0)))}`, bold: true, size: 26, color: O })] }),
   ]
+
+  // Sans cette ligne, le client croit que la facture d'acompte solde le projet.
+  if (lignesProjetW.length) {
+    const projetTtcW = calcTotaux(lignesProjetW.map(l => ({ ...l, bloc: null })), doc.remise_pct).ttc
+    const soldeW = Math.round((projetTtcW - (tot.ttc - (Number(doc.montant_paye) || 0))) * 100) / 100
+    if (soldeW > 0.004) {
+      totauxPara.push(new Paragraph({ spacing: { before: 120 }, alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `Solde restant sur le projet, à payer plus tard : ${eurW(soldeW)}`, size: 18, color: GREY })] }))
+    }
+  }
 
   // Options
   const optionsPara = []
@@ -1452,6 +1882,7 @@ async function exportWord(type, doc, lignes) {
         entete,
         ...clientPara,
         new Paragraph({ text: '', spacing: { after: 100 } }),
+        ...projetPara,
         tableLignes,
         ...totauxPara,
         ...optionsPara,
@@ -1684,15 +2115,6 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
   )
 }
 
-function ChampL({ label, children }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-      <span style={{ fontSize: 9, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase' }}>{label}</span>
-      {children}
-    </div>
-  )
-}
-
 function ApercuFacture({ fid, nom }) {
   const [etat, setEtat] = useState('load')
   useEffect(() => { setEtat('load') }, [fid])
@@ -1713,6 +2135,7 @@ function EnvoiFactureModal({ doc, b64, fileName, onClose, onSent }) {
   const C = LODE.couleur
   const [to, setTo] = useState(doc.client_email || '')
   const [cc, setCc] = useState('contact@lode-group.be')
+  const [cci, setCci] = useState('info@lode-group.be')
   const [subject, setSubject] = useState(`Facture ${doc.numero} de LODE`)
   const [body, setBody] = useState(`Bonjour ${doc.client_nom || ''},\n\nVeuillez trouver ci-joint notre facture ${doc.numero} d'un montant de ${eur(doc.total_ttc)}.\n\nBien a vous,\nLODE`)
   const [sending, setSending] = useState(false)
@@ -1728,7 +2151,7 @@ function EnvoiFactureModal({ doc, b64, fileName, onClose, onSent }) {
       const r = await fetch('/api/facture-send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ entite: 'lode', client_email: to.trim(), cc: cc.trim(), subject, body, numero: doc.numero, fileName, pdfBase64: b64 }),
+        body: JSON.stringify({ entite: 'lode', client_email: to.trim(), cc: cc.trim(), bcc: cci.trim(), subject, body, numero: doc.numero, fileName, pdfBase64: b64 }),
       })
       const j = await r.json().catch(() => ({}))
       if (!r.ok || !j.ok) throw new Error(j.error || j.detail || ('HTTP ' + r.status))
@@ -1762,6 +2185,7 @@ function EnvoiFactureModal({ doc, b64, fileName, onClose, onSent }) {
         <div style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 13 }}>
           <div><label style={lbl}>A</label><input value={to} onChange={e => setTo(e.target.value)} style={champ} placeholder="client@email.be" /></div>
           <div><label style={lbl}>Cc</label><input value={cc} onChange={e => setCc(e.target.value)} style={champ} placeholder="(optionnel)" /></div>
+          <div><label style={lbl}>Cci</label><input value={cci} onChange={e => setCci(e.target.value)} style={champ} placeholder="(optionnel)" /></div>
           <div><label style={lbl}>Objet</label><input value={subject} onChange={e => setSubject(e.target.value)} style={champ} /></div>
           <div><label style={lbl}>Message</label><textarea value={body} onChange={e => setBody(e.target.value)} rows={7} style={{ ...champ, resize: 'vertical', lineHeight: 1.5 }} /></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: COUL.fond, border: '1px solid #eef2f6', borderRadius: 8, padding: '9px 12px', fontSize: 13 }}>
