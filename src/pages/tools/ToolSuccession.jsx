@@ -5,6 +5,14 @@ import OutilPage from '../../components/OutilPage'
 import { useAuth } from '../../lib/auth'
 import { COUL } from '../../lib/theme'
 
+// Les seules fonctions que le pont accepte d'appeler. Toutes en lecture,
+// toutes en SECURITY INVOKER, toutes a parametres types.
+const RPC_AUTORISEES = new Set([
+  'succ_clients_recherche', 'succ_batiments', 'succ_vie', 'succ_famille',
+  'succ_entreprises', 'succ_groupes_lies', 'succ_membres_entreprise',
+  'succ_clients_par_noms', 'succ_homonymes',
+])
+
 export default function ToolsSuccession() {
   const { user } = useAuth()
   const iframeRef = useRef(null)
@@ -1724,15 +1732,17 @@ function bridgeCall(action, params) {
   });
 }
 
-// mcpNs — returns result in MCP payload format so existing parsing code works
-var mcpNs = {
-  callTool: function(server, tool, input) {
-    return bridgeCall('execute_sql', { query: input.query || input.sql }).then(function(rows) {
-      // Wrap in MCP-style payload so existing parsing code (text.match(/\\[...\\]/)) works
-      return { payload: { result: JSON.stringify(rows) } };
-    });
-  }
-};
+// Une question nommee, des parametres types. Plus de SQL construit a la main,
+// donc plus rien a echapper — et plus rien a injecter.
+function rpc(fn, args) {
+  return bridgeCall('rpc', { fn: fn, args: args || {} }).catch(function(e) {
+    console.error('rpc ' + fn + ' :', e); return [];
+  });
+}
+// Conserve : plusieurs ecrans testent la presence de mcpNs pour savoir si
+// le pont est la. (Pas de backtick dans ce commentaire : il est lui-meme
+// a l'interieur d'un gabarit, et le terminerait.)
+var mcpNs = { pret: true };
 
 // dbNs — Firestore-like API for succession_simulations table
 var dbNs = {
@@ -1836,16 +1846,7 @@ async function searchClientsDB(query) {
     return;
   }
   try {
-    const safeQ = query.replace(/'/g, "''");
-    const sql = \`SELECT id, dossier, nom, prenom, date_naissance, cp, localite, etat_civil FROM clients WHERE LOWER(nom) LIKE LOWER('%\${safeQ}%') OR LOWER(prenom) LIKE LOWER('%\${safeQ}%') OR dossier LIKE '%\${safeQ}%' ORDER BY nom, prenom LIMIT 15\`;
-    const result = await mcpNs.callTool('Supabase', 'execute_sql', { query: sql });
-    const text = result?.payload?.result || result?.payload?.text || (typeof result?.payload === 'string' ? result.payload : JSON.stringify(result?.payload || ''));
-    // Parse JSON from response - extract the array
-    let rows = [];
-    try {
-      const match = text.match(/\\[[\\s\\S]*\\]/);
-      if (match) rows = JSON.parse(match[0]);
-    } catch(e) { /* parse error */ }
+    const rows = await rpc('succ_clients_recherche', { p_q: query, p_lim: 15 });
 
     const container = document.getElementById('dbResults');
     const statusEl = document.getElementById('dbSearchStatus');
@@ -1924,42 +1925,25 @@ async function prefillFromClient(client) {
   panel.style.display = '';
   panel.innerHTML = \`<div class="prefill-panel"><h3><span class="spinner"></span> Recherche en base...</h3></div>\`;
 
-  const safeDossier = (client.dossier+'').replace(/'/g,"''");
-  const safeNom = (client.nom||'').replace(/'/g,"''");
-  const safePrenom = (client.prenom||'').replace(/'/g,"''");
-  const PID = '${SUPABASE_PROJECT_REF}';
-  const sql = (q) => mcpNs.callTool('Supabase', 'execute_sql', { project_id: PID, query: q }).then(r => {
-    // Extract text from various possible response shapes
-    let raw = r?.payload;
-    // Also try content blocks if payload is empty
-    if (!raw && r?.content) {
-      const tb = r.content.find(b => b.type === 'text');
-      if (tb) raw = tb.text;
-    }
-    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
-      raw = raw.result || raw.text || JSON.stringify(raw);
-    }
-    if (typeof raw === 'string') {
-      const m = raw.match(/\\[[\\s\\S]*\\]/);
-      if (m) return JSON.parse(m[0]);
-    }
-    if (Array.isArray(raw)) return raw;
-    return [];
-  }).catch(e => { console.error('SQL enrichment error:', e); return []; });
+  // Plus de safeDossier/safeNom/safePrenom : il n'y a plus de chaine SQL a
+  // echapper. Les valeurs partent comme parametres.
+  const dossier = (client.dossier + '');
+  const nom = (client.nom || '');
+  const prenom = (client.prenom || '');
 
   // === PHASE 1: Direct queries on person's own dossier ===
   const [ownIncendieRows, familleRows, entrepriseRows, vieRows] = await Promise.all([
-    sql(\`SELECT DISTINCT o.description, o.type_risque FROM objets_risque o JOIN contrats c ON o.dossier=c.dossier AND o.police=c.police WHERE o.dossier='\${safeDossier}' AND o.domaine='Incendie risques simples' AND o.situation IN ('En cours','Suspendu') AND o.type_risque='Bâtiment'\`),
-    sql(\`SELECT DISTINCT p.membre_nom, c.dossier AS membre_dossier, c.date_naissance, c.cp FROM parentes p LEFT JOIN clients c ON UPPER(TRIM(p.membre_nom)) LIKE '%' || UPPER(TRIM(c.nom)) || '%' AND UPPER(TRIM(p.membre_nom)) LIKE '%' || UPPER(TRIM(c.prenom)) || '%' WHERE p.dossier_principal='\${safeDossier}' AND p.groupe_type='01-Famille' AND UPPER(TRIM(p.membre_nom)) NOT LIKE '%\${safeNom.toUpperCase()}%\${safePrenom.toUpperCase()}%' AND UPPER(TRIM(p.membre_nom)) NOT LIKE '%\${safePrenom.toUpperCase()}%\${safeNom.toUpperCase()}%'\`),
-    sql(\`SELECT DISTINCT p.membre_nom FROM parentes p WHERE p.dossier_principal='\${safeDossier}' AND p.groupe_type='02-Entreprise' AND UPPER(TRIM(p.membre_nom)) NOT LIKE '%\${safeNom.toUpperCase()}%'\`),
-    sql(\`SELECT DISTINCT o.police, o.compagnie, o.garantie, o.description, c.type_production FROM objets_risque o JOIN contrats c ON o.dossier=c.dossier AND o.police=c.police WHERE o.dossier='\${safeDossier}' AND o.domaine='Vie et placements' AND o.situation IN ('En cours','Suspendu')\`)
+    rpc('succ_batiments',   { p_dossiers: [dossier] }),
+    rpc('succ_famille',     { p_dossier: dossier, p_nom: nom, p_prenom: prenom }),
+    rpc('succ_entreprises', { p_dossier: dossier, p_nom: nom }),
+    rpc('succ_vie',         { p_dossiers: [dossier] })
   ]);
 
   // === PHASE 2: RECURSIVE company chain discovery ===
   // Start with direct entreprise members, then follow the chain
   const allCompanyNames = new Set(); // all unique company names discovered
   const allCompanyDossiers = new Map(); // dossier -> company name
-  const visitedDossiers = new Set([safeDossier]); // avoid loops
+  const visitedDossiers = new Set([dossier]); // avoid loops
   const deepEntreprises = []; // extended list with source info
 
   // Seed with direct entreprise members (these are company names found in person's parentes)
@@ -1974,18 +1958,17 @@ async function prefillFromClient(client) {
     depth++;
     const nextFrontier = [];
     // Find dossiers where these companies appear as membre_nom in entreprise parentes
-    const conditions = frontier.map(n => \`UPPER(TRIM(p.membre_nom)) = '\${n.toUpperCase().replace(/'/g,"''")}'\`).join(' OR ');
-    const linkedDossiers = await sql(\`SELECT DISTINCT p.dossier_principal, p.groupe_nom FROM parentes p WHERE (\${conditions}) AND p.groupe_type='02-Entreprise' AND p.dossier_principal NOT IN (\${[...visitedDossiers].map(d=>\`'\${d}'\`).join(',')})\`);
+    const linkedDossiers = await rpc('succ_groupes_lies', { p_noms: frontier, p_deja_vus: [...visitedDossiers] });
 
     for (const ld of linkedDossiers) {
-      const dos = (ld.dossier_principal||'').replace(/'/g,"''");
+      const dos = (ld.dossier_principal || '');
       if (visitedDossiers.has(dos)) continue;
       visitedDossiers.add(dos);
       // Get all entreprise members of this new dossier
-      const members = await sql(\`SELECT DISTINCT p.membre_nom FROM parentes p WHERE p.dossier_principal='\${dos}' AND p.groupe_type='02-Entreprise'\`);
+      const members = await rpc('succ_membres_entreprise', { p_dossier: dos });
       for (const m of members) {
         const mName = (m.membre_nom||'').trim();
-        if (!mName || mName.toUpperCase().includes(safeNom.toUpperCase())) continue; // skip the person themselves
+        if (!mName || mName.toUpperCase().includes(nom.toUpperCase())) continue; // skip the person themselves
         if (!allCompanyNames.has(mName.toUpperCase())) {
           allCompanyNames.add(mName.toUpperCase());
           const viaLabel = frontier.length === 1 ? \`Via \${frontier[0]}\` : \`Via \${ld.groupe_nom || dos}\`;
@@ -2001,8 +1984,7 @@ async function prefillFromClient(client) {
     }
     // Also resolve direct company names to their own dossiers (clients table)
     if (depth === 1) {
-      const cNames = frontier.map(n => \`UPPER(c.nom) = '\${n.toUpperCase().replace(/'/g,"''")}'\`).join(' OR ');
-      const cDossiers = await sql(\`SELECT DISTINCT c.dossier, c.nom FROM clients c WHERE \${cNames}\`);
+      const cDossiers = await rpc('succ_clients_par_noms', { p_noms: frontier });
       for (const cd of cDossiers) {
         if (!visitedDossiers.has(cd.dossier)) {
           visitedDossiers.add(cd.dossier);
@@ -2018,10 +2000,9 @@ async function prefillFromClient(client) {
   let companyVieRows = [];
   const compDossierKeys = [...allCompanyDossiers.keys()];
   if (compDossierKeys.length) {
-    const dossierList = compDossierKeys.map(d => \`'\${d.replace(/'/g,"''")}'\`).join(',');
     const [cInc, cVie] = await Promise.all([
-      sql(\`SELECT DISTINCT o.description, o.type_risque, o.dossier FROM objets_risque o JOIN contrats c ON o.dossier=c.dossier AND o.police=c.police WHERE o.dossier IN (\${dossierList}) AND o.domaine='Incendie risques simples' AND o.situation IN ('En cours','Suspendu') AND o.type_risque='Bâtiment'\`),
-      sql(\`SELECT DISTINCT o.police, o.compagnie, o.garantie, o.description, c.type_production, o.dossier FROM objets_risque o JOIN contrats c ON o.dossier=c.dossier AND o.police=c.police WHERE o.dossier IN (\${dossierList}) AND o.domaine='Vie et placements' AND o.situation IN ('En cours','Suspendu')\`)
+      rpc('succ_batiments', { p_dossiers: compDossierKeys }),
+      rpc('succ_vie',       { p_dossiers: compDossierKeys })
     ]);
     companyIncendieRows = cInc;
     companyVieRows = cVie;
@@ -2031,19 +2012,18 @@ async function prefillFromClient(client) {
   // Extract unique surnames from famille members and search for other clients with same surname
   const siblingRows = [];
   const knownNames = new Set(familleRows.map(r => (r.membre_nom||'').trim().toUpperCase()));
-  knownNames.add(\`\${safeNom.toUpperCase()} \${safePrenom.toUpperCase()}\`);
-  knownNames.add(\`\${safePrenom.toUpperCase()} \${safeNom.toUpperCase()}\`);
+  knownNames.add(\`\${nom.toUpperCase()} \${prenom.toUpperCase()}\`);
+  knownNames.add(\`\${prenom.toUpperCase()} \${nom.toUpperCase()}\`);
   const surnames = new Set();
   // Add own surname
-  surnames.add(safeNom.toUpperCase());
+  surnames.add(nom.toUpperCase());
   // Extract surnames from famille members (format "SURNAME Firstname" or "Firstname SURNAME")
   familleRows.forEach(r => {
     const parts = (r.membre_nom||'').trim().split(/\\s+/);
     parts.forEach(p => { if (p === p.toUpperCase() && p.length > 2) surnames.add(p); });
   });
   if (surnames.size) {
-    const surnameConditions = [...surnames].map(s => \`UPPER(TRIM(c.nom)) = '\${s.replace(/'/g,"''")}'\`).join(' OR ');
-    const sameNameClients = await sql(\`SELECT DISTINCT c.dossier, c.nom, c.prenom, c.date_naissance FROM clients c WHERE (\${surnameConditions}) AND c.dossier != '\${safeDossier}' AND c.prenom IS NOT NULL AND c.prenom != ''\`);
+    const sameNameClients = await rpc('succ_homonymes', { p_noms: [...surnames], p_hors_dossier: dossier });
     for (const sc of sameNameClients) {
       const fullName = \`\${(sc.nom||'')} \${(sc.prenom||'')}\`.trim().toUpperCase();
       if (knownNames.has(fullName)) continue; // already in famille
@@ -2302,16 +2282,7 @@ function onDbModalSearch(val) {
 async function searchClientsForModal(query) {
   if (!mcpNs) return;
   try {
-    const safeQ = query.replace(/'/g, "''");
-    const sql = \`SELECT id, dossier, nom, prenom, date_naissance, cp, localite, etat_civil FROM clients WHERE LOWER(nom) LIKE LOWER('%\${safeQ}%') OR LOWER(prenom) LIKE LOWER('%\${safeQ}%') ORDER BY nom, prenom LIMIT 15\`;
-    const res = await mcpNs.callTool('Supabase', 'execute_sql', { query: sql });
-    // Parse response — same logic as main search
-    let raw = res?.payload;
-    if (!raw && res?.content) { const tb = res.content.find(b => b.type === 'text'); if (tb) raw = tb.text; }
-    if (raw && typeof raw === 'object' && !Array.isArray(raw)) { raw = raw.result || raw.text || JSON.stringify(raw); }
-    let rows = [];
-    if (typeof raw === 'string') { const m = raw.match(/\\[[\\s\\S]*\\]/); if (m) try { rows = JSON.parse(m[0]); } catch(e){} }
-    else if (Array.isArray(raw)) rows = raw;
+    const rows = await rpc('succ_clients_recherche', { p_q: query, p_lim: 15 });
     const container = document.getElementById('dbModalResults');
     if (!rows.length) { container.innerHTML = '<div style="font-size:11px;color:#6b7a99;padding:8px">Aucun résultat</div>'; return; }
     container.innerHTML = rows.map(r => {
@@ -2607,6 +2578,9 @@ update();
     if (!iframe) return
 
     function handleMessage(e) {
+      // La source doit etre NOTRE iframe. Sans ce controle, tout script de la
+      // page — ou tout cadre — pouvait emettre une bridge-request.
+      if (e.source !== iframe.contentWindow) return
       if (!e.data || !e.data.type) return
       const { type, callId, action, params } = e.data
 
@@ -2630,9 +2604,24 @@ update();
       ;(async () => {
         try {
           switch (action) {
-            case 'execute_sql': {
-              const { data, error } = await supabase.rpc('execute_raw_sql', { sql_query: params.query })
-              if (error) respondError('SQL error: ' + error.message)
+            // LE PONT N'EXECUTE PLUS DE SQL. Il appelle une fonction choisie
+            // dans une liste fermee, avec des parametres typés.
+            //
+            // Avant : l'iframe envoyait une chaine SQL, que le parent passait
+            // a execute_raw_sql — SECURITY DEFINER, droits du proprietaire de
+            // la base. N'importe quel script de la page pouvait donc emettre
+            // une bridge-request et lire ou ecrire ce qu'il voulait, hors de
+            // toute regle d'acces.
+            //
+            // Les neuf fonctions ci-dessous sont en SECURITY INVOKER : elles
+            // s'executent avec les droits de celui qui regarde.
+            case 'rpc': {
+              if (!RPC_AUTORISEES.has(params?.fn)) {
+                respondError('Fonction non autorisée : ' + params?.fn)
+                break
+              }
+              const { data, error } = await supabase.rpc(params.fn, params.args || {})
+              if (error) respondError(error.message)
               else respond(Array.isArray(data) ? data : [])
               break
             }
