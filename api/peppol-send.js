@@ -59,6 +59,34 @@ function versOrder(f) {
     OrderLines,
   }
   if (nombre(f.remise_pct) > 0) order.Discount = nombre(f.remise_pct)
+
+  // ── ACOMPTE DEJA RECU ───────────────────────────────────────────────────
+  //
+  // SANS CECI, LE CLIENT RECOIT LE MONTANT PLEIN. Le Hub deduit l'acompte
+  // dans son PDF depuis le 06/11, mais `montant_paye` n'etait pas transmis a
+  // Billit : la facture electronique partait a 2 911,17 la ou le papier
+  // annoncait 2 411,17. Deux documents contradictoires pour une meme facture,
+  // et c'est l'electronique qui fait foi depuis que le B2B structure est
+  // obligatoire en Belgique.
+  //
+  // Billit expose deux champs d'en-tete, et ils S'EXCLUENT :
+  //   - partiellement payee : `ToPay` porte le SOLDE RESTANT ; ne pas mettre `Paid`
+  //   - entierement payee   : `Paid` (booleen) + `PaidDate` ; ne pas mettre `ToPay`
+  // Billit recalcule ensuite PrepaidAmount et PayableAmount dans l'UBL sortant.
+  const totalTTC = nombre(f.total_ttc)
+  const dejaPaye = Math.max(0, nombre(f.montant_paye))
+  if (dejaPaye > 0 && totalTTC > 0) {
+    const reste = Math.round((totalTTC - dejaPaye) * 100) / 100
+    if (reste <= 0) {
+      order.Paid = true
+      // Faute de date de paiement enregistree, la date de facture est le
+      // choix le moins faux : elle ne peut pas etre posterieure au paiement.
+      order.PaidDate = f.date_facture
+    } else {
+      order.ToPay = reste
+    }
+  }
+
   return order
 }
 

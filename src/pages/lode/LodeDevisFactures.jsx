@@ -1756,7 +1756,21 @@ export default function LodeDevisFactures() {
   const envoyerPeppol = async (doc) => {
     if (!PEPPOL_ACTIF) { alert('Le lien Peppol est désactivé pour le moment.'); return }
     if (!doc.client_tva) { alert('Numéro de TVA du client manquant — Peppol route sur la TVA.'); return }
-    if (!confirm(`Envoyer la facture ${doc.numero} sur le réseau Peppol via Billit ?`)) return
+    // On annonce LE MONTANT RECLAME, pas seulement le numero. Une facture
+    // electronique fait foi : si l'acompte ne passait pas, le client serait
+    // debite du montant plein sans que personne s'en apercoive avant la
+    // reclamation. Autant le voir avant d'envoyer.
+    const dejaPaye = Math.max(0, Number(doc.montant_paye) || 0)
+    const reclame = Math.round(((Number(doc.total_ttc) || 0) - dejaPaye) * 100) / 100
+    const recap = dejaPaye > 0
+      ? `Envoyer la facture ${doc.numero} sur le réseau Peppol via Billit ?\n\n`
+        + `Total : ${eur(Number(doc.total_ttc) || 0)}\n`
+        + `Acompte déjà payé : − ${eur(dejaPaye)}\n`
+        + `MONTANT RÉCLAMÉ AU CLIENT : ${eur(reclame)}\n\n`
+        + `Vérifie ce montant chez Billit après l'envoi : c'est la première fois `
+        + `qu'une facture avec acompte part en Peppol.`
+      : `Envoyer la facture ${doc.numero} sur le réseau Peppol via Billit ?\n\nMontant : ${eur(Number(doc.total_ttc) || 0)}`
+    if (!confirm(recap)) return
     setBusy(doc.id + 'peppol')
     try {
       const { data: { session } } = await supabase.auth.getSession()
