@@ -12,6 +12,7 @@
 
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { COUL } from '../lib/theme'
 
 // Pastille aux couleurs de Ponto, dessinée ici : on n'embarque pas leur logo, qui ne
 // nous appartient pas. Le relief vient d'un dégradé diagonal, d'un reflet sur la
@@ -26,8 +27,8 @@ export const IconeSyncPonto = ({ taille = 18, anime = false }) => (
         <stop offset="100%" stopColor="#E09B00" />
       </linearGradient>
       <linearGradient id="pontoReflet" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%"   stopColor="#fff" stopOpacity="0.75" />
-        <stop offset="100%" stopColor="#fff" stopOpacity="0" />
+        <stop offset="0%"   stopColor={COUL.blanc} stopOpacity="0.75" />
+        <stop offset="100%" stopColor={COUL.blanc} stopOpacity="0" />
       </linearGradient>
       <filter id="pontoOmbre" x="-30%" y="-30%" width="160%" height="170%">
         <feDropShadow dx="0" dy="1.6" stdDeviation="1.6" floodColor="#8A5B00" floodOpacity="0.38" />
@@ -111,10 +112,10 @@ export default function BoutonSyncPonto({ onTermine, style, surFonce = false }) 
       {message && (
         <span style={{ fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
           color: etat === 'error'
-            ? (surFonce ? '#fca5a5' : '#dc2626')
+            ? (surFonce ? '#fca5a5' : COUL.danger)
             : etat === 'ok'
-              ? (surFonce ? '#86efac' : '#16a34a')
-              : (surFonce ? 'rgba(255,255,255,0.85)' : '#64748b') }}>
+              ? (surFonce ? '#86efac' : COUL.succes)
+              : (surFonce ? 'rgba(255,255,255,0.85)' : COUL.texteDoux) }}>
           {message}
         </span>
       )}
@@ -122,7 +123,7 @@ export default function BoutonSyncPonto({ onTermine, style, surFonce = false }) 
         onClick={lancer}
         disabled={etat === 'running'}
         title="Relancer la synchronisation Ponto maintenant (sinon automatique à 3h, 9h, 15h et 21h)"
-        style={{ fontSize: 11.5, color: '#334155', background: etat === 'running' ? '#f8fafc' : '#fff',
+        style={{ fontSize: 11.5, color: COUL.texteSombre, background: etat === 'running' ? '#f8fafc' : COUL.blanc,
           border: '1px solid #e2e8f0', borderRadius: 7, padding: '4px 11px 4px 7px',
           cursor: etat === 'running' ? 'default' : 'pointer', fontWeight: 700,
           fontFamily: 'inherit', letterSpacing: '.01em', whiteSpace: 'nowrap',

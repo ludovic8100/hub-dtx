@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useAuth, SOCIETES_CONFIG } from '../lib/auth'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { COUL } from '../lib/theme'
 
 const LOGOS = {
   dynassur: '/logo_dynassur.png',
@@ -19,17 +20,17 @@ function GroupeLogo({ size = 30 }) {
     <svg width={size} height={size} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <linearGradient id="hgrad_h" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#0080BD"/>
-          <stop offset="50%" stopColor="#7c3aed"/>
-          <stop offset="100%" stopColor="#ea580c"/>
+          <stop offset="0%" stopColor={COUL.bleu}/>
+          <stop offset="50%" stopColor={COUL.violet}/>
+          <stop offset="100%" stopColor={COUL.orange}/>
         </linearGradient>
       </defs>
       <polygon points="50,8 86,28 86,72 50,92 14,72 14,28"
                fill="none" stroke="url(#hgrad_h)" strokeWidth="6" strokeLinejoin="round"/>
       <circle cx="50" cy="50" r="13" fill="url(#hgrad_h)" opacity="0.9"/>
-      <circle cx="50" cy="14" r="5" fill="#0080BD"/>
-      <circle cx="80" cy="67" r="5" fill="#ea580c"/>
-      <circle cx="20" cy="67" r="5" fill="#7c3aed"/>
+      <circle cx="50" cy="14" r="5" fill={COUL.bleu}/>
+      <circle cx="80" cy="67" r="5" fill={COUL.orange}/>
+      <circle cx="20" cy="67" r="5" fill={COUL.violet}/>
     </svg>
   )
 }
@@ -78,11 +79,11 @@ function EntityDropdown({ activeSociete, societesDispo, onSelect, accentColor, l
             const src = logos[activeSociete] || LOGOS[activeSociete]
             return src
               ? <img src={src} alt={activeSociete} style={{ width:26, height:26, objectFit:'contain' }} />
-              : <div style={{ width:26, height:26, borderRadius:5, background:cfg.color, display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:800, color:'#fff' }}>{cfg.short}</div>
+              : <div style={{ width:26, height:26, borderRadius:5, background:cfg.color, display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:800, color:COUL.blanc }}>{cfg.short}</div>
           })()}
         </div>
         <div style={{ flex:1, textAlign:'left', overflow:'hidden', minWidth:0 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', lineHeight: 1.1, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{cfg.label}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: COUL.blanc, lineHeight: 1.1, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{cfg.label}</div>
           <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', lineHeight: 1 }}>Entité active</div>
         </div>
         <i className={`ti ${open ? 'ti-chevron-up' : 'ti-chevron-down'}`}
@@ -93,7 +94,7 @@ function EntityDropdown({ activeSociete, societesDispo, onSelect, accentColor, l
       {open && (
         <div style={{
           position: 'fixed', top: '62px', left: '8px',
-          background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)',
+          background: COUL.texte, border: '1px solid rgba(255,255,255,0.1)',
           borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
           minWidth: 200, zIndex: 200, overflow: 'hidden',
           animation: 'fadeInDown 0.12s ease'
@@ -123,7 +124,7 @@ function EntityDropdown({ activeSociete, societesDispo, onSelect, accentColor, l
                       ? <GroupeLogo size={26} />
                       : (logos[s.key] || LOGOS[s.key])
                         ? <img src={logos[s.key] || LOGOS[s.key]} alt={s.key} style={{ width:'100%', height:'100%', objectFit:'contain' }} />
-                        : <div style={{ width:28, height:28, borderRadius:6, background:s.color, display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:800, color:'#fff' }}>{s.short}</div>
+                        : <div style={{ width:28, height:28, borderRadius:6, background:s.color, display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:800, color:COUL.blanc }}>{s.short}</div>
                     }
                   </div>
                   <div style={{ flex:1 }}>
@@ -202,7 +203,7 @@ export default function Header({ currentPage, onToggleMenu, menuOuvert }) {
         {/* Bouton hamburger mobile */}
         {onToggleMenu && (
           <button onClick={onToggleMenu} aria-label="Menu" style={{
-            background: 'transparent', border: 'none', color: '#fff',
+            background: 'transparent', border: 'none', color: COUL.blanc,
             fontSize: '22px', cursor: 'pointer', padding: '0 4px',
             display: 'flex', alignItems: 'center'
           }}>

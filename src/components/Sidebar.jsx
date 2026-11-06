@@ -4,6 +4,7 @@ import { useTicketsBadge } from '../lib/useTicketsBadge'
 import { useNotesFraisBadge } from '../lib/useNotesFraisBadge'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { COUL } from '../lib/theme'
 
 // Icônes métal du menu (public/icons/hub-dtx-metal/, 24 px, PNG transparents).
 // La correspondance se fait sur le suffixe de la clé, donc une même icône sert
@@ -121,19 +122,19 @@ function ClientSearch({ accentLight }) {
       <style>{`.dyn-cs-input::placeholder{color:rgba(255,255,255,0.65);}`}</style>
       <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 9 }}>
         <img src="/icons/hub-dtx-metal/recherche-client.png" alt="" width={24} height={24} style={{ width: 18, height: 18 }} />
-        <span style={{ fontSize: 12.5, fontWeight: 700, color: '#fff', letterSpacing: '0.02em' }}>Recherche client</span>
+        <span style={{ fontSize: 12.5, fontWeight: 700, color: COUL.blanc, letterSpacing: '0.02em' }}>Recherche client</span>
       </div>
       <div style={{ position: 'relative' }}>
         <input className="dyn-cs-input" value={q} onChange={e => setQ(e.target.value)} placeholder="Nom, plaque, n°, localité…"
           style={{ width: '100%', boxSizing: 'border-box', padding: '8px 26px 8px 11px', borderRadius: 7,
             border: '1.5px solid rgba(255,255,255,0.7)', background: 'rgba(255,255,255,0.14)',
-            color: '#fff', fontSize: 13, fontFamily: "'Source Sans Pro', sans-serif", outline: 'none', fontWeight: 500 }} />
+            color: COUL.blanc, fontSize: 13, fontFamily: "'Source Sans Pro', sans-serif", outline: 'none', fontWeight: 500 }} />
         {q && <button onClick={() => { setQ(''); setRes([]); setErreur(null) }} style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 15 }}>✕</button>}
       </div>
       {q.trim().length >= 2 && (
         <div style={{ marginTop: 6, maxHeight: 340, overflowY: 'auto' }}>
           {searching ? <div style={{ padding: '8px 4px', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Recherche…</div>
-            : erreur ? <div style={{ padding: '8px 9px', fontSize: 11.5, lineHeight: 1.45, color: '#fff',
+            : erreur ? <div style={{ padding: '8px 9px', fontSize: 11.5, lineHeight: 1.45, color: COUL.blanc,
                 background: 'rgba(220,38,38,0.35)', border: '1px solid rgba(255,255,255,0.35)', borderRadius: 7 }}>
                 <strong>La recherche n'a pas abouti.</strong><br />{erreur}<br />
                 <span style={{ opacity: 0.85 }}>Recharge la page (Ctrl+Maj+R). Si ça persiste, envoie-moi ce message.</span>
@@ -143,7 +144,7 @@ function ClientSearch({ accentLight }) {
                 <div key={c.dossier || i} onClick={() => go(c.dossier)} style={{ padding: '7px 9px', borderRadius: 7, cursor: 'pointer', marginBottom: 3, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.16)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}>
-                  <div style={{ fontSize: 13, color: '#fff', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.nom} {c.prenom}</div>
+                  <div style={{ fontSize: 13, color: COUL.blanc, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.nom} {c.prenom}</div>
                   <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>#{c.dossier}{c.localite ? ` · ${c.localite}` : ''}</div>
                   {c.match_info && <div style={{ fontSize: 11, color: accentLight, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.match_info}</div>}
                 </div>
@@ -204,7 +205,7 @@ export default function Sidebar() {
         <span style={{ fontSize:'13.5px', fontFamily:"'Source Sans Pro', sans-serif", color: active ? '#0D2F5E' : 'rgba(255,255,255,0.65)', fontWeight: active ? '700' : '400', flex:1 }}>
           {item.label}
         </span>
-        {item.badge > 0 && <span style={{ background:'#E74C3C', color:'#fff', borderRadius:'10px', fontSize:'11px', fontWeight:700, padding:'1px 7px', minWidth:'18px', textAlign:'center' }}>{item.badge}</span>}
+        {item.badge > 0 && <span style={{ background:'#E74C3C', color:COUL.blanc, borderRadius:'10px', fontSize:'11px', fontWeight:700, padding:'1px 7px', minWidth:'18px', textAlign:'center' }}>{item.badge}</span>}
       </div>
     )
   }

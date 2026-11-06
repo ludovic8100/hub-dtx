@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { COUL } from '../lib/theme'
 
 // Carte « Téléphonie 3CX » de l'écran Synchronisations.
 //
@@ -10,15 +11,15 @@ import { supabase } from '../lib/supabase'
 // La fonction serveur exige une session Supabase ; on la récupère ici plutôt
 // que de la faire chercher à la main dans le stockage du navigateur.
 
-const NAVY = '#0D2F5E'
+const NAVY = COUL.marine
 
 const btn = (principal = false) => ({
   display: 'inline-flex', alignItems: 'center', gap: 7,
   padding: '8px 14px', borderRadius: 8, fontSize: 13, fontWeight: 700,
   fontFamily: 'inherit', cursor: 'pointer',
-  border: `1px solid ${principal ? NAVY : '#e2e8f0'}`,
-  background: principal ? NAVY : '#fff',
-  color: principal ? '#fff' : '#334155',
+  border: `1px solid ${principal ? NAVY : COUL.bord}`,
+  background: principal ? NAVY : COUL.blanc,
+  color: principal ? '#fff' : COUL.texteSombre,
 })
 
 export default function Diagnostic3cx() {
@@ -50,11 +51,11 @@ export default function Diagnostic3cx() {
   const copier = () => navigator.clipboard?.writeText(JSON.stringify(rapport, null, 2))
 
   return (
-    <section style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 18px', marginBottom: 20 }}>
+    <section style={{ background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 18px', marginBottom: 20 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 240 }}>
           <h2 style={{ fontSize: 14.5, fontWeight: 800, color: NAVY, margin: 0 }}>Téléphonie 3CX</h2>
-          <p style={{ fontSize: 11.5, color: '#94a3b8', margin: '3px 0 0', lineHeight: 1.5 }}>
+          <p style={{ fontSize: 11.5, color: COUL.texteFaible, margin: '3px 0 0', lineHeight: 1.5 }}>
             Jusqu'ici, 3CX écrit dans le Hub mais le Hub n'interroge jamais le central. Ce test
             ouvre le sens inverse et dit ce que votre installation expose réellement — c'est ce
             qui décidera si la présence en direct et la file d'attente sont réalisables.
@@ -67,13 +68,13 @@ export default function Diagnostic3cx() {
       </div>
 
       {etat === 'encours' && (
-        <p style={{ fontSize: 12.5, color: '#64748b', marginTop: 12 }}>
+        <p style={{ fontSize: 12.5, color: COUL.texteDoux, marginTop: 12 }}>
           Interrogation du central… cela peut prendre une dizaine de secondes.
         </p>
       )}
 
       {erreur && (
-        <div style={{ marginTop: 12, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 9, padding: '11px 14px', fontSize: 12.5, color: '#991b1b' }}>
+        <div style={{ marginTop: 12, background: COUL.dangerFondDoux, border: '1px solid #fecaca', borderRadius: 9, padding: '11px 14px', fontSize: 12.5, color: '#991b1b' }}>
           {erreur}
         </div>
       )}
@@ -87,7 +88,7 @@ function Rapport({ r, onCopier }) {
   // Trois issues possibles : pas configuré, identifiants refusés, ou ça marche.
   if (r.configure === false) {
     return (
-      <Bloc fond="#fffbeb" bord="#fde68a" encre="#92400e" titre="3CX n'est pas configuré">
+      <Bloc fond={COUL.alerteFondDoux} bord="#fde68a" encre={COUL.alerteFonce} titre="3CX n'est pas configuré">
         <p style={{ margin: 0 }}>{r.message}</p>
       </Bloc>
     )
@@ -95,7 +96,7 @@ function Rapport({ r, onCopier }) {
 
   if (r.authentifie === false) {
     return (
-      <Bloc fond="#fef2f2" bord="#fecaca" encre="#991b1b" titre="Le central répond, mais refuse les identifiants">
+      <Bloc fond={COUL.dangerFondDoux} bord={COUL.dangerBord} encre="#991b1b" titre="Le central répond, mais refuse les identifiants">
         <p style={{ margin: '0 0 8px' }}>
           Bonne nouvelle : l'adresse est correcte et le central est joignable. Seule
           l'authentification échoue.
@@ -111,7 +112,7 @@ function Rapport({ r, onCopier }) {
 
   const ok = (r.resultats || []).filter(x => x.repond)
   return (
-    <Bloc fond="#f0fdf4" bord="#bbf7d0" encre="#166534"
+    <Bloc fond={COUL.succesFondDoux} bord={COUL.succesBord} encre="#166534"
       titre={`Connexion établie — ${ok.length} point${ok.length > 1 ? 's' : ''} d'accès sur ${(r.resultats || []).length}`}>
       <p style={{ margin: '0 0 10px' }}>
         Authentification acceptée{r.modeAuth ? ` (mode « ${r.modeAuth} »)` : ''}.
@@ -122,10 +123,10 @@ function Rapport({ r, onCopier }) {
             <tr key={x.chemin} style={{ borderTop: '1px solid rgba(22,101,52,.15)' }}>
               <td style={{ padding: '6px 8px 6px 0', width: 18 }}>
                 <i className={`ti ${x.repond ? 'ti-circle-check' : 'ti-circle-x'}`}
-                  style={{ color: x.repond ? '#16a34a' : '#94a3b8', fontSize: 15 }} />
+                  style={{ color: x.repond ? '#16a34a' : COUL.texteFaible, fontSize: 15 }} />
               </td>
               <td style={{ padding: '6px 8px 6px 0' }}>{x.pour}</td>
-              <td style={{ padding: '6px 0', textAlign: 'right', color: '#475569', whiteSpace: 'nowrap' }}>
+              <td style={{ padding: '6px 0', textAlign: 'right', color: COUL.texteMoyen, whiteSpace: 'nowrap' }}>
                 {x.repond ? (x.forme?.lignes != null ? `${x.forme.lignes} ligne(s)` : 'OK') : `HTTP ${x.status || '—'}`}
               </td>
             </tr>

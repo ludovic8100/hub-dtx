@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
+import { COUL } from '../lib/theme'
 
 // Lit une éventuelle erreur renvoyée par Supabase/Microsoft dans l'URL de
 // retour (#error=...&error_description=...), pour l'afficher directement à
@@ -44,7 +45,7 @@ export default function AuthCallback() {
 
   const fond = {
     minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: '#0D2F5E', fontFamily: "'Source Sans Pro', sans-serif", color: '#fff',
+    background: COUL.marine, fontFamily: "'Source Sans Pro', sans-serif", color: COUL.blanc,
     flexDirection: 'column', gap: '16px', padding: '24px', textAlign: 'center',
   }
 
@@ -60,7 +61,7 @@ export default function AuthCallback() {
           onClick={() => navigate('/login', { replace: true })}
           style={{
             padding: '10px 20px', borderRadius: 8, border: 'none',
-            background: '#fff', color: '#0D2F5E', fontWeight: 700, cursor: 'pointer',
+            background: COUL.blanc, color: COUL.marine, fontWeight: 700, cursor: 'pointer',
           }}
         >
           Retour
@@ -75,7 +76,7 @@ export default function AuthCallback() {
         <div style={{
           width: '40px', height: '40px',
           border: '3px solid rgba(255,255,255,0.3)',
-          borderTopColor: '#fff',
+          borderTopColor: COUL.blanc,
           borderRadius: '50%',
           animation: 'spin 0.8s linear infinite',
         }} />

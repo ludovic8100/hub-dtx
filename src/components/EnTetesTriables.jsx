@@ -1,4 +1,5 @@
 import { basculerTri } from '../lib/tri'
+import { COUL } from '../lib/theme'
 
 // Les en-têtes d'un tableau triable — un seul rendu pour tout le Hub.
 //
@@ -9,15 +10,15 @@ import { basculerTri } from '../lib/tri'
 //
 // La flèche est TOUJOURS présente, en gris pâle sur les colonnes inactives :
 // sans elle, rien ne dit que les titres se cliquent.
-export default function EnTetesTriables({ cols, tri, onTri, couleur = '#0D2F5E', style = {} }) {
+export default function EnTetesTriables({ cols, tri, onTri, couleur = COUL.marine, style = {} }) {
   const base = {
     textAlign: 'left', padding: '9px 16px', fontSize: 10, fontWeight: 700,
-    color: '#94a3b8', textTransform: 'uppercase', whiteSpace: 'nowrap',
+    color: COUL.texteFaible, textTransform: 'uppercase', whiteSpace: 'nowrap',
     borderBottom: '1px solid #e2e8f0', cursor: 'pointer', userSelect: 'none',
     ...style,
   }
   return (
-    <tr style={{ background: '#f8fafc' }}>
+    <tr style={{ background: COUL.fond }}>
       {cols.map(col => {
         const actif = tri?.col === col.cle
         return (

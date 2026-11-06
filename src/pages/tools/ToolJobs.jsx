@@ -13,21 +13,22 @@ import { useState, useEffect } from 'react'
 import OutilPage, { Chargement } from '../../components/OutilPage'
 import Diagnostic3cx from '../../components/Diagnostic3cx'
 import { supabase } from '../../lib/supabase'
+import { COUL } from '../../lib/theme'
 
-const NAVY = '#0D2F5E'
+const NAVY = COUL.marine
 
 const ETATS = {
-  ok:        { label: 'À jour',      couleur: '#16a34a', fond: '#f0fdf4', bord: '#bbf7d0', icone: 'ti-circle-check' },
-  en_retard: { label: 'En retard',   couleur: '#dc2626', fond: '#fef2f2', bord: '#fecaca', icone: 'ti-alert-circle' },
-  echec:     { label: 'En échec',    couleur: '#dc2626', fond: '#fef2f2', bord: '#fecaca', icone: 'ti-x' },
-  bloque:    { label: 'Bloqué',      couleur: '#b45309', fond: '#fffbeb', bord: '#fde68a', icone: 'ti-hourglass' },
-  jamais:    { label: 'Jamais vu',   couleur: '#64748b', fond: '#f8fafc', bord: '#e2e8f0', icone: 'ti-help-circle' },
-  inactif:   { label: 'Désactivé',   couleur: '#94a3b8', fond: '#f8fafc', bord: '#e2e8f0', icone: 'ti-player-pause' },
+  ok:        { label: 'À jour',      couleur: COUL.succes, fond: COUL.succesFondDoux, bord: COUL.succesBord, icone: 'ti-circle-check' },
+  en_retard: { label: 'En retard',   couleur: COUL.danger, fond: COUL.dangerFondDoux, bord: COUL.dangerBord, icone: 'ti-alert-circle' },
+  echec:     { label: 'En échec',    couleur: COUL.danger, fond: COUL.dangerFondDoux, bord: COUL.dangerBord, icone: 'ti-x' },
+  bloque:    { label: 'Bloqué',      couleur: COUL.alerte, fond: COUL.alerteFondDoux, bord: '#fde68a', icone: 'ti-hourglass' },
+  jamais:    { label: 'Jamais vu',   couleur: COUL.texteDoux, fond: COUL.fond, bord: COUL.bord, icone: 'ti-help-circle' },
+  inactif:   { label: 'Désactivé',   couleur: COUL.texteFaible, fond: COUL.fond, bord: COUL.bord, icone: 'ti-player-pause' },
 }
 
 const PLATEFORMES = {
   supabase: { label: 'Supabase', couleur: '#3ecf8e' },
-  vercel:   { label: 'Vercel',   couleur: '#0f172a' },
+  vercel:   { label: 'Vercel',   couleur: COUL.texteFort },
   github:   { label: 'GitHub',   couleur: '#6e40c9' },
   n8n:      { label: 'n8n',      couleur: '#ea4b71' },
 }
@@ -76,7 +77,7 @@ export default function ToolJobs() {
 
   const boutonRafraichir = (
     <button onClick={charger}
-      style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid #e2e8f0', background: '#fff', borderRadius: 8, padding: '7px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#334155', fontFamily: 'inherit' }}>
+      style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid #e2e8f0', background: COUL.blanc, borderRadius: 8, padding: '7px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: COUL.texteSombre, fontFamily: 'inherit' }}>
       <i className="ti ti-reload" style={{ fontSize: 14 }} /> Rafraîchir
     </button>
   )
@@ -92,8 +93,8 @@ export default function ToolJobs() {
         <Diagnostic3cx />
 
         {enAlerte.length > 0 && (
-          <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '12px 16px', marginBottom: 18, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-            <i className="ti ti-alert-triangle" style={{ color: '#dc2626', fontSize: 18, marginTop: 1 }} />
+          <div style={{ background: COUL.dangerFondDoux, border: '1px solid #fecaca', borderRadius: 10, padding: '12px 16px', marginBottom: 18, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+            <i className="ti ti-alert-triangle" style={{ color: COUL.danger, fontSize: 18, marginTop: 1 }} />
             <div style={{ fontSize: 13, color: '#991b1b' }}>
               <b>{enAlerte.length} synchronisation{enAlerte.length > 1 ? 's' : ''} à vérifier</b> —{' '}
               {enAlerte.map(j => j.libelle).join(', ')}
@@ -104,17 +105,17 @@ export default function ToolJobs() {
         {jobs === null ? (
           <Chargement />
         ) : !jobs.length ? (
-          <p style={{ color: '#94a3b8', fontSize: 13 }}>Aucun job déclaré.</p>
+          <p style={{ color: COUL.texteFaible, fontSize: 13 }}>Aucun job déclaré.</p>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(320px,1fr))', gap: 14, marginBottom: 26 }}>
             {jobs.map(j => {
               const e = ETATS[j.sante] || ETATS.jamais
-              const p = PLATEFORMES[j.plateforme] || { label: j.plateforme, couleur: '#94a3b8' }
+              const p = PLATEFORMES[j.plateforme] || { label: j.plateforme, couleur: COUL.texteFaible }
               const actif = selection === j.job
               return (
                 <div key={j.job}
                   onClick={() => setSelection(actif ? null : j.job)}
-                  style={{ background: '#fff', border: `1px solid ${actif ? NAVY : '#e2e8f0'}`, borderTop: `3px solid ${e.couleur}`, borderRadius: 12, padding: '14px 16px', cursor: 'pointer', boxShadow: actif ? '0 2px 10px rgba(13,47,94,0.12)' : '0 1px 3px rgba(0,0,0,0.04)' }}>
+                  style={{ background: COUL.blanc, border: `1px solid ${actif ? NAVY : COUL.bord}`, borderTop: `3px solid ${e.couleur}`, borderRadius: 12, padding: '14px 16px', cursor: 'pointer', boxShadow: actif ? '0 2px 10px rgba(13,47,94,0.12)' : '0 1px 3px rgba(0,0,0,0.04)' }}>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                     <span style={{ fontSize: 14, fontWeight: 800, color: NAVY, flex: 1 }}>{j.libelle}</span>
@@ -128,23 +129,23 @@ export default function ToolJobs() {
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12 }}>
                     <div>
-                      <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.04em' }}>Dernier succès</div>
-                      <div style={{ color: '#1e293b', fontWeight: 600 }}>{fmtDate(j.dernier_succes)}</div>
-                      {j.dernier_succes && <div style={{ color: '#64748b', fontSize: 11 }}>il y a {fmtAge(j.dernier_succes)}</div>}
+                      <div style={{ fontSize: 9, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.04em' }}>Dernier succès</div>
+                      <div style={{ color: COUL.texte, fontWeight: 600 }}>{fmtDate(j.dernier_succes)}</div>
+                      {j.dernier_succes && <div style={{ color: COUL.texteDoux, fontSize: 11 }}>il y a {fmtAge(j.dernier_succes)}</div>}
                     </div>
                     <div>
-                      <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.04em' }}>Lignes écrites</div>
-                      <div style={{ color: '#1e293b', fontWeight: 600 }}>{fmtNb(j.succes_lignes)}</div>
+                      <div style={{ fontSize: 9, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.04em' }}>Lignes écrites</div>
+                      <div style={{ color: COUL.texte, fontWeight: 600 }}>{fmtNb(j.succes_lignes)}</div>
                     </div>
                   </div>
 
                   {j.dernier_message && (
-                    <div style={{ marginTop: 10, fontSize: 11, color: j.dernier_statut === 'echec' ? '#dc2626' : '#64748b', lineHeight: 1.4 }}>
+                    <div style={{ marginTop: 10, fontSize: 11, color: j.dernier_statut === 'echec' ? '#dc2626' : COUL.texteDoux, lineHeight: 1.4 }}>
                       {j.dernier_message}
                     </div>
                   )}
                   {j.commentaire && (
-                    <div style={{ marginTop: 8, fontSize: 10.5, color: '#94a3b8', lineHeight: 1.4 }}>{j.commentaire}</div>
+                    <div style={{ marginTop: 8, fontSize: 10.5, color: COUL.texteFaible, lineHeight: 1.4 }}>{j.commentaire}</div>
                   )}
                 </div>
               )
@@ -158,21 +159,21 @@ export default function ToolJobs() {
           </h2>
           {selection && (
             <button onClick={() => setSelection(null)}
-              style={{ border: 'none', background: '#f1f5f9', borderRadius: 6, padding: '3px 9px', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: '#64748b', fontFamily: 'inherit' }}>
+              style={{ border: 'none', background: COUL.fondDoux, borderRadius: 6, padding: '3px 9px', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: COUL.texteDoux, fontFamily: 'inherit' }}>
               Tout voir
             </button>
           )}
         </div>
 
         {!lignes.length ? (
-          <p style={{ color: '#94a3b8', fontSize: 13 }}>
+          <p style={{ color: COUL.texteFaible, fontSize: 13 }}>
             Aucune exécution enregistrée. Le journal se remplit au prochain passage de chaque job.
           </p>
         ) : (
-          <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden' }}>
+          <div style={{ background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
-                <tr style={{ textAlign: 'left', color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                <tr style={{ textAlign: 'left', color: COUL.texteDoux, background: COUL.fond, borderBottom: '1px solid #e2e8f0' }}>
                   {['Job', 'Démarré', 'Durée', 'Déclencheur', 'Écrites', 'Statut', 'Message'].map(h => (
                     <th key={h} style={{ padding: '8px 10px', fontWeight: 700, whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
@@ -183,18 +184,18 @@ export default function ToolJobs() {
                   const duree = l.termine_a
                     ? `${Math.max(1, Math.round((new Date(l.termine_a) - new Date(l.demarre_a)) / 1000))} s`
                     : '—'
-                  const couleur = l.statut === 'succes' ? '#16a34a' : l.statut === 'echec' ? '#dc2626' : '#b45309'
+                  const couleur = l.statut === 'succes' ? '#16a34a' : l.statut === 'echec' ? '#dc2626' : COUL.alerte
                   return (
                     <tr key={l.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: '7px 10px', fontWeight: 600, color: NAVY, whiteSpace: 'nowrap' }}>{l.job}</td>
                       <td style={{ padding: '7px 10px', whiteSpace: 'nowrap' }}>{fmtDate(l.demarre_a)}</td>
-                      <td style={{ padding: '7px 10px', whiteSpace: 'nowrap', color: '#64748b' }}>{duree}</td>
-                      <td style={{ padding: '7px 10px', color: '#64748b' }}>{l.declencheur}</td>
+                      <td style={{ padding: '7px 10px', whiteSpace: 'nowrap', color: COUL.texteDoux }}>{duree}</td>
+                      <td style={{ padding: '7px 10px', color: COUL.texteDoux }}>{l.declencheur}</td>
                       <td style={{ padding: '7px 10px', textAlign: 'right' }}>{fmtNb(l.lignes_ecrites)}</td>
                       <td style={{ padding: '7px 10px', whiteSpace: 'nowrap' }}>
                         <span style={{ fontSize: 10, fontWeight: 800, color: couleur }}>{l.statut}</span>
                       </td>
-                      <td style={{ padding: '7px 10px', color: l.statut === 'echec' ? '#dc2626' : '#64748b', maxWidth: 340 }}>{l.message || '—'}</td>
+                      <td style={{ padding: '7px 10px', color: l.statut === 'echec' ? '#dc2626' : COUL.texteDoux, maxWidth: 340 }}>{l.message || '—'}</td>
                     </tr>
                   )
                 })}

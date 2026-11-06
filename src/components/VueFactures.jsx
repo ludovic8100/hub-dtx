@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { sansExtraits } from '../lib/factures'
+import { COUL } from '../lib/theme'
 
 const FONT = "'Source Sans Pro', sans-serif"
 const fmt = (v) => v === null || v === undefined ? '—'
@@ -204,28 +205,28 @@ function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, s
     ? (masquerMontant ? ['Société', 'Statut', 'Date', 'Facture', ''] : ['Société', 'Statut', 'Date', 'Facture', 'Montant', ''])
     : (masquerMontant ? ['Statut', 'Date', 'Facture', ''] : ['Statut', 'Date', 'Facture', 'Montant', ''])
 
-  if (loading) return <div style={{ padding: '50px', textAlign: 'center', color: '#94a3b8' }}>Chargement…</div>
+  if (loading) return <div style={{ padding: '50px', textAlign: 'center', color: COUL.texteFaible }}>Chargement…</div>
 
   const kpis = vente ? [
     { label: 'Total rentrées', value: total, c: color, sub: `${nbPayees} encaissées • ${nbNonPayees} à vérifier` },
-    { label: 'Encaissées', value: nbPayees, c: '#16a34a', sub: 'liées à un mouvement', clic: 'payees' },
-    { label: 'Factures à encaisser', value: nbNonPayees, c: '#dc2626', sub: 'aucun mouvement lié', clic: 'nonpayees' },
+    { label: 'Encaissées', value: nbPayees, c: COUL.succes, sub: 'liées à un mouvement', clic: 'payees' },
+    { label: 'Factures à encaisser', value: nbNonPayees, c: COUL.danger, sub: 'aucun mouvement lié', clic: 'nonpayees' },
     { label: 'Rapprochements douteux', value: nbDouteux, c: '#d97706', sub: 'montant ≠ mouvement lié', clic: 'douteux' },
   ] : [
     { label: 'Total dépenses', value: total, c: color, sub: `${nbPayees} payées • ${nbNonPayees} à vérifier` },
-    { label: 'Payées', value: nbPayees, c: '#16a34a', sub: 'liées à un paiement', clic: 'payees' },
-    { label: 'Factures à vérifier', value: nbNonPayees, c: '#dc2626', sub: 'aucun paiement lié', clic: 'nonpayees' },
+    { label: 'Payées', value: nbPayees, c: COUL.succes, sub: 'liées à un paiement', clic: 'payees' },
+    { label: 'Factures à vérifier', value: nbNonPayees, c: COUL.danger, sub: 'aucun paiement lié', clic: 'nonpayees' },
     { label: 'Rapprochements douteux', value: nbDouteux, c: '#d97706', sub: 'montant ≠ paiement lié', clic: 'douteux' },
-    { label: 'Paiements à vérifier', value: nbPaiementsAVerifier, c: '#ea580c', sub: 'mouvement sans facture' },
+    { label: 'Paiements à vérifier', value: nbPaiementsAVerifier, c: COUL.orange, sub: 'mouvement sans facture' },
   ]
 
   return (
     <>
       <KpiRow kpis={kpis} actif={filtre.statut} onClic={(v) => setFiltre(f => ({ ...f, statut: f.statut === v ? 'toutes' : v }))} />
       <FiltreBar filtre={filtre} setFiltre={setFiltre} anneesDispo={anneesDispo} societesDispo={multiSociete ? societesDispo : null} placeholder="Nom de facture…" reset={() => setFiltre({ statut: 'toutes', recherche: '', annee: '', societe: '' })} />
-      <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+      <div style={{ background: COUL.blanc, borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
         <Ligne header cols={cols} items={entetes} />
-        {facturesPage.length === 0 && <div style={{ padding: '50px', textAlign: 'center', color: '#94a3b8' }}>Aucune facture</div>}
+        {facturesPage.length === 0 && <div style={{ padding: '50px', textAlign: 'center', color: COUL.texteFaible }}>Aucune facture</div>}
         {facturesPage.map((f, i) => {
           const payee = !!f.transaction_id
           const r = etatRappro(f)
@@ -238,15 +239,15 @@ function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, s
             : r.etat === 'introuvable' ? 'Lien cassé : le mouvement lié est introuvable — cliquer pour délier'
             : `${grp > 1 ? `Paiement groupé (${grp} factures) · ` : ''}Rapproché avec ${detailMvt} — cliquer pour délier`
           const cells = [
-            ...(multiSociete ? [<span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: '600' }}>{f.societe}</span>] : []),
+            ...(multiSociete ? [<span style={{ fontSize: '12px', color: COUL.texteFaible, fontWeight: '600' }}>{f.societe}</span>] : []),
             <span onClick={(e) => { e.stopPropagation(); payee ? delierPaiement(f) : setLierPaiement(f) }} style={{ cursor: 'pointer' }}
               title={titreBadge}>
               <BadgeRappro etat={r.etat} vente={vente} montantMvt={mvt ? Math.abs(mvt.montant) : null} />
             </span>,
-            <span style={{ fontSize: '12.5px', color: '#64748b', fontWeight: '600' }}>{fmtDate(f.date_facture)}</span>,
-            <span style={{ fontSize: '13px', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '10px' }}>{(f.nom || '').replace(/\.pdf$/i, '')}</span>,
-            ...(masquerMontant ? [] : [<span style={{ textAlign: 'right', display: 'block', fontSize: '13.5px', fontWeight: '700', color: f.montant == null ? '#cbd5e1' : (vente ? '#16a34a' : '#dc2626') }}>{f.montant == null ? '—' : (vente ? '+ ' : '- ') + fmt(Math.abs(f.montant))}</span>]),
-            <button onClick={(e) => { e.stopPropagation(); basculerSens(f) }} title={vente ? 'Reclasser dans les Dépenses' : 'Reclasser dans les Rentrées'} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '30px', height: '30px', margin: '0 auto', borderRadius: '7px', border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', cursor: 'pointer' }}><i className="ti ti-transfer" style={{ fontSize: '16px' }} /></button>,
+            <span style={{ fontSize: '12.5px', color: COUL.texteDoux, fontWeight: '600' }}>{fmtDate(f.date_facture)}</span>,
+            <span style={{ fontSize: '13px', color: COUL.texteFort, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '10px' }}>{(f.nom || '').replace(/\.pdf$/i, '')}</span>,
+            ...(masquerMontant ? [] : [<span style={{ textAlign: 'right', display: 'block', fontSize: '13.5px', fontWeight: '700', color: f.montant == null ? '#cbd5e1' : (vente ? '#16a34a' : COUL.danger) }}>{f.montant == null ? '—' : (vente ? '+ ' : '- ') + fmt(Math.abs(f.montant))}</span>]),
+            <button onClick={(e) => { e.stopPropagation(); basculerSens(f) }} title={vente ? 'Reclasser dans les Dépenses' : 'Reclasser dans les Rentrées'} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '30px', height: '30px', margin: '0 auto', borderRadius: '7px', border: '1px solid #e2e8f0', background: COUL.blanc, color: COUL.texteDoux, cursor: 'pointer' }}><i className="ti ti-transfer" style={{ fontSize: '16px' }} /></button>,
           ]
           return <Ligne key={f.fichier_id} cols={cols} items={cells} onClick={() => ouvrir(f)} clickable={!!f.url} alt={i % 2 === 1} title={f.nom} />
         })}
@@ -298,31 +299,31 @@ function VueVentes({ tables, color }) {
   const totalPages = Math.ceil(filtrees.length / PAR_PAGE)
   const facturesPage = filtrees.slice((page - 1) * PAR_PAGE, page * PAR_PAGE)
 
-  if (loading) return <div style={{ padding: '50px', textAlign: 'center', color: '#94a3b8' }}>Chargement des rentrées…</div>
-  if (tables.length === 0) return <div style={{ padding: '50px', textAlign: 'center', color: '#94a3b8', background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0' }}>Pas de module de facturation pour cette entité.</div>
+  if (loading) return <div style={{ padding: '50px', textAlign: 'center', color: COUL.texteFaible }}>Chargement des rentrées…</div>
+  if (tables.length === 0) return <div style={{ padding: '50px', textAlign: 'center', color: COUL.texteFaible, background: COUL.blanc, borderRadius: '12px', border: '1px solid #e2e8f0' }}>Pas de module de facturation pour cette entité.</div>
 
   const kpis = [
     { label: 'Total rentrées', value: factures.length, c: color, sub: `${nbPayees} encaissées • ${nbNonPayees} en attente` },
-    { label: 'Encaissées', value: nbPayees, c: '#16a34a', sub: 'payées par le client', clic: 'payees' },
-    { label: 'En attente', value: nbNonPayees, c: '#dc2626', sub: 'non encore payées', clic: 'nonpayees' },
-    { label: 'Montant à encaisser', value: fmt(montantAEncaisser), c: '#dc2626', sub: 'solde dû par les clients' },
+    { label: 'Encaissées', value: nbPayees, c: COUL.succes, sub: 'payées par le client', clic: 'payees' },
+    { label: 'En attente', value: nbNonPayees, c: COUL.danger, sub: 'non encore payées', clic: 'nonpayees' },
+    { label: 'Montant à encaisser', value: fmt(montantAEncaisser), c: COUL.danger, sub: 'solde dû par les clients' },
   ]
 
   return (
     <>
       <KpiRow kpis={kpis} actif={filtre.statut} onClic={(v) => setFiltre(f => ({ ...f, statut: f.statut === v ? 'toutes' : v }))} />
       <FiltreBar filtre={filtre} setFiltre={setFiltre} anneesDispo={anneesDispo} placeholder="Client, n° ou objet…" reset={() => setFiltre({ statut: 'toutes', recherche: '', annee: '' })} />
-      <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+      <div style={{ background: COUL.blanc, borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
         <Ligne header cols={['100px', '110px', '110px', '1fr', '130px']} items={['Statut', 'Date', 'N°', 'Client', 'Montant TTC']} />
-        {facturesPage.length === 0 && <div style={{ padding: '50px', textAlign: 'center', color: '#94a3b8' }}>Aucune rentrée</div>}
+        {facturesPage.length === 0 && <div style={{ padding: '50px', textAlign: 'center', color: COUL.texteFaible }}>Aucune rentrée</div>}
         {facturesPage.map((f, i) => {
           const payee = estPayee(f)
           const cells = [
             <Badge payee={payee} labelPayee="✓ Encaissée" labelNon="✕ En attente" />,
-            <span style={{ fontSize: '12.5px', color: '#64748b', fontWeight: '600' }}>{fmtDate(f.date_facture)}</span>,
-            <span style={{ fontSize: '12.5px', color: '#475569', fontWeight: '600' }}>{f.numero || '—'}</span>,
-            <span style={{ fontSize: '13px', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '10px' }}>{f.client_nom || f.objet || '—'}</span>,
-            <span style={{ textAlign: 'right', display: 'block', fontSize: '13.5px', fontWeight: '700', color: '#16a34a' }}>{'+ ' + fmt(f.total_ttc)}</span>,
+            <span style={{ fontSize: '12.5px', color: COUL.texteDoux, fontWeight: '600' }}>{fmtDate(f.date_facture)}</span>,
+            <span style={{ fontSize: '12.5px', color: COUL.texteMoyen, fontWeight: '600' }}>{f.numero || '—'}</span>,
+            <span style={{ fontSize: '13px', color: COUL.texteFort, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '10px' }}>{f.client_nom || f.objet || '—'}</span>,
+            <span style={{ textAlign: 'right', display: 'block', fontSize: '13.5px', fontWeight: '700', color: COUL.succes }}>{'+ ' + fmt(f.total_ttc)}</span>,
           ]
           return <Ligne key={f.id} cols={['100px', '110px', '110px', '1fr', '130px']} items={cells} alt={i % 2 === 1} />
         })}
@@ -338,10 +339,10 @@ function KpiRow({ kpis, actif, onClic }) {
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', marginBottom: '14px' }}>
       {kpis.map((k, i) => (
         <div key={i} onClick={k.clic ? () => onClic(k.clic) : undefined}
-          style={{ background: (k.clic && actif === k.clic) ? '#f8fafc' : '#fff', borderRadius: '10px', border: `1px solid ${(k.clic && actif === k.clic) ? '#cbd5e1' : '#e2e8f0'}`, borderTop: `3px solid ${k.c}`, padding: '16px 20px', cursor: k.clic ? 'pointer' : 'default' }}>
-          <div style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>{k.label}</div>
+          style={{ background: (k.clic && actif === k.clic) ? '#f8fafc' : COUL.blanc, borderRadius: '10px', border: `1px solid ${(k.clic && actif === k.clic) ? '#cbd5e1' : COUL.bord}`, borderTop: `3px solid ${k.c}`, padding: '16px 20px', cursor: k.clic ? 'pointer' : 'default' }}>
+          <div style={{ fontSize: '11px', fontWeight: '700', color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>{k.label}</div>
           <div style={{ fontSize: '20px', fontWeight: '800', color: k.c, lineHeight: 1 }}>{k.value}</div>
-          {k.sub && <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '5px', fontWeight: '600' }}>{k.sub}</div>}
+          {k.sub && <div style={{ fontSize: '11px', color: COUL.texteFaible, marginTop: '5px', fontWeight: '600' }}>{k.sub}</div>}
         </div>
       ))}
     </div>
@@ -350,25 +351,25 @@ function KpiRow({ kpis, actif, onClic }) {
 
 function FiltreBar({ filtre, setFiltre, anneesDispo, placeholder, reset, societesDispo }) {
   return (
-    <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '14px 16px', marginBottom: '14px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+    <div style={{ background: COUL.blanc, borderRadius: '12px', border: '1px solid #e2e8f0', padding: '14px 16px', marginBottom: '14px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-        <label style={{ fontSize: '10px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Statut</label>
+        <label style={{ fontSize: '10px', fontWeight: '700', color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Statut</label>
         <div style={{ display: 'flex', gap: '4px' }}>
           {[['toutes', 'Toutes', '#64748b'], ['payees', '✓ Payées', '#16a34a'], ['nonpayees', '✕ À vérifier', '#dc2626']].map(([v, l, c]) => (
             <button key={v} onClick={() => setFiltre(f => ({ ...f, statut: v }))} style={{
               padding: '7px 12px', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: FONT,
-              border: `1px solid ${filtre.statut === v ? c : '#e2e8f0'}`, background: filtre.statut === v ? c : '#fff', color: filtre.statut === v ? '#fff' : '#64748b'
+              border: `1px solid ${filtre.statut === v ? c : COUL.bord}`, background: filtre.statut === v ? c : COUL.blanc, color: filtre.statut === v ? '#fff' : COUL.texteDoux
             }}>{l}</button>
           ))}
         </div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', flex: 1, minWidth: '180px' }}>
-        <label style={{ fontSize: '10px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Recherche</label>
+        <label style={{ fontSize: '10px', fontWeight: '700', color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Recherche</label>
         <input value={filtre.recherche} onChange={e => setFiltre(f => ({ ...f, recherche: e.target.value }))} placeholder={placeholder}
           style={{ padding: '7px 10px', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '13px', fontFamily: FONT }} />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-        <label style={{ fontSize: '10px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Année</label>
+        <label style={{ fontSize: '10px', fontWeight: '700', color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Année</label>
         <select value={filtre.annee} onChange={e => setFiltre(f => ({ ...f, annee: e.target.value }))} style={{ padding: '7px 10px', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '13px', fontFamily: FONT, cursor: 'pointer' }}>
           <option value="">Toutes</option>
           {anneesDispo.map(a => <option key={a} value={a}>{a}</option>)}
@@ -376,7 +377,7 @@ function FiltreBar({ filtre, setFiltre, anneesDispo, placeholder, reset, societe
       </div>
       {societesDispo && societesDispo.length > 1 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-          <label style={{ fontSize: '10px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Société</label>
+          <label style={{ fontSize: '10px', fontWeight: '700', color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Société</label>
           <select value={filtre.societe || ''} onChange={e => setFiltre(f => ({ ...f, societe: e.target.value }))} style={{ padding: '7px 10px', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '13px', fontFamily: FONT, cursor: 'pointer' }}>
             <option value="">Toutes</option>
             {societesDispo.map(sc => <option key={sc} value={sc}>{sc}</option>)}
@@ -384,7 +385,7 @@ function FiltreBar({ filtre, setFiltre, anneesDispo, placeholder, reset, societe
         </div>
       )}
       {(filtre.statut !== 'toutes' || filtre.recherche || filtre.annee || filtre.societe) && (
-        <button onClick={reset} style={{ padding: '7px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', fontFamily: FONT }}>Réinitialiser</button>
+        <button onClick={reset} style={{ padding: '7px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', border: '1px solid #e2e8f0', background: COUL.blanc, color: COUL.texteDoux, fontFamily: FONT }}>Réinitialiser</button>
       )}
     </div>
   )
@@ -392,7 +393,7 @@ function FiltreBar({ filtre, setFiltre, anneesDispo, placeholder, reset, societe
 
 function Badge({ payee, labelPayee, labelNon }) {
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: '700', background: payee ? '#dcfce7' : '#fee2e2', color: payee ? '#16a34a' : '#dc2626' }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: '700', background: payee ? '#dcfce7' : COUL.dangerFond, color: payee ? '#16a34a' : COUL.danger }}>
       {payee ? labelPayee : labelNon}
     </span>
   )
@@ -401,10 +402,10 @@ function Badge({ payee, labelPayee, labelNon }) {
 // Badge de rapprochement à 3 états : vert (lié, montant OK), orange (lié mais montant ≠ / lien cassé), rouge (pas lié)
 function BadgeRappro({ etat, vente, montantMvt }) {
   const map = {
-    ok:          { bg: '#dcfce7', fg: '#16a34a', txt: vente ? '✓ Encaissée' : '✓ Payée' },
-    non:         { bg: '#fee2e2', fg: '#dc2626', txt: '🔍 Rechercher mouvement' },
-    douteux:     { bg: '#fef3c7', fg: '#b45309', txt: `⚠ ${fmt(montantMvt)}` },
-    introuvable: { bg: '#fef3c7', fg: '#b45309', txt: '⚠ lien cassé' },
+    ok:          { bg: COUL.succesFond, fg: COUL.succes, txt: vente ? '✓ Encaissée' : '✓ Payée' },
+    non:         { bg: COUL.dangerFond, fg: COUL.danger, txt: '🔍 Rechercher mouvement' },
+    douteux:     { bg: COUL.alerteFond, fg: COUL.alerte, txt: `⚠ ${fmt(montantMvt)}` },
+    introuvable: { bg: COUL.alerteFond, fg: COUL.alerte, txt: '⚠ lien cassé' },
   }
   const s = map[etat] || map.non
   return (
@@ -419,8 +420,8 @@ function Ligne({ cols, items, header, onClick, clickable, alt, title }) {
     <div onClick={onClick} title={title}
       style={{ display: 'grid', gridTemplateColumns: cols.join(' '), padding: header ? '11px 16px' : '10px 16px', alignItems: 'center',
         borderBottom: header ? '2px solid #f1f5f9' : '1px solid #f8fafc', cursor: clickable ? 'pointer' : 'default',
-        background: header ? '#fff' : (alt ? '#fafafa' : '#fff'),
-        fontSize: header ? '11px' : '13px', fontWeight: header ? '700' : '400', color: header ? '#94a3b8' : '#0f172a',
+        background: header ? '#fff' : (alt ? '#fafafa' : COUL.blanc),
+        fontSize: header ? '11px' : '13px', fontWeight: header ? '700' : '400', color: header ? '#94a3b8' : COUL.texteFort,
         textTransform: header ? 'uppercase' : 'none', letterSpacing: header ? '0.04em' : 'normal' }}>
       {items.map((it, i) => <div key={i} style={i === items.length - 1 && header ? { textAlign: 'right' } : {}}>{it}</div>)}
     </div>
@@ -431,9 +432,9 @@ function Pagination({ page, totalPages, setPage, total }) {
   if (totalPages <= 1) return null
   return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginTop: '16px' }}>
-      <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} style={{ padding: '7px 14px', borderRadius: '7px', border: '1px solid #e2e8f0', background: page <= 1 ? '#f1f5f9' : '#fff', color: page <= 1 ? '#cbd5e1' : '#334155', cursor: page <= 1 ? 'default' : 'pointer', fontSize: '13px', fontWeight: '600', fontFamily: FONT }}>← Précédent</button>
-      <span style={{ fontSize: '13px', color: '#64748b', fontWeight: '600' }}>Page {page} / {totalPages} · {total} factures</span>
-      <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} style={{ padding: '7px 14px', borderRadius: '7px', border: '1px solid #e2e8f0', background: page >= totalPages ? '#f1f5f9' : '#fff', color: page >= totalPages ? '#cbd5e1' : '#334155', cursor: page >= totalPages ? 'default' : 'pointer', fontSize: '13px', fontWeight: '600', fontFamily: FONT }}>Suivant →</button>
+      <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} style={{ padding: '7px 14px', borderRadius: '7px', border: '1px solid #e2e8f0', background: page <= 1 ? '#f1f5f9' : COUL.blanc, color: page <= 1 ? '#cbd5e1' : COUL.texteSombre, cursor: page <= 1 ? 'default' : 'pointer', fontSize: '13px', fontWeight: '600', fontFamily: FONT }}>← Précédent</button>
+      <span style={{ fontSize: '13px', color: COUL.texteDoux, fontWeight: '600' }}>Page {page} / {totalPages} · {total} factures</span>
+      <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} style={{ padding: '7px 14px', borderRadius: '7px', border: '1px solid #e2e8f0', background: page >= totalPages ? '#f1f5f9' : COUL.blanc, color: page >= totalPages ? '#cbd5e1' : COUL.texteSombre, cursor: page >= totalPages ? 'default' : 'pointer', fontSize: '13px', fontWeight: '600', fontFamily: FONT }}>Suivant →</button>
     </div>
   )
 }
@@ -517,59 +518,59 @@ function PanneauLierPaiement({ facture, color, onClose, onLier, tousComptes = fa
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT }} onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: '14px', width: 'min(620px, 94vw)', maxHeight: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: COUL.blanc, borderRadius: '14px', width: 'min(620px, 94vw)', maxHeight: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: '12px' }}>
           {facture.fichier_id && (
             <img src={`/api/apercu-facture?fid=${facture.fichier_id}`} alt=""
               onClick={() => facture.url && window.open(facture.url, '_blank', 'noopener,noreferrer')}
               onError={e => { e.currentTarget.style.display = 'none' }}
               title="Ouvrir la facture"
-              style={{ width: '46px', height: '60px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #e2e8f0', flexShrink: 0, cursor: facture.url ? 'pointer' : 'default', background: '#f8fafc' }} />
+              style={{ width: '46px', height: '60px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #e2e8f0', flexShrink: 0, cursor: facture.url ? 'pointer' : 'default', background: COUL.fond }} />
           )}
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a' }}>Rechercher un mouvement</div>
-            <div style={{ fontSize: '12.5px', color: '#64748b', marginTop: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(facture.nom || '').replace(/\.pdf$/i, '')} — <strong>{fmt(facture.montant)}</strong></div>
+            <div style={{ fontSize: '15px', fontWeight: '800', color: COUL.texteFort }}>Rechercher un mouvement</div>
+            <div style={{ fontSize: '12.5px', color: COUL.texteDoux, marginTop: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(facture.nom || '').replace(/\.pdf$/i, '')} — <strong>{fmt(facture.montant)}</strong></div>
           </div>
         </div>
         <div style={{ padding: '12px 20px', borderBottom: '1px solid #f1f5f9' }}>
           <input value={recherche} onChange={e => setRecherche(e.target.value)} placeholder="Rechercher sur tout : contrepartie, IBAN, communication, montant, date…" autoFocus
             style={{ width: '100%', padding: '9px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', fontFamily: FONT, boxSizing: 'border-box' }} />
-          {!recherche && montantCible > 0 && <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px' }}>{tous.length} mouvements non liés · triés par montant proche de {fmt(montantCible)}</div>}
-          {recherche && <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px' }}>{mouvements.length} résultat{mouvements.length > 1 ? 's' : ''}</div>}
+          {!recherche && montantCible > 0 && <div style={{ fontSize: '11px', color: COUL.texteFaible, marginTop: '6px' }}>{tous.length} mouvements non liés · triés par montant proche de {fmt(montantCible)}</div>}
+          {recherche && <div style={{ fontSize: '11px', color: COUL.texteFaible, marginTop: '6px' }}>{mouvements.length} résultat{mouvements.length > 1 ? 's' : ''}</div>}
         </div>
         <div style={{ overflowY: 'auto', flex: 1 }}>
-          {loading && <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>Recherche…</div>}
-          {!loading && mouvements.length === 0 && <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>Aucun mouvement correspondant.</div>}
+          {loading && <div style={{ padding: '40px', textAlign: 'center', color: COUL.texteFaible }}>Recherche…</div>}
+          {!loading && mouvements.length === 0 && <div style={{ padding: '40px', textAlign: 'center', color: COUL.texteFaible }}>Aucun mouvement correspondant.</div>}
           {!loading && mouvements.map(m => {
             const exact = Math.abs(Math.abs(m.montant) - montantCible) < 0.01
             return (
-              <div key={m.id} onClick={() => toggle(m.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '11px 20px', borderBottom: '1px solid #f8fafc', cursor: 'pointer', background: sel.includes(m.id) ? '#eff6ff' : '#fff' }}
-                onMouseEnter={e => { if (!sel.includes(m.id)) e.currentTarget.style.background = '#f8fafc' }} onMouseLeave={e => { e.currentTarget.style.background = sel.includes(m.id) ? '#eff6ff' : '#fff' }}>
+              <div key={m.id} onClick={() => toggle(m.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '11px 20px', borderBottom: '1px solid #f8fafc', cursor: 'pointer', background: sel.includes(m.id) ? '#eff6ff' : COUL.blanc }}
+                onMouseEnter={e => { if (!sel.includes(m.id)) e.currentTarget.style.background = COUL.fond }} onMouseLeave={e => { e.currentTarget.style.background = sel.includes(m.id) ? '#eff6ff' : COUL.blanc }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '11px', minWidth: 0 }}>
-                  <span style={{ width: '18px', height: '18px', flexShrink: 0, borderRadius: '5px', border: sel.includes(m.id) ? 'none' : '2px solid #cbd5e1', background: sel.includes(m.id) ? color : '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{sel.includes(m.id) && <i className="ti ti-check" style={{ fontSize: '12px', color: '#fff' }} />}</span>
+                  <span style={{ width: '18px', height: '18px', flexShrink: 0, borderRadius: '5px', border: sel.includes(m.id) ? 'none' : '2px solid #cbd5e1', background: sel.includes(m.id) ? color : COUL.blanc, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{sel.includes(m.id) && <i className="ti ti-check" style={{ fontSize: '12px', color: COUL.blanc }} />}</span>
                   <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.contrepartie_nom || 'Mouvement'}</div>
-                  <div style={{ fontSize: '11.5px', color: '#94a3b8' }}>{fmtDate(m.date_valeur || m.date_execution)} · {m.comptes_bancaires?.banque || ''}{tousComptes && m.comptes_bancaires?.societes?.code ? ` · ${m.comptes_bancaires.societes.code}` : ''}</div>
-                  {m.information_paiement && <div title={m.information_paiement} style={{ fontSize: '11px', color: '#64748b', overflow: 'hidden', marginTop: '2px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', lineHeight: '1.4', wordBreak: 'break-word' }}><i className="ti ti-file-description" style={{ fontSize: '11px', color: '#cbd5e1', marginRight: '3px' }} />{m.information_paiement.replace(/[\r\n]+/g, ' · ').replace(/\s+/g, ' ').trim()}</div>}
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: COUL.texteFort, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.contrepartie_nom || 'Mouvement'}</div>
+                  <div style={{ fontSize: '11.5px', color: COUL.texteFaible }}>{fmtDate(m.date_valeur || m.date_execution)} · {m.comptes_bancaires?.banque || ''}{tousComptes && m.comptes_bancaires?.societes?.code ? ` · ${m.comptes_bancaires.societes.code}` : ''}</div>
+                  {m.information_paiement && <div title={m.information_paiement} style={{ fontSize: '11px', color: COUL.texteDoux, overflow: 'hidden', marginTop: '2px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', lineHeight: '1.4', wordBreak: 'break-word' }}><i className="ti ti-file-description" style={{ fontSize: '11px', color: COUL.bordFort, marginRight: '3px' }} />{m.information_paiement.replace(/[\r\n]+/g, ' · ').replace(/\s+/g, ' ').trim()}</div>}
                 </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-                  {exact && <span style={{ fontSize: '10px', fontWeight: '700', color: '#16a34a', background: '#dcfce7', padding: '2px 7px', borderRadius: '12px' }}>montant exact</span>}
-                  <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#dc2626' }}>{fmt(m.montant)}</span>
+                  {exact && <span style={{ fontSize: '10px', fontWeight: '700', color: COUL.succes, background: COUL.succesFond, padding: '2px 7px', borderRadius: '12px' }}>montant exact</span>}
+                  <span style={{ fontSize: '13.5px', fontWeight: '700', color: COUL.danger }}>{fmt(m.montant)}</span>
                 </div>
               </div>
             )
           })}
         </div>
         <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-          <div style={{ fontSize: '12.5px', color: '#64748b', minWidth: 0 }}>
+          <div style={{ fontSize: '12.5px', color: COUL.texteDoux, minWidth: 0 }}>
             {sel.length > 0
-              ? <span>{sel.length} sélectionné{sel.length > 1 ? 's' : ''} · &Sigma; <strong style={{ color: ecartOk ? '#16a34a' : '#0f172a' }}>{fmt(sommeSel)}</strong>{montantCible > 0 && !ecartOk && <span style={{ color: '#94a3b8' }}> / {fmt(montantCible)}</span>}{ecartOk && <span style={{ color: '#16a34a', fontWeight: 700 }}> &#10003;</span>}</span>
-              : <span style={{ color: '#94a3b8' }}>Cochez un ou plusieurs mouvements</span>}
+              ? <span>{sel.length} sélectionné{sel.length > 1 ? 's' : ''} · &Sigma; <strong style={{ color: ecartOk ? '#16a34a' : COUL.texteFort }}>{fmt(sommeSel)}</strong>{montantCible > 0 && !ecartOk && <span style={{ color: COUL.texteFaible }}> / {fmt(montantCible)}</span>}{ecartOk && <span style={{ color: COUL.succes, fontWeight: 700 }}> &#10003;</span>}</span>
+              : <span style={{ color: COUL.texteFaible }}>Cochez un ou plusieurs mouvements</span>}
           </div>
           <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-            <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', cursor: 'pointer', fontSize: '13px', fontWeight: '600', fontFamily: FONT }}>Annuler</button>
-            <button onClick={() => sel.length && onLier(selMouvements)} disabled={sel.length === 0} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: sel.length ? color : '#e2e8f0', color: sel.length ? '#fff' : '#94a3b8', cursor: sel.length ? 'pointer' : 'default', fontSize: '13px', fontWeight: '700', fontFamily: FONT }}>{sel.length > 1 ? `Lier ${sel.length} mouvements` : 'Lier ce paiement'}</button>
+            <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #e2e8f0', background: COUL.blanc, color: COUL.texteDoux, cursor: 'pointer', fontSize: '13px', fontWeight: '600', fontFamily: FONT }}>Annuler</button>
+            <button onClick={() => sel.length && onLier(selMouvements)} disabled={sel.length === 0} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: sel.length ? color : COUL.bord, color: sel.length ? '#fff' : COUL.texteFaible, cursor: sel.length ? 'pointer' : 'default', fontSize: '13px', fontWeight: '700', fontFamily: FONT }}>{sel.length > 1 ? `Lier ${sel.length} mouvements` : 'Lier ce paiement'}</button>
           </div>
         </div>
       </div>

@@ -10,8 +10,9 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { COUL } from '../lib/theme'
 
-const COULEUR = '#0080BD'
+const COULEUR = COUL.bleu
 
 // Lance le reload et renvoie { ok, status, error }
 export async function lancerSyncQlik() {
@@ -71,7 +72,7 @@ export function BoutonSyncQlik({ style, onDark, compact }) {
   const running = etat === 'running'
   const fond = onDark
     ? (running ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.92)')
-    : (running ? '#f1f5f9' : etat === 'ok' ? '#f0fdf4' : etat === 'error' ? '#fef2f2' : '#fff')
+    : (running ? '#f1f5f9' : etat === 'ok' ? '#f0fdf4' : etat === 'error' ? '#fef2f2' : COUL.blanc)
   const bordure = onDark ? '1px solid rgba(255,255,255,0.3)' : (etat === 'error' ? '1px solid #fecaca' : '1px solid #e2e8f0')
   const couleurIcone = running ? '#94a3b8' : etat === 'ok' ? '#16a34a' : etat === 'error' ? '#dc2626' : COULEUR
   const dateSync = dernier
@@ -87,26 +88,26 @@ export function BoutonSyncQlik({ style, onDark, compact }) {
           padding: compact ? '4px 9px' : '7px 12px', borderRadius: compact ? 7 : 8,
           border: bordure, background: fond, cursor: running ? 'wait' : 'pointer',
           fontSize: compact ? 11.5 : 12, fontWeight: 600, fontFamily: "'Source Sans Pro', sans-serif",
-          color: onDark ? '#1e293b' : '#334155', whiteSpace: 'nowrap',
+          color: onDark ? '#1e293b' : COUL.texteSombre, whiteSpace: 'nowrap',
         }}>
         <i className={`ti ${running ? 'ti-loader-2' : etat === 'ok' ? 'ti-check' : etat === 'error' ? 'ti-x' : 'ti-database-import'}`}
           style={{ color: couleurIcone, fontSize: compact ? 14 : 15, animation: running ? 'spin 1s linear infinite' : 'none' }} />
         <span>{compact ? 'Qlik' : 'Recharger depuis Qlik'}</span>
         {dateSync && (
           <span title="Dernière donnée reçue (heure belge)"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, paddingLeft: 6, borderLeft: '1px solid #e2e8f0', color: '#334155', fontSize: compact ? 10 : 11, fontWeight: 600 }}>
-            <i className="ti ti-clock" style={{ fontSize: compact ? 11 : 12, color: '#64748b' }} />
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, paddingLeft: 6, borderLeft: '1px solid #e2e8f0', color: COUL.texteSombre, fontSize: compact ? 10 : 11, fontWeight: 600 }}>
+            <i className="ti ti-clock" style={{ fontSize: compact ? 11 : 12, color: COUL.texteDoux }} />
             {dateSync}
           </span>
         )}
       </button>
       {erreur && (
-        <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 50, minWidth: 240, maxWidth: 340, background: '#fff', border: '1px solid #fecaca', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.15)', padding: '10px 12px' }}>
+        <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 50, minWidth: 240, maxWidth: 340, background: COUL.blanc, border: '1px solid #fecaca', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.15)', padding: '10px 12px' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-            <i className="ti ti-alert-triangle" style={{ color: '#dc2626', fontSize: 16, marginTop: 1 }} />
-            <div style={{ flex: 1, fontSize: 12, color: '#334155', lineHeight: 1.45 }}>{erreur}</div>
+            <i className="ti ti-alert-triangle" style={{ color: COUL.danger, fontSize: 16, marginTop: 1 }} />
+            <div style={{ flex: 1, fontSize: 12, color: COUL.texteSombre, lineHeight: 1.45 }}>{erreur}</div>
             <button onClick={(e) => { e.stopPropagation(); setErreur(null) }}
-              style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 16, lineHeight: 1, padding: 0 }}>✕</button>
+              style={{ border: 'none', background: 'none', cursor: 'pointer', color: COUL.texteFaible, fontSize: 16, lineHeight: 1, padding: 0 }}>✕</button>
           </div>
         </div>
       )}

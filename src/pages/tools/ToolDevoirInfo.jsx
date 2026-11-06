@@ -6,19 +6,20 @@ import { traduitGarantie } from '../../lib/garantieFr'
 import { buildDevoirInfoPdf, genererMotivation } from '../../lib/devoirInfoPdf'
 import * as pdfjsLib from 'pdfjs-dist'
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.js?url'
+import { COUL } from '../../lib/theme'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
 // Devoir d'information non-vie (IARD) : client + contrat (Supabase) + PDF des conditions
 // particulières → document pré-rempli, vérifié, signé sur tablette, archivé (bucket devoir-info).
 
-const NAVY = '#1A3A6B'
-const card = { border: '1px solid #e2e8f0', borderRadius: 12, padding: '18px 20px', background: '#fff', marginBottom: 14 }
-const h2 = { fontSize: 15, fontWeight: 700, color: '#1e293b', marginBottom: 10 }
-const lab = { fontSize: 12, color: '#64748b', margin: '10px 0 4px', display: 'block' }
+const NAVY = COUL.marineClair
+const card = { border: '1px solid #e2e8f0', borderRadius: 12, padding: '18px 20px', background: COUL.blanc, marginBottom: 14 }
+const h2 = { fontSize: 15, fontWeight: 700, color: COUL.texte, marginBottom: 10 }
+const lab = { fontSize: 12, color: COUL.texteDoux, margin: '10px 0 4px', display: 'block' }
 const inp = { width: '100%', padding: '9px 12px', fontSize: 14, border: '1px solid #cbd5e1', borderRadius: 8, boxSizing: 'border-box', fontFamily: 'inherit' }
-const btn = { background: NAVY, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 14, fontWeight: 700, cursor: 'pointer' }
-const btn2 = { background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }
+const btn = { background: NAVY, color: COUL.blanc, border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 14, fontWeight: 700, cursor: 'pointer' }
+const btn2 = { background: COUL.fondDoux, color: COUL.texteMoyen, border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }
 const DOCS = ['Fiche produit', 'Conditions générales', 'Conditions particulières']
 
 const norm = s => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ')
@@ -60,7 +61,7 @@ function SignaturePad({ label, onChange }) {
   useEffect(() => {
     const cv = ref.current, r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1
     cv.width = r.width * dpr; cv.height = r.height * dpr
-    const ctx = cv.getContext('2d'); ctx.scale(dpr, dpr); ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.strokeStyle = '#0f172a'
+    const ctx = cv.getContext('2d'); ctx.scale(dpr, dpr); ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.strokeStyle = COUL.texteFort
   }, [])
   const pos = e => { const r = ref.current.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top] }
   const down = e => { e.preventDefault(); ref.current.setPointerCapture(e.pointerId); drawing.current = true; const ctx = ref.current.getContext('2d'); ctx.beginPath(); ctx.moveTo(...pos(e)) }
@@ -74,7 +75,7 @@ function SignaturePad({ label, onChange }) {
         <button type="button" onClick={effacer} style={{ ...btn2, padding: '3px 10px', fontSize: 12 }}>Effacer</button>
       </div>
       <canvas ref={ref} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerLeave={up}
-        style={{ width: '100%', height: 140, border: '1px dashed #94a3b8', borderRadius: 8, background: '#f8fafc', touchAction: 'none' }} />
+        style={{ width: '100%', height: 140, border: '1px dashed #94a3b8', borderRadius: 8, background: COUL.fond, touchAction: 'none' }} />
     </div>
   )
 }
@@ -206,7 +207,7 @@ export default function ToolDevoirInfo() {
   const reset = () => { setClient(null); setQ(''); setContrats([]); setContrat(null); setEtat({}); setCatalogue([]); setSigC(null); setSigG(null); setMsg(null); setRaison(''); setMotivManuelle(false) }
   const etatBtn = (g, v, txt, coul) => (
     <button type="button" onClick={() => setEtat(p => ({ ...p, [g]: p[g] === v ? '' : v }))}
-      style={{ padding: '4px 10px', fontSize: 12, borderRadius: 6, cursor: 'pointer', border: `1px solid ${etat[g] === v ? coul : '#e2e8f0'}`, background: etat[g] === v ? coul : '#fff', color: etat[g] === v ? '#fff' : '#475569', fontWeight: 600 }}>{txt}</button>
+      style={{ padding: '4px 10px', fontSize: 12, borderRadius: 6, cursor: 'pointer', border: `1px solid ${etat[g] === v ? coul : COUL.bord}`, background: etat[g] === v ? coul : COUL.blanc, color: etat[g] === v ? '#fff' : COUL.texteMoyen, fontWeight: 600 }}>{txt}</button>
   )
 
   return (
@@ -224,7 +225,7 @@ export default function ToolDevoirInfo() {
               <input style={inp} placeholder="Nom, prénom ou n° de dossier" value={q} onChange={e => setQ(e.target.value)} />
               {clients.map(c => (
                 <div key={c.id} onClick={() => choisirClient(c)} style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', fontSize: 14 }}>
-                  <b>{c.nom} {c.prenom}</b> <span style={{ color: '#64748b' }}>— {c.dossier} — {c.localite}</span>
+                  <b>{c.nom} {c.prenom}</b> <span style={{ color: COUL.texteDoux }}>— {c.dossier} — {c.localite}</span>
                 </div>
               ))}
             </>
@@ -247,7 +248,7 @@ export default function ToolDevoirInfo() {
           <div style={card}>
             <div style={h2}>2. Conditions particulières (PDF)</div>
             <input type="file" accept=".pdf" onChange={e => importerPdf(e.target.files?.[0])} />
-            <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 6 }}>
+            <div style={{ fontSize: 12.5, color: COUL.texteDoux, marginTop: 6 }}>
               {pdfNom ? pdfInfo : 'Facultatif : les garanties connues de Brio sont déjà cochées. Le PDF complète la liste (contrat récent pas encore synchronisé).'}
             </div>
           </div>
@@ -261,7 +262,7 @@ export default function ToolDevoirInfo() {
 
             <span style={lab}>Garanties — souscrite ou refusée par le client</span>
             <div style={{ border: '1px solid #e2e8f0', borderRadius: 8 }}>
-              {catalogue.length === 0 && <div style={{ padding: 10, fontSize: 13, color: '#64748b' }}>Aucune garantie connue pour cette branche.</div>}
+              {catalogue.length === 0 && <div style={{ padding: 10, fontSize: 13, color: COUL.texteDoux }}>Aucune garantie connue pour cette branche.</div>}
               {catalogue.map(g => (
                 <div key={g} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', borderBottom: '1px solid #f1f5f9', gap: 8 }}>
                   <span style={{ fontSize: 13.5 }}>{g}</span>
@@ -300,7 +301,7 @@ export default function ToolDevoirInfo() {
               <SignaturePad label={`Client — ${client.prenom || ''} ${client.nom || ''}`} onChange={setSigC} />
               <SignaturePad label={`Dynassur — ${gestionnaire}`} onChange={setSigG} />
             </div>
-            {msg && <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, fontSize: 13, background: msg.err ? '#fef2f2' : '#f0fdf4', color: msg.err ? '#991b1b' : '#166534' }}>{msg.t}</div>}
+            {msg && <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, fontSize: 13, background: msg.err ? '#fef2f2' : COUL.succesFondDoux, color: msg.err ? '#991b1b' : '#166534' }}>{msg.t}</div>}
             <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
               <button style={btn2} onClick={apercu}>Aperçu PDF</button>
               <button style={{ ...btn, opacity: busy ? 0.6 : 1 }} disabled={busy} onClick={signerEtArchiver}>{busy ? 'Archivage…' : 'Signer et archiver'}</button>

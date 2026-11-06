@@ -7,11 +7,12 @@
 // d'un coup d'œil ce qui vient du contrat et ce qu'il a validé lui-même.
 
 import { useState } from 'react'
+import { COUL } from '../lib/theme'
 
 const C = {
-  bleu: '#1A3A6B', bleuClair: '#eff6ff, #e2f1fa', bord: '#dce4ec',
-  texte: '#0f1826', gris: '#56677c', grisClair: '#8c9cb0',
-  orange: '#b45309', orangeFond: '#fffaf0', orangeBord: '#f0c478',
+  bleu: COUL.marineClair, bleuClair: '#eff6ff, #e2f1fa', bord: '#dce4ec',
+  texte: '#0f1826', gris: COUL.grisBleuFonce, grisClair: COUL.grisBleu,
+  orange: COUL.alerte, orangeFond: '#fffaf0', orangeBord: '#f0c478',
 }
 
 /**
@@ -257,7 +258,7 @@ function Tableau({ q, v, onChange, propose, entete }) {
               if (ligne && typeof ligne === 'object' && ligne.titre) {
                 return (
                   <tr key={`t${i}`}><td colSpan={(q.colonnes || []).length + 1}
-                    style={{ ...td, fontWeight: 700, background: '#f8fafc' }}>{ligne.titre}</td></tr>
+                    style={{ ...td, fontWeight: 700, background: COUL.fond }}>{ligne.titre}</td></tr>
                 )
               }
               const nom = String(ligne)
@@ -287,12 +288,12 @@ function Tableau({ q, v, onChange, propose, entete }) {
 
 const Badge = () => (
   <span style={{
-    marginLeft: 7, fontSize: 9.5, fontWeight: 700, color: '#1e40af', background: '#eff6ff',
+    marginLeft: 7, fontSize: 9.5, fontWeight: 700, color: '#1e40af', background: COUL.infoFond,
     border: '1px solid #bfdbfe', borderRadius: 4, padding: '1px 5px', verticalAlign: 1,
   }}>proposé</span>
 )
 
-const carte = { background: '#fff', border: `1px solid ${C.bord}`, borderRadius: 10, padding: 14, marginBottom: 12 }
+const carte = { background: COUL.blanc, border: `1px solid ${C.bord}`, borderRadius: 10, padding: 14, marginBottom: 12 }
 const titreSection = { fontSize: 14, fontWeight: 700, color: C.bleu, margin: '0 0 10px' }
 const titreSousSection = { fontSize: 13, fontWeight: 700, color: C.bleu, margin: '12px 0 6px' }
 const intro = { fontSize: 11.5, color: C.gris, lineHeight: 1.5, margin: '0 0 8px' }

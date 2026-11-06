@@ -7,19 +7,20 @@ import BlocComptes from '../../components/BlocComptes'
 import { ENTITES } from '../../lib/entites'
 import { StatBanner } from '../../components/ui/AccountableUI'
 import { BoutonSyncQlik } from '../../components/SyncQlik'
+import { COUL } from '../../lib/theme'
 
-const C = { navy:'#0D2F5E', blue:'#0080BD', cyan:'#5DC3E8', ok:'#16a34a', warn:'#f59e0b', danger:'#dc2626', border:'#e2e8f0', bg:'#f8fafc', text:'#1e293b', muted:'#94a3b8' }
+const C = { navy:COUL.marine, blue:COUL.bleu, cyan:'#5DC3E8', ok:COUL.succes, warn:COUL.alerteVif, danger:COUL.danger, border:COUL.bord, bg:COUL.fond, text:COUL.texte, muted:COUL.texteFaible }
 const fmt = v => v==null?'—':new Intl.NumberFormat('fr-BE',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(v)
 const fmtN = v => v==null?'—':new Intl.NumberFormat('fr-BE').format(v)
 const fmtDate = v => v ? new Date(v).toLocaleDateString('fr-BE',{day:'2-digit',month:'2-digit'}) : '—'
 
 function KpiCard({ label, value, icon, color, sub }) {
   return (
-    <div style={{ background:'#fff', borderRadius:12, padding:20, border:`1px solid ${C.border}`, borderTop:`3px solid ${color}` }}>
+    <div style={{ background:COUL.blanc, borderRadius:12, padding:20, border:`1px solid ${C.border}`, borderTop:`3px solid ${color}` }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
         <div>
           <div style={{ fontSize:11, color:C.muted, fontWeight:700, textTransform:'uppercase', letterSpacing:'.05em', marginBottom:8 }}>{label}</div>
-          <div style={{ fontSize:28, fontWeight:800, color:'#0f172a', lineHeight:1 }}>{value}</div>
+          <div style={{ fontSize:28, fontWeight:800, color:COUL.texteFort, lineHeight:1 }}>{value}</div>
           {sub && <div style={{ fontSize:12, color:C.muted, marginTop:4 }}>{sub}</div>}
         </div>
         <div style={{ width:44, height:44, background:color+'18', borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center' }}>
@@ -34,7 +35,7 @@ function Bar({ pct, col }) {
   const p = Math.min(pct||0, 100)
   return (
     <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-      <div style={{ flex:1, background:'#e2e8f0', borderRadius:4, height:6, overflow:'hidden' }}>
+      <div style={{ flex:1, background:COUL.bord, borderRadius:4, height:6, overflow:'hidden' }}>
         <div style={{ width:`${p}%`, height:'100%', borderRadius:4, background: p>=100?C.ok:p>=70?(col||C.blue):C.warn, transition:'width 0.4s' }} />
       </div>
       <span style={{ fontSize:11, fontWeight:700, minWidth:32, color: p>=100?C.ok:p>=70?(col||C.blue):C.warn }}>{Math.round(p)}%</span>
@@ -117,7 +118,7 @@ export default function DashboardDynassur() {
 
         {/* Derniers clients consultés */}
         {recents.length > 0 && (
-          <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', padding:'14px 18px', marginBottom:24 }}>
+          <div style={{ background:COUL.blanc, borderRadius:12, border:'1px solid #e2e8f0', padding:'14px 18px', marginBottom:24 }}>
             <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
               <i className="ti ti-history" style={{ fontSize:15, color:C.blue }} />
               <span style={{ fontSize:13, fontWeight:700, color:C.navy }}>Derniers clients consultés</span>
@@ -125,15 +126,15 @@ export default function DashboardDynassur() {
             <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
               {recents.map(r=>(
                 <button key={r.dossier} onClick={()=>navigate(`/dynassur/clients?dossier=${encodeURIComponent(r.dossier)}`)}
-                  style={{ display:'flex', alignItems:'center', gap:8, background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:10, padding:'8px 12px', cursor:'pointer', textAlign:'left', transition:'all 0.12s' }}
+                  style={{ display:'flex', alignItems:'center', gap:8, background:COUL.fond, border:'1px solid #e2e8f0', borderRadius:10, padding:'8px 12px', cursor:'pointer', textAlign:'left', transition:'all 0.12s' }}
                   onMouseEnter={e=>{ e.currentTarget.style.borderColor=C.blue; e.currentTarget.style.background='#f0f9ff' }}
                   onMouseLeave={e=>{ e.currentTarget.style.borderColor='#e2e8f0'; e.currentTarget.style.background='#f8fafc' }}>
                   <div style={{ width:30, height:30, borderRadius:8, background:C.blue+'18', color:C.blue, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:12, flexShrink:0 }}>
                     {`${(r.prenom||'?')[0]||''}${(r.nom||'?')[0]||''}`.toUpperCase()}
                   </div>
                   <div>
-                    <div style={{ fontSize:12.5, fontWeight:700, color:'#1e293b' }}>{r.prenom} {r.nom}</div>
-                    <div style={{ fontSize:10.5, color:'#94a3b8' }}>#{r.dossier}{r.localite?` · ${r.localite}`:''}</div>
+                    <div style={{ fontSize:12.5, fontWeight:700, color:COUL.texte }}>{r.prenom} {r.nom}</div>
+                    <div style={{ fontSize:10.5, color:COUL.texteFaible }}>#{r.dossier}{r.localite?` · ${r.localite}`:''}</div>
                   </div>
                 </button>
               ))}
@@ -149,12 +150,12 @@ export default function DashboardDynassur() {
 
             {/* Objectifs progression */}
             {obj && (
-              <div style={{ background:'#fff', borderRadius:12, border:`1px solid ${C.border}`, padding:18 }}>
+              <div style={{ background:COUL.blanc, borderRadius:12, border:`1px solid ${C.border}`, padding:18 }}>
                 <div style={{ fontSize:12, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'.05em', marginBottom:14 }}>Objectifs {annee}</div>
                 {obj.target_na > 0 && (
                   <div style={{ marginBottom:10 }}>
                     <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
-                      <span style={{ fontSize:12, color:'#64748b' }}>Nouvelles Affaires</span>
+                      <span style={{ fontSize:12, color:COUL.texteDoux }}>Nouvelles Affaires</span>
                       <span style={{ fontSize:12, fontWeight:700 }}>{fmtN(obj.actual_na)} / {fmtN(obj.target_na)}</span>
                     </div>
                     <Bar pct={obj.pct_na} col={C.blue} />
@@ -163,7 +164,7 @@ export default function DashboardDynassur() {
                 {obj.target_primes > 0 && (
                   <div style={{ marginBottom:10 }}>
                     <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
-                      <span style={{ fontSize:12, color:'#64748b' }}>Primes</span>
+                      <span style={{ fontSize:12, color:COUL.texteDoux }}>Primes</span>
                       <span style={{ fontSize:12, fontWeight:700 }}>{fmt(obj.actual_primes)} / {fmt(obj.target_primes)}</span>
                     </div>
                     <Bar pct={obj.pct_primes} col={C.blue} />
@@ -172,7 +173,7 @@ export default function DashboardDynassur() {
                 {obj.target_commissions > 0 && (
                   <div>
                     <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
-                      <span style={{ fontSize:12, color:'#64748b' }}>Commissions</span>
+                      <span style={{ fontSize:12, color:COUL.texteDoux }}>Commissions</span>
                       <span style={{ fontSize:12, fontWeight:700 }}>{fmt(obj.actual_commissions)} / {fmt(obj.target_commissions)}</span>
                     </div>
                     <Bar pct={obj.pct_commissions} col={C.blue} />
@@ -182,14 +183,14 @@ export default function DashboardDynassur() {
             )}
 
             {/* Top agents NA ce mois */}
-            <div style={{ background:'#fff', borderRadius:12, border:`1px solid ${C.border}`, padding:18 }}>
+            <div style={{ background:COUL.blanc, borderRadius:12, border:`1px solid ${C.border}`, padding:18 }}>
               <div style={{ fontSize:12, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'.05em', marginBottom:12 }}>Top NA — mois {mois}</div>
               {loading ? <div style={{ color:C.muted, fontSize:13 }}>Chargement…</div>
               : prodMois.length === 0 ? <div style={{ color:C.muted, fontSize:13 }}>Aucune NA ce mois</div>
               : prodMois.map(([code,nb]) => (
                 <div key={code} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
-                  <span style={{ fontSize:12, color:'#64748b', width:90, flexShrink:0 }}>{AGENT_NOMS[code]||code}</span>
-                  <div style={{ flex:1, background:'#e2e8f0', borderRadius:3, height:6, overflow:'hidden' }}>
+                  <span style={{ fontSize:12, color:COUL.texteDoux, width:90, flexShrink:0 }}>{AGENT_NOMS[code]||code}</span>
+                  <div style={{ flex:1, background:COUL.bord, borderRadius:3, height:6, overflow:'hidden' }}>
                     <div style={{ width:`${nb/Math.max(...prodMois.map(a=>a[1]))*100}%`, height:'100%', background:C.blue, borderRadius:3 }} />
                   </div>
                   <span style={{ fontSize:12, fontWeight:700, color:C.blue, minWidth:20, textAlign:'right' }}>{nb}</span>
@@ -199,13 +200,13 @@ export default function DashboardDynassur() {
           </div>
 
           {/* COL 2 — Bordereaux */}
-          <div style={{ background:'#fff', borderRadius:12, border:`1px solid ${C.border}`, overflow:'hidden' }}>
+          <div style={{ background:COUL.blanc, borderRadius:12, border:`1px solid ${C.border}`, overflow:'hidden' }}>
             <div style={{ padding:'14px 18px', borderBottom:`1px solid ${C.border}`, display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
               <i className="ti ti-file-alert" style={{ fontSize:15, color:C.danger }} />
-              <span style={{ fontSize:13, fontWeight:700, color:'#0f172a' }}>Bordereaux {annee}</span>
+              <span style={{ fontSize:13, fontWeight:700, color:COUL.texteFort }}>Bordereaux {annee}</span>
               {bordereaux.length > 0
-                ? <span style={{ fontSize:11, background:'#fee2e2', color:C.danger, padding:'2px 7px', borderRadius:10, fontWeight:700 }}>{bordereaux.length} alertes</span>
-                : <span style={{ fontSize:11, background:'#dcfce7', color:C.ok, padding:'2px 7px', borderRadius:10, fontWeight:700 }}>✓ OK</span>
+                ? <span style={{ fontSize:11, background:COUL.dangerFond, color:C.danger, padding:'2px 7px', borderRadius:10, fontWeight:700 }}>{bordereaux.length} alertes</span>
+                : <span style={{ fontSize:11, background:COUL.succesFond, color:C.ok, padding:'2px 7px', borderRadius:10, fontWeight:700 }}>✓ OK</span>
               }
             </div>
             {loading ? <div style={{ padding:30, textAlign:'center', color:C.muted }}>Chargement…</div>
@@ -214,10 +215,10 @@ export default function DashboardDynassur() {
               <div style={{ maxHeight:380, overflowY:'auto' }}>
                 {bordereaux.map((b,i) => {
                   const STATUT = {
-                    fichier_ok_non_encaisse: { label:'Non encaissé',        col:C.warn,   bg:'#fef3c7' },
-                    fichier_sans_chiffres:   { label:'Sans chiffres',        col:'#ea580c', bg:'#fff7ed' },
-                    commission_sans_fichier: { label:'Sans fichier',         col:'#7c3aed', bg:'#f5f3ff' },
-                    manquant:                { label:'Manquant',             col:C.danger,  bg:'#fee2e2' },
+                    fichier_ok_non_encaisse: { label:'Non encaissé',        col:C.warn,   bg:COUL.alerteFond },
+                    fichier_sans_chiffres:   { label:'Sans chiffres',        col:COUL.orange, bg:COUL.orangeFond },
+                    commission_sans_fichier: { label:'Sans fichier',         col:COUL.violet, bg:COUL.violetFond },
+                    manquant:                { label:'Manquant',             col:C.danger,  bg:COUL.dangerFond },
                   }
                   const s = STATUT[b.statut_reconciliation]||STATUT.manquant
                   return (
@@ -239,7 +240,7 @@ export default function DashboardDynassur() {
         </div>
 
         <div style={{ marginTop:18 }}>
-          {isAdmin && <BlocComptes societeCode="DYNASSUR" color="#0080BD" />}
+          {isAdmin && <BlocComptes societeCode="DYNASSUR" color={COUL.bleu} />}
         </div>
 
       </div>

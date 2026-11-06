@@ -1,4 +1,5 @@
 import { useAuth } from '../lib/auth'
+import { COUL } from '../lib/theme'
 
 export default function AccessDenied() {
   const { user, signOut } = useAuth()
@@ -9,11 +10,11 @@ export default function AccessDenied() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: '#f8fafc',
+      background: COUL.fond,
       fontFamily: "'Source Sans Pro', sans-serif"
     }}>
       <div style={{
-        background: '#fff',
+        background: COUL.blanc,
         borderRadius: '16px',
         padding: '48px 40px',
         textAlign: 'center',
@@ -23,21 +24,21 @@ export default function AccessDenied() {
       }}>
         <div style={{
           width: '56px', height: '56px',
-          background: '#fef2f2',
+          background: COUL.dangerFondDoux,
           borderRadius: '12px',
           margin: '0 auto 20px',
           display: 'flex', alignItems: 'center', justifyContent: 'center'
         }}>
-          <i className="ti ti-lock" style={{ fontSize: '28px', color: '#dc2626' }} />
+          <i className="ti ti-lock" style={{ fontSize: '28px', color: COUL.danger }} />
         </div>
 
-        <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#0D2F5E', margin: '0 0 8px' }}>
+        <h2 style={{ fontSize: '20px', fontWeight: '700', color: COUL.marine, margin: '0 0 8px' }}>
           Accès non autorisé
         </h2>
-        <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 8px', lineHeight: '1.6' }}>
+        <p style={{ fontSize: '14px', color: COUL.texteDoux, margin: '0 0 8px', lineHeight: '1.6' }}>
           Ton compte <strong>{user?.email}</strong> n'a pas encore accès au Hub.
         </p>
-        <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 28px', lineHeight: '1.6' }}>
+        <p style={{ fontSize: '14px', color: COUL.texteDoux, margin: '0 0 28px', lineHeight: '1.6' }}>
           Contacte l'administrateur pour activer tes droits.
         </p>
 
@@ -45,8 +46,8 @@ export default function AccessDenied() {
           onClick={signOut}
           style={{
             padding: '10px 24px',
-            background: '#0080BD',
-            color: '#fff',
+            background: COUL.bleu,
+            color: COUL.blanc,
             border: 'none',
             borderRadius: '8px',
             fontSize: '14px',

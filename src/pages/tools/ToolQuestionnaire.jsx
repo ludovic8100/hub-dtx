@@ -10,6 +10,7 @@ import { formaterDateSaisie } from '../../components/FicheVieFormulaire'
 import { FICHES, versionPourDate, SEUIL_VERSION } from '../../lib/fichesVie'
 import { construireFichePDF } from '../../lib/fichesViePdf'
 import { proposerReponses, profilDepuisReponses, profilDepuisScoreRisque } from '../../lib/fichesVieReponses'
+import { COUL } from '../../lib/theme'
 import { risqueFonds, lectureComposition, profilDepuisScore, chargerFonds,
          chargerCompagniesSansFonds, compagnieSansFonds, enregistrerFonds } from '../../lib/fondsRisque'
 
@@ -47,7 +48,7 @@ async function ocrPdfPages(pdf, onProgress) {
     canvas.height = viewport.height
     const ctx = canvas.getContext('2d')
     // White background (improves OCR on transparent PDFs)
-    ctx.fillStyle = '#ffffff'
+    ctx.fillStyle = COUL.blanc
     ctx.fillRect(0, 0, canvas.width, canvas.height)
     await page.render({ canvasContext: ctx, viewport }).promise
 
@@ -902,14 +903,14 @@ export default function ToolQuestionnaire() {
   // ─── Styles ───
   const cardStyle = {
     border: '1px solid #e2e8f0', borderRadius: 12, padding: '18px 20px',
-    background: '#fff', marginBottom: 14,
+    background: COUL.blanc, marginBottom: 14,
   }
   const btnPrimary = {
-    background: '#1A3A6B', color: '#fff', border: 'none', borderRadius: 8,
+    background: COUL.marineClair, color: COUL.blanc, border: 'none', borderRadius: 8,
     padding: '10px 22px', fontSize: 14, fontWeight: 700, cursor: 'pointer',
   }
   const btnSecondary = {
-    background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0', borderRadius: 8,
+    background: COUL.fondDoux, color: COUL.texteMoyen, border: '1px solid #e2e8f0', borderRadius: 8,
     padding: '10px 22px', fontSize: 14, fontWeight: 600, cursor: 'pointer',
   }
   const inputStyle = {
@@ -920,11 +921,11 @@ export default function ToolQuestionnaire() {
   // ─── Right panel style ───
   const panelCardStyle = {
     border: '1px solid #e2e8f0', borderRadius: 10, padding: '14px 16px',
-    background: '#fff', marginBottom: 12,
+    background: COUL.blanc, marginBottom: 12,
   }
   const profileColors = {
-    'Défensif': '#16a34a', 'Conservateur': '#22c55e',
-    'Neutre / Équilibré': '#f59e0b', 'Dynamique': '#ea580c', 'Offensif': '#dc2626',
+    'Défensif': COUL.succes, 'Conservateur': '#22c55e',
+    'Neutre / Équilibré': COUL.alerteVif, 'Dynamique': COUL.orange, 'Offensif': COUL.danger,
   }
 
   return (
@@ -940,10 +941,10 @@ export default function ToolQuestionnaire() {
         {/* ═══ STEP 1: Search client ═══ */}
         {step === 'search' && (
           <div style={cardStyle}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', marginBottom: 4 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: COUL.texte, marginBottom: 4 }}>
               1. Rechercher un client
             </div>
-            <div style={{ fontSize: 12.5, color: '#64748b', marginBottom: 12 }}>
+            <div style={{ fontSize: 12.5, color: COUL.texteDoux, marginBottom: 12 }}>
               Tapez le nom, prénom ou n° de dossier
             </div>
             <input
@@ -953,7 +954,7 @@ export default function ToolQuestionnaire() {
               onChange={e => setSearchTerm(e.target.value)}
               autoFocus
             />
-            {searching && <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 8 }}>Recherche...</div>}
+            {searching && <div style={{ fontSize: 12, color: COUL.texteFaible, marginTop: 8 }}>Recherche...</div>}
 
             {searchResults.length > 0 && (
               <div style={{ marginTop: 10, maxHeight: 320, overflowY: 'auto' }}>
@@ -966,13 +967,13 @@ export default function ToolQuestionnaire() {
                       border: '1px solid #e2e8f0', marginBottom: 6,
                       transition: 'all 0.15s',
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.background = '#f0f9ff'; e.currentTarget.style.borderColor = '#93c5fd' }}
-                    onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = '#e2e8f0' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = COUL.infoFondDoux; e.currentTarget.style.borderColor = '#93c5fd' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = COUL.blanc; e.currentTarget.style.borderColor = COUL.bord }}
                   >
-                    <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: COUL.texte }}>
                       {c.nom} {c.prenom}
                     </div>
-                    <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                    <div style={{ fontSize: 12, color: COUL.texteDoux, marginTop: 2 }}>
                       Dossier : {c.dossier}
                       {c.date_naissance ? ` — Né(e) le ${c.date_naissance}` : ''}
                       {c.localite ? ` — ${c.localite}` : ''}
@@ -983,7 +984,7 @@ export default function ToolQuestionnaire() {
             )}
 
             {searchTerm.length >= 2 && !searching && searchResults.length === 0 && (
-              <div style={{ fontSize: 13, color: '#94a3b8', marginTop: 10 }}>Aucun client trouvé</div>
+              <div style={{ fontSize: 13, color: COUL.texteFaible, marginTop: 10 }}>Aucun client trouvé</div>
             )}
 
             {/* Un prospect n'est pas encore dans le portefeuille, et un client
@@ -992,27 +993,27 @@ export default function ToolQuestionnaire() {
             <div style={{
               marginTop: 16, paddingTop: 14, borderTop: '1px solid #e2e8f0',
             }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: COUL.texte }}>
                 Nouveau client, pas encore d'épargne
               </div>
-              <div style={{ fontSize: 12, color: '#64748b', margin: '3px 0 9px', lineHeight: 1.5 }}>
+              <div style={{ fontSize: 12, color: COUL.texteDoux, margin: '3px 0 9px', lineHeight: 1.5 }}>
                 La fiche se remplit avec le client. Aucun contrat ni fonds n'est nécessaire —
                 c'est la version {SEUIL_VERSION ? 'en vigueur aujourd\u2019hui' : 'courante'} qui s'applique.
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                <label style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>
+                <label style={{ fontSize: 11, color: COUL.texteFaible, fontWeight: 600 }}>
                   Nom<br />
                   <input value={clientLibre?.nom || ''} placeholder="Dupont"
                     onChange={e => setClientLibre({ ...(clientLibre || {}), nom: e.target.value })}
                     style={{ ...inputStyle, width: 170, marginTop: 3 }} />
                 </label>
-                <label style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>
+                <label style={{ fontSize: 11, color: COUL.texteFaible, fontWeight: 600 }}>
                   Prénom<br />
                   <input value={clientLibre?.prenom || ''} placeholder="Jean"
                     onChange={e => setClientLibre({ ...(clientLibre || {}), prenom: e.target.value })}
                     style={{ ...inputStyle, width: 150, marginTop: 3 }} />
                 </label>
-                <label style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>
+                <label style={{ fontSize: 11, color: COUL.texteFaible, fontWeight: 600 }}>
                   Date de naissance<br />
                   <input value={clientLibre?.date_naissance || ''} placeholder="JJ/MM/AAAA" inputMode="numeric"
                     onChange={e => setClientLibre({ ...(clientLibre || {}), date_naissance: formaterDateSaisie(e.target.value) })}
@@ -1038,12 +1039,12 @@ export default function ToolQuestionnaire() {
                   marginTop: 12, padding: '10px 12px', borderRadius: 8,
                   background: '#fffaf0', border: '1px solid #f0c478',
                 }}>
-                  <div style={{ fontSize: 12.5, fontWeight: 700, color: '#b45309', marginBottom: 2 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: COUL.alerte, marginBottom: 2 }}>
                     {doublons.some(d => d.pts >= 10)
                       ? 'Ce client est déjà au portefeuille'
                       : 'Des clients portent un nom proche'}
                   </div>
-                  <div style={{ fontSize: 11.5, color: '#92400e', marginBottom: 7, lineHeight: 1.5 }}>
+                  <div style={{ fontSize: 11.5, color: COUL.alerteFonce, marginBottom: 7, lineHeight: 1.5 }}>
                     Si c'est lui, pars de sa fiche : le profil sera rattaché à son dossier.
                     Sinon, continue — tu crées bien un nouveau client.
                   </div>
@@ -1051,20 +1052,20 @@ export default function ToolQuestionnaire() {
                     <div key={d.id}
                       onClick={() => { setClientLibre(null); setDoublons([]); selectClient(d) }}
                       style={{
-                        padding: '7px 10px', borderRadius: 6, cursor: 'pointer', background: '#fff',
+                        padding: '7px 10px', borderRadius: 6, cursor: 'pointer', background: COUL.blanc,
                         border: d.pts >= 10 ? '1px solid #f0c478' : '1px solid #e2e8f0', marginBottom: 5,
                       }}>
-                      <div style={{ fontSize: 12.5, fontWeight: 700, color: '#1e293b' }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 700, color: COUL.texte }}>
                         {d.nom} {d.prenom}
                         {d.pts >= 10 && (
                           <span style={{
-                            marginLeft: 7, fontSize: 9.5, fontWeight: 700, color: '#b45309',
+                            marginLeft: 7, fontSize: 9.5, fontWeight: 700, color: COUL.alerte,
                             background: '#fdf0d8', border: '1px solid #f0c478',
                             borderRadius: 4, padding: '1px 5px',
                           }}>même date de naissance</span>
                         )}
                       </div>
-                      <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 1 }}>
+                      <div style={{ fontSize: 11.5, color: COUL.texteDoux, marginTop: 1 }}>
                         Dossier {d.dossier}
                         {d.date_naissance && d.date_naissance !== '1900-01-01'
                           ? ` — né(e) le ${d.date_naissance.split('-').reverse().join('/')}`
@@ -1084,7 +1085,7 @@ export default function ToolQuestionnaire() {
           <>
             <div style={cardStyle}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: '#1e293b' }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: COUL.texte }}>
                   Client sélectionné
                 </div>
                 <button style={{ ...btnSecondary, padding: '6px 14px', fontSize: 12 }} onClick={handleReset}>
@@ -1092,12 +1093,12 @@ export default function ToolQuestionnaire() {
                 </button>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 20px', fontSize: 13 }}>
-                <div><span style={{ color: '#94a3b8', fontWeight: 600 }}>Nom :</span> {selectedClient.nom}</div>
-                <div><span style={{ color: '#94a3b8', fontWeight: 600 }}>Prénom :</span> {selectedClient.prenom || '—'}</div>
-                <div><span style={{ color: '#94a3b8', fontWeight: 600 }}>Dossier :</span> {selectedClient.dossier}</div>
-                <div><span style={{ color: '#94a3b8', fontWeight: 600 }}>Naissance :</span> {selectedClient.date_naissance || '—'}</div>
+                <div><span style={{ color: COUL.texteFaible, fontWeight: 600 }}>Nom :</span> {selectedClient.nom}</div>
+                <div><span style={{ color: COUL.texteFaible, fontWeight: 600 }}>Prénom :</span> {selectedClient.prenom || '—'}</div>
+                <div><span style={{ color: COUL.texteFaible, fontWeight: 600 }}>Dossier :</span> {selectedClient.dossier}</div>
+                <div><span style={{ color: COUL.texteFaible, fontWeight: 600 }}>Naissance :</span> {selectedClient.date_naissance || '—'}</div>
                 <div style={{ gridColumn: '1 / -1' }}>
-                  <span style={{ color: '#94a3b8', fontWeight: 600 }}>Adresse :</span>{' '}
+                  <span style={{ color: COUL.texteFaible, fontWeight: 600 }}>Adresse :</span>{' '}
                   {[selectedClient.rue, selectedClient.num_maison, selectedClient.boite].filter(Boolean).join(' ')}
                   {selectedClient.cp ? `, ${selectedClient.cp}` : ''} {selectedClient.localite || ''}
                 </div>
@@ -1105,10 +1106,10 @@ export default function ToolQuestionnaire() {
             </div>
 
             <div style={cardStyle}>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', marginBottom: 4 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: COUL.texte, marginBottom: 4 }}>
                 2. Sélectionner un contrat Vie
               </div>
-              {loadingContrats && <div style={{ fontSize: 13, color: '#94a3b8' }}>Chargement...</div>}
+              {loadingContrats && <div style={{ fontSize: 13, color: COUL.texteFaible }}>Chargement...</div>}
               {contrats.length > 0 && (
                 <div style={{ marginTop: 8 }}>
                   {contrats.map(ct => (
@@ -1120,13 +1121,13 @@ export default function ToolQuestionnaire() {
                         border: '1px solid #e2e8f0', marginBottom: 6,
                         transition: 'all 0.15s',
                       }}
-                      onMouseEnter={e => { e.currentTarget.style.background = '#f0f9ff'; e.currentTarget.style.borderColor = '#93c5fd' }}
-                      onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = '#e2e8f0' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = COUL.infoFondDoux; e.currentTarget.style.borderColor = '#93c5fd' }}
+                      onMouseLeave={e => { e.currentTarget.style.background = COUL.blanc; e.currentTarget.style.borderColor = COUL.bord }}
                     >
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: COUL.texte }}>
                         {ct.compagnie || '—'} — Police {ct.police || '—'}
                       </div>
-                      <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                      <div style={{ fontSize: 12, color: COUL.texteDoux, marginTop: 2 }}>
                         {ct.type_production || '—'} — {ct.situation || '—'}
                         {ct.date_creation ? ` — ${ct.date_creation}` : ''}
                       </div>
@@ -1136,7 +1137,7 @@ export default function ToolQuestionnaire() {
               )}
 
               {!loadingContrats && contrats.length === 0 && (
-                <div style={{ fontSize: 13, color: '#64748b', marginTop: 8 }}>
+                <div style={{ fontSize: 13, color: COUL.texteDoux, marginTop: 8 }}>
                   Aucun contrat Vie pour ce client.
                 </div>
               )}
@@ -1145,7 +1146,7 @@ export default function ToolQuestionnaire() {
                   ouvrir une dont le contrat n'existe pas encore. La fiche ne
                   depend pas d'un contrat. */}
               <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid #e2e8f0' }}>
-                <div style={{ fontSize: 12.5, color: '#64748b', marginBottom: 8, lineHeight: 1.5 }}>
+                <div style={{ fontSize: 12.5, color: COUL.texteDoux, marginBottom: 8, lineHeight: 1.5 }}>
                   Pas d'épargne existante, ou un contrat qui n'est pas encore créé ?
                   La fiche se remplit avec le client, sans contrat ni fonds.
                 </div>
@@ -1165,16 +1166,16 @@ export default function ToolQuestionnaire() {
             <div style={cardStyle}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: COUL.texte }}>
                     {clientActif.nom} {clientActif.prenom}
                   </div>
                   {selectedContrat ? (
-                    <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                    <div style={{ fontSize: 12, color: COUL.texteDoux, marginTop: 2 }}>
                       {selectedContrat.compagnie} — {selectedContrat.type_production}
                       {selectedContrat.police ? ` — N° ${selectedContrat.police}` : ''}
                     </div>
                   ) : (
-                    <div style={{ fontSize: 12, color: '#15803d', marginTop: 2, fontWeight: 600 }}>
+                    <div style={{ fontSize: 12, color: COUL.succesFonce, marginTop: 2, fontWeight: 600 }}>
                       Sans épargne existante — les réponses sont recueillies auprès du client
                     </div>
                   )}
@@ -1186,23 +1187,23 @@ export default function ToolQuestionnaire() {
             </div>
 
             <div style={cardStyle}>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', marginBottom: 4 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: COUL.texte, marginBottom: 4 }}>
                 3. Uploader la proposition / le contrat PDF
               </div>
-              <div style={{ fontSize: 12.5, color: '#64748b', marginBottom: 12 }}>
+              <div style={{ fontSize: 12.5, color: COUL.texteDoux, marginBottom: 12 }}>
                 Le PDF sera analysé pour extraire les fonds d'investissement, les dates d'effet et de fin, et calculer automatiquement le profil de risque et l'horizon de placement.
               </div>
 
               {/* File input */}
               <div style={{
                 border: '2px dashed #cbd5e1', borderRadius: 10, padding: '24px 20px',
-                textAlign: 'center', background: '#f8fafc', cursor: 'pointer',
+                textAlign: 'center', background: COUL.fond, cursor: 'pointer',
                 transition: 'all 0.15s',
               }}
                 onClick={() => document.getElementById('pdf-input').click()}
-                onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = '#93c5fd'; e.currentTarget.style.background = '#eff6ff' }}
-                onDragLeave={e => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.background = '#f8fafc' }}
-                onDrop={e => { e.preventDefault(); e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.background = '#f8fafc'; if (e.dataTransfer.files[0]) handlePdfUpload(e.dataTransfer.files[0]) }}
+                onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = '#93c5fd'; e.currentTarget.style.background = COUL.infoFond }}
+                onDragLeave={e => { e.currentTarget.style.borderColor = COUL.bordFort; e.currentTarget.style.background = COUL.fond }}
+                onDrop={e => { e.preventDefault(); e.currentTarget.style.borderColor = COUL.bordFort; e.currentTarget.style.background = COUL.fond; if (e.dataTransfer.files[0]) handlePdfUpload(e.dataTransfer.files[0]) }}
               >
                 <input
                   id="pdf-input"
@@ -1212,21 +1213,21 @@ export default function ToolQuestionnaire() {
                   onChange={e => { if (e.target.files[0]) handlePdfUpload(e.target.files[0]) }}
                 />
                 <div style={{ fontSize: 28, marginBottom: 8 }}>
-                  <i className="ti ti-file-upload" style={{ color: '#94a3b8' }} />
+                  <i className="ti ti-file-upload" style={{ color: COUL.texteFaible }} />
                 </div>
                 {pdfFile ? (
-                  <div style={{ fontSize: 13, color: '#1e293b', fontWeight: 600 }}>
+                  <div style={{ fontSize: 13, color: COUL.texte, fontWeight: 600 }}>
                     {pdfFile.name}
                   </div>
                 ) : (
-                  <div style={{ fontSize: 13, color: '#64748b' }}>
+                  <div style={{ fontSize: 13, color: COUL.texteDoux }}>
                     Cliquez ou glissez un PDF ici
                   </div>
                 )}
               </div>
 
               {extracting && (
-                <div style={{ fontSize: 13, color: '#1A3A6B', marginTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ fontSize: 13, color: COUL.marineClair, marginTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div style={{ width: 16, height: 16, border: '2px solid #1A3A6B', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
                   {extractionProgress || 'Extraction en cours...'}
                   <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
@@ -1236,8 +1237,8 @@ export default function ToolQuestionnaire() {
               {/* Warning message */}
               {extractionWarning && (
                 <div style={{
-                  background: '#fffbeb', border: '1px solid #fed7aa', borderRadius: 8,
-                  padding: '10px 14px', marginTop: 12, fontSize: 12.5, color: '#92400e',
+                  background: COUL.alerteFondDoux, border: '1px solid #fed7aa', borderRadius: 8,
+                  padding: '10px 14px', marginTop: 12, fontSize: 12.5, color: COUL.alerteFonce,
                 }}>
                   {extractionWarning}
                 </div>
@@ -1250,9 +1251,9 @@ export default function ToolQuestionnaire() {
                 return (
                   <div style={{
                     marginTop: 12, padding: '11px 14px', borderRadius: 8,
-                    background: '#f0fdf4', border: '1px solid #86efac',
+                    background: COUL.succesFondDoux, border: '1px solid #86efac',
                   }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: '#15803d' }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: COUL.succesFonce }}>
                       {cie.nom} ne propose pas de produits à fonds
                     </div>
                     <div style={{ fontSize: 11.5, color: '#3f6212', marginTop: 3, lineHeight: 1.5 }}>
@@ -1266,7 +1267,7 @@ export default function ToolQuestionnaire() {
               {/* Extracted funds display */}
               {Object.keys(funds).length > 0 && !manualMode && (
                 <div style={{ marginTop: 14 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', marginBottom: 6 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: COUL.texte, marginBottom: 6 }}>
                     Fonds extraits :
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -1278,18 +1279,18 @@ export default function ToolQuestionnaire() {
                         : riskVal == null ? 'Fonds non reconnu'
                         : profilDepuisScore(riskVal)
                       const classColors = {
-                        'Défensif': '#16a34a', 'Conservateur': '#22c55e',
-                        'Neutre / Équilibré': '#f59e0b', 'Dynamique': '#ea580c', 'Offensif': '#dc2626',
-                        'Fonds a preciser': '#b45309', 'Fonds non reconnu': '#b45309',
+                        'Défensif': COUL.succes, 'Conservateur': '#22c55e',
+                        'Neutre / Équilibré': COUL.alerteVif, 'Dynamique': COUL.orange, 'Offensif': COUL.danger,
+                        'Fonds a preciser': COUL.alerte, 'Fonds non reconnu': COUL.alerte,
                       }
                       return (
                         <div key={name} style={{
                           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                          padding: '6px 10px', background: '#f8fafc', borderRadius: 6, fontSize: 12.5,
+                          padding: '6px 10px', background: COUL.fond, borderRadius: 6, fontSize: 12.5,
                         }}>
-                          <span style={{ color: '#334155', fontWeight: 500 }}>{name}</span>
+                          <span style={{ color: COUL.texteSombre, fontWeight: 500 }}>{name}</span>
                           <span style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                            <span style={{ color: '#1A3A6B', fontWeight: 700 }}>{pct}%</span>
+                            <span style={{ color: COUL.marineClair, fontWeight: 700 }}>{pct}%</span>
                             <span style={{
                               color: classColors[fundProfile] || '#64748b', fontSize: 11, fontWeight: 600,
                               padding: '1px 6px', borderRadius: 4,
@@ -1300,7 +1301,7 @@ export default function ToolQuestionnaire() {
                             {source === 'inconnu' && (
                               <button onClick={() => setAjoutFonds({ nom: name, sri: '' })}
                                 style={{
-                                  border: '1px solid #f0c478', background: '#fffaf0', color: '#b45309',
+                                  border: '1px solid #f0c478', background: '#fffaf0', color: COUL.alerte,
                                   borderRadius: 5, padding: '2px 8px', fontSize: 10.5, fontWeight: 700,
                                   cursor: 'pointer', fontFamily: 'inherit',
                                 }}>
@@ -1318,24 +1319,24 @@ export default function ToolQuestionnaire() {
                   {ajoutFonds && (
                     <div style={{
                       marginTop: 10, padding: '12px 14px', borderRadius: 8,
-                      background: '#fff', border: '1px solid #f0c478',
+                      background: COUL.blanc, border: '1px solid #f0c478',
                     }}>
-                      <div style={{ fontSize: 12.5, fontWeight: 700, color: '#b45309', marginBottom: 6 }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 700, color: COUL.alerte, marginBottom: 6 }}>
                         Enregistrer « {ajoutFonds.nom} »
                       </div>
-                      <div style={{ fontSize: 11.5, color: '#92400e', lineHeight: 1.5, marginBottom: 8 }}>
+                      <div style={{ fontSize: 11.5, color: COUL.alerteFonce, lineHeight: 1.5, marginBottom: 8 }}>
                         Le SRI (1 à 7) figure dans le document d'informations clés du fonds.
                         C'est l'indicateur publié par la compagnie — à préférer à une estimation.
                       </div>
                       <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                        <label style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>
+                        <label style={{ fontSize: 11, color: COUL.texteDoux, fontWeight: 600 }}>
                           Compagnie<br />
                           <input value={ajoutFonds.compagnie ?? (selectedContrat?.compagnie || '')}
                             onChange={e => setAjoutFonds({ ...ajoutFonds, compagnie: e.target.value })}
                             style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid #dce4ec',
                                      fontSize: 12, fontFamily: 'inherit', width: 210 }} />
                         </label>
-                        <label style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>
+                        <label style={{ fontSize: 11, color: COUL.texteDoux, fontWeight: 600 }}>
                           SRI (1-7)<br />
                           <input type="number" min={1} max={7} value={ajoutFonds.sri}
                             onChange={e => setAjoutFonds({ ...ajoutFonds, sri: e.target.value })}
@@ -1356,8 +1357,8 @@ export default function ToolQuestionnaire() {
                             } catch (e) { setError(`Enregistrement du fonds impossible : ${e.message}`) }
                           }}
                           style={{
-                            padding: '6px 14px', borderRadius: 6, border: 'none', background: '#1A3A6B',
-                            color: '#fff', fontSize: 12, fontWeight: 700, fontFamily: 'inherit',
+                            padding: '6px 14px', borderRadius: 6, border: 'none', background: COUL.marineClair,
+                            color: COUL.blanc, fontSize: 12, fontWeight: 700, fontFamily: 'inherit',
                             cursor: ajoutFonds.sri ? 'pointer' : 'not-allowed',
                             opacity: ajoutFonds.sri ? 1 : 0.5,
                           }}>
@@ -1365,7 +1366,7 @@ export default function ToolQuestionnaire() {
                         </button>
                         <button onClick={() => setAjoutFonds(null)}
                           style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #dce4ec',
-                                   background: '#fff', color: '#64748b', fontSize: 12,
+                                   background: COUL.blanc, color: COUL.texteDoux, fontSize: 12,
                                    fontFamily: 'inherit', cursor: 'pointer' }}>
                           Annuler
                         </button>
@@ -1377,8 +1378,8 @@ export default function ToolQuestionnaire() {
                   {(() => {
                     const l = lectureComposition(funds, tableFonds)
                     const couleurs = {
-                      'Défensif': '#16a34a', 'Conservateur': '#22c55e',
-                      'Neutre / Équilibré': '#f59e0b', 'Dynamique': '#ea580c', 'Offensif': '#dc2626',
+                      'Défensif': COUL.succes, 'Conservateur': '#22c55e',
+                      'Neutre / Équilibré': COUL.alerteVif, 'Dynamique': COUL.orange, 'Offensif': COUL.danger,
                     }
                     // 100 % a capital garanti : il n'y a pas de risque de
                     // marche, donc pas de profil de risque a etablir. Mieux
@@ -1387,9 +1388,9 @@ export default function ToolQuestionnaire() {
                       return (
                         <div style={{
                           marginTop: 10, padding: '10px 14px', borderRadius: 8,
-                          background: '#f0fdf4', border: '1px solid #86efac',
+                          background: COUL.succesFondDoux, border: '1px solid #86efac',
                         }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: '#15803d' }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: COUL.succesFonce }}>
                             Capital garanti à 100 % — pas de profil de risque à établir
                           </div>
                           <div style={{ fontSize: 11.5, color: '#3f6212', marginTop: 3, lineHeight: 1.5 }}>
@@ -1407,10 +1408,10 @@ export default function ToolQuestionnaire() {
                           marginTop: 10, padding: '10px 14px', borderRadius: 8,
                           background: '#fffaf0', border: '1px solid #f0c478',
                         }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: '#b45309' }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: COUL.alerte }}>
                             Quel fonds ? « {l.aPreciser.join(' , ')} » ne suffit pas
                           </div>
-                          <div style={{ fontSize: 11.5, color: '#92400e', marginTop: 3, lineHeight: 1.5 }}>
+                          <div style={{ fontSize: 11.5, color: COUL.alerteFonce, marginTop: 3, lineHeight: 1.5 }}>
                             La branche 23 est une famille, pas un fonds : le risque va d'un fonds
                             obligataire défensif à 100 % actions. Indiquez le nom du fonds pour
                             que le profil veuille dire quelque chose.
@@ -1424,10 +1425,10 @@ export default function ToolQuestionnaire() {
                           marginTop: 10, padding: '10px 14px', borderRadius: 8,
                           background: '#fffaf0', border: '1px solid #f0c478',
                         }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: '#b45309' }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: COUL.alerte }}>
                             Aucun fonds reconnu — pas de profil calculable
                           </div>
-                          <div style={{ fontSize: 11.5, color: '#92400e', marginTop: 3, lineHeight: 1.5 }}>
+                          <div style={{ fontSize: 11.5, color: COUL.alerteFonce, marginTop: 3, lineHeight: 1.5 }}>
                             {l.inconnus.length ? `Non reconnu : ${l.inconnus.join(' , ')}.` : ''} Le
                             profil se construit à partir des réponses du client, pas d'une valeur
                             par défaut.
@@ -1444,12 +1445,12 @@ export default function ToolQuestionnaire() {
                         <div style={{ fontSize: 13, fontWeight: 700, color: couleurs[l.profil] || '#475569' }}>
                           Orientation de la composition : {l.profil}
                         </div>
-                        <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                        <div style={{ fontSize: 11, color: COUL.texteDoux, marginTop: 2 }}>
                           Score de risque pondéré : {Math.round(l.score * 10) / 10} / 100
                           {l.reconnuPct < l.totalPct && ` — sur ${Math.round(l.reconnuPct)} % de la composition seulement`}
                         </div>
                         {l.inconnus.length > 0 && (
-                          <div style={{ fontSize: 11.5, color: '#b45309', marginTop: 4, lineHeight: 1.5 }}>
+                          <div style={{ fontSize: 11.5, color: COUL.alerte, marginTop: 4, lineHeight: 1.5 }}>
                             Non reconnu, donc exclu du calcul : {l.inconnus.join(' , ')}.
                           </div>
                         )}
@@ -1461,15 +1462,15 @@ export default function ToolQuestionnaire() {
                   {(pdfDates.dateDebut || pdfDates.dateFin) && (
                     <div style={{
                       marginTop: 8, padding: '8px 14px', borderRadius: 8,
-                      background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: 12.5,
+                      background: COUL.fond, border: '1px solid #e2e8f0', fontSize: 12.5,
                     }}>
-                      <div style={{ color: '#334155' }}>
+                      <div style={{ color: COUL.texteSombre }}>
                         <strong>Date d'effet :</strong> {pdfDates.dateDebut || '—'}
                         {' — '}
                         <strong>Date de fin :</strong> {pdfDates.dateFin || '—'}
                       </div>
                       {horizonYears !== null && (
-                        <div style={{ color: '#1A3A6B', fontWeight: 600, marginTop: 2 }}>
+                        <div style={{ color: COUL.marineClair, fontWeight: 600, marginTop: 2 }}>
                           Horizon de placement : {horizonYears} ans
                         </div>
                       )}
@@ -1481,7 +1482,7 @@ export default function ToolQuestionnaire() {
               {/* Manual fund entry */}
               {manualMode && (
                 <div style={{ marginTop: 14 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', marginBottom: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: COUL.texte, marginBottom: 8 }}>
                     Encodage manuel des fonds :
                   </div>
                   {manualFunds.map((f, idx) => (
@@ -1535,12 +1536,12 @@ export default function ToolQuestionnaire() {
                   </div>
 
                   {/* Manual date entry */}
-                  <div style={{ marginTop: 14, fontSize: 13, fontWeight: 700, color: '#1e293b', marginBottom: 6 }}>
+                  <div style={{ marginTop: 14, fontSize: 13, fontWeight: 700, color: COUL.texte, marginBottom: 6 }}>
                     Dates du contrat (optionnel) :
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>Date d'effet (JJ/MM/AAAA)</div>
+                      <div style={{ fontSize: 11, color: COUL.texteDoux, marginBottom: 4 }}>Date d'effet (JJ/MM/AAAA)</div>
                       <input
                         style={inputStyle}
                         placeholder="01/01/2020"
@@ -1555,7 +1556,7 @@ export default function ToolQuestionnaire() {
                       />
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>Date de fin (JJ/MM/AAAA)</div>
+                      <div style={{ fontSize: 11, color: COUL.texteDoux, marginBottom: 4 }}>Date de fin (JJ/MM/AAAA)</div>
                       <input
                         style={inputStyle}
                         placeholder="01/01/2045"
@@ -1571,7 +1572,7 @@ export default function ToolQuestionnaire() {
                     </div>
                   </div>
                   {horizonYears !== null && (
-                    <div style={{ fontSize: 12.5, color: '#1A3A6B', fontWeight: 600, marginTop: 6 }}>
+                    <div style={{ fontSize: 12.5, color: COUL.marineClair, fontWeight: 600, marginTop: 6 }}>
                       Horizon calculé : {horizonYears} ans
                     </div>
                   )}
@@ -1612,26 +1613,26 @@ export default function ToolQuestionnaire() {
             <div style={cardStyle}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: COUL.texte }}>
                     {clientActif.nom} {clientActif.prenom}
                   </div>
                   {selectedContrat ? (
-                    <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                    <div style={{ fontSize: 12, color: COUL.texteDoux, marginTop: 2 }}>
                       {selectedContrat.compagnie} — {selectedContrat.type_production}
                       {selectedContrat.police ? ` — N° ${selectedContrat.police}` : ''}
                     </div>
                   ) : (
-                    <div style={{ fontSize: 12, color: '#15803d', marginTop: 2, fontWeight: 600 }}>
+                    <div style={{ fontSize: 12, color: COUL.succesFonce, marginTop: 2, fontWeight: 600 }}>
                       Sans épargne existante — les réponses sont recueillies auprès du client
                     </div>
                   )}
                   {Object.keys(funds).length > 0 && (
-                    <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>
+                    <div style={{ fontSize: 11, color: COUL.texteFaible, marginTop: 4 }}>
                       Fonds : {Object.entries(funds).map(([n, p]) => `${n} (${p}%)`).join(', ')}
                     </div>
                   )}
                   {horizonYears !== null && (
-                    <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+                    <div style={{ fontSize: 11, color: COUL.texteFaible, marginTop: 2 }}>
                       Horizon : {horizonYears} ans
                       {pdfDates.dateDebut ? ` — du ${pdfDates.dateDebut}` : ''}
                       {pdfDates.dateFin ? ` au ${pdfDates.dateFin}` : ''}
@@ -1653,22 +1654,22 @@ export default function ToolQuestionnaire() {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{
-                  width: 42, height: 42, borderRadius: '50%', background: '#1A3A6B',
+                  width: 42, height: 42, borderRadius: '50%', background: COUL.marineClair,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: '#fff', fontWeight: 800, fontSize: 16,
+                  color: COUL.blanc, fontWeight: 800, fontSize: 16,
                 }}>
                   {score != null ? score : '—'}
                 </div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: '#1e293b' }}>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: COUL.texte }}>
                     {profile || 'Profil non déterminé'}
                   </div>
-                  <div style={{ fontSize: 12, color: '#64748b' }}>
+                  <div style={{ fontSize: 12, color: COUL.texteDoux }}>
                     {calculProfil.repondues}/{calculProfil.total} questions de risque répondues
                     {score != null ? ` — indice ${score}/100` : ''}
                     {!calculProfil.complet && ' — le profil se précisera en complétant la section « Comportement face au risque »'}
                   </div>
-                  <div style={{ fontSize: 11, color: '#b45309', marginTop: 3, fontWeight: 600 }}>
+                  <div style={{ fontSize: 11, color: COUL.alerte, marginTop: 3, fontWeight: 600 }}>
                     Le profil n'apparaît pas sur la fiche imprimée : il est conservé dans la fiche du client.
                   </div>
                 </div>
@@ -1682,13 +1683,13 @@ export default function ToolQuestionnaire() {
             <div style={{
               ...cardStyle,
               border: desaccordVersion ? '2px solid #b91c1c' : '1px solid #dce4ec',
-              background: desaccordVersion ? '#fef2f2' : '#fff',
+              background: desaccordVersion ? '#fef2f2' : COUL.blanc,
             }}>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', marginBottom: 8 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: COUL.texte, marginBottom: 8 }}>
                 4. Version de la fiche d'intermédiation
               </div>
 
-              <div style={{ fontSize: 12.5, color: '#56677c', lineHeight: 1.5, marginBottom: 10 }}>
+              <div style={{ fontSize: 12.5, color: COUL.grisBleuFonce, lineHeight: 1.5, marginBottom: 10 }}>
                 {dateEffet.date
                   ? <>Date d'effet retenue : <b>{dateEffet.date.toLocaleDateString('fr-BE')}</b>
                       {' '}({dateEffet.source === 'pdf' ? 'lue dans la proposition' : 'date de création du contrat'})
@@ -1705,12 +1706,12 @@ export default function ToolQuestionnaire() {
                     <button key={cle} onClick={() => setVersionChoisie(cle)} style={{
                       flex: '1 1 220px', padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
                       border: actif ? '2px solid #1A3A6B' : '1px solid #c3cfdb',
-                      background: actif ? '#eff6ff' : '#fff', fontFamily: 'inherit',
+                      background: actif ? '#eff6ff' : COUL.blanc, fontFamily: 'inherit',
                       fontSize: 12.5, fontWeight: actif ? 700 : 500,
-                      color: actif ? '#1A3A6B' : '#56677c', textAlign: 'left',
+                      color: actif ? '#1A3A6B' : COUL.grisBleuFonce, textAlign: 'left',
                     }}>
                       {lib}
-                      <div style={{ fontSize: 10.5, fontWeight: 400, color: '#8c9cb0', marginTop: 2 }}>
+                      <div style={{ fontSize: 10.5, fontWeight: 400, color: COUL.grisBleu, marginTop: 2 }}>
                         {FICHES[cle].titreCourt}
                       </div>
                     </button>
@@ -1721,19 +1722,19 @@ export default function ToolQuestionnaire() {
               {desaccordVersion && (
                 <div style={{
                   marginTop: 12, padding: '11px 13px', borderRadius: 8,
-                  background: '#fff', border: '2px solid #b91c1c',
+                  background: COUL.blanc, border: '2px solid #b91c1c',
                 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 800, color: '#b91c1c', marginBottom: 4 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 800, color: COUL.dangerFonce, marginBottom: 4 }}>
                     ⚠ Attention — vous ne serez pas en ordre
                   </div>
-                  <div style={{ fontSize: 12.5, color: '#334155', lineHeight: 1.55 }}>
+                  <div style={{ fontSize: 12.5, color: COUL.texteSombre, lineHeight: 1.55 }}>
                     Le contrat prend effet le <b>{dateEffet.date?.toLocaleDateString('fr-BE')}</b>, donc la fiche
                     applicable est <b>{versionDetectee === 'AVANT_2025' ? 'celle d\'avant 2025' : 'celle d\'après 2025'}</b>.
                     Vous avez choisi l'autre. Le document produit n'aura jamais pu exister à cette date.
                     {' '}
                     <button onClick={() => setVersionChoisie(null)} style={{
                       border: 'none', background: 'none', padding: 0, font: 'inherit',
-                      color: '#b91c1c', fontWeight: 700, textDecoration: 'underline', cursor: 'pointer',
+                      color: COUL.dangerFonce, fontWeight: 700, textDecoration: 'underline', cursor: 'pointer',
                     }}>Revenir à la version détectée</button>
                   </div>
                 </div>
@@ -1743,7 +1744,7 @@ export default function ToolQuestionnaire() {
             {/* La fiche elle-même */}
             {fiche
               ? <FicheVieFormulaire fiche={fiche} reponses={answers} onChange={handleAnswerChange} proposees={proposees} />
-              : <div style={{ ...cardStyle, fontSize: 13, color: '#8c9cb0' }}>
+              : <div style={{ ...cardStyle, fontSize: 13, color: COUL.grisBleu }}>
                   Choisis une version de fiche ci-dessus pour afficher le questionnaire.
                 </div>}
 
@@ -1762,21 +1763,21 @@ export default function ToolQuestionnaire() {
         {/* ═══ STEP 5: Done ═══ */}
         {step === 'done' && (
           <div style={cardStyle}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#16a34a', marginBottom: 8 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: COUL.succes, marginBottom: 8 }}>
               PDF généré avec succès
             </div>
             {savingToDB && (
-              <div style={{ fontSize: 12, color: '#1A3A6B', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ fontSize: 12, color: COUL.marineClair, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <div style={{ width: 12, height: 12, border: '2px solid #1A3A6B', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
                 Sauvegarde en base de données...
               </div>
             )}
             {savedToDBMsg && (
-              <div style={{ fontSize: 12, color: savedToDBMsg.startsWith('Erreur') ? '#dc2626' : '#16a34a', marginBottom: 6, fontWeight: 600 }}>
+              <div style={{ fontSize: 12, color: savedToDBMsg.startsWith('Erreur') ? '#dc2626' : COUL.succes, marginBottom: 6, fontWeight: 600 }}>
                 {savedToDBMsg}
               </div>
             )}
-            <div style={{ fontSize: 13, color: '#64748b', marginBottom: 14 }}>
+            <div style={{ fontSize: 13, color: COUL.texteDoux, marginBottom: 14 }}>
               Questionnaire pour <strong>{clientActif?.nom} {clientActif?.prenom}</strong> — Profil :{' '}
               <strong>{profile || 'non établi'}</strong>{score != null ? ` (score ${score}/100)` : ''}
               {horizonYears !== null && <> — Horizon : <strong>{horizonYears} ans</strong></>}
@@ -1784,7 +1785,7 @@ export default function ToolQuestionnaire() {
                   exactement la meme tete qu'un profil complet. Il faut le dire :
                   c'est une conclusion qu'on porte dans la fiche du client. */}
               {profile && !calculProfil.complet && (
-                <div style={{ color: '#b45309', marginTop: 4, fontWeight: 600 }}>
+                <div style={{ color: COUL.alerte, marginTop: 4, fontWeight: 600 }}>
                   Profil établi sur {calculProfil.repondues} question
                   {calculProfil.repondues > 1 ? 's' : ''} sur {calculProfil.total} —
                   complétez la section « comportement face au risque » pour qu'il soit fiable.
@@ -1812,32 +1813,32 @@ export default function ToolQuestionnaire() {
 
         {/* ── Saved profiles ── */}
         <div style={panelCardStyle}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <i className="ti ti-user-check" style={{ color: '#1A3A6B' }} />
+          <div style={{ fontSize: 13, fontWeight: 700, color: COUL.texte, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <i className="ti ti-user-check" style={{ color: COUL.marineClair }} />
             Profils enregistrés
           </div>
           {!selectedClient ? (
-            <div style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic' }}>Sélectionnez un client pour voir ses profils</div>
+            <div style={{ fontSize: 12, color: COUL.texteFaible, fontStyle: 'italic' }}>Sélectionnez un client pour voir ses profils</div>
           ) : loadingProfiles ? (
-            <div style={{ fontSize: 12, color: '#94a3b8' }}>Chargement...</div>
+            <div style={{ fontSize: 12, color: COUL.texteFaible }}>Chargement...</div>
           ) : savedProfiles.length === 0 ? (
-            <div style={{ fontSize: 12, color: '#94a3b8' }}>Aucun profil enregistré</div>
+            <div style={{ fontSize: 12, color: COUL.texteFaible }}>Aucun profil enregistré</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {savedProfiles.map(p => (
                 <div key={p.id} style={{
-                  padding: '8px 10px', borderRadius: 6, background: '#f8fafc',
+                  padding: '8px 10px', borderRadius: 6, background: COUL.fond,
                   border: '1px solid #e2e8f0', fontSize: 12,
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontWeight: 700, color: profileColors[p.profil] || '#475569' }}>{p.profil}</span>
-                    <span style={{ color: '#94a3b8', fontSize: 11 }}>{p.score}/42</span>
+                    <span style={{ color: COUL.texteFaible, fontSize: 11 }}>{p.score}/42</span>
                   </div>
-                  <div style={{ color: '#64748b', marginTop: 2 }}>
+                  <div style={{ color: COUL.texteDoux, marginTop: 2 }}>
                     {p.nom_client}
                     {p.source === 'uploaded' && <span style={{ marginLeft: 6, color: '#8b5cf6', fontSize: 10, fontWeight: 600 }}>PDF importé</span>}
                   </div>
-                  <div style={{ color: '#94a3b8', fontSize: 10, marginTop: 2 }}>
+                  <div style={{ color: COUL.texteFaible, fontSize: 10, marginTop: 2 }}>
                     {new Date(p.created_at).toLocaleDateString('fr-BE')}
                     {p.horizon_years ? ` — ${p.horizon_years} ans` : ''}
                   </div>
@@ -1849,14 +1850,14 @@ export default function ToolQuestionnaire() {
 
         {/* ── Pending Vie contracts ── */}
         <div style={panelCardStyle}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <i className="ti ti-alert-circle" style={{ color: '#f59e0b' }} />
+          <div style={{ fontSize: 13, fontWeight: 700, color: COUL.texte, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <i className="ti ti-alert-circle" style={{ color: COUL.alerteVif }} />
             Contrats Vie sans profil
           </div>
           {!selectedClient ? (
-            <div style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic' }}>Sélectionnez un client</div>
+            <div style={{ fontSize: 12, color: COUL.texteFaible, fontStyle: 'italic' }}>Sélectionnez un client</div>
           ) : pendingContrats.length === 0 ? (
-            <div style={{ fontSize: 12, color: '#16a34a', fontWeight: 600 }}>Tous les contrats ont un profil</div>
+            <div style={{ fontSize: 12, color: COUL.succes, fontWeight: 600 }}>Tous les contrats ont un profil</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {pendingContrats.map(ct => (
@@ -1864,17 +1865,17 @@ export default function ToolQuestionnaire() {
                   key={ct.id}
                   onClick={() => { selectContrat(ct); }}
                   style={{
-                    padding: '6px 10px', borderRadius: 6, background: '#fffbeb',
+                    padding: '6px 10px', borderRadius: 6, background: COUL.alerteFondDoux,
                     border: '1px solid #fed7aa', fontSize: 12, cursor: 'pointer',
                     transition: 'all 0.15s',
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.background = '#fef3c7' }}
-                  onMouseLeave={e => { e.currentTarget.style.background = '#fffbeb' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = COUL.alerteFond }}
+                  onMouseLeave={e => { e.currentTarget.style.background = COUL.alerteFondDoux }}
                 >
-                  <div style={{ fontWeight: 600, color: '#92400e' }}>
+                  <div style={{ fontWeight: 600, color: COUL.alerteFonce }}>
                     {ct.compagnie || '—'} — {ct.police || '—'}
                   </div>
-                  <div style={{ color: '#b45309', fontSize: 11, marginTop: 1 }}>
+                  <div style={{ color: COUL.alerte, fontSize: 11, marginTop: 1 }}>
                     {ct.type_production || '—'}
                   </div>
                 </div>
@@ -1885,11 +1886,11 @@ export default function ToolQuestionnaire() {
 
         {/* ── Upload pre-filled questionnaire ── */}
         <div style={panelCardStyle}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: COUL.texte, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
             <i className="ti ti-file-import" style={{ color: '#8b5cf6' }} />
             Importer questionnaire rempli
           </div>
-          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>
+          <div style={{ fontSize: 11, color: COUL.texteDoux, marginBottom: 8 }}>
             Uploadez un questionnaire FSMA déjà rempli — les réponses seront extraites automatiquement.
           </div>
 
@@ -1914,38 +1915,38 @@ export default function ToolQuestionnaire() {
             {uploadQFile ? (
               <span style={{ color: '#6d28d9', fontWeight: 600 }}>{uploadQFile.name}</span>
             ) : (
-              <span style={{ color: '#7c3aed' }}>Glissez ou cliquez — PDF questionnaire</span>
+              <span style={{ color: COUL.violet }}>Glissez ou cliquez — PDF questionnaire</span>
             )}
           </div>
 
           {uploadQExtracting && (
-            <div style={{ fontSize: 11, color: '#7c3aed', marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ fontSize: 11, color: COUL.violet, marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
               <div style={{ width: 12, height: 12, border: '2px solid #7c3aed', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
               {uploadQProgress || 'Extraction...'}
             </div>
           )}
 
           {uploadQError && (
-            <div style={{ fontSize: 11, color: '#dc2626', marginTop: 8, background: '#fef2f2', padding: '6px 8px', borderRadius: 6 }}>
+            <div style={{ fontSize: 11, color: COUL.danger, marginTop: 8, background: COUL.dangerFondDoux, padding: '6px 8px', borderRadius: 6 }}>
               {uploadQError}
             </div>
           )}
 
           {uploadQResult && (
-            <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 6, background: '#f5f3ff', border: '1px solid #c4b5fd' }}>
+            <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 6, background: COUL.violetFond, border: '1px solid #c4b5fd' }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: profileColors[uploadQResult.profile] || '#475569' }}>
                 {uploadQResult.profile}
               </div>
-              <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+              <div style={{ fontSize: 11, color: COUL.texteDoux, marginTop: 2 }}>
                 Score : {uploadQResult.score}/42 — {uploadQResult.answeredCount}/14 réponses détectées
               </div>
               {selectedClient && selectedContrat && (
-                <div style={{ fontSize: 10, color: '#16a34a', marginTop: 4, fontWeight: 600 }}>
+                <div style={{ fontSize: 10, color: COUL.succes, marginTop: 4, fontWeight: 600 }}>
                   Sauvegardé pour {selectedClient.nom} {selectedClient.prenom}
                 </div>
               )}
               {(!selectedClient || !selectedContrat) && (
-                <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>
+                <div style={{ fontSize: 10, color: COUL.alerteVif, marginTop: 4 }}>
                   Sélectionnez un client + contrat pour sauvegarder
                 </div>
               )}

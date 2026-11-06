@@ -3,6 +3,7 @@
 // Usage : import { StatBanner, TabsBar, StatusBadge, ActionButton, DataCard } from '../components/ui/AccountableUI'
 
 import { useState, useEffect } from 'react'
+import { COUL } from '../../lib/theme'
 
 const FONT = "'Source Sans Pro', sans-serif"
 
@@ -36,7 +37,7 @@ export function StatBanner({ color, colorDark, title, subtitle, stats = [], acti
     <div style={{
       position: 'relative', overflow: 'hidden',
       background: `linear-gradient(135deg, ${color} 0%, ${colorDark || color} 140%)`,
-      borderRadius: 16, padding: mob ? '12px 16px' : '16px 24px', marginBottom: mob ? 8 : 10, color: '#fff',
+      borderRadius: 16, padding: mob ? '12px 16px' : '16px 24px', marginBottom: mob ? 8 : 10, color: COUL.blanc,
       fontFamily: FONT, boxShadow: `0 6px 20px ${hexToRgba(color, 0.25)}`,
     }}>
       {/* Cercle décoratif en fond */}
@@ -90,7 +91,7 @@ export function TabsBar({ color, tabs = [], active, onChange }) {
         return (
           <button key={t.key} onClick={() => onChange(t.key)} style={{
             background: 'none', border: 'none', padding: '11px 18px', cursor: 'pointer',
-            fontSize: 14.5, fontWeight: 700, color: on ? color : '#94a3b8',
+            fontSize: 14.5, fontWeight: 700, color: on ? color : COUL.texteFaible,
             borderBottom: on ? `2.5px solid ${color}` : '2.5px solid transparent', marginBottom: -2,
             display: 'flex', alignItems: 'center', gap: 8, fontFamily: FONT,
           }}>
@@ -98,7 +99,7 @@ export function TabsBar({ color, tabs = [], active, onChange }) {
             {t.count != null && (
               <span style={{
                 fontSize: 11.5, fontWeight: 700, padding: '1px 8px', borderRadius: 20,
-                background: on ? hexToRgba(color, 0.12) : '#f1f5f9', color: on ? color : '#94a3b8',
+                background: on ? hexToRgba(color, 0.12) : COUL.fondDoux, color: on ? color : COUL.texteFaible,
               }}>{t.count}</span>
             )}
           </button>
@@ -113,11 +114,11 @@ export function TabsBar({ color, tabs = [], active, onChange }) {
  * props: bg, col, label  OU  tone ('grey'|'blue'|'green'|'red'|'amber') + label
  * ------------------------------------------------------------------------- */
 const TONES = {
-  grey: { bg: '#f1f5f9', col: '#64748b' },
-  blue: { bg: '#dbeafe', col: '#2563eb' },
-  green: { bg: '#dcfce7', col: '#16a34a' },
-  red: { bg: '#fee2e2', col: '#dc2626' },
-  amber: { bg: '#fef3c7', col: '#b45309' },
+  grey: { bg: COUL.fondDoux, col: COUL.texteDoux },
+  blue: { bg: '#dbeafe', col: COUL.info },
+  green: { bg: COUL.succesFond, col: COUL.succes },
+  red: { bg: COUL.dangerFond, col: COUL.danger },
+  amber: { bg: COUL.alerteFond, col: COUL.alerte },
 }
 export function StatusBadge({ bg, col, tone, label }) {
   const c = tone ? TONES[tone] : { bg, col }
@@ -134,11 +135,11 @@ export function StatusBadge({ bg, col, tone, label }) {
  * props: onClick, disabled, children, tone ('grey'|'pdf'|'excel'|'accent'|'danger'|'peppol'), color (pour 'accent')
  * ------------------------------------------------------------------------- */
 const BTN_TONES = {
-  grey: { bg: '#f1f5f9', col: '#64748b' },
-  pdf: { bg: '#fef2f2', col: '#dc2626' },
-  excel: { bg: '#f0fdf4', col: '#16a34a' },
-  peppol: { bg: '#eff6ff', col: '#2563eb' },
-  danger: { bg: '#fff', col: '#dc2626' },
+  grey: { bg: COUL.fondDoux, col: COUL.texteDoux },
+  pdf: { bg: COUL.dangerFondDoux, col: COUL.danger },
+  excel: { bg: COUL.succesFondDoux, col: COUL.succes },
+  peppol: { bg: COUL.infoFond, col: COUL.info },
+  danger: { bg: COUL.blanc, col: COUL.danger },
 }
 export function ActionButton({ onClick, disabled, children, tone = 'grey', color }) {
   const c = tone === 'accent' ? { bg: hexToRgba(color || '#ea580c', 0.1), col: color || '#ea580c' } : (BTN_TONES[tone] || BTN_TONES.grey)
@@ -156,7 +157,7 @@ export function ActionButton({ onClick, disabled, children, tone = 'grey', color
  * ------------------------------------------------------------------------- */
 export function DataCard({ children, style }) {
   return (
-    <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #eef2f6', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', fontFamily: FONT, ...style }}>
+    <div style={{ background: COUL.blanc, borderRadius: 14, border: '1px solid #eef2f6', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', fontFamily: FONT, ...style }}>
       {children}
     </div>
   )
@@ -166,7 +167,7 @@ export function DataCard({ children, style }) {
 export function PrimaryButton({ onClick, children, color }) {
   return (
     <button onClick={onClick} style={{
-      background: '#fff', color: color || '#ea580c', border: 'none', borderRadius: 10,
+      background: COUL.blanc, color: color || '#ea580c', border: 'none', borderRadius: 10,
       padding: '10px 18px', cursor: 'pointer', fontSize: 13.5, fontWeight: 700, fontFamily: FONT,
       display: 'flex', alignItems: 'center', gap: 7, boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
     }}>{children}</button>

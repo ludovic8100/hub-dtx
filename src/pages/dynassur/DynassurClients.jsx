@@ -8,9 +8,10 @@ import { StatBanner } from '../../components/ui/AccountableUI'
 import { getCompagnies, resolveCie } from '../../lib/cie'
 import { trierLignes } from '../../lib/tri'
 import EnTetesTriables from '../../components/EnTetesTriables'
+import { COUL } from '../../lib/theme'
 
-const BLUE  = '#0080BD'
-const NAVY  = '#0D2F5E'
+const BLUE  = COUL.bleu
+const NAVY  = COUL.marine
 const PER   = 40
 
 const fmt     = v => v == null ? '—' : new Intl.NumberFormat('fr-BE',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(v)
@@ -88,7 +89,7 @@ const TRANCHES = [
   { val:'jamais', label:'Jamais contacté',  min:null, max:null },
 ]
 const trancheDe = jours => TRANCHES.find(t=>t.min!=null&&jours>=t.min&&jours<t.max)?.val || null
-const TRANCHE_COL = { m1:'#16a34a', m3:'#65a30d', m6:'#ca8a04', m12:'#ea580c', a2:'#dc2626', a2p:'#991b1b', jamais:'#6b7280' }
+const TRANCHE_COL = { m1:COUL.succes, m3:'#65a30d', m6:'#ca8a04', m12:COUL.orange, a2:COUL.danger, a2p:'#991b1b', jamais:'#6b7280' }
 // Âge en années (+ mois) à partir d'une date de naissance
 const calcAge = v => {
   const d=parseDate(v); if(!d) return null
@@ -132,7 +133,7 @@ function EnDev({ label='En cours de développement', mini=false }) {
   return (
     <span title="Fonctionnalité en cours de développement" style={{
       display:'inline-flex',alignItems:'center',gap:4,
-      background:'#fff7ed',color:'#c2410c',border:'1px solid #fed7aa',
+      background:COUL.orangeFond,color:'#c2410c',border:'1px solid #fed7aa',
       borderRadius:20,padding:mini?'1px 7px':'2px 9px',fontSize:mini?9:10,fontWeight:700,
       textTransform:'uppercase',letterSpacing:'.03em',whiteSpace:'nowrap',verticalAlign:'middle',
     }}>
@@ -168,12 +169,12 @@ const PROPAGE = lib => { const t=(lib||'').toLowerCase(); return ['conjoint','co
 // ── Relation → badge ──
 const REL_MAP = {
   conjoint:   { icon:'💍', col:'#ec4899', bg:'#fdf2f8', label:'Conjoint·e' },
-  enfant:     { icon:'👶', col:'#7c3aed', bg:'#f5f3ff', label:'Enfant' },
-  parent:     { icon:'👨‍👩‍👧', col:'#0d9488', bg:'#f0fdfa', label:'Parent' },
-  fratrie:    { icon:'👫', col:'#2563eb', bg:'#eff6ff', label:'Fratrie' },
-  entreprise: { icon:'🏢', col:'#94a3b8', bg:'#f8fafc', label:'Entreprise' },
-  apporteur:  { icon:'🤝', col:'#16a34a', bg:'#f0fdf4', label:'Apporteur' },
-  autre:      { icon:'🔗', col:'#64748b', bg:'#f1f5f9', label:'Autre' },
+  enfant:     { icon:'👶', col:COUL.violet, bg:COUL.violetFond, label:'Enfant' },
+  parent:     { icon:'👨‍👩‍👧', col:COUL.teal, bg:COUL.tealFond, label:'Parent' },
+  fratrie:    { icon:'👫', col:COUL.info, bg:COUL.infoFond, label:'Fratrie' },
+  entreprise: { icon:'🏢', col:COUL.texteFaible, bg:COUL.fond, label:'Entreprise' },
+  apporteur:  { icon:'🤝', col:COUL.succes, bg:COUL.succesFondDoux, label:'Apporteur' },
+  autre:      { icon:'🔗', col:COUL.texteDoux, bg:COUL.fondDoux, label:'Autre' },
 }
 
 // ── Section pliable ──
@@ -181,7 +182,7 @@ function Sec({ icon, title, count, children, extra, open: defOpen=true, col=BLUE
   const [open, setOpen] = useState(defOpen)
   return (
     <div style={{ border:'1px solid #e2e8f0', borderRadius:10, overflow:'hidden', marginBottom:10 }}>
-      <div onClick={()=>setOpen(o=>!o)} style={{ padding:'10px 16px', display:'flex', alignItems:'center', gap:8, cursor:'pointer', background:'#f8fafc', userSelect:'none' }}
+      <div onClick={()=>setOpen(o=>!o)} style={{ padding:'10px 16px', display:'flex', alignItems:'center', gap:8, cursor:'pointer', background:COUL.fond, userSelect:'none' }}
         onMouseEnter={e=>e.currentTarget.style.background='#f1f5f9'}
         onMouseLeave={e=>e.currentTarget.style.background='#f8fafc'}>
         <i className={`ti ${icon}`} style={{ fontSize:14, color:col }} />
@@ -189,7 +190,7 @@ function Sec({ icon, title, count, children, extra, open: defOpen=true, col=BLUE
         {count>0 && <span style={{ fontSize:10, background:col+'20', color:col, padding:'1px 7px', borderRadius:10, fontWeight:700 }}>{count}</span>}
         {extra}
         <span style={{ flex:1 }} />
-        <i className={`ti ${open?'ti-chevron-up':'ti-chevron-down'}`} style={{ fontSize:11, color:'#94a3b8' }} />
+        <i className={`ti ${open?'ti-chevron-up':'ti-chevron-down'}`} style={{ fontSize:11, color:COUL.texteFaible }} />
       </div>
       {open && <div style={{ padding:'14px 16px' }}>{children}</div>}
     </div>
@@ -206,47 +207,47 @@ function Primes({ dossier }) {
     supabase.from('quittances').select('compagnie,date_comptable,prime_totale,commission,commission_sa,sous_agent').eq('dossier',dossier).order('date_comptable',{ascending:false}).limit(50)
       .then(({data})=>{ setRows(data||[]); setLoad(false) })
   },[dossier])
-  if(load) return <p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>
-  if(!rows.length) return <p style={{color:'#94a3b8',fontSize:12}}>Aucune quittance trouvée</p>
+  if(load) return <p style={{color:COUL.texteFaible,fontSize:12}}>Chargement…</p>
+  if(!rows.length) return <p style={{color:COUL.texteFaible,fontSize:12}}>Aucune quittance trouvée</p>
   const tP=rows.reduce((s,r)=>s+parseFloat(r.prime_totale||0),0)
   const tC=rows.reduce((s,r)=>s+parseFloat(r.commission||0),0)
   const tS=rows.reduce((s,r)=>s+parseFloat(r.commission_sa||0),0)
   return (
     <div>
       <div style={{display:'flex',gap:10,marginBottom:12,flexWrap:'wrap',alignItems:'flex-start'}}>
-        <div style={{background:'#eff6ff',borderRadius:8,padding:'8px 14px',border:'1px solid #bfdbfe'}}>
-          <div style={{fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',marginBottom:2}}>Primes TTC</div>
+        <div style={{background:COUL.infoFond,borderRadius:8,padding:'8px 14px',border:'1px solid #bfdbfe'}}>
+          <div style={{fontSize:10,fontWeight:700,color:COUL.texteFaible,textTransform:'uppercase',marginBottom:2}}>Primes TTC</div>
           <div style={{fontSize:18,fontWeight:800,color:NAVY}}>{fmt(tP)}</div>
         </div>
         {show&&<>
-          <div style={{background:'#f0fdf4',borderRadius:8,padding:'8px 14px',border:'1px solid #bbf7d0'}}>
-            <div style={{fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',marginBottom:2}}>Comm. DYN</div>
-            <div style={{fontSize:18,fontWeight:800,color:'#16a34a'}}>{fmt(tC)}</div>
+          <div style={{background:COUL.succesFondDoux,borderRadius:8,padding:'8px 14px',border:'1px solid #bbf7d0'}}>
+            <div style={{fontSize:10,fontWeight:700,color:COUL.texteFaible,textTransform:'uppercase',marginBottom:2}}>Comm. DYN</div>
+            <div style={{fontSize:18,fontWeight:800,color:COUL.succes}}>{fmt(tC)}</div>
           </div>
           <div style={{background:'#fdf4ff',borderRadius:8,padding:'8px 14px',border:'1px solid #e9d5ff'}}>
-            <div style={{fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',marginBottom:2}}>Comm. SA</div>
-            <div style={{fontSize:18,fontWeight:800,color:'#7c3aed'}}>{fmt(tS)}</div>
+            <div style={{fontSize:10,fontWeight:700,color:COUL.texteFaible,textTransform:'uppercase',marginBottom:2}}>Comm. SA</div>
+            <div style={{fontSize:18,fontWeight:800,color:COUL.violet}}>{fmt(tS)}</div>
           </div>
         </>}
-        {canComm&&<button onClick={()=>setShowC(s=>!s)} style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:6,fontSize:12,color:showC?'#16a34a':'#64748b',background:showC?'#f0fdf4':'#f8fafc',border:`1px solid ${showC?'#bbf7d0':'#e2e8f0'}`,borderRadius:7,padding:'5px 12px',cursor:'pointer',fontWeight:600}}>
+        {canComm&&<button onClick={()=>setShowC(s=>!s)} style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:6,fontSize:12,color:showC?'#16a34a':COUL.texteDoux,background:showC?'#f0fdf4':COUL.fond,border:`1px solid ${showC?'#bbf7d0':COUL.bord}`,borderRadius:7,padding:'5px 12px',cursor:'pointer',fontWeight:600}}>
           <i className={`ti ${showC?'ti-eye-off':'ti-eye'}`}/>{showC?'Masquer commissions':'Voir commissions'}
         </button>}
       </div>
       <div style={{overflowX:'auto',maxHeight:200,overflowY:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
-          <thead style={{position:'sticky',top:0,background:'#f8fafc',zIndex:1}}>
+          <thead style={{position:'sticky',top:0,background:COUL.fond,zIndex:1}}>
             <tr>{['Période','Compagnie','Prime TTC',...(show?['Comm. DYN','Comm. SA']:[])].map(h=>(
-              <th key={h} style={{padding:'6px 12px',textAlign:'left',fontWeight:700,color:'#94a3b8',fontSize:10,textTransform:'uppercase',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>
+              <th key={h} style={{padding:'6px 12px',textAlign:'left',fontWeight:700,color:COUL.texteFaible,fontSize:10,textTransform:'uppercase',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>
             ))}</tr>
           </thead>
           <tbody>
             {rows.map((r,i)=>(
-              <tr key={i} style={{background:i%2===0?'#fff':'#fafafe'}}>
-                <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b',whiteSpace:'nowrap'}}>{fmtMois(r.date_comptable)}</td>
+              <tr key={i} style={{background:i%2===0?'#fff':COUL.fondAlterne}}>
+                <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',color:COUL.texteDoux,whiteSpace:'nowrap'}}>{fmtMois(r.date_comptable)}</td>
                 <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',color:'#374151'}}>{r.compagnie||'—'}</td>
                 <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',fontWeight:600,color:NAVY}}>{fmt(r.prime_totale)}</td>
-                {show&&<><td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',fontWeight:600,color:'#16a34a'}}>{fmt(r.commission)}</td>
-                <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',fontWeight:600,color:'#7c3aed'}}>{fmt(r.commission_sa)}</td></>}
+                {show&&<><td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',fontWeight:600,color:COUL.succes}}>{fmt(r.commission)}</td>
+                <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',fontWeight:600,color:COUL.violet}}>{fmt(r.commission_sa)}</td></>}
               </tr>
             ))}
           </tbody>
@@ -339,13 +340,13 @@ function Analyse360({ client, contrats, typeSel, onType }) {
     return {...e, etat:'absent'}
   })
   const manquants=couv.filter(e=>e.etat==='absent')
-  const STY={ direct:{bg:'#f0fdf4',col:'#16a34a',bd:'#bbf7d0',ic:'ti-check'}, relation:{bg:'#eff6ff',col:'#2563eb',bd:'#bfdbfe',ic:'ti-users'}, absent:{bg:'#fef2f2',col:'#dc2626',bd:'#fecaca',ic:'ti-x'} }
+  const STY={ direct:{bg:COUL.succesFondDoux,col:COUL.succes,bd:COUL.succesBord,ic:'ti-check'}, relation:{bg:COUL.infoFond,col:COUL.info,bd:'#bfdbfe',ic:'ti-users'}, absent:{bg:COUL.dangerFondDoux,col:COUL.danger,bd:COUL.dangerBord,ic:'ti-x'} }
 
   return (
-    <div style={{background:'#fafafe',border:'1px solid #e2e8f0',borderRadius:10,padding:'12px 14px',marginBottom:12}}>
+    <div style={{background:COUL.fondAlterne,border:'1px solid #e2e8f0',borderRadius:10,padding:'12px 14px',marginBottom:12}}>
       <div style={{fontSize:11,fontWeight:700,color:NAVY,textTransform:'uppercase',letterSpacing:'.04em',marginBottom:9,display:'flex',alignItems:'center',gap:6}}>
-        <i className="ti ti-radar" style={{color:'#7c3aed'}}/>Analyse 360 — couverture
-        {loadExt&&<span style={{fontSize:10,color:'#94a3b8',fontWeight:500,textTransform:'none'}}>· analyse des relations…</span>}
+        <i className="ti ti-radar" style={{color:COUL.violet}}/>Analyse 360 — couverture
+        {loadExt&&<span style={{fontSize:10,color:COUL.texteFaible,fontWeight:500,textTransform:'none'}}>· analyse des relations…</span>}
       </div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(165px,1fr))',gap:7}}>
         {couv.map((e,i)=>{
@@ -368,7 +369,7 @@ function Analyse360({ client, contrats, typeSel, onType }) {
         })}
       </div>
       {manquants.length>0&&(
-        <div style={{fontSize:11,color:'#92400e',marginTop:9,background:'#fffbeb',border:'1px solid #fde68a',borderRadius:7,padding:'7px 11px'}}>
+        <div style={{fontSize:11,color:COUL.alerteFonce,marginTop:9,background:COUL.alerteFondDoux,border:'1px solid #fde68a',borderRadius:7,padding:'7px 11px'}}>
           <strong>{manquants.length} couverture{manquants.length>1?'s':''} à proposer :</strong> {manquants.map(m=>m.label).join(', ')}
         </div>
       )}
@@ -409,9 +410,9 @@ function Risques({ contrats, loadContrats }) {
     fetchAll()
   },[contrats,loadContrats])
 
-  if(loadContrats||load) return <p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>
+  if(loadContrats||load) return <p style={{color:COUL.texteFaible,fontSize:12}}>Chargement…</p>
   const aContratsActifs=contrats.some(c=>c.situation==='En cours')
-  if(!risques.length&&!aContratsActifs) return <p style={{color:'#94a3b8',fontSize:12}}>Aucun objet de risque trouvé pour ce client</p>
+  if(!risques.length&&!aContratsActifs) return <p style={{color:COUL.texteFaible,fontSize:12}}>Aucun objet de risque trouvé pour ce client</p>
 
   // Séparer actifs / inactifs
   const actifs=risques.filter(r=>r.actif)
@@ -430,8 +431,8 @@ function Risques({ contrats, loadContrats }) {
           <div key={i} style={{display:'flex',alignItems:'center',gap:8,background:'#faf5ff',borderRadius:9,padding:'9px 14px',border:'1px solid #e9d5ff'}}>
             <span style={{fontSize:22}}>{RICON(type)}</span>
             <div>
-              <div style={{fontSize:12,fontWeight:700,color:'#1e293b'}}>{type}</div>
-              <div style={{fontSize:10,color:'#94a3b8'}}>{arr.length} objet{arr.length>1?'s':''}</div>
+              <div style={{fontSize:12,fontWeight:700,color:COUL.texte}}>{type}</div>
+              <div style={{fontSize:10,color:COUL.texteFaible}}>{arr.length} objet{arr.length>1?'s':''}</div>
             </div>
           </div>
         ))}
@@ -440,7 +441,7 @@ function Risques({ contrats, loadContrats }) {
       {/* Bouton aperçu des inactifs */}
       {inactifs.length>0&&(
         <button onClick={()=>setShowInactifs(s=>!s)} style={{alignSelf:'flex-start',display:'flex',alignItems:'center',gap:6,fontSize:12,fontWeight:600,
-          color:showInactifs?'#dc2626':'#64748b',background:showInactifs?'#fef2f2':'#f8fafc',border:`1px solid ${showInactifs?'#fecaca':'#e2e8f0'}`,borderRadius:7,padding:'5px 12px',cursor:'pointer'}}>
+          color:showInactifs?'#dc2626':COUL.texteDoux,background:showInactifs?'#fef2f2':COUL.fond,border:`1px solid ${showInactifs?'#fecaca':COUL.bord}`,borderRadius:7,padding:'5px 12px',cursor:'pointer'}}>
           <i className={`ti ${showInactifs?'ti-eye-off':'ti-eye'}`}/>{showInactifs?`Masquer les ${inactifs.length} inactif${inactifs.length>1?'s':''}`:`Aperçu des ${inactifs.length} risque${inactifs.length>1?'s':''} inactif${inactifs.length>1?'s':''}`}
         </button>
       )}
@@ -448,20 +449,20 @@ function Risques({ contrats, loadContrats }) {
       {/* Détail */}
       {visibles.length>0&&<div style={{overflowX:'auto',maxHeight:240,overflowY:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
-          <thead style={{position:'sticky',top:0,background:'#f8fafc',zIndex:1}}>
+          <thead style={{position:'sticky',top:0,background:COUL.fond,zIndex:1}}>
             <tr>{['Police','Type','Description','Contrats','Statut'].map(h=>(
-              <th key={h} style={{padding:'7px 12px',textAlign:'left',fontWeight:700,color:'#94a3b8',fontSize:10,textTransform:'uppercase',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>
+              <th key={h} style={{padding:'7px 12px',textAlign:'left',fontWeight:700,color:COUL.texteFaible,fontSize:10,textTransform:'uppercase',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>
             ))}</tr>
           </thead>
           <tbody>
             {visibles.map((r,i)=>(
-              <tr key={i} style={{background:r.actif?(i%2===0?'#fff':'#fafafe'):'#fef2f2'}}>
+              <tr key={i} style={{background:r.actif?(i%2===0?'#fff':COUL.fondAlterne):COUL.dangerFondDoux}}>
                 <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',fontFamily:'monospace',fontSize:11,fontWeight:600,color:NAVY}}>{r.police}</td>
-                <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#1e293b'}}>{RICON(r.type_risque_libelle)} {r.type_risque_libelle||'—'}</td>
-                <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{r.description||'—'}</td>
-                <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',textAlign:'center',color:'#64748b'}}>{r.total_contrats_en_cours||0}</td>
+                <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:COUL.texte}}>{RICON(r.type_risque_libelle)} {r.type_risque_libelle||'—'}</td>
+                <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',color:COUL.texteDoux}}>{r.description||'—'}</td>
+                <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9',textAlign:'center',color:COUL.texteDoux}}>{r.total_contrats_en_cours||0}</td>
                 <td style={{padding:'7px 12px',borderBottom:'1px solid #f1f5f9'}}>
-                  <span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:4,background:r.actif?'#dcfce7':'#fee2e2',color:r.actif?'#16a34a':'#dc2626'}}>{r.actif?'Actif':'Inactif'}</span>
+                  <span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:4,background:r.actif?'#dcfce7':COUL.dangerFond,color:r.actif?'#16a34a':COUL.danger}}>{r.actif?'Actif':'Inactif'}</span>
                 </td>
               </tr>
             ))}
@@ -479,15 +480,15 @@ function Relations({ client, onOpenDossier }) {
   const relCfg = lib => {
     const t=(lib||'').toLowerCase()
     if(t.includes('conjoint')||t.includes('époux')||t.includes('epoux')||t.includes('marié')) return {icon:'💍',col:'#ec4899',bg:'#fdf2f8'}
-    if(t.includes('cohabitant')||t.includes('concubin')) return {icon:'🏡',col:'#0d9488',bg:'#f0fdfa'}
-    if(t.includes('enfant')||t.includes('fils')||t.includes('fille')) return {icon:'👶',col:'#7c3aed',bg:'#f5f3ff'}
-    if(t.includes('parent')||t.includes('père')||t.includes('mère')||t.includes('pere')||t.includes('mere')||t.includes('grand-parent')) return {icon:'👨‍👩‍👧',col:'#0d9488',bg:'#f0fdfa'}
-    if(t.includes('frère')||t.includes('soeur')||t.includes('sœur')||t.includes('frere')) return {icon:'👫',col:'#2563eb',bg:'#eff6ff'}
-    if(t.includes('cousin')||t.includes('oncle')||t.includes('tante')||t.includes('neveu')||t.includes('nièce')||t.includes('beau')||t.includes('belle')) return {icon:'🧑‍🤝‍🧑',col:'#2563eb',bg:'#eff6ff'}
-    if(t.includes('gérant')||t.includes('gerant')||t.includes('administrateur')||t.includes('coopérateur')||t.includes('bénéficiaire effectif')) return {icon:'👔',col:'#b45309',bg:'#fffbeb'}
-    if(t.includes('firme')||t.includes('société')||t.includes('societe')||t.includes('entreprise')||t.includes('morale')||t.includes('organisation')) return {icon:'🏢',col:'#475569',bg:'#f8fafc'}
-    if(t.includes('employeur')||t.includes('salarié')||t.includes('salarie')||t.includes('membre')||t.includes('représentant')||t.includes('representant')) return {icon:'💼',col:'#475569',bg:'#f8fafc'}
-    return {icon:'🔗',col:'#64748b',bg:'#f1f5f9'}
+    if(t.includes('cohabitant')||t.includes('concubin')) return {icon:'🏡',col:COUL.teal,bg:COUL.tealFond}
+    if(t.includes('enfant')||t.includes('fils')||t.includes('fille')) return {icon:'👶',col:COUL.violet,bg:COUL.violetFond}
+    if(t.includes('parent')||t.includes('père')||t.includes('mère')||t.includes('pere')||t.includes('mere')||t.includes('grand-parent')) return {icon:'👨‍👩‍👧',col:COUL.teal,bg:COUL.tealFond}
+    if(t.includes('frère')||t.includes('soeur')||t.includes('sœur')||t.includes('frere')) return {icon:'👫',col:COUL.info,bg:COUL.infoFond}
+    if(t.includes('cousin')||t.includes('oncle')||t.includes('tante')||t.includes('neveu')||t.includes('nièce')||t.includes('beau')||t.includes('belle')) return {icon:'🧑‍🤝‍🧑',col:COUL.info,bg:COUL.infoFond}
+    if(t.includes('gérant')||t.includes('gerant')||t.includes('administrateur')||t.includes('coopérateur')||t.includes('bénéficiaire effectif')) return {icon:'👔',col:COUL.alerte,bg:COUL.alerteFondDoux}
+    if(t.includes('firme')||t.includes('société')||t.includes('societe')||t.includes('entreprise')||t.includes('morale')||t.includes('organisation')) return {icon:'🏢',col:COUL.texteMoyen,bg:COUL.fond}
+    if(t.includes('employeur')||t.includes('salarié')||t.includes('salarie')||t.includes('membre')||t.includes('représentant')||t.includes('representant')) return {icon:'💼',col:COUL.texteMoyen,bg:COUL.fond}
+    return {icon:'🔗',col:COUL.texteDoux,bg:COUL.fondDoux}
   }
   const SEL='dossier,nom_principal,prenom_principal,type_relation_libelle,relation_active,physique_morale_libelle,nom_lie,prenom_lie,cp_lie,localite_lie'
 
@@ -549,8 +550,8 @@ function Relations({ client, onOpenDossier }) {
     })
   },[client?.dossier])
 
-  if(load) return <p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>
-  if(!rels.length) return <div style={{color:'#94a3b8',fontSize:12,fontStyle:'italic'}}>Aucune relation enregistrée pour ce dossier.</div>
+  if(load) return <p style={{color:COUL.texteFaible,fontSize:12}}>Chargement…</p>
+  if(!rels.length) return <div style={{color:COUL.texteFaible,fontSize:12,fontStyle:'italic'}}>Aucune relation enregistrée pour ce dossier.</div>
   return(
     <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
       {rels.map((r,i)=>{
@@ -572,14 +573,14 @@ function Relations({ client, onOpenDossier }) {
             <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:5}}>
               <span style={{fontSize:18}}>{cfg.icon}</span>
               <span style={{fontSize:10,fontWeight:700,color:cfg.col,textTransform:'uppercase',letterSpacing:'.03em',lineHeight:1.2}}>{role||'Relation'}</span>
-              {!r.active&&<span style={{fontSize:9,color:'#dc2626',marginLeft:'auto',fontWeight:600}}>inactive</span>}
+              {!r.active&&<span style={{fontSize:9,color:COUL.danger,marginLeft:'auto',fontWeight:600}}>inactive</span>}
             </div>
-            <div style={{fontSize:13,fontWeight:700,color:'#1e293b'}}>{nomAffiche||'—'}</div>
+            <div style={{fontSize:13,fontWeight:700,color:COUL.texte}}>{nomAffiche||'—'}</div>
             {direction&&<div style={{fontSize:10,color:cfg.col,marginTop:1,fontStyle:'italic'}}>{direction}</div>}
-            <div style={{fontSize:11,color:'#64748b',marginTop:2}}>{[r.cp,r.localite].filter(Boolean).join(' ')||'—'}</div>
+            <div style={{fontSize:11,color:COUL.texteDoux,marginTop:2}}>{[r.cp,r.localite].filter(Boolean).join(' ')||'—'}</div>
             {clickable
               ? <div style={{fontSize:10,color:cfg.col,marginTop:4,fontWeight:600}}>Voir la fiche →</div>
-              : <div style={{fontSize:10,color:'#cbd5e1',marginTop:4}}>Hors portefeuille</div>}
+              : <div style={{fontSize:10,color:COUL.bordFort,marginTop:4}}>Hors portefeuille</div>}
           </div>
         )
       })}
@@ -594,11 +595,11 @@ function Relations({ client, onOpenDossier }) {
 // ── Badge compagnie : logo si disponible, sinon monogramme coloré (nom complet au survol) ──
 function Cie({ nom, cies, size=18 }) {
   const [err,setErr]=useState(false)
-  if(!nom) return <span style={{color:'#cbd5e1'}}>—</span>
+  if(!nom) return <span style={{color:COUL.bordFort}}>—</span>
   const r=resolveCie(nom,cies); const pad=Math.round(size*0.3)
   if(r.logoUrl && !err)
     return <img src={r.logoUrl} alt={nom} title={nom} onError={()=>setErr(true)}
-      style={{height:size,maxWidth:size*3.4,objectFit:'contain',verticalAlign:'middle',background:'#fff',borderRadius:4,padding:'1px 2px'}}/>
+      style={{height:size,maxWidth:size*3.4,objectFit:'contain',verticalAlign:'middle',background:COUL.blanc,borderRadius:4,padding:'1px 2px'}}/>
   return <span title={nom} style={{display:'inline-block',fontSize:Math.max(10,Math.round(size*0.6)),fontWeight:800,padding:`1px ${pad}px`,borderRadius:6,background:r.couleur+'22',color:r.couleur,lineHeight:`${size}px`,whiteSpace:'nowrap'}}>{r.court}</span>
 }
 
@@ -735,9 +736,9 @@ function VueContrats({ client, objets, contratsClient, garantiesParPolice, cies,
   let visC=typeC.filter(c=>showTermines||c.enc); if(selObj) visC=visC.filter(c=>c.objs.includes(selObj))
 
   const CATS=[
-    {key:'perso',label:'Contrats personnels',col:'#7c3aed',bg:'#f5f3ff',bd:'#e9d5ff'},
-    {key:'lie',label:'Famille & sociétés',col:'#0d9488',bg:'#f0fdfa',bd:'#99f6e4'},
-    {key:'autre',label:'Autres preneurs',col:'#b45309',bg:'#fffbeb',bd:'#fde68a'},
+    {key:'perso',label:'Contrats personnels',col:COUL.violet,bg:COUL.violetFond,bd:'#e9d5ff'},
+    {key:'lie',label:'Famille & sociétés',col:COUL.teal,bg:COUL.tealFond,bd:'#99f6e4'},
+    {key:'autre',label:'Autres preneurs',col:COUL.alerte,bg:COUL.alerteFondDoux,bd:'#fde68a'},
   ]
   const TYPES=['Conjoint','Cohabitant','Enfant','Parent','Frère / Sœur','Société / gérance','Apporteur','Autre']
   const SEC='9.5px'
@@ -745,74 +746,74 @@ function VueContrats({ client, objets, contratsClient, garantiesParPolice, cies,
   relsFam.forEach(r=>{ const nom=`${r.nom||''} ${r.prenom||''}`.trim(); liensAff.push({nom:nom||('Dossier '+(r.dossier||'?')),type:r.type,dossier:r.dossier,source:'famille'}) })
   manuels.forEach(m=>{ liensAff.push({nom:preneurs[m.autreDossier]||('Dossier '+m.autreDossier),type:m.type,dossier:m.autreDossier,source:'manuel',id:m.id}) })
 
-  if(loadF) return <p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>
+  if(loadF) return <p style={{color:COUL.texteFaible,fontSize:12}}>Chargement…</p>
 
   return (
     <div style={{display:'flex',flexDirection:'column',gap:14}}>
       {typeSel&&(
-        <div style={{display:'flex',alignItems:'center',gap:9,flexWrap:'wrap',background:'#f5f3ff',border:'1px solid #e9d5ff',borderRadius:9,padding:'8px 12px'}}>
-          <i className="ti ti-filter-filled" style={{fontSize:15,color:'#7c3aed'}}/>
-          <span style={{fontSize:12,color:'#1e293b'}}>
+        <div style={{display:'flex',alignItems:'center',gap:9,flexWrap:'wrap',background:COUL.violetFond,border:'1px solid #e9d5ff',borderRadius:9,padding:'8px 12px'}}>
+          <i className="ti ti-filter-filled" style={{fontSize:15,color:COUL.violet}}/>
+          <span style={{fontSize:12,color:COUL.texte}}>
             Filtré sur <strong>{typeSel.icon} {typeSel.label}</strong> — {typeC.length} contrat{typeC.length>1?'s':''} et {objetsList.length} objet{objetsList.length>1?'s':''} de risque.
           </span>
-          <button onClick={()=>onType&&onType(null)} style={{marginLeft:'auto',fontSize:11,fontWeight:700,padding:'4px 10px',borderRadius:6,cursor:'pointer',border:'1px solid #c4b5fd',background:'#fff',color:'#7c3aed'}}>
+          <button onClick={()=>onType&&onType(null)} style={{marginLeft:'auto',fontSize:11,fontWeight:700,padding:'4px 10px',borderRadius:6,cursor:'pointer',border:'1px solid #c4b5fd',background:COUL.blanc,color:COUL.violet}}>
             <i className="ti ti-x" style={{marginRight:4}}/>Tout afficher
           </button>
         </div>
       )}
       {typeSel&&!typeC.length&&(
-        <div style={{fontSize:12,color:'#92400e',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:9,padding:'8px 12px'}}>
+        <div style={{fontSize:12,color:COUL.alerteFonce,background:COUL.alerteFondDoux,border:'1px solid #fde68a',borderRadius:9,padding:'8px 12px'}}>
           Aucun contrat de ce type sur ce dossier. La couverture vient peut-être d'une relation (voir l'Analyse 360).
         </div>
       )}
       {objetsList.length>0&&(
         <div>
-          <div style={{fontSize:SEC,fontWeight:800,letterSpacing:.3,textTransform:'uppercase',color:'#7c3aed',marginBottom:6}}>Objets de risque</div>
+          <div style={{fontSize:SEC,fontWeight:800,letterSpacing:.3,textTransform:'uppercase',color:COUL.violet,marginBottom:6}}>Objets de risque</div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(190px,1fr))',gap:8}}>
             {objetsList.map((g,i)=>{
               const ic=_isVeh(g.type)?'ti-car':(_isBat(g.type)?'ti-building':'ti-point'); const sel=selObj===g.key
               return (
                 <div key={i} onClick={()=>setSelObj(sel?null:g.key)} title="Filtrer les contrats de cet objet"
                   style={{border:'1px solid '+(sel?'#7c3aed':'#e9d5ff'),borderRadius:10,padding:'9px 11px',background:sel?'#f5f3ff':'#fdfcff',cursor:'pointer',display:'flex',alignItems:'center',gap:8}}>
-                  <i className={`ti ${ic}`} style={{fontSize:18,color:'#7c3aed',flexShrink:0}}/>
+                  <i className={`ti ${ic}`} style={{fontSize:18,color:COUL.violet,flexShrink:0}}/>
                   <div style={{minWidth:0,flex:1}}>
-                    <div style={{fontSize:12.5,fontWeight:800,color:'#1e293b',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{_firstSeg(g.label)||'—'}</div>
-                    <div style={{fontSize:10,color:'#94a3b8',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(g.label||'').split(' - ').slice(1).join(' · ')||'\u00A0'}</div>
+                    <div style={{fontSize:12.5,fontWeight:800,color:COUL.texte,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{_firstSeg(g.label)||'—'}</div>
+                    <div style={{fontSize:10,color:COUL.texteFaible,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(g.label||'').split(' - ').slice(1).join(' · ')||'\u00A0'}</div>
                   </div>
-                  <span style={{fontSize:10,fontWeight:700,padding:'1px 6px',borderRadius:5,background:g.enc?'#dcfce7':'#f1f5f9',color:g.enc?'#15803d':'#94a3b8',flexShrink:0}}>{g.enc}</span>
+                  <span style={{fontSize:10,fontWeight:700,padding:'1px 6px',borderRadius:5,background:g.enc?'#dcfce7':COUL.fondDoux,color:g.enc?'#15803d':COUL.texteFaible,flexShrink:0}}>{g.enc}</span>
                 </div>
               )
             })}
           </div>
-          {selObj&&<button onClick={()=>setSelObj(null)} style={{marginTop:6,fontSize:10.5,fontWeight:700,color:'#7c3aed',background:'none',border:'none',cursor:'pointer',padding:0}}>← Voir tous les contrats</button>}
+          {selObj&&<button onClick={()=>setSelObj(null)} style={{marginTop:6,fontSize:10.5,fontWeight:700,color:COUL.violet,background:'none',border:'none',cursor:'pointer',padding:0}}>← Voir tous les contrats</button>}
         </div>
       )}
 
       <div>
         <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
-          <span style={{fontSize:SEC,fontWeight:800,letterSpacing:.3,textTransform:'uppercase',color:'#0d9488'}}>Liens (famille, sociétés…)</span>
-          <button onClick={()=>setEditOpen(o=>!o)} style={{fontSize:10.5,fontWeight:700,padding:'3px 9px',borderRadius:6,cursor:'pointer',border:'1px solid #99f6e4',background:editOpen?'#f0fdfa':'#fff',color:'#0d9488'}}><i className="ti ti-edit" style={{marginRight:4}}/>Modifier</button>
+          <span style={{fontSize:SEC,fontWeight:800,letterSpacing:.3,textTransform:'uppercase',color:COUL.teal}}>Liens (famille, sociétés…)</span>
+          <button onClick={()=>setEditOpen(o=>!o)} style={{fontSize:10.5,fontWeight:700,padding:'3px 9px',borderRadius:6,cursor:'pointer',border:'1px solid #99f6e4',background:editOpen?'#f0fdfa':COUL.blanc,color:COUL.teal}}><i className="ti ti-edit" style={{marginRight:4}}/>Modifier</button>
         </div>
         {liensAff.length? (
           <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
             {liensAff.map((l,i)=>(
-              <span key={i} style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:11,padding:'3px 9px',borderRadius:7,background:l.source==='manuel'?'#eff6ff':'#f8fafc',border:'1px solid '+(l.source==='manuel'?'#bfdbfe':'#e2e8f0'),color:'#1e293b'}}>
+              <span key={i} style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:11,padding:'3px 9px',borderRadius:7,background:l.source==='manuel'?'#eff6ff':COUL.fond,border:'1px solid '+(l.source==='manuel'?'#bfdbfe':COUL.bord),color:COUL.texte}}>
                 {l.dossier&&onOpenDossier? <span onClick={()=>onOpenDossier(l.dossier)} style={{cursor:'pointer',fontWeight:700,textDecoration:'underline'}}>{l.nom}</span> : <span style={{fontWeight:700}}>{l.nom}</span>}
-                {l.type&&<span style={{color:'#94a3b8'}}>· {l.type}</span>}
+                {l.type&&<span style={{color:COUL.texteFaible}}>· {l.type}</span>}
                 {l.source==='manuel'&&<i className="ti ti-x" onClick={()=>supprimerLien(l.id)} title="Supprimer ce lien" style={{cursor:'pointer',color:'#ef4444',fontSize:13}}/>}
               </span>
             ))}
           </div>
-        ) : <div style={{fontSize:11.5,color:'#94a3b8',fontStyle:'italic'}}>Aucun lien connu pour ce dossier.</div>}
+        ) : <div style={{fontSize:11.5,color:COUL.texteFaible,fontStyle:'italic'}}>Aucun lien connu pour ce dossier.</div>}
         {editOpen&&(
-          <div style={{marginTop:8,padding:'10px 12px',border:'1px dashed #99f6e4',borderRadius:9,background:'#f0fdfa'}}>
+          <div style={{marginTop:8,padding:'10px 12px',border:'1px dashed #99f6e4',borderRadius:9,background:COUL.tealFond}}>
             <div style={{fontSize:11,color:'#0f766e',marginBottom:6}}>Ajoutez un lien vers un autre preneur : recherchez-le, choisissez le type, validez. Ses contrats couvrant les mêmes objets remonteront alors en « Famille & sociétés ».</div>
             {qSel? (
               <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                <span style={{fontSize:12,fontWeight:700,color:'#1e293b'}}>{`${qSel.nom||''} ${qSel.prenom||''}`.trim()} <span style={{color:'#94a3b8',fontWeight:400}}>· {qSel.dossier}</span></span>
+                <span style={{fontSize:12,fontWeight:700,color:COUL.texte}}>{`${qSel.nom||''} ${qSel.prenom||''}`.trim()} <span style={{color:COUL.texteFaible,fontWeight:400}}>· {qSel.dossier}</span></span>
                 <select value={qType} onChange={e=>setQType(e.target.value)} style={{fontSize:12,padding:'4px 8px',borderRadius:6,border:'1px solid #cbd5e1'}}>{TYPES.map(t=><option key={t} value={t}>{t}</option>)}</select>
-                <button disabled={saving} onClick={ajouterLien} style={{fontSize:11,fontWeight:700,padding:'5px 11px',borderRadius:6,cursor:'pointer',border:'none',background:'#0d9488',color:'#fff'}}>{saving?'…':'Ajouter'}</button>
-                <button onClick={()=>{setQSel(null);setQ('')}} style={{fontSize:11,fontWeight:700,padding:'5px 9px',borderRadius:6,cursor:'pointer',border:'1px solid #cbd5e1',background:'#fff',color:'#64748b'}}>Annuler</button>
+                <button disabled={saving} onClick={ajouterLien} style={{fontSize:11,fontWeight:700,padding:'5px 11px',borderRadius:6,cursor:'pointer',border:'none',background:COUL.teal,color:COUL.blanc}}>{saving?'…':'Ajouter'}</button>
+                <button onClick={()=>{setQSel(null);setQ('')}} style={{fontSize:11,fontWeight:700,padding:'5px 9px',borderRadius:6,cursor:'pointer',border:'1px solid #cbd5e1',background:COUL.blanc,color:COUL.texteDoux}}>Annuler</button>
               </div>
             ):(
               <div>
@@ -820,14 +821,14 @@ function VueContrats({ client, objets, contratsClient, garantiesParPolice, cies,
                 {qres.length>0&&(
                   <div style={{marginTop:6,display:'flex',flexDirection:'column',gap:3,maxHeight:180,overflowY:'auto'}}>
                     {qres.map((c,i)=>(
-                      <div key={i} onClick={()=>setQSel(c)} style={{fontSize:12,padding:'5px 9px',borderRadius:6,background:'#fff',border:'1px solid #e2e8f0',cursor:'pointer',display:'flex',gap:8,alignItems:'center'}}>
-                        <span style={{fontWeight:700,color:'#1e293b'}}>{`${c.nom||''} ${c.prenom||''}`.trim()}</span>
-                        <span style={{color:'#94a3b8',fontFamily:'monospace',fontSize:11}}>{c.dossier}</span>
+                      <div key={i} onClick={()=>setQSel(c)} style={{fontSize:12,padding:'5px 9px',borderRadius:6,background:COUL.blanc,border:'1px solid #e2e8f0',cursor:'pointer',display:'flex',gap:8,alignItems:'center'}}>
+                        <span style={{fontWeight:700,color:COUL.texte}}>{`${c.nom||''} ${c.prenom||''}`.trim()}</span>
+                        <span style={{color:COUL.texteFaible,fontFamily:'monospace',fontSize:11}}>{c.dossier}</span>
                       </div>
                     ))}
                   </div>
                 )}
-                {q.trim().length>=2&&!qres.length&&<div style={{fontSize:11,color:'#94a3b8',marginTop:5}}>Aucun résultat.</div>}
+                {q.trim().length>=2&&!qres.length&&<div style={{fontSize:11,color:COUL.texteFaible,marginTop:5}}>Aucun résultat.</div>}
               </div>
             )}
           </div>
@@ -836,9 +837,9 @@ function VueContrats({ client, objets, contratsClient, garantiesParPolice, cies,
 
       <div>
         <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,flexWrap:'wrap'}}>
-          <span style={{fontSize:SEC,fontWeight:800,letterSpacing:.3,textTransform:'uppercase',color:'#7c3aed'}}>Contrats{selObj?` · ${_firstSeg((objMap[selObj]||{}).label||'')}`:''}</span>
-          {loading&&<span style={{fontSize:10,color:'#cbd5e1'}}>recherche des couvertures liées…</span>}
-          {nbTermines>0&&<button onClick={()=>setShowTermines(s=>!s)} style={{marginLeft:'auto',fontSize:11,fontWeight:700,padding:'4px 10px',borderRadius:7,cursor:'pointer',border:'1px solid '+(showTermines?'#cbd5e1':'#e2e8f0'),background:showTermines?'#f1f5f9':'#fff',color:'#475569',whiteSpace:'nowrap'}}><i className={`ti ${showTermines?'ti-eye-off':'ti-eye'}`} style={{marginRight:5}}/>{showTermines?'Masquer les terminés':`Afficher les ${nbTermines} terminé${nbTermines>1?'s':''}`}</button>}
+          <span style={{fontSize:SEC,fontWeight:800,letterSpacing:.3,textTransform:'uppercase',color:COUL.violet}}>Contrats{selObj?` · ${_firstSeg((objMap[selObj]||{}).label||'')}`:''}</span>
+          {loading&&<span style={{fontSize:10,color:COUL.bordFort}}>recherche des couvertures liées…</span>}
+          {nbTermines>0&&<button onClick={()=>setShowTermines(s=>!s)} style={{marginLeft:'auto',fontSize:11,fontWeight:700,padding:'4px 10px',borderRadius:7,cursor:'pointer',border:'1px solid '+(showTermines?'#cbd5e1':COUL.bord),background:showTermines?'#f1f5f9':COUL.blanc,color:COUL.texteMoyen,whiteSpace:'nowrap'}}><i className={`ti ${showTermines?'ti-eye-off':'ti-eye'}`} style={{marginRight:5}}/>{showTermines?'Masquer les terminés':`Afficher les ${nbTermines} terminé${nbTermines>1?'s':''}`}</button>}
         </div>
         {CATS.map(cat=>{
           const cs=visC.filter(c=>c.cat===cat.key); if(!cs.length) return null
@@ -846,7 +847,7 @@ function VueContrats({ client, objets, contratsClient, garantiesParPolice, cies,
             <div key={cat.key} style={{marginBottom:9}}>
               <div style={{display:'flex',alignItems:'center',gap:6,margin:'2px 0 5px'}}>
                 <span style={{fontSize:SEC,fontWeight:800,letterSpacing:.3,textTransform:'uppercase',padding:'2px 7px',borderRadius:5,background:cat.bg,color:cat.col,border:`1px solid ${cat.bd}`}}>{cat.label}</span>
-                <span style={{fontSize:10,color:'#cbd5e1'}}>{cs.length}</span>
+                <span style={{fontSize:10,color:COUL.bordFort}}>{cs.length}</span>
               </div>
               <div style={{display:'flex',flexDirection:'column',gap:6}}>
                 {cs.sort((a,b)=>(b.enc?1:0)-(a.enc?1:0)).map((c,j)=>{
@@ -855,15 +856,15 @@ function VueContrats({ client, objets, contratsClient, garantiesParPolice, cies,
                     <div key={j} style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',padding:'6px 8px',borderRadius:7,background:enc?'#fff':'#fafafa',border:'1px solid #f1f5f9',opacity:enc?1:.6}}>
                       <Cie nom={c.compagnie} cies={cies} size={18}/>
                       {c.externe
-                        ? <span onClick={()=>onOpenDossier&&onOpenDossier(c.dossier)} title={`Ouvrir le dossier ${c.dossier}`} style={{fontFamily:'monospace',fontSize:11,color:'#64748b',cursor:'pointer',textDecoration:'underline'}}>n° {c.police}</span>
+                        ? <span onClick={()=>onOpenDossier&&onOpenDossier(c.dossier)} title={`Ouvrir le dossier ${c.dossier}`} style={{fontFamily:'monospace',fontSize:11,color:COUL.texteDoux,cursor:'pointer',textDecoration:'underline'}}>n° {c.police}</span>
                         : (c.raw&&previewContrat
                             ? <span onMouseEnter={()=>previewContrat(c.raw)} onMouseLeave={leaveContrat} onClick={()=>openContrat&&openContrat(c.raw)} title="Survoler pour aperçu · cliquer pour épingler" style={{fontFamily:'monospace',fontSize:11,color:BLUE,fontWeight:700,cursor:'pointer',textDecoration:'underline'}}>n° {c.police}</span>
-                            : <span style={{fontFamily:'monospace',fontSize:11,color:'#64748b'}}>n° {c.police||'—'}</span>)}
+                            : <span style={{fontFamily:'monospace',fontSize:11,color:COUL.texteDoux}}>n° {c.police||'—'}</span>)}
                       {c.externe&&<span onClick={()=>onOpenDossier&&onOpenDossier(c.dossier)} title={`Ouvrir le dossier ${c.dossier}`} style={{fontSize:10,fontWeight:700,padding:'1px 6px',borderRadius:5,background:cat.bg,color:cat.col,cursor:'pointer'}}>{pren} · {c.dossier}</span>}
-                      {c.domaine&&<span style={{fontSize:10,color:'#64748b'}}>{c.domaine}</span>}
+                      {c.domaine&&<span style={{fontSize:10,color:COUL.texteDoux}}>{c.domaine}</span>}
                       {!selObj&&c.objs.length>0&&<span style={{display:'flex',flexWrap:'wrap',gap:3}}>{c.objs.map((k,z)=><span key={z} style={{fontSize:9.5,fontWeight:700,padding:'1px 5px',borderRadius:4,background:'#eef2ff',color:'#4338ca',whiteSpace:'nowrap'}}>{_firstSeg((objMap[k]||{}).label||k)}</span>)}</span>}
-                      <span style={{display:'flex',flexWrap:'wrap',gap:3,flex:1,minWidth:0}}>{c.gars.map((gr,k)=><span key={k} style={{fontSize:10,fontWeight:600,padding:'1px 6px',borderRadius:4,background:'#f5f3ff',color:'#7c3aed',whiteSpace:'nowrap'}}>{gr}</span>)}</span>
-                      <span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:4,background:enc?'#dcfce7':'#f1f5f9',color:enc?'#15803d':'#94a3b8'}}>{c.situation||'—'}</span>
+                      <span style={{display:'flex',flexWrap:'wrap',gap:3,flex:1,minWidth:0}}>{c.gars.map((gr,k)=><span key={k} style={{fontSize:10,fontWeight:600,padding:'1px 6px',borderRadius:4,background:COUL.violetFond,color:COUL.violet,whiteSpace:'nowrap'}}>{gr}</span>)}</span>
+                      <span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:4,background:enc?'#dcfce7':COUL.fondDoux,color:enc?'#15803d':COUL.texteFaible}}>{c.situation||'—'}</span>
                     </div>
                   )
                 })}
@@ -871,15 +872,15 @@ function VueContrats({ client, objets, contratsClient, garantiesParPolice, cies,
             </div>
           )
         })}
-        {!visC.length&&<div style={{fontSize:11.5,color:'#94a3b8',fontStyle:'italic'}}>Aucun contrat {showTermines?'':'en cours '}{selObj?'pour cet objet':''}.</div>}
+        {!visC.length&&<div style={{fontSize:11.5,color:COUL.texteFaible,fontStyle:'italic'}}>Aucun contrat {showTermines?'':'en cours '}{selObj?'pour cet objet':''}.</div>}
       </div>
     </div>
   )
 }
 
 function ObjetsDetail({ objets, loading, cies }) {
-  if(loading) return <p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>
-  if(!objets.length) return <div style={{color:'#94a3b8',fontSize:12,fontStyle:'italic'}}>Aucun objet de risque détaillé pour ce dossier.</div>
+  if(loading) return <p style={{color:COUL.texteFaible,fontSize:12}}>Chargement…</p>
+  if(!objets.length) return <div style={{color:COUL.texteFaible,fontSize:12,fontStyle:'italic'}}>Aucun objet de risque détaillé pour ce dossier.</div>
   // regrouper par police
   const parPolice={}
   objets.forEach(o=>{ const gp=(parPolice[o.police]=parPolice[o.police]||{police:o.police,type:o.type_risque,compagnie:o.compagnie,domaine:o.domaine,descrs:new Set(),gars:[]}); gp.gars.push({g:o.garantie,s:o.situation}); if(o.description) gp.descrs.add(o.description) })
@@ -894,23 +895,23 @@ function ObjetsDetail({ objets, loading, cies }) {
           <div key={i} style={{border:'1px solid #ede9fe',borderRadius:9,padding:'10px 12px',background:actif?'#fbfaff':'#fafafa',opacity:actif?1:.7}}>
             <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:6}}>
               <span style={{fontSize:13,fontWeight:800,color:'#6d28d9'}}>{p.type||'Objet de risque'}</span>
-              <span style={{fontSize:11,color:'#94a3b8'}}>n° {p.police}</span>
+              <span style={{fontSize:11,color:COUL.texteFaible}}>n° {p.police}</span>
               {p.compagnie&&<Cie nom={p.compagnie} cies={cies} size={16}/>}
-              {p.domaine&&<span style={{fontSize:10,fontWeight:700,padding:'1px 7px',borderRadius:5,background:'#f5f3ff',color:'#7c3aed'}}>{p.domaine}</span>}
+              {p.domaine&&<span style={{fontSize:10,fontWeight:700,padding:'1px 7px',borderRadius:5,background:COUL.violetFond,color:COUL.violet}}>{p.domaine}</span>}
             </div>
             {p.descrs&&p.descrs.size>0&&(
               <div style={{display:'flex',flexDirection:'column',gap:3,marginBottom:8}}>
                 {[...p.descrs].map((d,k)=>{
                   const tl=(p.type||'').toLowerCase()
                   const ic=tl.includes('hicule')?'ti-car':(tl.includes('timent')||tl.includes('immeuble')?'ti-building':(tl.includes('individu')||tl.includes('personne')?'ti-user':'ti-point'))
-                  return <div key={k} style={{fontSize:12.5,fontWeight:700,color:'#334155',display:'flex',alignItems:'center',gap:6}}><i className={`ti ${ic}`} style={{fontSize:14,color:'#7c3aed'}}/>{d}</div>
+                  return <div key={k} style={{fontSize:12.5,fontWeight:700,color:COUL.texteSombre,display:'flex',alignItems:'center',gap:6}}><i className={`ti ${ic}`} style={{fontSize:14,color:COUL.violet}}/>{d}</div>
                 })}
               </div>
             )}
             <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
               {p.gars.map((x,j)=>{
                 const enc=x.s==='En cours'
-                return <span key={j} title={x.s} style={{fontSize:11,fontWeight:600,padding:'3px 9px',borderRadius:6,background:enc?'#dcfce7':'#f1f5f9',color:enc?'#15803d':'#94a3b8',border:`1px solid ${enc?'#86efac':'#e2e8f0'}`}}>{x.g||'—'}</span>
+                return <span key={j} title={x.s} style={{fontSize:11,fontWeight:600,padding:'3px 9px',borderRadius:6,background:enc?'#dcfce7':COUL.fondDoux,color:enc?'#15803d':COUL.texteFaible,border:`1px solid ${enc?'#86efac':COUL.bord}`}}>{x.g||'—'}</span>
               })}
             </div>
           </div>
@@ -940,8 +941,8 @@ function ContratModal({ contrat, dossier, objets, onClose, preview, cies }) {
   const objList=Object.values(parObjet)
   const derniere=quit[0]||null
   const qval=f=>{ const r=quit.find(x=>x[f]!=null&&x[f]!=='' ); return r?r[f]:null }
-  const SIT={'En cours':{bg:'#dcfce7',col:'#16a34a'},'Résilié':{bg:'#fee2e2',col:'#dc2626'},'Terminé':{bg:'#fee2e2',col:'#dc2626'},'Suspendu':{bg:'#fef3c7',col:'#92400e'}}
-  const st=SIT[contrat.situation]||{bg:'#f1f5f9',col:'#64748b'}
+  const SIT={'En cours':{bg:COUL.succesFond,col:COUL.succes},'Résilié':{bg:COUL.dangerFond,col:COUL.danger},'Terminé':{bg:COUL.dangerFond,col:COUL.danger},'Suspendu':{bg:COUL.alerteFond,col:COUL.alerteFonce}}
+  const st=SIT[contrat.situation]||{bg:COUL.fondDoux,col:COUL.texteDoux}
   const Bloc=({icon,titre,col,children})=>(
     <div style={{marginBottom:16}}>
       <div style={{display:'flex',alignItems:'center',gap:7,marginBottom:8}}>
@@ -953,28 +954,28 @@ function ContratModal({ contrat, dossier, objets, onClose, preview, cies }) {
   )
   const Row=({k,v})=> (v==null||v==='')?null:(
     <div style={{display:'flex',gap:10,fontSize:12.5,padding:'3px 0',borderBottom:'1px solid #f8fafc'}}>
-      <span style={{color:'#94a3b8',minWidth:140,flexShrink:0}}>{k}</span>
-      <span style={{color:'#1e293b',fontWeight:600,wordBreak:'break-word'}}>{v}</span>
+      <span style={{color:COUL.texteFaible,minWidth:140,flexShrink:0}}>{k}</span>
+      <span style={{color:COUL.texte,fontWeight:600,wordBreak:'break-word'}}>{v}</span>
     </div>
   )
   return (
     <div onClick={preview?undefined:onClose} style={{position:'fixed',inset:0,background:preview?'transparent':'rgba(15,23,42,0.55)',zIndex:1000,display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'40px 16px',overflowY:'auto',pointerEvents:preview?'none':'auto'}}>
-      <div onClick={e=>e.stopPropagation()} style={{background:'#fff',borderRadius:14,maxWidth:720,width:'100%',boxShadow:preview?'0 24px 70px rgba(15,23,42,0.28)':'0 20px 60px rgba(0,0,0,0.35)',overflow:'hidden',border:preview?`1px solid ${BLUE}55`:'none'}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:COUL.blanc,borderRadius:14,maxWidth:720,width:'100%',boxShadow:preview?'0 24px 70px rgba(15,23,42,0.28)':'0 20px 60px rgba(0,0,0,0.35)',overflow:'hidden',border:preview?`1px solid ${BLUE}55`:'none'}}>
         <div style={{background:`linear-gradient(135deg, ${BLUE} 0%, ${NAVY} 140%)`,padding:'16px 20px',display:'flex',alignItems:'flex-start',gap:12}}>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:10,color:'rgba(255,255,255,0.75)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.05em'}}>Contrat</div>
-            <div style={{fontSize:21,fontWeight:800,color:'#fff',fontFamily:'monospace',lineHeight:1.1}}>{contrat.police||'—'}</div>
+            <div style={{fontSize:21,fontWeight:800,color:COUL.blanc,fontFamily:'monospace',lineHeight:1.1}}>{contrat.police||'—'}</div>
             <div style={{display:'flex',alignItems:'center',gap:8,marginTop:5,flexWrap:'wrap'}}><Cie nom={contrat.compagnie} cies={cies} size={20}/>{contrat.domaine&&<span style={{fontSize:12.5,color:'rgba(255,255,255,0.9)'}}>· {contrat.domaine}</span>}</div>
           </div>
           {preview
-            ? <span style={{alignSelf:'center',background:'rgba(255,255,255,0.18)',border:'1px solid rgba(255,255,255,0.3)',borderRadius:8,padding:'5px 10px',color:'#fff',fontSize:11,fontWeight:700,flexShrink:0,whiteSpace:'nowrap'}}><i className="ti ti-pin"/> Cliquer pour épingler</span>
-            : <button onClick={onClose} style={{background:'rgba(255,255,255,0.15)',border:'1px solid rgba(255,255,255,0.3)',borderRadius:8,padding:'6px 11px',cursor:'pointer',color:'#fff',fontSize:13,fontWeight:600,flexShrink:0}}><i className="ti ti-x"/></button>}
+            ? <span style={{alignSelf:'center',background:'rgba(255,255,255,0.18)',border:'1px solid rgba(255,255,255,0.3)',borderRadius:8,padding:'5px 10px',color:COUL.blanc,fontSize:11,fontWeight:700,flexShrink:0,whiteSpace:'nowrap'}}><i className="ti ti-pin"/> Cliquer pour épingler</span>
+            : <button onClick={onClose} style={{background:'rgba(255,255,255,0.15)',border:'1px solid rgba(255,255,255,0.3)',borderRadius:8,padding:'6px 11px',cursor:'pointer',color:COUL.blanc,fontSize:13,fontWeight:600,flexShrink:0}}><i className="ti ti-x"/></button>}
         </div>
         <div style={{padding:'18px 20px',maxHeight:'72vh',overflowY:'auto'}}>
           <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:18}}>
             <span style={{fontSize:11,fontWeight:700,padding:'3px 10px',borderRadius:6,background:st.bg,color:st.col}}>{contrat.situation||'—'}</span>
-            {contrat.date_creation&&<span style={{fontSize:11,fontWeight:600,padding:'3px 10px',borderRadius:6,background:'#f1f5f9',color:'#475569'}}>Depuis {fmtDate(contrat.date_creation)}</span>}
-            {contrat.garantie_valeur?<span style={{fontSize:11,fontWeight:600,padding:'3px 10px',borderRadius:6,background:'#eff6ff',color:'#1d4ed8'}}>Valeur assurée {fmt(contrat.garantie_valeur)}</span>:null}
+            {contrat.date_creation&&<span style={{fontSize:11,fontWeight:600,padding:'3px 10px',borderRadius:6,background:COUL.fondDoux,color:COUL.texteMoyen}}>Depuis {fmtDate(contrat.date_creation)}</span>}
+            {contrat.garantie_valeur?<span style={{fontSize:11,fontWeight:600,padding:'3px 10px',borderRadius:6,background:COUL.infoFond,color:'#1d4ed8'}}>Valeur assurée {fmt(contrat.garantie_valeur)}</span>:null}
           </div>
 
           <Bloc icon="ti-file-info" titre="Détails du contrat" col={BLUE}>
@@ -994,20 +995,20 @@ function ContratModal({ contrat, dossier, objets, onClose, preview, cies }) {
               <Row k="Dernière quittance" v={derniere?`${fmtMois(derniere.date_comptable)} · ${fmt(derniere.prime_totale)}`:null}/>
               <Row k="État quittance" v={derniere?.etat}/>
             </div>
-            <p style={{color:'#cbd5e1',fontSize:10.5,margin:'8px 0 0',fontStyle:'italic'}}>Seuls les champs présents dans la base sont affichés. Le reste de la fiche Brio (dates d'effet/échéance, avenants, fractionnement, documents…) n'est pas encore importé.</p>
+            <p style={{color:COUL.bordFort,fontSize:10.5,margin:'8px 0 0',fontStyle:'italic'}}>Seuls les champs présents dans la base sont affichés. Le reste de la fiche Brio (dates d'effet/échéance, avenants, fractionnement, documents…) n'est pas encore importé.</p>
           </Bloc>
 
-          <Bloc icon="ti-shield-check" titre="Garanties & objets couverts" col="#7c3aed">
-            {!objList.length?<p style={{color:'#94a3b8',fontSize:12,margin:0}}>Aucun objet de risque détaillé pour cette police.</p>:
+          <Bloc icon="ti-shield-check" titre="Garanties & objets couverts" col={COUL.violet}>
+            {!objList.length?<p style={{color:COUL.texteFaible,fontSize:12,margin:0}}>Aucun objet de risque détaillé pour cette police.</p>:
               <div style={{display:'flex',flexDirection:'column',gap:8}}>
                 {objList.map((o,i)=>{
                   const tl=(o.type||'').toLowerCase()
                   const ic=tl.includes('hicule')?'ti-car':(tl.includes('timent')||tl.includes('immeuble')?'ti-building':(tl.includes('individu')||tl.includes('personne')?'ti-user':'ti-point'))
                   return(
                     <div key={i} style={{border:'1px solid #ede9fe',borderRadius:9,padding:'9px 12px',background:'#fbfaff'}}>
-                      <div style={{fontSize:12.5,fontWeight:700,color:'#334155',display:'flex',alignItems:'center',gap:6,marginBottom:6}}><i className={`ti ${ic}`} style={{fontSize:14,color:'#7c3aed'}}/>{o.descr||o.type||'Objet'}</div>
+                      <div style={{fontSize:12.5,fontWeight:700,color:COUL.texteSombre,display:'flex',alignItems:'center',gap:6,marginBottom:6}}><i className={`ti ${ic}`} style={{fontSize:14,color:COUL.violet}}/>{o.descr||o.type||'Objet'}</div>
                       <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
-                        {[...o.gars].length?[...o.gars].map((g,j)=><span key={j} style={{fontSize:11,fontWeight:600,padding:'3px 9px',borderRadius:6,background:'#dcfce7',color:'#15803d',border:'1px solid #86efac'}}>{g}</span>):<span style={{fontSize:11,color:'#94a3b8'}}>—</span>}
+                        {[...o.gars].length?[...o.gars].map((g,j)=><span key={j} style={{fontSize:11,fontWeight:600,padding:'3px 9px',borderRadius:6,background:COUL.succesFond,color:COUL.succesFonce,border:'1px solid #86efac'}}>{g}</span>):<span style={{fontSize:11,color:COUL.texteFaible}}>—</span>}
                       </div>
                     </div>
                   )
@@ -1015,29 +1016,29 @@ function ContratModal({ contrat, dossier, objets, onClose, preview, cies }) {
               </div>}
           </Bloc>
 
-          <Bloc icon="ti-cash" titre="Primes & mensualités" col="#16a34a">
-            {ld?<p style={{color:'#94a3b8',fontSize:12,margin:0}}>Chargement…</p>:!quit.length?<p style={{color:'#94a3b8',fontSize:12,margin:0}}>Aucune quittance pour cette police.</p>:
+          <Bloc icon="ti-cash" titre="Primes & mensualités" col={COUL.succes}>
+            {ld?<p style={{color:COUL.texteFaible,fontSize:12,margin:0}}>Chargement…</p>:!quit.length?<p style={{color:COUL.texteFaible,fontSize:12,margin:0}}>Aucune quittance pour cette police.</p>:
               <div>
                 {derniere&&<div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:10}}>
-                  <div style={{background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:8,padding:'8px 14px'}}>
-                    <div style={{fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase'}}>Dernière prime</div>
+                  <div style={{background:COUL.succesFondDoux,border:'1px solid #bbf7d0',borderRadius:8,padding:'8px 14px'}}>
+                    <div style={{fontSize:10,fontWeight:700,color:COUL.texteFaible,textTransform:'uppercase'}}>Dernière prime</div>
                     <div style={{fontSize:17,fontWeight:800,color:NAVY}}>{fmt(derniere.prime_totale)}</div>
                   </div>
-                  {derniere.periodicite&&<div style={{background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:8,padding:'8px 14px'}}>
-                    <div style={{fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase'}}>Périodicité</div>
+                  {derniere.periodicite&&<div style={{background:COUL.infoFond,border:'1px solid #bfdbfe',borderRadius:8,padding:'8px 14px'}}>
+                    <div style={{fontSize:10,fontWeight:700,color:COUL.texteFaible,textTransform:'uppercase'}}>Périodicité</div>
                     <div style={{fontSize:15,fontWeight:800,color:'#1d4ed8'}}>{derniere.periodicite}</div>
                   </div>}
                 </div>}
                 <div style={{maxHeight:180,overflowY:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
                   <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
-                    <thead style={{position:'sticky',top:0,background:'#f8fafc'}}><tr>{['Période','Prime','Périodicité','Type'].map(h=><th key={h} style={{padding:'6px 12px',textAlign:'left',fontWeight:700,color:'#94a3b8',fontSize:10,textTransform:'uppercase',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
+                    <thead style={{position:'sticky',top:0,background:COUL.fond}}><tr>{['Période','Prime','Périodicité','Type'].map(h=><th key={h} style={{padding:'6px 12px',textAlign:'left',fontWeight:700,color:COUL.texteFaible,fontSize:10,textTransform:'uppercase',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
                     <tbody>
                       {quit.map((r,i)=>(
-                        <tr key={i} style={{background:i%2===0?'#fff':'#fafafe'}}>
-                          <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b',whiteSpace:'nowrap'}}>{fmtMois(r.date_comptable)}</td>
+                        <tr key={i} style={{background:i%2===0?'#fff':COUL.fondAlterne}}>
+                          <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',color:COUL.texteDoux,whiteSpace:'nowrap'}}>{fmtMois(r.date_comptable)}</td>
                           <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',fontWeight:600,color:NAVY}}>{fmt(r.prime_totale)}</td>
-                          <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{r.periodicite||'—'}</td>
-                          <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',color:'#64748b'}}>{r.type_quittance||'—'}</td>
+                          <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',color:COUL.texteDoux}}>{r.periodicite||'—'}</td>
+                          <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',color:COUL.texteDoux}}>{r.type_quittance||'—'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1046,8 +1047,8 @@ function ContratModal({ contrat, dossier, objets, onClose, preview, cies }) {
               </div>}
           </Bloc>
 
-          <Bloc icon="ti-alert-triangle" titre="Sinistres" col="#dc2626">
-            <p style={{color:'#94a3b8',fontSize:12,margin:0,fontStyle:'italic'}}>Les sinistres ne sont pas rattachés au n° de police dans les données actuelles (identifiant interne Brio distinct). À raccorder via un mapping dédié.</p>
+          <Bloc icon="ti-alert-triangle" titre="Sinistres" col={COUL.danger}>
+            <p style={{color:COUL.texteFaible,fontSize:12,margin:0,fontStyle:'italic'}}>Les sinistres ne sont pas rattachés au n° de police dans les données actuelles (identifiant interne Brio distinct). À raccorder via un mapping dédié.</p>
           </Bloc>
         </div>
       </div>
@@ -1085,29 +1086,29 @@ function Foyer({ client, onOpenDossier }) {
     })()
   },[client?.dossier])
 
-  if(ld) return <p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>
-  if(!membres.length) return <div style={{color:'#94a3b8',fontSize:12,fontStyle:'italic'}}>Aucune autre personne enregistrée à cette adresse.</div>
-  const SIT={'En cours':{bg:'#dcfce7',col:'#16a34a'},'Résilié':{bg:'#fee2e2',col:'#dc2626'},'Terminé':{bg:'#fee2e2',col:'#dc2626'},'Suspendu':{bg:'#fef3c7',col:'#92400e'}}
+  if(ld) return <p style={{color:COUL.texteFaible,fontSize:12}}>Chargement…</p>
+  if(!membres.length) return <div style={{color:COUL.texteFaible,fontSize:12,fontStyle:'italic'}}>Aucune autre personne enregistrée à cette adresse.</div>
+  const SIT={'En cours':{bg:COUL.succesFond,col:COUL.succes},'Résilié':{bg:COUL.dangerFond,col:COUL.danger},'Terminé':{bg:COUL.dangerFond,col:COUL.danger},'Suspendu':{bg:COUL.alerteFond,col:COUL.alerteFonce}}
   const adr=[client.rue,client.num_maison,client.boite&&('bte '+client.boite)].filter(Boolean).join(' ')
   return(
     <div style={{display:'flex',flexDirection:'column',gap:12}}>
-      <div style={{fontSize:11,color:'#94a3b8',fontStyle:'italic'}}>Personnes physiques à la même adresse — boîte comprise — sociétés domiciliées exclues ({adr||'—'}). Leurs garanties « famille / vie privée » peuvent couvrir tout le foyer, mais l'adresse ne prouve pas le foyer : à confirmer.</div>
+      <div style={{fontSize:11,color:COUL.texteFaible,fontStyle:'italic'}}>Personnes physiques à la même adresse — boîte comprise — sociétés domiciliées exclues ({adr||'—'}). Leurs garanties « famille / vie privée » peuvent couvrir tout le foyer, mais l'adresse ne prouve pas le foyer : à confirmer.</div>
       {membres.map((g,i)=>(
         <div key={i} style={{border:'1px solid #e2e8f0',borderRadius:10,padding:'10px 13px'}}>
           <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:g.contrats.length?7:0}}>
             <div style={{fontSize:13,fontWeight:800,color:NAVY}}>{[g.prenom,g.nom].filter(Boolean).join(' ')||'—'}
-              {g.lien ? <span style={{fontSize:11,fontWeight:700,color:'#0891b2',marginLeft:6}}>· {g.lien}</span> : <span style={{fontSize:10,fontWeight:700,color:'#94a3b8',background:'#f1f5f9',borderRadius:4,padding:'1px 6px',marginLeft:6}}>même adresse</span>}
-              <span style={{fontSize:11,fontWeight:600,color:'#94a3b8',marginLeft:6}}>#{g.dossier} · {g.contrats.length} contrat(s)</span>
+              {g.lien ? <span style={{fontSize:11,fontWeight:700,color:'#0891b2',marginLeft:6}}>· {g.lien}</span> : <span style={{fontSize:10,fontWeight:700,color:COUL.texteFaible,background:COUL.fondDoux,borderRadius:4,padding:'1px 6px',marginLeft:6}}>même adresse</span>}
+              <span style={{fontSize:11,fontWeight:600,color:COUL.texteFaible,marginLeft:6}}>#{g.dossier} · {g.contrats.length} contrat(s)</span>
             </div>
-            {onOpenDossier&&<button onClick={()=>onOpenDossier(g.dossier)} style={{marginLeft:'auto',fontSize:11,fontWeight:600,color:BLUE,background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:6,padding:'3px 9px',cursor:'pointer'}}>Ouvrir</button>}
+            {onOpenDossier&&<button onClick={()=>onOpenDossier(g.dossier)} style={{marginLeft:'auto',fontSize:11,fontWeight:600,color:BLUE,background:COUL.infoFond,border:'1px solid #bfdbfe',borderRadius:6,padding:'3px 9px',cursor:'pointer'}}>Ouvrir</button>}
           </div>
           {g.contrats.length>0&&<div style={{display:'flex',flexDirection:'column',gap:5}}>
             {g.contrats.map((c,j)=>{
-              const st=SIT[c.situation]||{bg:'#f1f5f9',col:'#64748b'}
+              const st=SIT[c.situation]||{bg:COUL.fondDoux,col:COUL.texteDoux}
               return(
                 <div key={j} style={{display:'flex',alignItems:'center',gap:8,fontSize:12}}>
                   <span style={{fontFamily:'monospace',fontWeight:600,color:NAVY,minWidth:82}}>{c.police||'—'}</span>
-                  <span style={{color:'#1e293b',flex:1,minWidth:0}}>{[c.compagnie,c.domaine].filter(Boolean).join(' · ')||'—'}</span>
+                  <span style={{color:COUL.texte,flex:1,minWidth:0}}>{[c.compagnie,c.domaine].filter(Boolean).join(' · ')||'—'}</span>
                   <span style={{fontSize:10,fontWeight:700,padding:'2px 6px',borderRadius:4,background:st.bg,color:st.col,whiteSpace:'nowrap'}}>{c.situation||'—'}</span>
                 </div>
               )
@@ -1198,7 +1199,7 @@ function Fiche({ client, onClose, onOpenDossier }) {
     if(!risques[k]) risques[k]={...cfg,n:0}
     risques[k].n++
   })
-  const SIT={  'En cours':{bg:'#dcfce7',col:'#16a34a'},'Résilié':{bg:'#fee2e2',col:'#dc2626'},'Terminé':{bg:'#fee2e2',col:'#dc2626'},'Suspendu':{bg:'#fef3c7',col:'#92400e'} }
+  const SIT={  'En cours':{bg:COUL.succesFond,col:COUL.succes},'Résilié':{bg:COUL.dangerFond,col:COUL.danger},'Terminé':{bg:COUL.dangerFond,col:COUL.danger},'Suspendu':{bg:COUL.alerteFond,col:COUL.alerteFonce} }
 
   // Le type de couverture sur lequel on filtre. Il vit ici, et pas dans
   // Analyse360, parce qu'il est choisi dans un composant et appliqué dans
@@ -1221,17 +1222,17 @@ function Fiche({ client, onClose, onOpenDossier }) {
   objets.forEach(o=>{ if(o.police){ const gset=(garantiesParPolice[o.police]=garantiesParPolice[o.police]||new Set()); if(o.garantie) gset.add(o.garantie); const oset=(objetsParPolice[o.police]=objetsParPolice[o.police]||new Set()); if(o.description) oset.add(o.description) } })
 
   const SECTIONS=[
-    { key:'contacts', icon:'ti-address-book', title:'Contacts', col:'#0d9488', count:contactsUnifies.length, body:(
-      loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:!contactsUnifies.length?
-        <p style={{color:'#94a3b8',fontSize:12}}>Aucun appel enregistré pour ce client.</p>:(
+    { key:'contacts', icon:'ti-address-book', title:'Contacts', col:COUL.teal, count:contactsUnifies.length, body:(
+      loadF?<p style={{color:COUL.texteFaible,fontSize:12}}>Chargement…</p>:!contactsUnifies.length?
+        <p style={{color:COUL.texteFaible,fontSize:12}}>Aucun appel enregistré pour ce client.</p>:(
         <div>
           {dernierContact&&(
             <div style={{display:'flex',gap:12,flexWrap:'wrap',marginBottom:12}}>
-              <div style={{flex:'1 1 220px',background:'#f0fdfa',border:'1px solid #99f6e4',borderRadius:10,padding:'12px 16px'}}>
-                <div style={{fontSize:10,fontWeight:800,color:'#0d9488',textTransform:'uppercase',letterSpacing:'.05em'}}>Dernier contact</div>
+              <div style={{flex:'1 1 220px',background:COUL.tealFond,border:'1px solid #99f6e4',borderRadius:10,padding:'12px 16px'}}>
+                <div style={{fontSize:10,fontWeight:800,color:COUL.teal,textTransform:'uppercase',letterSpacing:'.05em'}}>Dernier contact</div>
                 <div style={{fontSize:20,fontWeight:800,color:NAVY,lineHeight:1.1,marginTop:3}}>{fmtAppel(dernierContact.data.debut)}</div>
-                <div style={{fontSize:12,color:'#0d9488',fontWeight:600}}>{ilYa(joursDernierC)}</div>
-                <div style={{fontSize:12,color:'#64748b',marginTop:4}}>{`${String(dernierContact.data.direction||'').toLowerCase().startsWith('in')?'Appel entrant':'Appel sortant'}${dernierContact.data.nom_3cx?` · ${dernierContact.data.nom_3cx}`:''}`}</div>
+                <div style={{fontSize:12,color:COUL.teal,fontWeight:600}}>{ilYa(joursDernierC)}</div>
+                <div style={{fontSize:12,color:COUL.texteDoux,marginTop:4}}>{`${String(dernierContact.data.direction||'').toLowerCase().startsWith('in')?'Appel entrant':'Appel sortant'}${dernierContact.data.nom_3cx?` · ${dernierContact.data.nom_3cx}`:''}`}</div>
               </div>
             </div>
           )}
@@ -1243,12 +1244,12 @@ function Fiche({ client, onClose, onOpenDossier }) {
                 <div key={'a'+a.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',borderBottom:last?'none':'1px solid #f8fafc'}}>
                   <span style={{fontSize:10,fontWeight:800,padding:'2px 7px',borderRadius:5,background:entrant?'#dcfce7':'#dbeafe',color:entrant?'#16a34a':'#1d4ed8',whiteSpace:'nowrap'}}><i className={`ti ${entrant?'ti-phone-incoming':'ti-phone-outgoing'}`} style={{marginRight:4}}/>{entrant?'Entrant':'Sortant'}</span>
                   <span style={{fontSize:12,fontWeight:700,color:NAVY,whiteSpace:'nowrap',minWidth:74}}>{fmtAppel(a.debut)}</span>
-                  <span style={{flex:1,fontSize:12,color:'#1e293b',minWidth:0}}>
+                  <span style={{flex:1,fontSize:12,color:COUL.texte,minWidth:0}}>
                     {a.numero_e164||a.numero_externe||'—'}
-                    {a.nom_3cx&&<span style={{fontSize:11,color:'#94a3b8'}}> · {a.nom_3cx}</span>}
+                    {a.nom_3cx&&<span style={{fontSize:11,color:COUL.texteFaible}}> · {a.nom_3cx}</span>}
                   </span>
-                  {a.agent&&<span style={{fontSize:10,fontWeight:700,color:'#64748b'}}>poste {a.agent}</span>}
-                  <span style={{fontSize:11,color:'#64748b',whiteSpace:'nowrap'}}>{a.duree||''}</span>
+                  {a.agent&&<span style={{fontSize:10,fontWeight:700,color:COUL.texteDoux}}>poste {a.agent}</span>}
+                  <span style={{fontSize:11,color:COUL.texteDoux,whiteSpace:'nowrap'}}>{a.duree||''}</span>
                 </div>
               )
             })}
@@ -1257,27 +1258,27 @@ function Fiche({ client, onClose, onOpenDossier }) {
       )
     )},
     { key:'relations', icon:'ti-users-group', title:'Relations', col:'#ec4899', count:null, body:(<Relations client={client} onOpenDossier={onOpenDossier}/>) },
-    ...(groupe.length>0?[{ key:'groupe', icon:'ti-home-2', title:'Groupe / Ménage', col:'#0d9488', count:groupe.length, body:(
+    ...(groupe.length>0?[{ key:'groupe', icon:'ti-home-2', title:'Groupe / Ménage', col:COUL.teal, count:groupe.length, body:(
       <div>
-        <div style={{fontSize:12,color:'#64748b',marginBottom:8,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+        <div style={{fontSize:12,color:COUL.texteDoux,marginBottom:8,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
           <strong style={{color:NAVY}}>{groupe[0].groupe_nom||'Groupe'}</strong>
-          {groupe[0].groupe_type&&<span style={{fontSize:10,fontWeight:800,padding:'2px 7px',borderRadius:5,background:'#f0fdfa',color:'#0d9488',border:'1px solid #99f6e4'}}>{groupe[0].groupe_type}</span>}
-          {(groupe[0].nb_polices||groupe[0].prime_totale)?<span style={{color:'#94a3b8'}}>· {Math.round(groupe[0].nb_polices||0)} police(s) · {Math.round(groupe[0].prime_totale||0).toLocaleString('fr-BE')} € de prime</span>:null}
+          {groupe[0].groupe_type&&<span style={{fontSize:10,fontWeight:800,padding:'2px 7px',borderRadius:5,background:COUL.tealFond,color:COUL.teal,border:'1px solid #99f6e4'}}>{groupe[0].groupe_type}</span>}
+          {(groupe[0].nb_polices||groupe[0].prime_totale)?<span style={{color:COUL.texteFaible}}>· {Math.round(groupe[0].nb_polices||0)} police(s) · {Math.round(groupe[0].prime_totale||0).toLocaleString('fr-BE')} € de prime</span>:null}
         </div>
         <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
-          {groupe.map((m,i)=>(<span key={i} style={{fontSize:12,padding:'5px 10px',borderRadius:7,background:'#f8fafc',border:'1px solid #e2e8f0',color:'#1e293b'}}>{m.membre_nom}</span>))}
+          {groupe.map((m,i)=>(<span key={i} style={{fontSize:12,padding:'5px 10px',borderRadius:7,background:COUL.fond,border:'1px solid #e2e8f0',color:COUL.texte}}>{m.membre_nom}</span>))}
         </div>
       </div>
     )}]:[]),
-    { key:'objets', icon:'ti-shield', title:'Objets de risque', col:'#7c3aed', count:objets.length, body:(<ObjetsDetail objets={objets} loading={loadF} cies={cies}/>) },
-    { key:'sinistres', icon:'ti-alert-triangle', title:'Sinistres', col:'#dc2626', count:sinistres.length, body:(
-      loadF?<p style={{color:'#94a3b8',fontSize:12}}>Chargement…</p>:!sinistres.length?
-        <p style={{color:'#16a34a',fontSize:12}}>✓ Aucun sinistre</p>:(
+    { key:'objets', icon:'ti-shield', title:'Objets de risque', col:COUL.violet, count:objets.length, body:(<ObjetsDetail objets={objets} loading={loadF} cies={cies}/>) },
+    { key:'sinistres', icon:'ti-alert-triangle', title:'Sinistres', col:COUL.danger, count:sinistres.length, body:(
+      loadF?<p style={{color:COUL.texteFaible,fontSize:12}}>Chargement…</p>:!sinistres.length?
+        <p style={{color:COUL.succes,fontSize:12}}>✓ Aucun sinistre</p>:(
         <div>
-          <div style={{fontSize:11,color:'#b45309',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:7,padding:'6px 10px',marginBottom:10,display:'flex',alignItems:'center',gap:6}}><i className="ti ti-info-circle"/>Rapprochement par nom de l'assuré (pas de clé exacte disponible) — vérifiez qu'il s'agit bien de ce client.</div>
+          <div style={{fontSize:11,color:COUL.alerte,background:COUL.alerteFondDoux,border:'1px solid #fde68a',borderRadius:7,padding:'6px 10px',marginBottom:10,display:'flex',alignItems:'center',gap:6}}><i className="ti ti-info-circle"/>Rapprochement par nom de l'assuré (pas de clé exacte disponible) — vérifiez qu'il s'agit bien de ce client.</div>
           <div style={{overflowX:'auto'}}>
           <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
-            <thead><tr style={{textAlign:'left',color:'#64748b',borderBottom:'1px solid #e2e8f0'}}>
+            <thead><tr style={{textAlign:'left',color:COUL.texteDoux,borderBottom:'1px solid #e2e8f0'}}>
               <th style={{padding:'6px 8px',fontWeight:700,whiteSpace:'nowrap'}}>Réf.</th>
               <th style={{padding:'6px 8px',fontWeight:700}}>Objet / garantie</th>
               <th style={{padding:'6px 8px',fontWeight:700,whiteSpace:'nowrap'}}>Ouverture</th>
@@ -1289,11 +1290,11 @@ function Fiche({ client, onClose, onOpenDossier }) {
               {sinistres.map((s,i)=>{ const clos=String(s.etat||'').toLowerCase().startsWith('cl')||s.etat_code==='1'; return(
                 <tr key={i} style={{borderBottom:'1px solid #f1f5f9'}}>
                   <td style={{padding:'6px 8px',fontWeight:700,color:NAVY,whiteSpace:'nowrap'}}>{s.reference_sinistre||'—'}</td>
-                  <td style={{padding:'6px 8px',color:'#1e293b'}}>{s.garantie||'—'}</td>
+                  <td style={{padding:'6px 8px',color:COUL.texte}}>{s.garantie||'—'}</td>
                   <td style={{padding:'6px 8px',whiteSpace:'nowrap'}}>{fmtDate(s.date_ouverture)}</td>
-                  <td style={{padding:'6px 8px',whiteSpace:'nowrap',color:clos?'#1e293b':'#94a3b8'}}>{clos?fmtDate(s.date_etat):'en cours'}</td>
-                  <td style={{padding:'6px 8px',color:'#475569'}}>{s.responsabilite||'—'}</td>
-                  <td style={{padding:'6px 8px',whiteSpace:'nowrap'}}><span style={{fontSize:10,fontWeight:800,padding:'2px 7px',borderRadius:5,background:clos?'#f1f5f9':'#fef3c7',color:clos?'#64748b':'#92400e'}}>{s.etat||(clos?'Clôturé':'En cours')}</span></td>
+                  <td style={{padding:'6px 8px',whiteSpace:'nowrap',color:clos?'#1e293b':COUL.texteFaible}}>{clos?fmtDate(s.date_etat):'en cours'}</td>
+                  <td style={{padding:'6px 8px',color:COUL.texteMoyen}}>{s.responsabilite||'—'}</td>
+                  <td style={{padding:'6px 8px',whiteSpace:'nowrap'}}><span style={{fontSize:10,fontWeight:800,padding:'2px 7px',borderRadius:5,background:clos?'#f1f5f9':COUL.alerteFond,color:clos?'#64748b':COUL.alerteFonce}}>{s.etat||(clos?'Clôturé':'En cours')}</span></td>
                 </tr>
               )})}
             </tbody>
@@ -1303,7 +1304,7 @@ function Fiche({ client, onClose, onOpenDossier }) {
       )
     )},
     { key:'contrats', icon:'ti-file-text', title:'Contrats', col:BLUE, count:contrats.length, body:(<div><Analyse360 client={client} contrats={contrats} typeSel={typeSel} onType={setTypeSel}/><div style={{marginTop:14}}><VueContrats client={client} objets={objets} contratsClient={contrats} garantiesParPolice={garantiesParPolice} cies={cies} onOpenDossier={onOpenDossier} loadF={loadF} previewContrat={previewContrat} openContrat={openContrat} leaveContrat={leaveContrat} typeSel={typeSel} onType={setTypeSel}/></div></div>) },
-    { key:'primes', icon:'ti-cash', title:'Primes & commissions', col:'#16a34a', count:null, body:(<Primes dossier={client.dossier}/>) },
+    { key:'primes', icon:'ti-cash', title:'Primes & commissions', col:COUL.succes, count:null, body:(<Primes dossier={client.dossier}/>) },
   ]
   const active = SECTIONS.find(s=>s.key===openSec) || SECTIONS.find(s=>s.key==='contrats') || SECTIONS[0]
   const coordItems=[
@@ -1327,13 +1328,13 @@ function Fiche({ client, onClose, onOpenDossier }) {
   ].filter(Boolean) : []
 
   return(
-    <div ref={ref} style={{background:'#fff',borderRadius:14,border:`2px solid ${BLUE}25`,overflow:'hidden',boxShadow:'0 4px 24px rgba(0,128,189,0.1)'}}>
+    <div ref={ref} style={{background:COUL.blanc,borderRadius:14,border:`2px solid ${BLUE}25`,overflow:'hidden',boxShadow:'0 4px 24px rgba(0,128,189,0.1)'}}>
 
       <div style={{background:`linear-gradient(135deg, ${ENTITES.dynassur.color} 0%, ${ENTITES.dynassur.colorDark} 140%)`,padding:'14px 20px'}}>
         <div style={{display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
-          <div style={{width:44,height:44,borderRadius:11,background:'rgba(255,255,255,0.2)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:16,fontWeight:800,color:'#fff'}}>{initiales}</div>
+          <div style={{width:44,height:44,borderRadius:11,background:'rgba(255,255,255,0.2)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:16,fontWeight:800,color:COUL.blanc}}>{initiales}</div>
           <div style={{flex:1,minWidth:160}}>
-            <h2 style={{fontSize:23,fontWeight:800,color:'#fff',margin:0,lineHeight:1.1}}>{client.prenom} {client.nom}</h2>
+            <h2 style={{fontSize:23,fontWeight:800,color:COUL.blanc,margin:0,lineHeight:1.1}}>{client.prenom} {client.nom}</h2>
             <div style={{fontSize:11,color:'rgba(255,255,255,0.7)',display:'flex',gap:12,flexWrap:'wrap',marginTop:2}}>
               <span>#{client.dossier}</span>
               {client.etat_civil&&<span>{client.etat_civil}</span>}
@@ -1342,7 +1343,7 @@ function Fiche({ client, onClose, onOpenDossier }) {
             </div>
           </div>
           {client.alerte&&(
-            <div title={client.alerte} style={{display:'flex',alignItems:'center',gap:6,background:'#fff7ed',border:'1px solid #fed7aa',borderRadius:8,padding:'5px 10px',color:'#c2410c',fontSize:12,fontWeight:700,maxWidth:300,flexShrink:0}}>
+            <div title={client.alerte} style={{display:'flex',alignItems:'center',gap:6,background:COUL.orangeFond,border:'1px solid #fed7aa',borderRadius:8,padding:'5px 10px',color:'#c2410c',fontSize:12,fontWeight:700,maxWidth:300,flexShrink:0}}>
               <i className="ti ti-alert-triangle" style={{fontSize:15,flexShrink:0}}/>
               <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{client.alerte}</span>
             </div>
@@ -1350,15 +1351,15 @@ function Fiche({ client, onClose, onOpenDossier }) {
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
             {[{v:actifs,l:'Actifs'},{v:contrats.length,l:'Contrats'}].map(k=>(
               <div key={k.l} style={{textAlign:'center',background:'rgba(255,255,255,0.15)',borderRadius:8,padding:'5px 12px'}}>
-                <div style={{fontSize:18,fontWeight:800,color:'#fff',lineHeight:1}}>{k.v}</div>
+                <div style={{fontSize:18,fontWeight:800,color:COUL.blanc,lineHeight:1}}>{k.v}</div>
                 <div style={{fontSize:9,color:'rgba(255,255,255,0.65)',fontWeight:600,marginTop:2}}>{k.l}</div>
               </div>
             ))}
           </div>
-          <button onClick={()=>navigate(`/tickets?new=1&dossier=${encodeURIComponent(client.dossier)}${client.id?`&client_id=${client.id}`:''}`)} title="Ouvrir un ticket lié à ce dossier" style={{background:'rgba(255,255,255,0.15)',border:'1px solid rgba(255,255,255,0.3)',borderRadius:8,padding:'6px 12px',cursor:'pointer',color:'#fff',fontSize:13,fontWeight:600,display:'flex',alignItems:'center',gap:5}}>
+          <button onClick={()=>navigate(`/tickets?new=1&dossier=${encodeURIComponent(client.dossier)}${client.id?`&client_id=${client.id}`:''}`)} title="Ouvrir un ticket lié à ce dossier" style={{background:'rgba(255,255,255,0.15)',border:'1px solid rgba(255,255,255,0.3)',borderRadius:8,padding:'6px 12px',cursor:'pointer',color:COUL.blanc,fontSize:13,fontWeight:600,display:'flex',alignItems:'center',gap:5}}>
             <i className="ti ti-ticket"/>Ouvrir ticket
           </button>
-          <button onClick={onClose} style={{background:'rgba(255,255,255,0.15)',border:'1px solid rgba(255,255,255,0.3)',borderRadius:8,padding:'6px 12px',cursor:'pointer',color:'#fff',fontSize:13,fontWeight:600,display:'flex',alignItems:'center',gap:5}}>
+          <button onClick={onClose} style={{background:'rgba(255,255,255,0.15)',border:'1px solid rgba(255,255,255,0.3)',borderRadius:8,padding:'6px 12px',cursor:'pointer',color:COUL.blanc,fontSize:13,fontWeight:600,display:'flex',alignItems:'center',gap:5}}>
             <i className="ti ti-x"/>Fermer
           </button>
         </div>
@@ -1370,11 +1371,11 @@ function Fiche({ client, onClose, onOpenDossier }) {
               <div style={{fontSize:9,color:'rgba(255,255,255,0.55)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.05em'}}>Adresse</div>
               {adresseComplete?(
                 <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-                  <span style={{fontSize:13,color:'#fff'}}>{adresseComplete}</span>
-                  <a href={mapsUrl} target="_blank" rel="noreferrer" style={{fontSize:11,color:'#fff',background:'rgba(255,255,255,0.18)',padding:'2px 8px',borderRadius:6,fontWeight:600,textDecoration:'none',display:'inline-flex',alignItems:'center',gap:3}}><i className="ti ti-brand-google-maps" style={{fontSize:12}}/>Maps</a>
-                  <a href={wazeUrl} target="_blank" rel="noreferrer" style={{fontSize:11,color:'#fff',background:'rgba(255,255,255,0.18)',padding:'2px 8px',borderRadius:6,fontWeight:600,textDecoration:'none',display:'inline-flex',alignItems:'center',gap:3}}><i className="ti ti-navigation" style={{fontSize:12}}/>Waze</a>
+                  <span style={{fontSize:13,color:COUL.blanc}}>{adresseComplete}</span>
+                  <a href={mapsUrl} target="_blank" rel="noreferrer" style={{fontSize:11,color:COUL.blanc,background:'rgba(255,255,255,0.18)',padding:'2px 8px',borderRadius:6,fontWeight:600,textDecoration:'none',display:'inline-flex',alignItems:'center',gap:3}}><i className="ti ti-brand-google-maps" style={{fontSize:12}}/>Maps</a>
+                  <a href={wazeUrl} target="_blank" rel="noreferrer" style={{fontSize:11,color:COUL.blanc,background:'rgba(255,255,255,0.18)',padding:'2px 8px',borderRadius:6,fontWeight:600,textDecoration:'none',display:'inline-flex',alignItems:'center',gap:3}}><i className="ti ti-navigation" style={{fontSize:12}}/>Waze</a>
                 </div>
-              ):<div style={{fontSize:13,color:'#fff'}}>—</div>}
+              ):<div style={{fontSize:13,color:COUL.blanc}}>—</div>}
             </div>
           </div>
           {coordItems.map(r=>(
@@ -1383,10 +1384,10 @@ function Fiche({ client, onClose, onOpenDossier }) {
               <div style={{minWidth:0}}>
                 <div style={{fontSize:9,color:'rgba(255,255,255,0.55)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.05em'}}>{r.l}</div>
                 {canAppel&&r.tel&&r.v!=='—'
-                  ?<a href={`tel:${r.tel}`} title="Appeler" style={{fontSize:13,color:'#fff',wordBreak:'break-word',textDecoration:'none',borderBottom:'1px dotted rgba(255,255,255,0.6)'}}>{r.v}</a>
+                  ?<a href={`tel:${r.tel}`} title="Appeler" style={{fontSize:13,color:COUL.blanc,wordBreak:'break-word',textDecoration:'none',borderBottom:'1px dotted rgba(255,255,255,0.6)'}}>{r.v}</a>
                   :r.mail&&r.v!=='—'
-                  ?<a href={`mailto:${r.mail}`} title="Envoyer un email" style={{fontSize:13,color:'#fff',wordBreak:'break-word',textDecoration:'none'}}>{r.v}</a>
-                  :<div style={{fontSize:13,color:'#fff',wordBreak:'break-word'}}>{r.v}</div>}
+                  ?<a href={`mailto:${r.mail}`} title="Envoyer un email" style={{fontSize:13,color:COUL.blanc,wordBreak:'break-word',textDecoration:'none'}}>{r.v}</a>
+                  :<div style={{fontSize:13,color:COUL.blanc,wordBreak:'break-word'}}>{r.v}</div>}
               </div>
             </div>
           ))}
@@ -1395,7 +1396,7 @@ function Fiche({ client, onClose, onOpenDossier }) {
               <i className={`ti ${r.icon}`} style={{fontSize:14,color:'rgba(255,255,255,0.6)',marginTop:2,flexShrink:0}}/>
               <div style={{minWidth:0}}>
                 <div style={{fontSize:9,color:'rgba(255,255,255,0.55)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.05em'}}>{r.l}</div>
-                <div style={{fontSize:13,color:'#fff',wordBreak:'break-word'}}>{r.v}{r.warn&&<span style={{marginLeft:6,fontSize:10,fontWeight:700,color:'#fecaca'}}>{r.warn}</span>}</div>
+                <div style={{fontSize:13,color:COUL.blanc,wordBreak:'break-word'}}>{r.v}{r.warn&&<span style={{marginLeft:6,fontSize:10,fontWeight:700,color:COUL.dangerBord}}>{r.warn}</span>}</div>
                 {r.sub&&<div style={{fontSize:11,color:'rgba(255,255,255,0.6)',marginTop:1}}>{r.sub}</div>}
               </div>
             </div>
@@ -1408,7 +1409,7 @@ function Fiche({ client, onClose, onOpenDossier }) {
           {SECTIONS.map(s=>{
             const on=active.key===s.key
             return(
-              <button key={s.key} onClick={()=>setOpenSec(s.key)} style={{textAlign:'left',cursor:'pointer',borderRadius:11,padding:'11px 12px',border:on?`2px solid ${s.col}`:'1.5px solid #e2e8f0',background:on?`${s.col}0d`:'#fff',boxShadow:on?`0 3px 12px ${s.col}22`:'0 1px 3px rgba(0,0,0,0.03)',transition:'all .15s',fontFamily:'inherit'}}
+              <button key={s.key} onClick={()=>setOpenSec(s.key)} style={{textAlign:'left',cursor:'pointer',borderRadius:11,padding:'11px 12px',border:on?`2px solid ${s.col}`:'1.5px solid #e2e8f0',background:on?`${s.col}0d`:COUL.blanc,boxShadow:on?`0 3px 12px ${s.col}22`:'0 1px 3px rgba(0,0,0,0.03)',transition:'all .15s',fontFamily:'inherit'}}
                 onMouseEnter={e=>{ if(!on){e.currentTarget.style.borderColor=s.col+'70'} }}
                 onMouseLeave={e=>{ if(!on){e.currentTarget.style.borderColor='#e2e8f0'} }}>
                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
@@ -1447,28 +1448,28 @@ function RecentsBlock({ title, icon, rows, onOpen, showWho, empty }) {
   return (
     <div style={{padding:'4px 0'}}>
       <div style={{display:'flex',alignItems:'center',gap:7,padding:'12px 16px 6px'}}>
-        <i className={`ti ${icon}`} style={{fontSize:15,color:'#0d9488'}}/>
+        <i className={`ti ${icon}`} style={{fontSize:15,color:COUL.teal}}/>
         <span style={{fontSize:13,fontWeight:800,color:NAVY}}>{title}</span>
-        {rows&&rows.length>0&&<span style={{fontSize:11,color:'#94a3b8'}}>({rows.length})</span>}
+        {rows&&rows.length>0&&<span style={{fontSize:11,color:COUL.texteFaible}}>({rows.length})</span>}
       </div>
       {rows===null ? (
-        <p style={{padding:'4px 16px 12px',color:'#94a3b8',fontSize:12.5}}>Chargement…</p>
+        <p style={{padding:'4px 16px 12px',color:COUL.texteFaible,fontSize:12.5}}>Chargement…</p>
       ) : !rows.length ? (
-        <p style={{padding:'4px 16px 12px',color:'#94a3b8',fontSize:12.5}}>{empty}</p>
+        <p style={{padding:'4px 16px 12px',color:COUL.texteFaible,fontSize:12.5}}>{empty}</p>
       ) : (
         <div style={{overflowX:'auto'}}>
           <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-            <thead><EnTetesTriables cols={cols} tri={tri} onTri={setTri} couleur="#0d9488"/></thead>
+            <thead><EnTetesTriables cols={cols} tri={tri} onTri={setTri} couleur={COUL.teal}/></thead>
             <tbody>
               {trierLignes(rows,cols,tri,parNom).map((c,i)=>(
-                <tr key={c.dossier} onClick={()=>onOpen(c.dossier)} style={{cursor:'pointer',borderBottom:'1px solid #f1f5f9',background:i%2===0?'#fff':'#fafafe'}}
+                <tr key={c.dossier} onClick={()=>onOpen(c.dossier)} style={{cursor:'pointer',borderBottom:'1px solid #f1f5f9',background:i%2===0?'#fff':COUL.fondAlterne}}
                   onMouseEnter={e=>e.currentTarget.style.background='#f0fdfa'}
-                  onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'#fff':'#fafafe'}>
-                  <td style={{padding:'9px 16px',fontWeight:600,color:'#1e293b'}}>{c.nom} {c.prenom}</td>
+                  onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'#fff':COUL.fondAlterne}>
+                  <td style={{padding:'9px 16px',fontWeight:600,color:COUL.texte}}>{c.nom} {c.prenom}</td>
                   <td style={{padding:'9px 16px',fontFamily:'monospace',fontSize:12,color:NAVY}}>{c.dossier}</td>
-                  <td style={{padding:'9px 16px',color:'#64748b'}}>{c.localite||'—'}</td>
-                  <td style={{padding:'9px 16px',color:'#64748b',whiteSpace:'nowrap'}}>{c.consulte_at?new Date(c.consulte_at).toLocaleString('fr-BE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—'}</td>
-                  {showWho&&<td style={{padding:'9px 16px',color:'#64748b'}}>{c.consultant_code||'—'}</td>}
+                  <td style={{padding:'9px 16px',color:COUL.texteDoux}}>{c.localite||'—'}</td>
+                  <td style={{padding:'9px 16px',color:COUL.texteDoux,whiteSpace:'nowrap'}}>{c.consulte_at?new Date(c.consulte_at).toLocaleString('fr-BE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—'}</td>
+                  {showWho&&<td style={{padding:'9px 16px',color:COUL.texteDoux}}>{c.consultant_code||'—'}</td>}
                 </tr>
               ))}
             </tbody>
@@ -1663,9 +1664,9 @@ export default function DynassurClients() {
   const pctBureau=counts.bureau?((counts.bureau/tot)*100).toFixed(1):'—'
 
   const SCOPES=[
-    { val:'mine',   icon:'ti-user',   label:'Mes clients',  nb:counts.mine,  pct:pctMine,   col:'#0080BD', note:myCode },
-    { val:'bureau', icon:'ti-building',label:'Mon bureau',  nb:counts.bureau,pct:pctBureau, col:'#7c3aed', note:myBureauLib },
-    { val:'all',    icon:'ti-users',  label:'Tous Dynassur',nb:counts.total, pct:'100',     col:'#16a34a', note:'Dynassur' },
+    { val:'mine',   icon:'ti-user',   label:'Mes clients',  nb:counts.mine,  pct:pctMine,   col:COUL.bleu, note:myCode },
+    { val:'bureau', icon:'ti-building',label:'Mon bureau',  nb:counts.bureau,pct:pctBureau, col:COUL.violet, note:myBureauLib },
+    { val:'all',    icon:'ti-users',  label:'Tous Dynassur',nb:counts.total, pct:'100',     col:COUL.succes, note:'Dynassur' },
   ]
 
   // Vue relance (dernier contact), filtrée par scope + tranche + recherche
@@ -1699,26 +1700,26 @@ export default function DynassurClients() {
               ]}
             />
 
-            <div style={{background:'#fff',borderRadius:12,border:'1px solid #e2e8f0',overflow:'hidden'}}>
+            <div style={{background:COUL.blanc,borderRadius:12,border:'1px solid #e2e8f0',overflow:'hidden'}}>
               <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',padding:'12px 16px',borderBottom:'1px solid #f1f5f9'}}>
                 <div style={{display:'flex',alignItems:'center',gap:8}}>
-                  <i className={modeRecents?"ti ti-history":"ti ti-calendar-heart"} style={{fontSize:18,color:'#0d9488'}}/>
+                  <i className={modeRecents?"ti ti-history":"ti ti-calendar-heart"} style={{fontSize:18,color:COUL.teal}}/>
                   <span style={{fontSize:15,fontWeight:800,color:NAVY}}>{modeRecents?'Derniers clients consultés':'Relance clients'}</span>
-                  <span style={{fontSize:12,color:'#94a3b8'}}>{modeRecents?'· vos dernières fiches et celles de votre bureau':'· trie les clients par ancienneté du dernier contact'}</span>
+                  <span style={{fontSize:12,color:COUL.texteFaible}}>{modeRecents?'· vos dernières fiches et celles de votre bureau':'· trie les clients par ancienneté du dernier contact'}</span>
                 </div>
                 <div style={{display:'flex',gap:8,marginLeft:'auto',flexWrap:'wrap'}}>
-                  <select value={scope} onChange={e=>setScope(e.target.value)} style={{padding:'7px 10px',borderRadius:8,border:'1px solid #e2e8f0',fontSize:13,fontFamily:'inherit',color:NAVY,background:'#fff'}}>
+                  <select value={scope} onChange={e=>setScope(e.target.value)} style={{padding:'7px 10px',borderRadius:8,border:'1px solid #e2e8f0',fontSize:13,fontFamily:'inherit',color:NAVY,background:COUL.blanc}}>
                     <option value="all">Tous Dynassur ({counts.total.toLocaleString('fr-BE')})</option>
                     <option value="mine">Mes clients ({counts.mine.toLocaleString('fr-BE')})</option>
                     <option value="bureau">Mon bureau ({counts.bureau.toLocaleString('fr-BE')})</option>
                   </select>
-                  <select value={contactFilter} onChange={e=>setContactFilter(e.target.value)} style={{padding:'7px 10px',borderRadius:8,border:`1px solid ${relanceActif?'#0d9488':'#e2e8f0'}`,fontSize:13,fontFamily:'inherit',color:NAVY,background:'#fff',fontWeight:relanceActif?700:400}}>
+                  <select value={contactFilter} onChange={e=>setContactFilter(e.target.value)} style={{padding:'7px 10px',borderRadius:8,border:`1px solid ${relanceActif?'#0d9488':COUL.bord}`,fontSize:13,fontFamily:'inherit',color:NAVY,background:COUL.blanc,fontWeight:relanceActif?700:400}}>
                     <option value="tous">Toutes les tranches</option>
                     {TRANCHES.map(t=><option key={t.val} value={t.val}>{t.label} ({relanceCounts[t.val]||0})</option>)}
                   </select>
                   <div style={{position:'relative'}}>
-                    <i className="ti ti-filter" style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'#94a3b8',fontSize:14}}/>
-                    <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Filtrer…" style={{padding:'7px 10px 7px 30px',borderRadius:8,border:`1px solid ${q?'#0d9488':'#e2e8f0'}`,fontSize:13,fontFamily:'inherit',outline:'none',width:150,boxSizing:'border-box'}}/>
+                    <i className="ti ti-filter" style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:COUL.texteFaible,fontSize:14}}/>
+                    <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Filtrer…" style={{padding:'7px 10px 7px 30px',borderRadius:8,border:`1px solid ${q?'#0d9488':COUL.bord}`,fontSize:13,fontFamily:'inherit',outline:'none',width:150,boxSizing:'border-box'}}/>
                   </div>
                 </div>
               </div>
@@ -1729,9 +1730,9 @@ export default function DynassurClients() {
                   <RecentsBlock title={`Votre bureau${myBureauLib?` — ${myBureauLib}`:''}`} icon="ti-building" rows={recentsBureau} onOpen={openDossier} showWho={true} empty="Aucune fiche consultée récemment par vos collègues."/>
                 </div>
               ):relance===null?(
-                <p style={{padding:30,textAlign:'center',color:'#94a3b8'}}>Chargement de la relance…</p>
+                <p style={{padding:30,textAlign:'center',color:COUL.texteFaible}}>Chargement de la relance…</p>
               ):!relanceView.length?(
-                <p style={{padding:30,textAlign:'center',color:'#94a3b8'}}>Aucun client pour ce filtre.</p>
+                <p style={{padding:30,textAlign:'center',color:COUL.texteFaible}}>Aucun client pour ce filtre.</p>
               ):(
                 <div style={{overflowX:'auto'}}>
                   <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
@@ -1740,20 +1741,20 @@ export default function DynassurClients() {
                       {relanceShow.map((c,i)=>{
                         const col=TRANCHE_COL[c.tranche]||'#64748b'
                         return(
-                          <tr key={c.id} onClick={()=>openDossier(c.dossier)} style={{cursor:'pointer',borderBottom:'1px solid #f1f5f9',background:i%2===0?'#fff':'#fafafe'}}
+                          <tr key={c.id} onClick={()=>openDossier(c.dossier)} style={{cursor:'pointer',borderBottom:'1px solid #f1f5f9',background:i%2===0?'#fff':COUL.fondAlterne}}
                             onMouseEnter={e=>e.currentTarget.style.background='#f0fdfa'}
-                            onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'#fff':'#fafafe'}>
-                            <td style={{padding:'9px 16px',fontWeight:600,color:'#1e293b'}}>{c.nom} {c.prenom}</td>
+                            onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'#fff':COUL.fondAlterne}>
+                            <td style={{padding:'9px 16px',fontWeight:600,color:COUL.texte}}>{c.nom} {c.prenom}</td>
                             <td style={{padding:'9px 16px',fontFamily:'monospace',fontSize:12,color:NAVY}}>{c.dossier}</td>
-                            <td style={{padding:'9px 16px',color:'#64748b'}}>{c.localite||'—'}</td>
+                            <td style={{padding:'9px 16px',color:COUL.texteDoux}}>{c.localite||'—'}</td>
                             <td style={{padding:'9px 16px'}}><span style={{fontSize:11,fontWeight:700,padding:'2px 8px',borderRadius:5,background:col+'18',color:col,whiteSpace:'nowrap'}}>{c.tranche==='jamais'?'Jamais contacté':ilYa(c.jours)}</span></td>
-                            <td style={{padding:'9px 16px',color:'#64748b'}}>{c.gestionnaire_nom||c.gestionnaire_code||'—'}</td>
+                            <td style={{padding:'9px 16px',color:COUL.texteDoux}}>{c.gestionnaire_nom||c.gestionnaire_code||'—'}</td>
                           </tr>
                         )
                       })}
                     </tbody>
                   </table>
-                  {relanceView.length>relanceShow.length&&(<p style={{padding:'10px 16px',color:'#94a3b8',fontSize:12}}>{relanceShow.length} affichés sur {relanceView.length.toLocaleString('fr-BE')} — affine le filtre.</p>)}
+                  {relanceView.length>relanceShow.length&&(<p style={{padding:'10px 16px',color:COUL.texteFaible,fontSize:12}}>{relanceShow.length} affichés sur {relanceView.length.toLocaleString('fr-BE')} — affine le filtre.</p>)}
                 </div>
               )}
             </div>
@@ -1762,14 +1763,14 @@ export default function DynassurClients() {
 
         {kpiModal&&(
           <div onClick={()=>setKpiModal(null)} style={{position:'fixed',inset:0,background:'rgba(15,23,42,.55)',zIndex:1000,display:'flex',justifyContent:'flex-end'}}>
-            <div onClick={e=>e.stopPropagation()} style={{width:'min(820px,96vw)',height:'100%',background:'#fff',display:'flex',flexDirection:'column',boxShadow:'-8px 0 30px rgba(0,0,0,.2)'}}>
+            <div onClick={e=>e.stopPropagation()} style={{width:'min(820px,96vw)',height:'100%',background:COUL.blanc,display:'flex',flexDirection:'column',boxShadow:'-8px 0 30px rgba(0,0,0,.2)'}}>
               <div style={{background:NAVY,padding:'14px 20px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                <div style={{color:'#fff',fontSize:15,fontWeight:800}}>{kpiModal==='loading'?'Calcul en cours…':kpiModal.titre}</div>
-                <button onClick={()=>setKpiModal(null)} style={{background:'transparent',border:'none',color:'#fff',fontSize:22,cursor:'pointer'}}>✕</button>
+                <div style={{color:COUL.blanc,fontSize:15,fontWeight:800}}>{kpiModal==='loading'?'Calcul en cours…':kpiModal.titre}</div>
+                <button onClick={()=>setKpiModal(null)} style={{background:'transparent',border:'none',color:COUL.blanc,fontSize:22,cursor:'pointer'}}>✕</button>
               </div>
               <div style={{flex:1,overflow:'auto'}}>
                 {kpiModal==='loading'?(
-                  <div style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Recherche des clients concernés…</div>
+                  <div style={{padding:40,textAlign:'center',color:COUL.texteFaible}}>Recherche des clients concernés…</div>
                 ):(
                   <table style={{width:'100%',borderCollapse:'collapse',fontSize:12.5}}>
                     {/* LES COLONNES SONT DES DONNÉES, pas du balisage recopié.
@@ -1779,23 +1780,23 @@ export default function DynassurClients() {
                       <EnTetesTriables cols={COLS_KPI(kpiModal.showAlerte)} tri={kpiTri} onTri={setKpiTri} couleur={NAVY} style={{padding:'8px 12px'}}/>
                     </thead>
                     <tbody>
-                      {!kpiModal.rows.length?(<tr><td colSpan={6} style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Aucun client.</td></tr>)
+                      {!kpiModal.rows.length?(<tr><td colSpan={6} style={{padding:40,textAlign:'center',color:COUL.texteFaible}}>Aucun client.</td></tr>)
                       :trierLignes(kpiModal.rows,COLS_KPI(kpiModal.showAlerte),kpiTri,parNom).slice(0,500).map((c,i)=>(
-                        <tr key={c.id} onClick={()=>{openDossier(c.dossier);setKpiModal(null)}} style={{cursor:'pointer',borderBottom:'1px solid #f1f5f9',background:i%2===0?'#fff':'#fafafe'}}
+                        <tr key={c.id} onClick={()=>{openDossier(c.dossier);setKpiModal(null)}} style={{cursor:'pointer',borderBottom:'1px solid #f1f5f9',background:i%2===0?'#fff':COUL.fondAlterne}}
                           onMouseEnter={e=>e.currentTarget.style.background='#f0f9ff'}
-                          onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'#fff':'#fafafe'}>
+                          onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'#fff':COUL.fondAlterne}>
                           <td style={{padding:'7px 12px',fontFamily:'monospace',fontSize:11,color:NAVY,fontWeight:600}}>{c.dossier}</td>
-                          <td style={{padding:'7px 12px',fontWeight:600,color:'#1e293b'}}>{c.nom} {c.prenom}</td>
-                          <td style={{padding:'7px 12px',color:'#64748b'}}>{c.cp} {c.localite||'—'}</td>
-                          <td style={{padding:'7px 12px',color:'#64748b'}}>{c.gestionnaire_nom||c.gestionnaire_code||'—'}{c.sa_nom?` · ${c.sa_nom}`:''}</td>
-                          <td style={{padding:'7px 12px',color:'#64748b'}}>{c.bureau||'—'}</td>
-                          <td style={{padding:'7px 12px',color:kpiModal.showAlerte?'#dc2626':'#64748b'}}>{kpiModal.showAlerte?(c.alerte||'—'):(c.gsm||c.tel_fixe||c.email||'—')}</td>
+                          <td style={{padding:'7px 12px',fontWeight:600,color:COUL.texte}}>{c.nom} {c.prenom}</td>
+                          <td style={{padding:'7px 12px',color:COUL.texteDoux}}>{c.cp} {c.localite||'—'}</td>
+                          <td style={{padding:'7px 12px',color:COUL.texteDoux}}>{c.gestionnaire_nom||c.gestionnaire_code||'—'}{c.sa_nom?` · ${c.sa_nom}`:''}</td>
+                          <td style={{padding:'7px 12px',color:COUL.texteDoux}}>{c.bureau||'—'}</td>
+                          <td style={{padding:'7px 12px',color:kpiModal.showAlerte?'#dc2626':COUL.texteDoux}}>{kpiModal.showAlerte?(c.alerte||'—'):(c.gsm||c.tel_fixe||c.email||'—')}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 )}
-                {kpiModal!=='loading'&&kpiModal.rows.length>500&&(<p style={{padding:'12px 16px',color:'#94a3b8',fontSize:12}}>500 premiers affichés sur {kpiModal.rows.length.toLocaleString('fr-BE')}.</p>)}
+                {kpiModal!=='loading'&&kpiModal.rows.length>500&&(<p style={{padding:'12px 16px',color:COUL.texteFaible,fontSize:12}}>500 premiers affichés sur {kpiModal.rows.length.toLocaleString('fr-BE')}.</p>)}
               </div>
             </div>
           </div>

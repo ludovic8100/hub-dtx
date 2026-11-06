@@ -5,6 +5,7 @@ import Layout from '../../components/Layout'
 import { ENTITES } from '../../lib/entites'
 import { VueEquipe, Rappels } from '../../components/AppelsVueEquipe'
 import { BarresEmpilees, Legende, COULEURS, Sparkline, Jauge, CarteChaleur } from '../../components/GraphAppels'
+import { COUL } from '../../lib/theme'
 
 // Journal et statistiques de la téléphonie 3CX.
 //
@@ -15,7 +16,7 @@ import { BarresEmpilees, Legende, COULEURS, Sparkline, Jauge, CarteChaleur } fro
 // Voir supabase/migrations/20261102210000_telephonie_postes_et_vue_appels.sql
 
 const E = ENTITES.dynassur
-const NAVY = '#0D2F5E'
+const NAVY = COUL.marine
 const PAGE = 1000
 
 const PERIODES = [
@@ -433,21 +434,21 @@ export default function DynassurAppels() {
           options={[{ v: 'tous', l: 'Entrants + sortants' }, { v: 'entrant', l: 'Entrants uniquement' }, { v: 'sortant', l: 'Sortants uniquement' }, { v: 'manque', l: 'Manqués uniquement' }]} />
         <button onClick={exporter} disabled={chargement}
           style={{ height: 43, minWidth: 140, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9,
-            border: '1px solid #008fe8', borderRadius: 7, background: '#fff', color: '#0086d9',
+            border: '1px solid #008fe8', borderRadius: 7, background: COUL.blanc, color: '#0086d9',
             fontWeight: 650, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', padding: '8px 16px' }}>
           <i className="ti ti-download" style={{ fontSize: 17 }} />Exporter CSV
         </button>
       </div>
 
       {erreur && (
-        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '12px 16px', marginBottom: 16, color: '#991b1b', fontSize: 13, display: 'flex', gap: 9 }}>
+        <div style={{ background: COUL.dangerFondDoux, border: '1px solid #fecaca', borderRadius: 10, padding: '12px 16px', marginBottom: 16, color: '#991b1b', fontSize: 13, display: 'flex', gap: 9 }}>
           <i className="ti ti-alert-circle" style={{ fontSize: 16, marginTop: 1 }} />
           <div>Lecture impossible : {erreur.message || String(erreur)}</div>
         </div>
       )}
 
       {chargement ? (
-        <div style={{ padding: '60px 0', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>Chargement…</div>
+        <div style={{ padding: '60px 0', textAlign: 'center', color: COUL.texteFaible, fontSize: 13 }}>Chargement…</div>
       ) : onglet === 'equipe' ? (
         <VueEquipe stats={stats} heures={stats.heuresVolume} rappels={stats.rappels} selection={filtrePersonne}
           onCollaborateur={p => { setFiltrePersonne(p.extension || ''); setOnglet('journal') }}
@@ -475,7 +476,7 @@ function Filtre({ libelle, valeur, onChange, options }) {
     <div style={{ minWidth: 0 }}>
       <label style={{ display: 'block', color: '#637899', fontSize: 11, fontWeight: 600, margin: '0 0 5px 2px' }}>{libelle}</label>
       <select value={valeur} onChange={e => onChange(e.target.value)}
-        style={{ height: 43, width: '100%', border: '1px solid #cadbed', borderRadius: 7, background: '#fff',
+        style={{ height: 43, width: '100%', border: '1px solid #cadbed', borderRadius: 7, background: COUL.blanc,
           color: '#102344', padding: '0 13px', fontWeight: 550, fontSize: 14, fontFamily: 'inherit',
           boxShadow: '0 3px 13px #18396a07', cursor: 'pointer' }}>
         {options.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
@@ -489,11 +490,11 @@ function Delta({ valeur, avant, unite = '', sensBon = 1, pts = false }) {
   if (avant == null || valeur == null || !isFinite(avant)) return null
   const d = valeur - avant
   if (Math.abs(d) < (pts ? 0.005 : 0.5)) {
-    return <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>= stable</span>
+    return <span style={{ fontSize: 11, color: COUL.texteFaible, fontWeight: 600 }}>= stable</span>
   }
   // sensBon = 0 : la grandeur n'a pas de sens souhaitable (le volume d'appels
   // n'est ni bon ni mauvais). On montre l'évolution sans la juger.
-  const couleur = sensBon === 0 ? '#94a3b8' : (d * sensBon > 0 ? '#16a34a' : '#dc2626')
+  const couleur = sensBon === 0 ? '#94a3b8' : (d * sensBon > 0 ? '#16a34a' : COUL.danger)
   const txt = pts ? `${Math.abs(Math.round(d * 100))} pts` : `${Math.abs(Math.round(d))}${unite}`
   return (
     <span title={`${d > 0 ? 'En hausse' : 'En baisse'} par rapport à la période précédente`}
@@ -524,7 +525,7 @@ function ChiffresCles({ stats, compact = false }) {
       courbe: stats.courbeDuree, couleur: COULEURS.sortant,
       delta: a?.moyenne != null && stats.moyenne != null ? <Delta valeur={stats.moyenne} avant={a.moyenne} unite=" s" sensBon={0} /> : null },
     { cle: 'hors',   label: 'Hors horaires', valeur: fmtNb(stats.horsHoraires),
-      sous: 'Arrivés bureau fermé', courbe: null, couleur: '#7c3aed',
+      sous: 'Arrivés bureau fermé', courbe: null, couleur: COUL.violet,
       delta: a ? <Delta valeur={stats.horsHoraires} avant={a.horsHoraires} sensBon={-1} /> : null },
   ]
 
@@ -541,7 +542,7 @@ function ChiffresCles({ stats, compact = false }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 1.15fr) minmax(300px, 2fr)', gap: 14, marginBottom: 18 }}>
       {/* Chiffre dominant */}
-      <div style={{ background: 'linear-gradient(150deg,#0D2F5E 0%,#17487f 100%)', borderRadius: 16, padding: '22px 24px', color: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: 168 }}>
+      <div style={{ background: 'linear-gradient(150deg,#0D2F5E 0%,#17487f 100%)', borderRadius: 16, padding: '22px 24px', color: COUL.blanc, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: 168 }}>
         <div>
           <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.09em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.62)' }}>Taux de décroché</div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginTop: 6 }}>
@@ -563,8 +564,8 @@ function ChiffresCles({ stats, compact = false }) {
             <Jauge part={stats.entrants} total={stats.entrantsTotal} couleur="#6da7ec" reste={COULEURS.manque} hauteur={9} />
           </div>
           <div style={{ display: 'flex', gap: 16, fontSize: 11.5, color: 'rgba(255,255,255,0.78)' }}>
-            <span><b style={{ color: '#fff' }}>{fmtNb(stats.entrants)}</b> répondus</span>
-            <span><b style={{ color: '#fff' }}>{fmtNb(stats.manques)}</b> manqués</span>
+            <span><b style={{ color: COUL.blanc }}>{fmtNb(stats.entrants)}</b> répondus</span>
+            <span><b style={{ color: COUL.blanc }}>{fmtNb(stats.manques)}</b> manqués</span>
           </div>
         </div>
       </div>
@@ -572,15 +573,15 @@ function ChiffresCles({ stats, compact = false }) {
       {/* Les quatre satellites */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gridTemplateRows: 'repeat(2,minmax(0,1fr))', gap: 14 }}>
         {tuiles.map(t => (
-          <div key={t.cle} style={{ background: '#fff', border: '1px solid #e8edf4', borderRadius: 14, padding: '14px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: 77 }}>
+          <div key={t.cle} style={{ background: COUL.blanc, border: '1px solid #e8edf4', borderRadius: 14, padding: '14px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: 77 }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: '#94a3b8' }}>{t.label}</div>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: COUL.texteFaible }}>{t.label}</div>
               {t.delta}
             </div>
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 8, marginTop: 4 }}>
               <div>
-                <div style={{ fontSize: 23, fontWeight: 800, color: '#0f172a', lineHeight: 1.1 }}>{t.valeur}</div>
-                <div style={{ fontSize: 10.5, color: '#94a3b8', marginTop: 3 }}>{t.sous}</div>
+                <div style={{ fontSize: 23, fontWeight: 800, color: COUL.texteFort, lineHeight: 1.1 }}>{t.valeur}</div>
+                <div style={{ fontSize: 10.5, color: COUL.texteFaible, marginTop: 3 }}>{t.sous}</div>
               </div>
               {t.courbe && t.courbe.length > 2 && <Sparkline valeurs={t.courbe} couleur={t.couleur} largeur={72} hauteur={28} />}
             </div>
@@ -593,22 +594,22 @@ function ChiffresCles({ stats, compact = false }) {
 
 function Tuile({ label, valeur, sous, couleur }) {
   return (
-    <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e8edf4', borderTop: `3px solid ${couleur}`, padding: '13px 16px' }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', lineHeight: 1 }}>{valeur}</div>
-      {sous && <div style={{ fontSize: 10.5, color: '#64748b', marginTop: 4 }}>{sous}</div>}
+    <div style={{ background: COUL.blanc, borderRadius: 12, border: '1px solid #e8edf4', borderTop: `3px solid ${couleur}`, padding: '13px 16px' }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 22, fontWeight: 800, color: COUL.texteFort, lineHeight: 1 }}>{valeur}</div>
+      {sous && <div style={{ fontSize: 10.5, color: COUL.texteDoux, marginTop: 4 }}>{sous}</div>}
     </div>
   )
 }
 
 /* ── Carte de section ── */
 const Carte = ({ titre, aide, extra, children }) => (
-  <section style={{ background: '#fff', borderRadius: 16, border: '1px solid #e8edf4', padding: '18px 20px 20px', marginBottom: 16 }}>
+  <section style={{ background: COUL.blanc, borderRadius: 16, border: '1px solid #e8edf4', padding: '18px 20px 20px', marginBottom: 16 }}>
     <header style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 14 }}>
       <span style={{ width: 3, alignSelf: 'stretch', minHeight: 26, borderRadius: 2, background: COULEURS.entrant, flexShrink: 0 }} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <h2 style={{ fontSize: 14.5, fontWeight: 800, color: NAVY, margin: 0, letterSpacing: '-0.01em' }}>{titre}</h2>
-        {aide && <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 3, lineHeight: 1.45 }}>{aide}</div>}
+        {aide && <div style={{ fontSize: 11.5, color: COUL.texteFaible, marginTop: 3, lineHeight: 1.45 }}>{aide}</div>}
       </div>
       {extra}
     </header>
@@ -626,13 +627,13 @@ function Stats({ stats, postes, edition, setEdition, renommer, joursPeriode }) {
     <>
       <ChiffresCles stats={stats} />
       {libelleCompare && (
-        <div style={{ fontSize: 11, color: '#94a3b8', margin: '-8px 0 16px 2px' }}>
+        <div style={{ fontSize: 11, color: COUL.texteFaible, margin: '-8px 0 16px 2px' }}>
           Les évolutions comparent la période affichée aux {joursPeriode} jours qui la précèdent.
         </div>
       )}
 
       {aNommer.length > 0 && (
-        <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12, padding: '12px 16px', marginBottom: 16, fontSize: 12.5, color: '#92400e', display: 'flex', gap: 10 }}>
+        <div style={{ background: COUL.alerteFondDoux, border: '1px solid #fde68a', borderRadius: 12, padding: '12px 16px', marginBottom: 16, fontSize: 12.5, color: COUL.alerteFonce, display: 'flex', gap: 10 }}>
           <i className="ti ti-help-circle" style={{ fontSize: 17, marginTop: 1, flexShrink: 0 }} />
           <div>
             <b>{aNommer.length} poste{aNommer.length > 1 ? 's' : ''} sans nom</b> — {aNommer.map(p => p.extension).join(', ')}.
@@ -665,18 +666,18 @@ function Stats({ stats, postes, edition, setEdition, renommer, joursPeriode }) {
         <Carte titre="Numéros qui reviennent" aide="Les numéros vus plusieurs fois sur la période — rappels en attente, ou dossiers qui s'éternisent.">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             {stats.topNumeros.map((n, i) => (
-              <div key={n.numero} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 10px', borderRadius: 9, background: i % 2 ? '#fbfcfe' : '#fff' }}>
-                <span style={{ width: 21, height: 21, borderRadius: 6, background: i < 3 ? COULEURS.entrant : '#eef2f7', color: i < 3 ? '#fff' : '#94a3b8', fontSize: 10.5, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</span>
-                <span style={{ fontSize: 12.5, color: '#1e293b', fontVariantNumeric: 'tabular-nums', minWidth: 118 }}>{n.numero}</span>
-                <span style={{ flex: 1, fontSize: 12.5, color: n.contact ? '#1e293b' : '#cbd5e1', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {n.contact || 'Inconnu'}{n.dossier && <span style={{ color: '#94a3b8', fontSize: 11 }}> · {n.dossier}</span>}
+              <div key={n.numero} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 10px', borderRadius: 9, background: i % 2 ? '#fbfcfe' : COUL.blanc }}>
+                <span style={{ width: 21, height: 21, borderRadius: 6, background: i < 3 ? COULEURS.entrant : '#eef2f7', color: i < 3 ? '#fff' : COUL.texteFaible, fontSize: 10.5, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</span>
+                <span style={{ fontSize: 12.5, color: COUL.texte, fontVariantNumeric: 'tabular-nums', minWidth: 118 }}>{n.numero}</span>
+                <span style={{ flex: 1, fontSize: 12.5, color: n.contact ? '#1e293b' : COUL.bordFort, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {n.contact || 'Inconnu'}{n.dossier && <span style={{ color: COUL.texteFaible, fontSize: 11 }}> · {n.dossier}</span>}
                 </span>
                 {n.manque > 0 && (
-                  <span style={{ fontSize: 10.5, fontWeight: 700, color: COULEURS.manque, background: '#fef2f2', borderRadius: 6, padding: '2px 7px', whiteSpace: 'nowrap' }}>
+                  <span style={{ fontSize: 10.5, fontWeight: 700, color: COULEURS.manque, background: COUL.dangerFondDoux, borderRadius: 6, padding: '2px 7px', whiteSpace: 'nowrap' }}>
                     <i className="ti ti-phone-off" style={{ marginRight: 3 }} />{n.manque} manqué{n.manque > 1 ? 's' : ''}
                   </span>
                 )}
-                <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', fontVariantNumeric: 'tabular-nums', minWidth: 26, textAlign: 'right' }}>{fmtNb(n.n)}</span>
+                <span style={{ fontSize: 13, fontWeight: 800, color: COUL.texteFort, fontVariantNumeric: 'tabular-nums', minWidth: 26, textAlign: 'right' }}>{fmtNb(n.n)}</span>
               </div>
             ))}
           </div>
@@ -699,7 +700,7 @@ function CartePoste({ p, maxPoste, postes, edition, setEdition, renommer }) {
   ].filter(x => x.v > 0)
 
   return (
-    <div style={{ border: '1px solid #e8edf4', borderRadius: 13, padding: '13px 15px', background: '#fff' }}>
+    <div style={{ border: '1px solid #e8edf4', borderRadius: 13, padding: '13px 15px', background: COUL.blanc }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 11 }}>
         <span style={{
           width: 33, height: 33, borderRadius: 9, flexShrink: 0,
@@ -722,25 +723,25 @@ function CartePoste({ p, maxPoste, postes, edition, setEdition, renommer }) {
                 <option value="hors_horaires">Hors horaires</option>
                 <option value="inconnu">À nommer</option>
               </select>
-              <button onClick={renommer} style={{ padding: '4px 8px', border: 'none', borderRadius: 6, background: '#16a34a', color: '#fff', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>OK</button>
+              <button onClick={renommer} style={{ padding: '4px 8px', border: 'none', borderRadius: 6, background: COUL.succes, color: COUL.blanc, fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>OK</button>
             </div>
           ) : (
             <>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: COUL.texteFort, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {estService ? (
                   <button onClick={() => { const po = postes.find(x => x.extension === p.extension); setEdition({ extension: p.extension, libelle: po?.libelle || '', categorie: po?.categorie || 'service' }) }}
-                    style={{ border: 'none', background: 'none', padding: 0, font: 'inherit', color: p.categorie === 'inconnu' ? '#b45309' : '#0f172a', cursor: 'pointer', textDecoration: 'underline dotted', textUnderlineOffset: 3 }}>
+                    style={{ border: 'none', background: 'none', padding: 0, font: 'inherit', color: p.categorie === 'inconnu' ? '#b45309' : COUL.texteFort, cursor: 'pointer', textDecoration: 'underline dotted', textUnderlineOffset: 3 }}>
                     {p.qui}
                   </button>
                 ) : p.qui}
               </div>
-              <div style={{ fontSize: 10.5, color: '#94a3b8' }}>Poste {p.extension || '—'}</div>
+              <div style={{ fontSize: 10.5, color: COUL.texteFaible }}>Poste {p.extension || '—'}</div>
             </>
           )}
         </div>
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
-          <div style={{ fontSize: 19, fontWeight: 800, color: '#0f172a', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{fmtNb(p.total)}</div>
-          <div style={{ fontSize: 9.5, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.05em' }}>appels</div>
+          <div style={{ fontSize: 19, fontWeight: 800, color: COUL.texteFort, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{fmtNb(p.total)}</div>
+          <div style={{ fontSize: 9.5, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.05em' }}>appels</div>
         </div>
       </div>
 
@@ -758,7 +759,7 @@ function CartePoste({ p, maxPoste, postes, edition, setEdition, renommer }) {
         <Mini label="Moyenne" valeur={p.repondus ? fmtDuree(Math.round(p.secondes / p.repondus)) : '—'} />
       </div>
 
-      <div style={{ display: 'flex', gap: 12, marginTop: 9, paddingTop: 8, borderTop: '1px solid #f1f5f9', fontSize: 10.5, color: '#64748b' }}>
+      <div style={{ display: 'flex', gap: 12, marginTop: 9, paddingTop: 8, borderTop: '1px solid #f1f5f9', fontSize: 10.5, color: COUL.texteDoux }}>
         <span><b style={{ color: COULEURS.entrant }}>{fmtNb(p.entrant)}</b> entrants</span>
         <span><b style={{ color: COULEURS.sortant }}>{fmtNb(p.sortant)}</b> sortants</span>
         {p.manque > 0 && <span><b style={{ color: COULEURS.manque }}>{fmtNb(p.manque)}</b> manqués</span>}
@@ -769,9 +770,9 @@ function CartePoste({ p, maxPoste, postes, edition, setEdition, renommer }) {
 }
 
 const Mini = ({ label, valeur, alerte }) => (
-  <div style={{ background: alerte ? '#fef2f2' : '#f8fafc', borderRadius: 8, padding: '6px 8px' }}>
-    <div style={{ fontSize: 9, fontWeight: 700, color: alerte ? '#b91c1c' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '.05em' }}>{label}</div>
-    <div style={{ fontSize: 12, fontWeight: 700, color: alerte ? '#dc2626' : '#334155', marginTop: 2, whiteSpace: 'nowrap' }}>{valeur}</div>
+  <div style={{ background: alerte ? '#fef2f2' : COUL.fond, borderRadius: 8, padding: '6px 8px' }}>
+    <div style={{ fontSize: 9, fontWeight: 700, color: alerte ? '#b91c1c' : COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.05em' }}>{label}</div>
+    <div style={{ fontSize: 12, fontWeight: 700, color: alerte ? '#dc2626' : COUL.texteSombre, marginTop: 2, whiteSpace: 'nowrap' }}>{valeur}</div>
   </div>
 )
 
@@ -782,50 +783,50 @@ function Journal({ lignes, total, relances = 0, sens, setSens, q, setQ, ouvrirFi
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
         <div style={{ display: 'flex', gap: 6 }}>
           {[{ v: 'tous', l: 'Tous' }, { v: 'entrant', l: 'Entrants' }, { v: 'sortant', l: 'Sortants' }, { v: 'manque', l: 'Manqués' }].map(o => (
-            <button key={o.v} onClick={() => setSens(o.v)} style={{ padding: '6px 12px', borderRadius: 7, border: '1px solid ' + (sens === o.v ? E.color : '#e2e8f0'), background: sens === o.v ? E.color : '#fff', color: sens === o.v ? '#fff' : '#64748b', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>{o.l}</button>
+            <button key={o.v} onClick={() => setSens(o.v)} style={{ padding: '6px 12px', borderRadius: 7, border: '1px solid ' + (sens === o.v ? E.color : COUL.bord), background: sens === o.v ? E.color : COUL.blanc, color: sens === o.v ? '#fff' : COUL.texteDoux, fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>{o.l}</button>
           ))}
         </div>
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher (numéro, contact, poste)…" style={{ flex: 1, minWidth: 200, padding: '8px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13 }} />
       </div>
 
-      <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+      <div style={{ background: COUL.blanc, borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
-              <tr style={{ background: '#f8fafc', textAlign: 'left' }}>
+              <tr style={{ background: COUL.fond, textAlign: 'left' }}>
                 {['Sens', 'Numéro', 'Contact', 'Poste', 'Durée', 'Date / heure', ''].map((h, i) => (
-                  <th key={i} style={{ padding: '10px 14px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap' }}>{h}</th>
+                  <th key={i} style={{ padding: '10px 14px', fontSize: 11, fontWeight: 700, color: COUL.texteDoux, textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {!lignes.length ? (
-                <tr><td colSpan={7} style={{ padding: 24, textAlign: 'center', color: '#94a3b8' }}>Aucun appel.</td></tr>
+                <tr><td colSpan={7} style={{ padding: 24, textAlign: 'center', color: COUL.texteFaible }}>Aucun appel.</td></tr>
               ) : lignes.map((r, i) => {
-                const etat = r.relance_sonnerie ? { l: 'Re-sonnerie', c: '#94a3b8', f: '#f1f5f9', i: 'ti-bell-ringing' }
-                  : r.manque ? { l: 'Manqué', c: COULEURS.manque, f: '#fef2f2', i: 'ti-phone-off' }
-                  : r.sens === 'entrant' ? { l: 'Entrant', c: COULEURS.entrant, f: '#eff6ff', i: 'ti-phone-incoming' }
+                const etat = r.relance_sonnerie ? { l: 'Re-sonnerie', c: COUL.texteFaible, f: COUL.fondDoux, i: 'ti-bell-ringing' }
+                  : r.manque ? { l: 'Manqué', c: COULEURS.manque, f: COUL.dangerFondDoux, i: 'ti-phone-off' }
+                  : r.sens === 'entrant' ? { l: 'Entrant', c: COULEURS.entrant, f: COUL.infoFond, i: 'ti-phone-incoming' }
                   : { l: 'Sortant', c: COULEURS.sortant, f: '#fff4ed', i: 'ti-phone-outgoing' }
                 return (
-                  <tr key={r.id} onClick={() => ouvrirFiche(r)} style={{ borderTop: '1px solid #f1f5f9', cursor: r.client_dossier ? 'pointer' : 'default', background: i % 2 ? '#fafafe' : '#fff' }}
-                    onMouseEnter={e => { if (r.client_dossier) e.currentTarget.style.background = '#eff6ff' }}
-                    onMouseLeave={e => { e.currentTarget.style.background = i % 2 ? '#fafafe' : '#fff' }}>
+                  <tr key={r.id} onClick={() => ouvrirFiche(r)} style={{ borderTop: '1px solid #f1f5f9', cursor: r.client_dossier ? 'pointer' : 'default', background: i % 2 ? '#fafafe' : COUL.blanc }}
+                    onMouseEnter={e => { if (r.client_dossier) e.currentTarget.style.background = COUL.infoFond }}
+                    onMouseLeave={e => { e.currentTarget.style.background = i % 2 ? '#fafafe' : COUL.blanc }}>
                     <td style={{ padding: '9px 14px' }}>
                       <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 5, background: etat.f, color: etat.c, whiteSpace: 'nowrap' }}>
                         <i className={`ti ${etat.i}`} style={{ marginRight: 4 }} />{etat.l}
                       </span>
                     </td>
-                    <td style={{ padding: '9px 14px', color: '#1e293b', whiteSpace: 'nowrap' }}>{r.numero || '—'}</td>
-                    <td style={{ padding: '9px 14px', color: r.contact ? '#1e293b' : '#cbd5e1' }}>
+                    <td style={{ padding: '9px 14px', color: COUL.texte, whiteSpace: 'nowrap' }}>{r.numero || '—'}</td>
+                    <td style={{ padding: '9px 14px', color: r.contact ? '#1e293b' : COUL.bordFort }}>
                       {r.contact || '—'}
-                      {r.client_dossier && <span style={{ color: '#94a3b8', fontSize: 11 }}> · {r.client_dossier}</span>}
+                      {r.client_dossier && <span style={{ color: COUL.texteFaible, fontSize: 11 }}> · {r.client_dossier}</span>}
                     </td>
-                    <td style={{ padding: '9px 14px', color: '#64748b', whiteSpace: 'nowrap' }}>
-                      {r.extension && <span style={{ fontWeight: 700, color: '#475569' }}>{r.extension}</span>}
+                    <td style={{ padding: '9px 14px', color: COUL.texteDoux, whiteSpace: 'nowrap' }}>
+                      {r.extension && <span style={{ fontWeight: 700, color: COUL.texteMoyen }}>{r.extension}</span>}
                       {quiPoste(r) !== `Poste ${r.extension}` && <span> · {quiPoste(r)}</span>}
                     </td>
-                    <td style={{ padding: '9px 14px', color: '#64748b', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{fmtDuree(r.duree_s)}</td>
-                    <td style={{ padding: '9px 14px', color: '#64748b', whiteSpace: 'nowrap' }}>{fmtDT(r.debut)}</td>
+                    <td style={{ padding: '9px 14px', color: COUL.texteDoux, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{fmtDuree(r.duree_s)}</td>
+                    <td style={{ padding: '9px 14px', color: COUL.texteDoux, whiteSpace: 'nowrap' }}>{fmtDT(r.debut)}</td>
                     <td style={{ padding: '9px 14px', textAlign: 'right' }}>{r.client_dossier && <i className="ti ti-external-link" style={{ color: E.color }} />}</td>
                   </tr>
                 )
@@ -835,7 +836,7 @@ function Journal({ lignes, total, relances = 0, sens, setSens, q, setQ, ouvrirFi
         </div>
       </div>
 
-      <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 10 }}>
+      <p style={{ fontSize: 11, color: COUL.texteFaible, marginTop: 10 }}>
         {fmtNb(lignes.length)} ligne(s) affichée(s) sur {fmtNb(total)} chargée(s) — toute la période, sans plafond.
         {relances > 0 && ` ${fmtNb(relances)} sont des re-sonneries du même appel, exclues des compteurs.`}
         {' '}{fmtNb(identifies)} contact(s) identifié(s). Clic sur une ligne = fiche client, quand un dossier est rattaché.

@@ -7,9 +7,10 @@ import { LODE, TVA_TAUX, CGV, DELAI_PAIEMENT_JOURS } from '../../lib/lodeConfig'
 import { I18N, CGV_I18N, LANGUES } from '../../lib/lodeI18n'
 import { StatBanner, TabsBar, StatusBadge, ActionButton, DataCard, PrimaryButton, useMobile } from '../../components/ui/AccountableUI'
 import { extraireDevis } from '../../lib/devisExtraction'
+import { COUL } from '../../lib/theme'
 
 const ORANGE = LODE.couleur
-const NAVY = '#1e293b'
+const NAVY = COUL.texte
 
 // ── Chargement dynamique de libs via CDN (PDF / Excel) ──────────
 function loadScript(src) {
@@ -75,19 +76,19 @@ function calcTotaux(lignesToutes, remiseGlobalePct) {
 }
 
 const STATUTS_DEVIS = {
-  brouillon: { bg: '#f1f5f9', col: '#64748b', label: 'Brouillon' },
-  'envoyé':  { bg: '#dbeafe', col: '#2563eb', label: 'Envoyé' },
-  'accepté': { bg: '#dcfce7', col: '#16a34a', label: 'Accepté' },
-  'refusé':  { bg: '#fee2e2', col: '#dc2626', label: 'Refusé' },
-  'expiré':  { bg: '#fef3c7', col: '#92400e', label: 'Expiré' },
+  brouillon: { bg: COUL.fondDoux, col: COUL.texteDoux, label: 'Brouillon' },
+  'envoyé':  { bg: '#dbeafe', col: COUL.info, label: 'Envoyé' },
+  'accepté': { bg: COUL.succesFond, col: COUL.succes, label: 'Accepté' },
+  'refusé':  { bg: COUL.dangerFond, col: COUL.danger, label: 'Refusé' },
+  'expiré':  { bg: COUL.alerteFond, col: COUL.alerteFonce, label: 'Expiré' },
 }
 const STATUTS_FACT = {
-  brouillon: { bg: '#f1f5f9', col: '#64748b', label: 'Brouillon' },
-  'envoyée': { bg: '#dbeafe', col: '#2563eb', label: 'Envoyée' },
-  'payée':   { bg: '#dcfce7', col: '#16a34a', label: 'Payée' },
-  'partiellement payée': { bg: '#fef3c7', col: '#92400e', label: 'Partielle' },
-  'en retard': { bg: '#fee2e2', col: '#dc2626', label: 'En retard' },
-  'annulée': { bg: '#f1f5f9', col: '#94a3b8', label: 'Annulée' },
+  brouillon: { bg: COUL.fondDoux, col: COUL.texteDoux, label: 'Brouillon' },
+  'envoyée': { bg: '#dbeafe', col: COUL.info, label: 'Envoyée' },
+  'payée':   { bg: COUL.succesFond, col: COUL.succes, label: 'Payée' },
+  'partiellement payée': { bg: COUL.alerteFond, col: COUL.alerteFonce, label: 'Partielle' },
+  'en retard': { bg: COUL.dangerFond, col: COUL.danger, label: 'En retard' },
+  'annulée': { bg: COUL.fondDoux, col: COUL.texteFaible, label: 'Annulée' },
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -438,20 +439,20 @@ function Editeur({ type, doc, onClose, onSaved }) {
   }
 
   const inp = { padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' }
-  const lbl = { fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 3, display: 'block' }
+  const lbl = { fontSize: 11, fontWeight: 700, color: COUL.texteDoux, marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: mobE ? 8 : 20, overflowY: 'auto' }}>
-      <div style={{ background: '#fff', borderRadius: 14, maxWidth: 880, width: '100%', padding: mobE ? 16 : 24, fontFamily: "'Source Sans Pro', sans-serif" }}>
+      <div style={{ background: COUL.blanc, borderRadius: 14, maxWidth: 880, width: '100%', padding: mobE ? 16 : 24, fontFamily: "'Source Sans Pro', sans-serif" }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
           <h2 style={{ fontSize: 18, fontWeight: 800, color: NAVY, margin: 0 }}>
             {doc?.id ? 'Modifier' : 'Nouveau'} {isDevis ? 'devis' : 'facture'} {doc?.numero ? `· ${doc.numero}` : ''}
           </h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#94a3b8' }}>×</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: COUL.texteFaible }}>×</button>
         </div>
 
         {verrouille && (
-          <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: 10, padding: '10px 14px', marginBottom: 14, fontSize: 13, fontWeight: 600 }}>
+          <div style={{ background: COUL.dangerFondDoux, border: '1px solid #fecaca', color: COUL.dangerFonce, borderRadius: 10, padding: '10px 14px', marginBottom: 14, fontSize: 13, fontWeight: 600 }}>
             🔒 Facture déjà émise — lecture seule. Une facture émise ne peut jamais être modifiée ni supprimée : pour la corriger, créez une note de crédit.
           </div>
         )}
@@ -462,15 +463,15 @@ function Editeur({ type, doc, onClose, onSaved }) {
           <label style={lbl}>Rechercher un client encodé (nom, prénom, dossier, ville, email, TVA…)</label>
           <input style={inp} value={clientQuery} placeholder="Tapez au moins 2 caractères — ou saisie manuelle ci-dessous" onChange={e => setClientQuery(e.target.value)} />
           {clientQuery.trim().length >= 2 && (
-            <div style={{ position: 'absolute', zIndex: 20, left: 0, right: 0, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, marginTop: 4, maxHeight: 280, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,.12)' }}>
-              {searching && <div style={{ padding: 10, fontSize: 13, color: '#64748b' }}>Recherche…</div>}
-              {!searching && clientResults.length === 0 && <div style={{ padding: 10, fontSize: 13, color: '#64748b' }}>Aucun client trouvé</div>}
+            <div style={{ position: 'absolute', zIndex: 20, left: 0, right: 0, background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 8, marginTop: 4, maxHeight: 280, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,.12)' }}>
+              {searching && <div style={{ padding: 10, fontSize: 13, color: COUL.texteDoux }}>Recherche…</div>}
+              {!searching && clientResults.length === 0 && <div style={{ padding: 10, fontSize: 13, color: COUL.texteDoux }}>Aucun client trouvé</div>}
               {clientResults.map(c => {
                 const L = labelClient(c)
                 return (
-                  <div key={c.id} onClick={() => choisirClient(c)} style={{ padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                  <div key={c.id} onClick={() => choisirClient(c)} style={{ padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = COUL.fond} onMouseLeave={e => e.currentTarget.style.background = COUL.blanc}>
                     <div style={{ fontSize: 13, fontWeight: 700 }}>{L.icon} {L.nom}</div>
-                    {L.sub && <div style={{ fontSize: 11, color: '#64748b' }}>{L.sub}</div>}
+                    {L.sub && <div style={{ fontSize: 11, color: COUL.texteDoux }}>{L.sub}</div>}
                   </div>
                 )
               })}
@@ -501,11 +502,11 @@ function Editeur({ type, doc, onClose, onSaved }) {
             </div>
           ) : (
             <button onClick={creerClient} disabled={creatingClient || !f.client_nom.trim()}
-              style={{ background: f.client_nom.trim() ? ORANGE : '#cbd5e1', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 700, cursor: (f.client_nom.trim() && !creatingClient) ? 'pointer' : 'not-allowed' }}>
+              style={{ background: f.client_nom.trim() ? ORANGE : COUL.bordFort, color: COUL.blanc, border: 'none', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 700, cursor: (f.client_nom.trim() && !creatingClient) ? 'pointer' : 'not-allowed' }}>
               {creatingClient ? 'Création…' : '➕ Créer ce client dans la base'}
             </button>
           )}
-          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 5 }}>
+          <div style={{ fontSize: 11, color: COUL.texteFaible, marginTop: 5 }}>
             {f.client_id
               ? 'Ce client est enregistré dans ta base — réutilisable pour tes prochains devis et factures.'
               : 'Client pas encore encodé. Crée-le pour le retrouver ensuite via la recherche.'}
@@ -531,7 +532,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {[['facture', 'Facture'], ['acompte', 'Acompte'], ['solde', 'Solde'], ['note_credit', 'Note de crédit']].map(([v, lab]) => {
                   const on = (f.type || 'facture') === v
-                  return (<button key={v} type="button" onClick={() => set('type', v)} style={{ flex: mobE ? '1 1 45%' : 1, padding: '9px 10px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 700, border: on ? '1.5px solid #ea580c' : '1.5px solid #e2e8f0', background: on ? '#fff7ed' : '#fff', color: on ? '#ea580c' : '#64748b', transition: 'all .12s' }}>{lab}</button>)
+                  return (<button key={v} type="button" onClick={() => set('type', v)} style={{ flex: mobE ? '1 1 45%' : 1, padding: '9px 10px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 700, border: on ? '1.5px solid #ea580c' : '1.5px solid #e2e8f0', background: on ? '#fff7ed' : COUL.blanc, color: on ? '#ea580c' : COUL.texteDoux, transition: 'all .12s' }}>{lab}</button>)
                 })}
               </div>
             </div>
@@ -548,7 +549,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
 
         {/* Acompte / Solde : total projet + deduction des acomptes */}
         {!isDevis && (f.type === 'acompte' || f.type === 'solde') && (
-          <div style={{ border: '1px solid #fed7aa', background: '#FFF7ED', borderRadius: 10, padding: 12, marginBottom: 14 }}>
+          <div style={{ border: '1px solid #fed7aa', background: COUL.orangeFond, borderRadius: 10, padding: 12, marginBottom: 14 }}>
             <div style={{ display: 'grid', gridTemplateColumns: mobE ? '1fr' : '1fr 1fr', gap: 10 }}>
               <div><label style={lbl}>Total projet TTC (pour mémoire)</label>
                 <input type="number" step="0.01" style={inp} value={f.total_projet_ttc || ''} onChange={e => set('total_projet_ttc', e.target.value)} placeholder="ex: 10000.00" /></div>
@@ -556,29 +557,29 @@ function Editeur({ type, doc, onClose, onSaved }) {
             {f.type === 'solde' && !doc?.id && (
               <div style={{ marginTop: 10 }}>
                 <div style={{ fontSize: 12, fontWeight: 800, color: ORANGE, marginBottom: 6 }}>Acomptes déjà facturés à déduire</div>
-                {!f.client_id && <div style={{ fontSize: 12, color: '#b45309' }}>Lie d'abord le client (bouton plus haut) pour retrouver ses acomptes.</div>}
-                {f.client_id && acomptesDispo.length === 0 && <div style={{ fontSize: 12, color: '#64748b' }}>Aucun acompte trouvé pour ce client.</div>}
+                {!f.client_id && <div style={{ fontSize: 12, color: COUL.alerte }}>Lie d'abord le client (bouton plus haut) pour retrouver ses acomptes.</div>}
+                {f.client_id && acomptesDispo.length === 0 && <div style={{ fontSize: 12, color: COUL.texteDoux }}>Aucun acompte trouvé pour ce client.</div>}
                 {acomptesDispo.map(ac => (
                   <label key={ac.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, padding: '4px 0', cursor: 'pointer' }}>
                     <input type="checkbox" checked={acomptesSel.includes(ac.id)} onChange={e => setAcomptesSel(p => e.target.checked ? [...p, ac.id] : p.filter(x => x !== ac.id))} />
                     <span style={{ fontWeight: 700 }}>{ac.numero}</span>
-                    <span style={{ color: '#64748b' }}>{(ac.date_facture || '').slice(0, 10)}{ac.objet ? ' · ' + ac.objet : ''}</span>
+                    <span style={{ color: COUL.texteDoux }}>{(ac.date_facture || '').slice(0, 10)}{ac.objet ? ' · ' + ac.objet : ''}</span>
                     <span style={{ marginLeft: 'auto', fontWeight: 700 }}>{eur(ac.total_ttc)}</span>
                   </label>
                 ))}
               </div>
             )}
             {f.type === 'solde' && doc?.id && (
-              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 8 }}>Solde existant : les lignes « Acompte déjà facturé » sont modifiables directement dans les lignes ci-dessous.</div>
+              <div style={{ fontSize: 11, color: COUL.texteFaible, marginTop: 8 }}>Solde existant : les lignes « Acompte déjà facturé » sont modifiables directement dans les lignes ci-dessous.</div>
             )}
           </div>
         )}
 
         {/* Note de credit : facture a crediter */}
         {!isDevis && f.type === 'note_credit' && (
-          <div style={{ border: '1px solid #fecaca', background: '#fef2f2', borderRadius: 10, padding: 12, marginBottom: 14 }}>
-            <div style={{ fontSize: 12, fontWeight: 800, color: '#dc2626', marginBottom: 6 }}>Note de crédit — facture à créditer</div>
-            {!f.client_id && <div style={{ fontSize: 12, color: '#b45309' }}>Lie d'abord le client pour retrouver ses factures.</div>}
+          <div style={{ border: '1px solid #fecaca', background: COUL.dangerFondDoux, borderRadius: 10, padding: 12, marginBottom: 14 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: COUL.danger, marginBottom: 6 }}>Note de crédit — facture à créditer</div>
+            {!f.client_id && <div style={{ fontSize: 12, color: COUL.alerte }}>Lie d'abord le client pour retrouver ses factures.</div>}
             {f.client_id && (
               <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
                 <div style={{ flex: 1, minWidth: 220 }}>
@@ -588,10 +589,10 @@ function Editeur({ type, doc, onClose, onSaved }) {
                     {origines.map(o => <option key={o.id} value={o.id}>{o.numero} · {eur(o.total_ttc)} · {(o.date_facture || '').slice(0, 10)}</option>)}
                   </select>
                 </div>
-                <button type="button" disabled={!f.facture_origine_id} onClick={reprendreLignesNegatif} style={{ background: f.facture_origine_id ? '#dc2626' : '#cbd5e1', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 14px', fontSize: 12, fontWeight: 700, cursor: f.facture_origine_id ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap' }}>↩ Reprendre les lignes en négatif</button>
+                <button type="button" disabled={!f.facture_origine_id} onClick={reprendreLignesNegatif} style={{ background: f.facture_origine_id ? '#dc2626' : COUL.bordFort, color: COUL.blanc, border: 'none', borderRadius: 8, padding: '9px 14px', fontSize: 12, fontWeight: 700, cursor: f.facture_origine_id ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap' }}>↩ Reprendre les lignes en négatif</button>
               </div>
             )}
-            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 6 }}>La note de crédit annule tout ou partie de la facture sélectionnée (montants négatifs).</div>
+            <div style={{ fontSize: 11, color: COUL.texteFaible, marginTop: 6 }}>La note de crédit annule tout ou partie de la facture sélectionnée (montants négatifs).</div>
           </div>
         )}
 
@@ -600,28 +601,28 @@ function Editeur({ type, doc, onClose, onSaved }) {
           onDragOver={e => { e.preventDefault(); setImportPDF(p => ({ ...p, drag: true })) }}
           onDragLeave={e => { e.preventDefault(); setImportPDF(p => ({ ...p, drag: false })) }}
           onDrop={e => { e.preventDefault(); const fs = [...e.dataTransfer.files].filter(x => x.type === 'application/pdf'); if (fs.length) importerPDFs(fs) }}
-          style={{ border: `2px dashed ${importPDF.drag ? ORANGE : '#cbd5e1'}`, background: importPDF.drag ? '#FFF7ED' : '#fafafa', borderRadius: 10, padding: '14px 16px', marginBottom: 14, textAlign: 'center', transition: 'all .15s' }}
+          style={{ border: `2px dashed ${importPDF.drag ? ORANGE : COUL.bordFort}`, background: importPDF.drag ? '#FFF7ED' : '#fafafa', borderRadius: 10, padding: '14px 16px', marginBottom: 14, textAlign: 'center', transition: 'all .15s' }}
         >
           <div style={{ fontSize: 13, fontWeight: 700, color: NAVY, marginBottom: 4 }}>📄 Importer un devis fournisseur (SDA / Marquise)</div>
-          <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 8 }}>Glissez vos PDF ici, ou cliquez pour parcourir — les lignes seront pré-remplies</div>
-          <label style={{ display: 'inline-block', background: '#fff', border: `1px solid ${ORANGE}`, color: ORANGE, borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+          <div style={{ fontSize: 12, color: COUL.texteFaible, marginBottom: 8 }}>Glissez vos PDF ici, ou cliquez pour parcourir — les lignes seront pré-remplies</div>
+          <label style={{ display: 'inline-block', background: COUL.blanc, border: `1px solid ${ORANGE}`, color: ORANGE, borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
             {importPDF.loading ? 'Lecture en cours…' : 'Parcourir…'}
             <input type="file" accept="application/pdf" multiple style={{ display: 'none' }} onChange={e => { const fs = [...e.target.files]; if (fs.length) importerPDFs(fs); e.target.value = '' }} />
           </label>
-          {importPDF.msg && <div style={{ marginTop: 8, fontSize: 12, fontWeight: 600, color: importPDF.msg.startsWith('✓') ? '#16a34a' : importPDF.msg.startsWith('⚠') ? '#b45309' : '#dc2626' }}>{importPDF.msg}</div>}
+          {importPDF.msg && <div style={{ marginTop: 8, fontSize: 12, fontWeight: 600, color: importPDF.msg.startsWith('✓') ? '#16a34a' : importPDF.msg.startsWith('⚠') ? '#b45309' : COUL.danger }}>{importPDF.msg}</div>}
         </div>
 
         {/* Lignes */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 10 }}>
           <div style={{ fontSize: 13, fontWeight: 800, color: ORANGE }}>Lignes</div>
-          <button type="button" onClick={() => setAfficherTVAC(v => !v)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: afficherTVAC ? ORANGE : '#f1f5f9', color: afficherTVAC ? '#fff' : '#64748b', border: 'none', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>💶 {afficherTVAC ? 'Prix TVAC affichés' : 'Afficher prix TVA comprise'}</button>
+          <button type="button" onClick={() => setAfficherTVAC(v => !v)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: afficherTVAC ? ORANGE : COUL.fondDoux, color: afficherTVAC ? '#fff' : COUL.texteDoux, border: 'none', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>💶 {afficherTVAC ? 'Prix TVAC affichés' : 'Afficher prix TVA comprise'}</button>
         </div>
         <div style={{ marginBottom: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
           {lignes.map((l, i) => {
             const totLigne = (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * (1 - (Number(l.remise_pct) || 0) / 100)
             const totTTC = totLigne * (1 + (Number(l.tva_pct) || 0) / 100)
             return (
-              <div key={i} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 10, background: l.optionnelle ? '#FFFBEB' : '#fff' }}>
+              <div key={i} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 10, background: l.optionnelle ? '#FFFBEB' : COUL.blanc }}>
                 {/* Rangée 1 : titre + chiffres */}
                 <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', flexWrap: mobE ? 'wrap' : 'nowrap' }}>
                   <div style={{ flex: 1, minWidth: mobE ? '100%' : 180 }}>
@@ -652,20 +653,20 @@ function Editeur({ type, doc, onClose, onSaved }) {
                     )}
                     <ChampL label="HT"><div style={{ minWidth: 78, textAlign: 'right', fontWeight: 700, color: NAVY, padding: '7px 0' }}>{eur(totLigne)}</div></ChampL>
                     <ChampL label="TTC"><div style={{ minWidth: 82, textAlign: 'right', fontWeight: 700, color: ORANGE, padding: '7px 0' }}>{eur(totTTC)}</div></ChampL>
-                    <button onClick={() => delLigne(i)} title="Supprimer la ligne" style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 18, alignSelf: 'center', marginTop: 12 }}>×</button>
+                    <button onClick={() => delLigne(i)} title="Supprimer la ligne" style={{ background: 'none', border: 'none', color: COUL.danger, cursor: 'pointer', fontSize: 18, alignSelf: 'center', marginTop: 12 }}>×</button>
                   </div>
                 </div>
                 {/* Rangée 2 : descriptif + photos à côté */}
                 <div style={{ display: 'flex', gap: 10, marginTop: 8, flexWrap: mobE ? 'wrap' : 'nowrap' }}>
-                  <textarea style={{ ...inp, flex: 1, minHeight: 54, fontSize: 12, color: '#475569', resize: 'vertical', minWidth: mobE ? '100%' : 200 }} placeholder="Descriptif détaillé (dimensions, coloris, options…)" value={l.descriptif || ''} onChange={e => setLigne(i, 'descriptif', e.target.value)} />
+                  <textarea style={{ ...inp, flex: 1, minHeight: 54, fontSize: 12, color: COUL.texteMoyen, resize: 'vertical', minWidth: mobE ? '100%' : 200 }} placeholder="Descriptif détaillé (dimensions, coloris, options…)" value={l.descriptif || ''} onChange={e => setLigne(i, 'descriptif', e.target.value)} />
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'flex-start' }}>
                     {(l.photos || []).map((ph, pi) => (
-                      <div key={pi} style={{ width: 76, height: 76, borderRadius: 8, overflow: 'hidden', position: 'relative', border: '1px solid #e2e8f0', background: '#f1f5f9' }}>
+                      <div key={pi} style={{ width: 76, height: 76, borderRadius: 8, overflow: 'hidden', position: 'relative', border: '1px solid #e2e8f0', background: COUL.fondDoux }}>
                         <img src={ph.url || ph} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        <span onClick={() => setLigne(i, 'photos', (l.photos || []).filter((_, j) => j !== pi))} style={{ position: 'absolute', top: 2, right: 3, background: 'rgba(0,0,0,.5)', color: '#fff', borderRadius: '50%', width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 12 }}>×</span>
+                        <span onClick={() => setLigne(i, 'photos', (l.photos || []).filter((_, j) => j !== pi))} style={{ position: 'absolute', top: 2, right: 3, background: 'rgba(0,0,0,.5)', color: COUL.blanc, borderRadius: '50%', width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 12 }}>×</span>
                       </div>
                     ))}
-                    <label style={{ width: 76, height: 76, borderRadius: 8, border: `1px dashed ${ORANGE}`, background: '#FFF7ED', color: ORANGE, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 11 }}>
+                    <label style={{ width: 76, height: 76, borderRadius: 8, border: `1px dashed ${ORANGE}`, background: COUL.orangeFond, color: ORANGE, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 11 }}>
                       <span style={{ fontSize: 18 }}>＋</span>photo
                       <input type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={e => ajouterPhotos(i, [...e.target.files])} />
                     </label>
@@ -673,7 +674,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
                 </div>
                 {/* Option : ligne optionnelle (non additionnée) */}
                 <div style={{ marginTop: 6 }}>
-                  <label style={{ fontSize: 11, color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
+                  <label style={{ fontSize: 11, color: COUL.texteDoux, display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
                     <input type="checkbox" checked={!!l.optionnelle} onChange={e => setLigne(i, 'optionnelle', e.target.checked)} />
                     Option au choix (non comptée dans le total)
                   </label>
@@ -682,21 +683,21 @@ function Editeur({ type, doc, onClose, onSaved }) {
             )
           })}
         </div>
-        <button onClick={addLigne} style={{ background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 16 }}>+ Ajouter une ligne</button>
+        <button onClick={addLigne} style={{ background: COUL.fond, border: '1px dashed #cbd5e1', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: COUL.texteDoux, marginBottom: 16 }}>+ Ajouter une ligne</button>
 
         {/* Totaux + remise globale */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
           <div style={{ width: 280 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <span style={{ fontSize: 12, color: '#64748b' }}>Remise globale %</span>
+              <span style={{ fontSize: 12, color: COUL.texteDoux }}>Remise globale %</span>
               <input type="number" style={{ ...inp, width: 70, padding: '5px', textAlign: 'center' }} value={f.remise_pct} onChange={e => set('remise_pct', e.target.value)} />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0' }}><span style={{ color: '#64748b' }}>Total HT</span><span style={{ fontWeight: 600 }}>{eur(tot.ht)}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0' }}><span style={{ color: COUL.texteDoux }}>Total HT</span><span style={{ fontWeight: 600 }}>{eur(tot.ht)}</span></div>
             {Object.entries(tot.parTaux).filter(([, v]) => v > 0).map(([t, v]) => (
-              <div key={t} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '2px 0', color: '#64748b' }}><span>TVA {t}%</span><span>{eur(v)}</span></div>
+              <div key={t} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '2px 0', color: COUL.texteDoux }}><span>TVA {t}%</span><span>{eur(v)}</span></div>
             ))}
             {totDeduction < 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '2px 0', color: '#b45309' }}><span>Acomptes déduits</span><span>{eur(totDeduction)}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '2px 0', color: COUL.alerte }}><span>Acomptes déduits</span><span>{eur(totDeduction)}</span></div>
             )}
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 800, color: ORANGE, padding: '8px 0', borderTop: '2px solid #f1f5f9', marginTop: 4 }}><span>Total TTC</span><span>{eur(tot.ttc)}</span></div>
           </div>
@@ -718,8 +719,8 @@ function Editeur({ type, doc, onClose, onSaved }) {
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-          <button onClick={onClose} style={{ background: '#f1f5f9', border: 'none', borderRadius: 9, padding: '10px 20px', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#64748b' }}>Annuler</button>
-          <button onClick={save} disabled={saving || verrouille} style={{ background: verrouille ? '#cbd5e1' : ORANGE, border: 'none', borderRadius: 9, padding: '10px 24px', cursor: (saving || verrouille) ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700, color: '#fff' }}>{verrouille ? '🔒 Verrouillée' : (saving ? 'Enregistrement…' : 'Enregistrer')}</button>
+          <button onClick={onClose} style={{ background: COUL.fondDoux, border: 'none', borderRadius: 9, padding: '10px 20px', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: COUL.texteDoux }}>Annuler</button>
+          <button onClick={save} disabled={saving || verrouille} style={{ background: verrouille ? '#cbd5e1' : ORANGE, border: 'none', borderRadius: 9, padding: '10px 24px', cursor: (saving || verrouille) ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700, color: COUL.blanc }}>{verrouille ? '🔒 Verrouillée' : (saving ? 'Enregistrement…' : 'Enregistrer')}</button>
         </div>
       </div>
     </div>
@@ -1267,21 +1268,21 @@ async function exportWord(type, doc, lignes) {
 //  PAGE PRINCIPALE
 // ════════════════════════════════════════════════════════════════
 const STATUT_CHIPS = [
-  { key: 'brouillon', label: 'Pas envoyé', col: '#94a3b8' },
-  { key: 'envoyé',    label: 'Envoyé',     col: '#2563eb' },
-  { key: 'accepté',   label: 'Approuvé',   col: '#16a34a' },
-  { key: 'refusé',    label: 'Rejeté',     col: '#dc2626' },
+  { key: 'brouillon', label: 'Pas envoyé', col: COUL.texteFaible },
+  { key: 'envoyé',    label: 'Envoyé',     col: COUL.info },
+  { key: 'accepté',   label: 'Approuvé',   col: COUL.succes },
+  { key: 'refusé',    label: 'Rejeté',     col: COUL.danger },
 ]
 const EVT = {
-  cree:    { icon: '📝', label: 'Créé',                  col: '#64748b' },
-  envoye:  { icon: '📤', label: 'Envoyé au client',      col: '#2563eb' },
-  ouvert:  { icon: '👁️', label: 'Email ouvert par le client', col: '#7c3aed' },
-  accepte: { icon: '✅', label: 'Accepté par le client', col: '#16a34a' },
-  refuse:  { icon: '✋', label: 'Refusé par le client',   col: '#dc2626' },
+  cree:    { icon: '📝', label: 'Créé',                  col: COUL.texteDoux },
+  envoye:  { icon: '📤', label: 'Envoyé au client',      col: COUL.info },
+  ouvert:  { icon: '👁️', label: 'Email ouvert par le client', col: COUL.violet },
+  accepte: { icon: '✅', label: 'Accepté par le client', col: COUL.succes },
+  refuse:  { icon: '✋', label: 'Refusé par le client',   col: COUL.danger },
 }
 
 function Row2({ l, v }) {
-  return <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', color: '#64748b' }}><span>{l}</span><span>{v}</span></div>
+  return <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', color: COUL.texteDoux }}><span>{l}</span><span>{v}</span></div>
 }
 
 function SuiviModal({ doc, color, onClose, onChanged }) {
@@ -1356,35 +1357,35 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: mob ? 0 : 20 }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: mob ? '100vw' : 'min(1080px,96vw)', height: mob ? '100vh' : 'min(92vh,900px)', background: '#fff', borderRadius: mob ? 0 : 16, overflow: 'hidden', display: 'flex', flexDirection: mob ? 'column' : 'row', boxShadow: '0 20px 60px rgba(0,0,0,.3)' }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: mob ? '100vw' : 'min(1080px,96vw)', height: mob ? '100vh' : 'min(92vh,900px)', background: COUL.blanc, borderRadius: mob ? 0 : 16, overflow: 'hidden', display: 'flex', flexDirection: mob ? 'column' : 'row', boxShadow: '0 20px 60px rgba(0,0,0,.3)' }}>
 
         {/* ── Colonne gauche : aperçu du document ── */}
-        <div style={{ flex: 1, background: '#f1f5f9', overflow: 'auto', padding: mob ? 14 : 28, order: mob ? 2 : 1 }}>
-          <div style={{ background: '#fff', maxWidth: 620, margin: '0 auto', borderRadius: 10, boxShadow: '0 2px 12px rgba(0,0,0,.08)', padding: mob ? '22px 18px' : '30px 34px', fontSize: 12, color: '#1e293b' }}>
+        <div style={{ flex: 1, background: COUL.fondDoux, overflow: 'auto', padding: mob ? 14 : 28, order: mob ? 2 : 1 }}>
+          <div style={{ background: COUL.blanc, maxWidth: 620, margin: '0 auto', borderRadius: 10, boxShadow: '0 2px 12px rgba(0,0,0,.08)', padding: mob ? '22px 18px' : '30px 34px', fontSize: 12, color: COUL.texte }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 22 }}>
               {LODE.logo_url ? <img src={LODE.logo_url} alt="LODE" style={{ height: 46 }} /> : <div style={{ fontWeight: 800, fontSize: 18, color }}>{LODE.raison_sociale}</div>}
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontWeight: 800, color }}>DEVIS {doc.numero}</div>
-                <div style={{ color: '#64748b' }}>Émis le : {fmtDate(doc.date_devis)}</div>
-                {doc.date_validite && <div style={{ color: '#64748b' }}>Valide jusqu'au : {fmtDate(doc.date_validite)}</div>}
+                <div style={{ color: COUL.texteDoux }}>Émis le : {fmtDate(doc.date_devis)}</div>
+                {doc.date_validite && <div style={{ color: COUL.texteDoux }}>Valide jusqu'au : {fmtDate(doc.date_validite)}</div>}
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 20, marginBottom: 20 }}>
               <div>
-                <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>De</div>
+                <div style={{ fontSize: 9, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase' }}>De</div>
                 <div style={{ fontWeight: 800 }}>{LODE.raison_sociale}</div>
-                <div style={{ color: '#475569' }}>{LODE.adresse}<br />{LODE.cp} {LODE.ville}<br />{LODE.pays}</div>
-                <div style={{ color: '#475569', marginTop: 4 }}>TVA : {LODE.tva}</div>
+                <div style={{ color: COUL.texteMoyen }}>{LODE.adresse}<br />{LODE.cp} {LODE.ville}<br />{LODE.pays}</div>
+                <div style={{ color: COUL.texteMoyen, marginTop: 4 }}>TVA : {LODE.tva}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Pour</div>
+                <div style={{ fontSize: 9, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase' }}>Pour</div>
                 <div style={{ fontWeight: 800 }}>{doc.client_nom}</div>
-                <div style={{ color: '#475569' }}>{doc.client_adresse}<br />{[doc.client_cp, doc.client_ville].filter(Boolean).join(' ')}</div>
-                {doc.client_tva && <div style={{ color: '#475569', marginTop: 4 }}>TVA : {doc.client_tva}</div>}
+                <div style={{ color: COUL.texteMoyen }}>{doc.client_adresse}<br />{[doc.client_cp, doc.client_ville].filter(Boolean).join(' ')}</div>
+                {doc.client_tva && <div style={{ color: COUL.texteMoyen, marginTop: 4 }}>TVA : {doc.client_tva}</div>}
               </div>
             </div>
             <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12 }}>
-              <thead><tr style={{ background: color, color: '#fff' }}>
+              <thead><tr style={{ background: color, color: COUL.blanc }}>
                 {['Description', 'Prix HTVA', 'TVA', 'Qté', 'Total'].map((h, i) => <th key={h} style={{ textAlign: i ? 'right' : 'left', padding: '6px 8px', fontSize: 10, fontWeight: 700 }}>{h}</th>)}
               </tr></thead>
               <tbody>
@@ -1406,8 +1407,8 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: `2px solid ${color}`, paddingTop: 6, marginTop: 4, fontWeight: 800, color }}><span>Montant</span><span>{eur(doc.total_ttc)}</span></div>
               </div>
             </div>
-            {doc.notes && <><div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginTop: 18 }}>Notes &amp; commentaires</div><div style={{ color: '#475569' }}>{doc.notes}</div></>}
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 22, paddingTop: 12, borderTop: '1px solid #e2e8f0', color: '#64748b', fontSize: 11 }}>
+            {doc.notes && <><div style={{ fontSize: 9, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', marginTop: 18 }}>Notes &amp; commentaires</div><div style={{ color: COUL.texteMoyen }}>{doc.notes}</div></>}
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 22, paddingTop: 12, borderTop: '1px solid #e2e8f0', color: COUL.texteDoux, fontSize: 11 }}>
               <div>{LODE.iban && <>IBAN : {LODE.iban}<br /></>}{LODE.bic && <>BIC : {LODE.bic}</>}</div>
               <div style={{ textAlign: 'right' }}>{LODE.email}{LODE.telephone && <><br />{LODE.telephone}</>}</div>
             </div>
@@ -1418,22 +1419,22 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
         <div style={{ width: mob ? '100%' : 380, borderLeft: mob ? 'none' : '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', order: mob ? 1 : 2, maxHeight: mob ? '46vh' : 'none' }}>
           <div style={{ background: `linear-gradient(135deg,${color},#7c2d12)`, padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
-              <div style={{ color: '#fff', fontSize: 18, fontWeight: 800 }}>Devis {doc.numero}</div>
-              <div style={{ color: '#fff', opacity: .9, fontSize: 14, marginTop: 2 }}>{eur(doc.total_ttc)} TVA incl.</div>
+              <div style={{ color: COUL.blanc, fontSize: 18, fontWeight: 800 }}>Devis {doc.numero}</div>
+              <div style={{ color: COUL.blanc, opacity: .9, fontSize: 14, marginTop: 2 }}>{eur(doc.total_ttc)} TVA incl.</div>
             </div>
-            <button onClick={onClose} style={{ background: 'rgba(255,255,255,.2)', border: 'none', color: '#fff', width: 30, height: 30, borderRadius: 8, cursor: 'pointer', fontSize: 16 }}>✕</button>
+            <button onClick={onClose} style={{ background: 'rgba(255,255,255,.2)', border: 'none', color: COUL.blanc, width: 30, height: 30, borderRadius: 8, cursor: 'pointer', fontSize: 16 }}>✕</button>
           </div>
 
           <div style={{ flex: 1, overflow: 'auto', padding: 20 }}>
           {/* Statut (chips cliquables, façon Accountable) */}
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 8 }}>Statut</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', marginBottom: 8 }}>Statut</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 22 }}>
             {STATUT_CHIPS.map(c => {
               const actif = statut === c.key
               return (
                 <button key={c.key} onClick={() => changeStatut(c.key)}
                   style={{ padding: '8px 14px', borderRadius: 999, fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                    border: `1.5px solid ${actif ? c.col : '#e2e8f0'}`, background: actif ? c.col : '#fff', color: actif ? '#fff' : '#64748b' }}>
+                    border: `1.5px solid ${actif ? c.col : COUL.bord}`, background: actif ? c.col : COUL.blanc, color: actif ? '#fff' : COUL.texteDoux }}>
                   {c.label}
                 </button>
               )
@@ -1441,30 +1442,30 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
           </div>
 
           {/* Lien d'acceptation */}
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Lien d'acceptation (client)</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', marginBottom: 6 }}>Lien d'acceptation (client)</div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
-            <input readOnly value={lien} style={{ flex: 1, padding: '9px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 12, fontFamily: 'monospace', color: '#475569', background: '#f8fafc' }} />
-            <button onClick={copier} style={{ padding: '9px 14px', border: 'none', borderRadius: 8, background: color, color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>{copied ? '✓ Copié' : 'Copier'}</button>
+            <input readOnly value={lien} style={{ flex: 1, padding: '9px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 12, fontFamily: 'monospace', color: COUL.texteMoyen, background: COUL.fond }} />
+            <button onClick={copier} style={{ padding: '9px 14px', border: 'none', borderRadius: 8, background: color, color: COUL.blanc, fontWeight: 700, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>{copied ? '✓ Copié' : 'Copier'}</button>
           </div>
 
           {/* Actions d'envoi */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 22 }}>
-            <button onClick={envoyerEmail} disabled={sending} style={{ flex: 1, minWidth: 180, padding: '11px 16px', border: 'none', borderRadius: 10, background: '#16a34a', color: '#fff', fontWeight: 700, fontSize: 14, cursor: sending ? 'wait' : 'pointer' }}>{sending ? '…' : '📧 Envoyer par email'}</button>
-            <button onClick={() => marquerEnvoye(false)} style={{ padding: '11px 16px', border: '1px solid #e2e8f0', borderRadius: 10, background: '#fff', color: '#64748b', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Marquer envoyé</button>
+            <button onClick={envoyerEmail} disabled={sending} style={{ flex: 1, minWidth: 180, padding: '11px 16px', border: 'none', borderRadius: 10, background: COUL.succes, color: COUL.blanc, fontWeight: 700, fontSize: 14, cursor: sending ? 'wait' : 'pointer' }}>{sending ? '…' : '📧 Envoyer par email'}</button>
+            <button onClick={() => marquerEnvoye(false)} style={{ padding: '11px 16px', border: '1px solid #e2e8f0', borderRadius: 10, background: COUL.blanc, color: COUL.texteDoux, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Marquer envoyé</button>
           </div>
 
           {/* Timeline */}
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 12 }}>Historique</div>
-          {events === null ? <p style={{ color: '#94a3b8', fontSize: 13 }}>Chargement…</p> : (
+          <div style={{ fontSize: 11, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', marginBottom: 12 }}>Historique</div>
+          {events === null ? <p style={{ color: COUL.texteFaible, fontSize: 13 }}>Chargement…</p> : (
             <div style={{ position: 'relative', paddingLeft: 26 }}>
-              <div style={{ position: 'absolute', left: 9, top: 4, bottom: 4, width: 2, background: '#e2e8f0' }} />
+              <div style={{ position: 'absolute', left: 9, top: 4, bottom: 4, width: 2, background: COUL.bord }} />
               {timeline.map((ev, i) => {
-                const cfg = EVT[ev.type] || { icon: '•', label: ev.type, col: '#64748b' }
+                const cfg = EVT[ev.type] || { icon: '•', label: ev.type, col: COUL.texteDoux }
                 return (
                   <div key={ev.id || i} style={{ position: 'relative', marginBottom: 18 }}>
-                    <div style={{ position: 'absolute', left: -26, width: 20, height: 20, borderRadius: '50%', background: '#fff', border: `2px solid ${cfg.col}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>{cfg.icon}</div>
-                    <div style={{ fontWeight: 700, color: '#1e293b', fontSize: 14 }}>{cfg.label}</div>
-                    <div style={{ fontSize: 12, color: '#94a3b8' }}>{ev.created_at ? new Date(ev.created_at).toLocaleString('fr-BE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}{ev.detail ? ` · ${ev.detail}` : ''}</div>
+                    <div style={{ position: 'absolute', left: -26, width: 20, height: 20, borderRadius: '50%', background: COUL.blanc, border: `2px solid ${cfg.col}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>{cfg.icon}</div>
+                    <div style={{ fontWeight: 700, color: COUL.texte, fontSize: 14 }}>{cfg.label}</div>
+                    <div style={{ fontSize: 12, color: COUL.texteFaible }}>{ev.created_at ? new Date(ev.created_at).toLocaleString('fr-BE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}{ev.detail ? ` · ${ev.detail}` : ''}</div>
                   </div>
                 )
               })}
@@ -1480,7 +1481,7 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
 function ChampL({ label, children }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-      <span style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>{label}</span>
+      <span style={{ fontSize: 9, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase' }}>{label}</span>
       {children}
     </div>
   )
@@ -1491,12 +1492,12 @@ function ApercuFacture({ fid, nom }) {
   useEffect(() => { setEtat('load') }, [fid])
   const src = `/api/apercu-facture?fid=${encodeURIComponent(fid)}`
   return (
-    <div style={{ position: 'fixed', top: '50%', right: 24, transform: 'translateY(-50%)', zIndex: 2100, width: 520, maxWidth: '48vw', maxHeight: '88vh', background: '#fff', borderRadius: 14, boxShadow: '0 20px 60px rgba(0,0,0,0.35)', border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', pointerEvents: 'none' }}>
-      <div style={{ padding: '10px 14px', background: '#0f172a', color: '#fff', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>📄 {nom}</div>
-      <div style={{ overflowY: 'auto', background: '#f8fafc' }}>
+    <div style={{ position: 'fixed', top: '50%', right: 24, transform: 'translateY(-50%)', zIndex: 2100, width: 520, maxWidth: '48vw', maxHeight: '88vh', background: COUL.blanc, borderRadius: 14, boxShadow: '0 20px 60px rgba(0,0,0,0.35)', border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', pointerEvents: 'none' }}>
+      <div style={{ padding: '10px 14px', background: COUL.texteFort, color: COUL.blanc, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>📄 {nom}</div>
+      <div style={{ overflowY: 'auto', background: COUL.fond }}>
         <img src={src} alt="Apercu facture" onLoad={() => setEtat('ok')} onError={() => setEtat('err')} style={{ width: '100%', height: 'auto', display: etat === 'ok' ? 'block' : 'none' }} />
-        {etat === 'load' && <div style={{ padding: '34px 20px', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>Chargement de l\'apercu…</div>}
-        {etat === 'err' && <div style={{ padding: '34px 20px', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>Apercu indisponible.</div>}
+        {etat === 'load' && <div style={{ padding: '34px 20px', textAlign: 'center', color: COUL.texteFaible, fontSize: 13 }}>Chargement de l\'apercu…</div>}
+        {etat === 'err' && <div style={{ padding: '34px 20px', textAlign: 'center', color: COUL.texteFaible, fontSize: 13 }}>Apercu indisponible.</div>}
       </div>
     </div>
   )
@@ -1543,27 +1544,27 @@ function EnvoiFactureModal({ doc, b64, fileName, onClose, onSent }) {
   }
 
   const champ = { width: '100%', padding: '9px 11px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13.5, fontFamily: 'inherit', boxSizing: 'border-box' }
-  const lbl = { fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 4, display: 'block' }
+  const lbl = { fontSize: 12, fontWeight: 700, color: COUL.texteDoux, marginBottom: 4, display: 'block' }
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.5)', zIndex: 9000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '5vh 16px', overflowY: 'auto' }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 560, boxShadow: '0 20px 60px rgba(0,0,0,.25)', overflow: 'hidden' }}>
-        <div style={{ background: C, color: '#fff', padding: '16px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: COUL.blanc, borderRadius: 16, width: '100%', maxWidth: 560, boxShadow: '0 20px 60px rgba(0,0,0,.25)', overflow: 'hidden' }}>
+        <div style={{ background: C, color: COUL.blanc, padding: '16px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: 17, fontWeight: 800 }}>Envoyer la facture {doc.numero}</div>
-          <button onClick={onClose} style={{ background: 'rgba(255,255,255,.2)', border: 'none', color: '#fff', width: 30, height: 30, borderRadius: 15, cursor: 'pointer', fontSize: 16 }}>{'\u00d7'}</button>
+          <button onClick={onClose} style={{ background: 'rgba(255,255,255,.2)', border: 'none', color: COUL.blanc, width: 30, height: 30, borderRadius: 15, cursor: 'pointer', fontSize: 16 }}>{'\u00d7'}</button>
         </div>
         <div style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 13 }}>
           <div><label style={lbl}>A</label><input value={to} onChange={e => setTo(e.target.value)} style={champ} placeholder="client@email.be" /></div>
           <div><label style={lbl}>Cc</label><input value={cc} onChange={e => setCc(e.target.value)} style={champ} placeholder="(optionnel)" /></div>
           <div><label style={lbl}>Objet</label><input value={subject} onChange={e => setSubject(e.target.value)} style={champ} /></div>
           <div><label style={lbl}>Message</label><textarea value={body} onChange={e => setBody(e.target.value)} rows={7} style={{ ...champ, resize: 'vertical', lineHeight: 1.5 }} /></div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: '#f8fafc', border: '1px solid #eef2f6', borderRadius: 8, padding: '9px 12px', fontSize: 13 }}>
-            <span style={{ fontSize: 16 }}>📎</span><span style={{ color: '#475569', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileName}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: COUL.fond, border: '1px solid #eef2f6', borderRadius: 8, padding: '9px 12px', fontSize: 13 }}>
+            <span style={{ fontSize: 16 }}>📎</span><span style={{ color: COUL.texteMoyen, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileName}</span>
           </div>
-          {err && <div style={{ color: '#dc2626', fontSize: 13, fontWeight: 600 }}>{err}</div>}
+          {err && <div style={{ color: COUL.danger, fontSize: 13, fontWeight: 600 }}>{err}</div>}
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
-            <button onClick={onClose} disabled={sending} style={{ padding: '10px 18px', border: '1px solid #e2e8f0', background: '#fff', color: '#475569', borderRadius: 10, fontWeight: 700, fontSize: 13.5, cursor: 'pointer' }}>Annuler</button>
-            <button onClick={envoyer} disabled={sending} style={{ padding: '10px 22px', border: 'none', background: '#16a34a', color: '#fff', borderRadius: 10, fontWeight: 700, fontSize: 13.5, cursor: sending ? 'wait' : 'pointer' }}>{sending ? 'Envoi\u2026' : '\u2709 Envoyer la facture'}</button>
+            <button onClick={onClose} disabled={sending} style={{ padding: '10px 18px', border: '1px solid #e2e8f0', background: COUL.blanc, color: COUL.texteMoyen, borderRadius: 10, fontWeight: 700, fontSize: 13.5, cursor: 'pointer' }}>Annuler</button>
+            <button onClick={envoyer} disabled={sending} style={{ padding: '10px 22px', border: 'none', background: COUL.succes, color: COUL.blanc, borderRadius: 10, fontWeight: 700, fontSize: 13.5, cursor: sending ? 'wait' : 'pointer' }}>{sending ? 'Envoi\u2026' : '\u2709 Envoyer la facture'}</button>
           </div>
         </div>
       </div>
@@ -1812,22 +1813,22 @@ export default function LodeDevisFactures() {
 
         {tab === 'factures' && aSolder.length > 0 && (
           <DataCard style={{ padding: 0, marginBottom: 14, border: '1px solid #fed7aa', overflow: 'hidden' }}>
-            <div style={{ background: '#fff7ed', color: '#9a3412', fontWeight: 800, fontSize: 13.5, padding: '10px 16px', borderBottom: '1px solid #fed7aa' }}>
+            <div style={{ background: COUL.orangeFond, color: '#9a3412', fontWeight: 800, fontSize: 13.5, padding: '10px 16px', borderBottom: '1px solid #fed7aa' }}>
               ⏳ À solder — {aSolder.length} dossier{aSolder.length > 1 ? 's' : ''} avec acompte facturé, reste à facturer
             </div>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {aSolder.map(d => (
                 <div key={d.key} style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', justifyContent: 'space-between', padding: '11px 16px', borderTop: '1px solid #f8fafc' }}>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, color: '#1e293b', fontSize: 14 }}>{d.acompte.client_nom}</div>
-                    <div style={{ color: '#94a3b8', fontSize: 12 }}>Acompte {d.acompte.numero} · projet {eur(d.projet)} · déjà facturé {eur(d.facture)}</div>
+                    <div style={{ fontWeight: 700, color: COUL.texte, fontSize: 14 }}>{d.acompte.client_nom}</div>
+                    <div style={{ color: COUL.texteFaible, fontSize: 12 }}>Acompte {d.acompte.numero} · projet {eur(d.projet)} · déjà facturé {eur(d.facture)}</div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: 10.5, color: '#9a3412', fontWeight: 700, textTransform: 'uppercase', letterSpacing: .3 }}>Reste</div>
                       <div style={{ fontWeight: 800, color: '#9a3412', fontSize: 16 }}>{eur(d.reste)}</div>
                     </div>
-                    <button onClick={() => facturerSolde(d)} style={{ background: '#16a34a', color: '#fff', border: 'none', borderRadius: 9, padding: '9px 15px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>Facturer le solde</button>
+                    <button onClick={() => facturerSolde(d)} style={{ background: COUL.succes, color: COUL.blanc, border: 'none', borderRadius: 9, padding: '9px 15px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>Facturer le solde</button>
                   </div>
                 </div>
               ))}
@@ -1835,10 +1836,10 @@ export default function LodeDevisFactures() {
           </DataCard>
         )}
 
-        {loading ? <p style={{ color: '#94a3b8' }}>Chargement…</p> :
+        {loading ? <p style={{ color: COUL.texteFaible }}>Chargement…</p> :
           liste.length === 0 ? (
             <DataCard style={{ padding: '48px 24px', textAlign: 'center' }}>
-              <p style={{ color: '#94a3b8', fontStyle: 'italic', margin: 0 }}>Aucun {tab === 'devis' ? 'devis' : 'facture'} pour le moment.</p>
+              <p style={{ color: COUL.texteFaible, fontStyle: 'italic', margin: 0 }}>Aucun {tab === 'devis' ? 'devis' : 'facture'} pour le moment.</p>
             </DataCard>
           ) : mob ? (
             /* === Vue mobile : cartes empilées === */
@@ -1851,13 +1852,13 @@ export default function LodeDevisFactures() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontFamily: 'monospace', fontWeight: 700, color: C, fontSize: 13 }}>{doc.numero}</div>
-                        <div style={{ color: '#1e293b', fontWeight: 700, fontSize: 15, marginTop: 2 }}>{doc.client_nom}</div>
-                        {doc.objet && <div style={{ color: '#64748b', fontSize: 12.5, marginTop: 2 }}>{doc.objet}</div>}
+                        <div style={{ color: COUL.texte, fontWeight: 700, fontSize: 15, marginTop: 2 }}>{doc.client_nom}</div>
+                        {doc.objet && <div style={{ color: COUL.texteDoux, fontSize: 12.5, marginTop: 2 }}>{doc.objet}</div>}
                       </div>
                       <StatusBadge bg={s.bg} col={s.col} label={s.label} />
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: 8 }}>
-                      <span style={{ color: '#94a3b8', fontSize: 12 }}>{fmtDate(tab === 'devis' ? doc.date_devis : doc.date_facture)}</span>
+                      <span style={{ color: COUL.texteFaible, fontSize: 12 }}>{fmtDate(tab === 'devis' ? doc.date_devis : doc.date_facture)}</span>
                       <span style={{ fontWeight: 800, color: NAVY, fontSize: 16 }}>{eur(doc.total_ttc)}</span>
                     </div>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
@@ -1887,9 +1888,9 @@ export default function LodeDevisFactures() {
             /* === Vue desktop : tableau === */
             <DataCard style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 760 }}>
-                <thead style={{ background: '#f8fafc' }}>
+                <thead style={{ background: COUL.fond }}>
                   <tr>{COLS.map(c => (
-                    <th key={c.h} onClick={() => c.key && setSort(s => ({ key: c.key, dir: s.key === c.key && s.dir === 'asc' ? 'desc' : 'asc' }))} style={{ padding: '11px 14px', textAlign: c.align, fontSize: 10, fontWeight: 700, color: sort.key === c.key ? C : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.03em', cursor: c.key ? 'pointer' : 'default', userSelect: 'none', whiteSpace: 'nowrap' }}>{c.h}{sort.key === c.key ? (sort.dir === 'asc' ? ' \u25B2' : ' \u25BC') : (c.key ? ' \u21C5' : '')}</th>
+                    <th key={c.h} onClick={() => c.key && setSort(s => ({ key: c.key, dir: s.key === c.key && s.dir === 'asc' ? 'desc' : 'asc' }))} style={{ padding: '11px 14px', textAlign: c.align, fontSize: 10, fontWeight: 700, color: sort.key === c.key ? C : COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '0.03em', cursor: c.key ? 'pointer' : 'default', userSelect: 'none', whiteSpace: 'nowrap' }}>{c.h}{sort.key === c.key ? (sort.dir === 'asc' ? ' \u25B2' : ' \u25BC') : (c.key ? ' \u21C5' : '')}</th>
                   ))}</tr>
                 </thead>
                 <tbody>
@@ -1898,11 +1899,11 @@ export default function LodeDevisFactures() {
                     return (
                       <tr key={doc.id} style={{ borderTop: '1px solid #f1f5f9' }}
                         onMouseEnter={e => e.currentTarget.style.background = '#fafbfc'}
-                        onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                        onMouseLeave={e => e.currentTarget.style.background = COUL.blanc}>
                         <td style={{ padding: '11px 14px', fontFamily: 'monospace', fontWeight: 700, color: C }}>{doc.numero}</td>
-                        <td style={{ padding: '11px 14px', color: '#1e293b', fontWeight: 600 }}>{doc.client_nom}</td>
-                        <td style={{ padding: '11px 14px', color: '#64748b' }}>{doc.objet || '—'}</td>
-                        <td style={{ padding: '11px 14px', color: '#64748b' }}>{fmtDate(tab === 'devis' ? doc.date_devis : doc.date_facture)}</td>
+                        <td style={{ padding: '11px 14px', color: COUL.texte, fontWeight: 600 }}>{doc.client_nom}</td>
+                        <td style={{ padding: '11px 14px', color: COUL.texteDoux }}>{doc.objet || '—'}</td>
+                        <td style={{ padding: '11px 14px', color: COUL.texteDoux }}>{fmtDate(tab === 'devis' ? doc.date_devis : doc.date_facture)}</td>
                         <td style={{ padding: '11px 14px', textAlign: 'right', fontWeight: 700, color: NAVY }}>{eur(doc.total_ttc)}</td>
                         <td style={{ padding: '11px 14px' }}><StatusBadge bg={s.bg} col={s.col} label={s.label} /></td>
                         <td style={{ padding: '11px 14px' }}>

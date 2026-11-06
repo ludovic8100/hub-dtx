@@ -1,11 +1,12 @@
 import { useState, useMemo, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { COUL } from '../lib/theme'
 
 const FONT = "'Source Sans Pro', sans-serif"
 const eur = (v) => Math.round(v).toLocaleString('fr-BE') + ' €'
 const MOIS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc']
 
-export default function RentabiliteView({ transactions = [], categories = [], activitesSoc = [], color = '#0080BD', ventilations = {}, facturesParTx = {} }) {
+export default function RentabiliteView({ transactions = [], categories = [], activitesSoc = [], color = COUL.bleu, ventilations = {}, facturesParTx = {} }) {
   const [anneesSel, setAnneesSel] = useState(null)
   const [scopeAct, setScopeAct] = useState('all')
   const [deplie, setDeplie] = useState(null)
@@ -84,7 +85,7 @@ export default function RentabiliteView({ transactions = [], categories = [], ac
     const codes = activitesSoc.map(a => a.code)
     const acc = {}
     for (const a of activitesSoc) acc[a.code] = { ...a, e: 0, s: 0 }
-    acc._none = { code: '_none', label: 'Non qualifié', couleur: '#94a3b8', e: 0, s: 0 }
+    acc._none = { code: '_none', label: 'Non qualifié', couleur: COUL.texteFaible, e: 0, s: 0 }
     for (const t of lignesAn) {
       const k = (t.activite && codes.includes(t.activite)) ? t.activite : '_none'
       const m = num(t); if (m > 0) acc[k].e += m; else acc[k].s += -m
@@ -128,35 +129,35 @@ export default function RentabiliteView({ transactions = [], categories = [], ac
   const maxCat = Math.max(1, ...parCategorie.map(c => c.total))
   const maxMois = Math.max(1, ...parMois.map(m => Math.max(m.e, m.s)))
 
-  const card = { background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px 18px' }
-  const kpi = { background: '#f8fafc', borderRadius: '10px', padding: '14px 16px' }
+  const card = { background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px 18px' }
+  const kpi = { background: COUL.fond, borderRadius: '10px', padding: '14px 16px' }
 
   return (
     <div style={{ fontFamily: FONT }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
-        <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 600 }}>Exercice(s) :</span>
+        <span style={{ fontSize: '13px', color: COUL.texteDoux, fontWeight: 600 }}>Exercice(s) :</span>
         {(annees.length ? annees : [anLabel]).map(a => {
           const on = anSel.has(a)
-          return <button key={a} onClick={() => toggleAnnee(a)} style={{ padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 700, fontFamily: FONT, border: on ? `2px solid ${color}` : '1px solid #e2e8f0', background: on ? `${color}14` : '#fff', color: on ? '#0f172a' : '#94a3b8' }}>{a}</button>
+          return <button key={a} onClick={() => toggleAnnee(a)} style={{ padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 700, fontFamily: FONT, border: on ? `2px solid ${color}` : '1px solid #e2e8f0', background: on ? `${color}14` : COUL.blanc, color: on ? '#0f172a' : COUL.texteFaible }}>{a}</button>
         })}
-        {annees.length > 1 && <button onClick={() => setAnneesSel(new Set(annees))} style={{ padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, fontFamily: FONT, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b' }}>Tous</button>}
+        {annees.length > 1 && <button onClick={() => setAnneesSel(new Set(annees))} style={{ padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, fontFamily: FONT, border: '1px solid #e2e8f0', background: COUL.blanc, color: COUL.texteDoux }}>Tous</button>}
       </div>
 
       {activitesSoc.length > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 600 }}>Activité :</span>
-          <button onClick={() => setScopeAct('all')} style={{ padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 700, fontFamily: FONT, border: scopeAct === 'all' ? '2px solid #1e293b' : '1px solid #e2e8f0', background: scopeAct === 'all' ? '#1e293b14' : '#fff', color: scopeAct === 'all' ? '#0f172a' : '#94a3b8' }}>Tout LODE</button>
+          <span style={{ fontSize: '13px', color: COUL.texteDoux, fontWeight: 600 }}>Activité :</span>
+          <button onClick={() => setScopeAct('all')} style={{ padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 700, fontFamily: FONT, border: scopeAct === 'all' ? '2px solid #1e293b' : '1px solid #e2e8f0', background: scopeAct === 'all' ? '#1e293b14' : COUL.blanc, color: scopeAct === 'all' ? '#0f172a' : COUL.texteFaible }}>Tout LODE</button>
           {activitesSoc.map(a => {
             const on = scopeAct === a.code
-            return <button key={a.code} onClick={() => setScopeAct(a.code)} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 700, fontFamily: FONT, border: on ? `2px solid ${a.couleur || '#1e293b'}` : '1px solid #e2e8f0', background: on ? (a.couleur || '#1e293b') + '18' : '#fff', color: on ? '#0f172a' : '#94a3b8' }}><span style={{ width: '9px', height: '9px', borderRadius: '3px', background: a.couleur || '#94a3b8' }} />{a.label}</button>
+            return <button key={a.code} onClick={() => setScopeAct(a.code)} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 700, fontFamily: FONT, border: on ? `2px solid ${a.couleur || '#1e293b'}` : '1px solid #e2e8f0', background: on ? (a.couleur || '#1e293b') + '18' : COUL.blanc, color: on ? '#0f172a' : COUL.texteFaible }}><span style={{ width: '9px', height: '9px', borderRadius: '3px', background: a.couleur || '#94a3b8' }} />{a.label}</button>
           })}
         </div>
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px,1fr))', gap: '12px', marginBottom: '16px' }}>
-        <div style={kpi}><div style={{ fontSize: '13px', color: '#64748b', marginBottom: '6px' }}>Entrées</div><div style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a' }}>{eur(glob.e)}</div></div>
-        <div style={kpi}><div style={{ fontSize: '13px', color: '#64748b', marginBottom: '6px' }}>Sorties</div><div style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a' }}>{eur(glob.s)}</div></div>
-        <div style={kpi}><div style={{ fontSize: '13px', color: '#64748b', marginBottom: '6px' }}>Résultat net</div><div style={{ fontSize: '24px', fontWeight: 700, color: glob.net >= 0 ? '#16a34a' : '#dc2626' }}>{glob.net >= 0 ? '+' : ''}{eur(glob.net)}</div></div>
+        <div style={kpi}><div style={{ fontSize: '13px', color: COUL.texteDoux, marginBottom: '6px' }}>Entrées</div><div style={{ fontSize: '24px', fontWeight: 700, color: COUL.texteFort }}>{eur(glob.e)}</div></div>
+        <div style={kpi}><div style={{ fontSize: '13px', color: COUL.texteDoux, marginBottom: '6px' }}>Sorties</div><div style={{ fontSize: '24px', fontWeight: 700, color: COUL.texteFort }}>{eur(glob.s)}</div></div>
+        <div style={kpi}><div style={{ fontSize: '13px', color: COUL.texteDoux, marginBottom: '6px' }}>Résultat net</div><div style={{ fontSize: '24px', fontWeight: 700, color: glob.net >= 0 ? '#16a34a' : COUL.danger }}>{glob.net >= 0 ? '+' : ''}{eur(glob.net)}</div></div>
       </div>
 
       {scopeAct === 'all' && parActivite.length > 0 && (
@@ -165,19 +166,19 @@ export default function RentabiliteView({ transactions = [], categories = [], ac
             <div key={a.code} style={card}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
                 <span style={{ width: '10px', height: '10px', borderRadius: '3px', background: a.couleur || '#94a3b8' }} />
-                <span style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>{a.label}</span>
-                <span style={{ marginLeft: 'auto', fontSize: '15px', fontWeight: 700, color: a.net >= 0 ? '#16a34a' : '#dc2626' }}>{a.net >= 0 ? '+' : ''}{eur(a.net)}</span>
+                <span style={{ fontSize: '15px', fontWeight: 700, color: COUL.texteFort }}>{a.label}</span>
+                <span style={{ marginLeft: 'auto', fontSize: '15px', fontWeight: 700, color: a.net >= 0 ? '#16a34a' : COUL.danger }}>{a.net >= 0 ? '+' : ''}{eur(a.net)}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#64748b', padding: '3px 0' }}><span>Entrées</span><span style={{ color: '#0f172a' }}>{eur(a.e)}</span></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#64748b', padding: '3px 0' }}><span>Sorties</span><span style={{ color: '#0f172a' }}>{eur(a.s)}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: COUL.texteDoux, padding: '3px 0' }}><span>Entrées</span><span style={{ color: COUL.texteFort }}>{eur(a.e)}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: COUL.texteDoux, padding: '3px 0' }}><span>Sorties</span><span style={{ color: COUL.texteFort }}>{eur(a.s)}</span></div>
             </div>
           ))}
         </div>
       )}
 
       <div style={{ ...card, marginBottom: '20px' }}>
-        <div style={{ fontSize: '13px', color: '#64748b', fontWeight: 600, marginBottom: '12px' }}>Dépenses par catégorie</div>
-        {parCategorie.length === 0 && <div style={{ color: '#94a3b8', fontSize: '13px' }}>Aucune dépense sur {anLabel}.</div>}
+        <div style={{ fontSize: '13px', color: COUL.texteDoux, fontWeight: 600, marginBottom: '12px' }}>Dépenses par catégorie</div>
+        {parCategorie.length === 0 && <div style={{ color: COUL.texteFaible, fontSize: '13px' }}>Aucune dépense sur {anLabel}.</div>}
         {parCategorie.map(c => {
           const enfants = Object.values(c.enfants).sort((a, b) => b.total - a.total)
           const ouvrable = enfants.length > 0
@@ -186,18 +187,18 @@ export default function RentabiliteView({ transactions = [], categories = [], ac
             <div key={c.id} style={{ marginBottom: '10px' }}>
               <div onClick={() => ouvrable && setDeplie(open ? null : c.id)} style={{ cursor: ouvrable ? 'pointer' : 'default' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px' }}>
-                  <span style={{ color: '#334155', fontWeight: 600 }}>{ouvrable && <span style={{ color: '#94a3b8', marginRight: '4px' }}>{open ? '▾' : '▸'}</span>}{c.nom}</span>
-                  <span style={{ color: '#0f172a', fontWeight: 600 }}>{eur(c.total)} <span style={{ color: '#94a3b8', fontWeight: 400 }}>· {Math.round(c.total / glob.s * 100) || 0}%</span></span>
+                  <span style={{ color: COUL.texteSombre, fontWeight: 600 }}>{ouvrable && <span style={{ color: COUL.texteFaible, marginRight: '4px' }}>{open ? '▾' : '▸'}</span>}{c.nom}</span>
+                  <span style={{ color: COUL.texteFort, fontWeight: 600 }}>{eur(c.total)} <span style={{ color: COUL.texteFaible, fontWeight: 400 }}>· {Math.round(c.total / glob.s * 100) || 0}%</span></span>
                 </div>
-                <div style={{ height: '8px', background: '#f1f5f9', borderRadius: '4px', overflow: 'hidden' }}><div style={{ height: '100%', width: `${c.total / maxCat * 100}%`, background: color, borderRadius: '4px' }} /></div>
+                <div style={{ height: '8px', background: COUL.fondDoux, borderRadius: '4px', overflow: 'hidden' }}><div style={{ height: '100%', width: `${c.total / maxCat * 100}%`, background: color, borderRadius: '4px' }} /></div>
               </div>
               {open && enfants.map(s => (
                 <div key={s.id} style={{ marginLeft: '18px', marginTop: '6px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '3px' }}>
-                    <span style={{ color: '#64748b' }}>↳ {s.nom}</span>
-                    <span style={{ color: '#475569' }}>{eur(s.total)}</span>
+                    <span style={{ color: COUL.texteDoux }}>↳ {s.nom}</span>
+                    <span style={{ color: COUL.texteMoyen }}>{eur(s.total)}</span>
                   </div>
-                  <div style={{ height: '6px', background: '#f8fafc', borderRadius: '3px', overflow: 'hidden' }}><div style={{ height: '100%', width: `${s.total / maxCat * 100}%`, background: `${color}99`, borderRadius: '3px' }} /></div>
+                  <div style={{ height: '6px', background: COUL.fond, borderRadius: '3px', overflow: 'hidden' }}><div style={{ height: '100%', width: `${s.total / maxCat * 100}%`, background: `${color}99`, borderRadius: '3px' }} /></div>
                 </div>
               ))}
             </div>
@@ -206,7 +207,7 @@ export default function RentabiliteView({ transactions = [], categories = [], ac
       </div>
 
       <div style={card}>
-        <div style={{ display: 'flex', gap: '16px', marginBottom: '14px', fontSize: '12px', color: '#64748b', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '16px', marginBottom: '14px', fontSize: '12px', color: COUL.texteDoux, alignItems: 'center' }}>
           <span style={{ fontWeight: 600 }}>Évolution mensuelle</span>
           <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '10px', height: '10px', borderRadius: '2px', background: '#1baf7a' }} />Entrées</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '10px', height: '10px', borderRadius: '2px', background: '#eb6834' }} />Sorties</span>
@@ -218,7 +219,7 @@ export default function RentabiliteView({ transactions = [], categories = [], ac
                 <div title={`${MOIS[m.mi]} ${m.an} — Entrées ${eur(m.e)}`} style={{ width: '42%', height: `${m.e / maxMois * 100}%`, background: '#1baf7a', borderRadius: '3px 3px 0 0', minHeight: m.e ? '2px' : '0' }} />
                 <div title={`${MOIS[m.mi]} ${m.an} — Sorties ${eur(m.s)}`} style={{ width: '42%', height: `${m.s / maxMois * 100}%`, background: '#eb6834', borderRadius: '3px 3px 0 0', minHeight: m.s ? '2px' : '0' }} />
               </div>
-              <span style={{ fontSize: anSel.size > 1 ? '9px' : '10px', color: '#94a3b8', whiteSpace: 'nowrap' }}>{MOIS[m.mi]}{anSel.size > 1 && m.mi === 0 ? " '" + String(m.an).slice(2) : ''}</span>
+              <span style={{ fontSize: anSel.size > 1 ? '9px' : '10px', color: COUL.texteFaible, whiteSpace: 'nowrap' }}>{MOIS[m.mi]}{anSel.size > 1 && m.mi === 0 ? " '" + String(m.an).slice(2) : ''}</span>
             </div>
           ))}
         </div>

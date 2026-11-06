@@ -4,6 +4,7 @@ import Layout from '../../components/Layout'
 import { ENTITES } from '../../lib/entites'
 import { StatBanner, useMobile } from '../../components/ui/AccountableUI'
 import HexMembreForm from '../../components/HexMembreForm'
+import { COUL } from '../../lib/theme'
 
 // ── Coordonnées émetteur Hexagroup (pied de facture) ──
 const HEX = {
@@ -47,14 +48,14 @@ function epcSepa(r) { return epcSepaMontant(r.total, r.numero) }
 async function qrDataURL(text) {
   try {
     const QRCode = (await import('qrcode')).default
-    return await QRCode.toDataURL(text, { margin: 1, width: 300, color: { dark: '#20202A', light: '#FFFFFF' } })
+    return await QRCode.toDataURL(text, { margin: 1, width: 300, color: { dark: '#20202A', light: COUL.blanc } })
   } catch (e) { return null }
 }
 
 const BADGES = {
-  a_envoyer: { bg: '#eef1f5', fg: '#64748b', ic: 'ti-clock', tx: 'À envoyer' },
-  envoyee:   { bg: '#fef3c7', fg: '#b45309', ic: 'ti-send', tx: 'Envoyée' },
-  payee:     { bg: '#dcfce7', fg: '#15803d', ic: 'ti-check', tx: 'Payée' },
+  a_envoyer: { bg: '#eef1f5', fg: COUL.texteDoux, ic: 'ti-clock', tx: 'À envoyer' },
+  envoyee:   { bg: COUL.alerteFond, fg: COUL.alerte, ic: 'ti-send', tx: 'Envoyée' },
+  payee:     { bg: COUL.succesFond, fg: COUL.succesFonce, ic: 'ti-check', tx: 'Payée' },
 }
 
 export default function HexagroupCotisations() {
@@ -387,16 +388,16 @@ export default function HexagroupCotisations() {
   }
 
   // ── UI ──
-  const card = { background: '#fff', border: '0.5px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }
+  const card = { background: COUL.blanc, border: '0.5px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }
   const metric = (label, val, col) => (
-    <div style={{ background: '#f8fafc', borderRadius: 10, padding: '14px 16px' }}>
-      <div style={{ fontSize: 13, color: '#64748b', marginBottom: 6 }}>{label}</div>
+    <div style={{ background: COUL.fond, borderRadius: 10, padding: '14px 16px' }}>
+      <div style={{ fontSize: 13, color: COUL.texteDoux, marginBottom: 6 }}>{label}</div>
       <div style={{ fontSize: 24, fontWeight: 700, color: col || '#0f172a' }}>{val}</div>
     </div>
   )
   const ibtn = (icon, label, onClick, col) => (
     <button onClick={onClick} title={label} aria-label={label}
-      style={{ width: 30, height: 30, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '0.5px solid #e2e8f0', background: '#fff', borderRadius: 6, cursor: 'pointer', color: col || '#475569' }}>
+      style={{ width: 30, height: 30, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '0.5px solid #e2e8f0', background: COUL.blanc, borderRadius: 6, cursor: 'pointer', color: col || '#475569' }}>
       <i className={`ti ${icon}`} style={{ fontSize: 16 }} />
     </button>
   )
@@ -413,16 +414,16 @@ export default function HexagroupCotisations() {
               <select value={annee} onChange={e => setAnnee(Number(e.target.value))} style={{ padding: '7px 10px', borderRadius: 8, border: 'none' }}>
                 {[annee + 1, annee, annee - 1, annee - 2].filter((v, i, a) => a.indexOf(v) === i).sort((a, b) => b - a).map(a => <option key={a} value={a}>{a}</option>)}
               </select>
-              <button onClick={nouvelleCampagne} disabled={busy} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: '#fff', color: cVIOLET, fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
+              <button onClick={nouvelleCampagne} disabled={busy} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: COUL.blanc, color: cVIOLET, fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
                 <i className="ti ti-plus" style={{ fontSize: 15, verticalAlign: -2, marginRight: 4 }} />Nouvelle campagne
               </button>
-              <button onClick={() => setPick(true)} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: 'rgba(255,255,255,.18)', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
+              <button onClick={() => setPick(true)} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: 'rgba(255,255,255,.18)', color: COUL.blanc, fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
                 <i className="ti ti-file-plus" style={{ fontSize: 15, verticalAlign: -2, marginRight: 4 }} />Nouvelle cotisation
               </button>
-              <button onClick={() => setExc({ membre_ids: [], objet: '', montant: '' })} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: 'rgba(255,255,255,.28)', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
+              <button onClick={() => setExc({ membre_ids: [], objet: '', montant: '' })} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: 'rgba(255,255,255,.28)', color: COUL.blanc, fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
                 <i className="ti ti-school" style={{ fontSize: 15, verticalAlign: -2, marginRight: 4 }} />Cotisation exceptionnelle
               </button>
-              <button onClick={rapprocherPaiements} disabled={busy} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: 'rgba(255,255,255,.28)', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
+              <button onClick={rapprocherPaiements} disabled={busy} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: 'rgba(255,255,255,.28)', color: COUL.blanc, fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
                 <i className="ti ti-arrows-transfer-down" style={{ fontSize: 15, verticalAlign: -2, marginRight: 4 }} />Rapprocher les paiements
               </button>
             </div>
@@ -437,25 +438,25 @@ export default function HexagroupCotisations() {
 
         {mob ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {loading && <div style={{ padding: 24, textAlign: 'center', color: '#94a3b8' }}>Chargement…</div>}
-            {!loading && rows.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: '#94a3b8' }}>Aucune cotisation pour {annee}.</div>}
+            {loading && <div style={{ padding: 24, textAlign: 'center', color: COUL.texteFaible }}>Chargement…</div>}
+            {!loading && rows.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: COUL.texteFaible }}>Aucune cotisation pour {annee}.</div>}
             {rows.map(r => {
               const b = BADGES[r.statut] || BADGES.a_envoyer
               const nbR = (r.rappels || []).length
               return (
                 <div key={r.id} style={{ ...card, padding: 14 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <span style={{ fontFamily: 'monospace', color: '#64748b', fontSize: 13 }}>{r.numero}</span>
+                    <span style={{ fontFamily: 'monospace', color: COUL.texteDoux, fontSize: 13 }}>{r.numero}</span>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: b.bg, color: b.fg, padding: '3px 9px', borderRadius: 20, fontSize: 12, fontWeight: 700 }}><i className={`ti ${b.ic}`} style={{ fontSize: 13 }} />{b.tx}</span>
                   </div>
                   <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 2 }}>{r.membre?.societe || r.membre?.contact || '—'}</div>
-                  {r.objet && <div style={{ fontSize: 12, color: '#b45309', marginBottom: 4 }}>{r.objet}</div>}
+                  {r.objet && <div style={{ fontSize: 12, color: COUL.alerte, marginBottom: 4 }}>{r.objet}</div>}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                     <span style={{ fontSize: 20, fontWeight: 700, color: cVIOLET }}>{eur(r.total)}</span>
-                    <span style={{ fontSize: 12, color: nbR >= 2 ? '#dc2626' : '#94a3b8' }}>{nbR > 0 ? <><i className="ti ti-bell" style={{ fontSize: 13, verticalAlign: -1 }} /> {nbR} rappel{nbR > 1 ? 's' : ''}</> : 'aucun rappel'}{r.statut === 'payee' && r.date_paiement ? ' · payé le ' + fmtD(r.date_paiement) : ''}</span>
+                    <span style={{ fontSize: 12, color: nbR >= 2 ? '#dc2626' : COUL.texteFaible }}>{nbR > 0 ? <><i className="ti ti-bell" style={{ fontSize: 13, verticalAlign: -1 }} /> {nbR} rappel{nbR > 1 ? 's' : ''}</> : 'aucun rappel'}{r.statut === 'payee' && r.date_paiement ? ' · payé le ' + fmtD(r.date_paiement) : ''}</span>
                   </div>
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                    {ibtn(r.statut === 'payee' ? 'ti-rotate' : 'ti-check', r.statut === 'payee' ? 'Annuler le paiement' : 'Marquer payé', () => basculerPaye(r), r.statut === 'payee' ? '#64748b' : '#15803d')}
+                    {ibtn(r.statut === 'payee' ? 'ti-rotate' : 'ti-check', r.statut === 'payee' ? 'Annuler le paiement' : 'Marquer payé', () => basculerPaye(r), r.statut === 'payee' ? '#64748b' : COUL.succesFonce)}
                     {ibtn('ti-bell-plus', 'Rappel', () => setRappel(r), '#b45309')}
                     {ibtn('ti-pencil', 'Éditer', () => ouvrirEdition(r))}
                     {ibtn('ti-file-type-pdf', 'Télécharger le PDF', () => genererPDF(r), cVIOLET)}
@@ -470,7 +471,7 @@ export default function HexagroupCotisations() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
             <colgroup><col style={{ width: 66 }} /><col /><col style={{ width: 98 }} /><col style={{ width: 112 }} /><col style={{ width: 64 }} /><col style={{ width: 196 }} /></colgroup>
             <thead>
-              <tr style={{ background: '#f8fafc', color: '#64748b', textAlign: 'left' }}>
+              <tr style={{ background: COUL.fond, color: COUL.texteDoux, textAlign: 'left' }}>
                 <th style={{ padding: '11px 12px', fontWeight: 700 }}>N°</th>
                 <th style={{ padding: '11px 12px', fontWeight: 700 }}>Membre</th>
                 <th style={{ padding: '11px 12px', fontWeight: 700, textAlign: 'right' }}>Montant</th>
@@ -480,32 +481,32 @@ export default function HexagroupCotisations() {
               </tr>
             </thead>
             <tbody>
-              {loading && <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: '#94a3b8' }}>Chargement…</td></tr>}
-              {!loading && rows.length === 0 && <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: '#94a3b8' }}>Aucune cotisation pour {annee}. Utilise « Nouvelle campagne ».</td></tr>}
+              {loading && <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: COUL.texteFaible }}>Chargement…</td></tr>}
+              {!loading && rows.length === 0 && <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: COUL.texteFaible }}>Aucune cotisation pour {annee}. Utilise « Nouvelle campagne ».</td></tr>}
               {rows.map(r => {
                 const b = BADGES[r.statut] || BADGES.a_envoyer
                 const nbR = (r.rappels || []).length
                 return (
                   <tr key={r.id} style={{ borderTop: '0.5px solid #eef2f7' }}>
-                    <td style={{ padding: '11px 12px', fontFamily: 'monospace', color: '#64748b' }}>{r.numero}</td>
+                    <td style={{ padding: '11px 12px', fontFamily: 'monospace', color: COUL.texteDoux }}>{r.numero}</td>
                     <td style={{ padding: '11px 12px' }}>
                       <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.membre?.societe || r.membre?.contact || '—'}</div>
-                      {r.objet && <div style={{ fontSize: 11, color: '#b45309', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.objet}</div>}
+                      {r.objet && <div style={{ fontSize: 11, color: COUL.alerte, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.objet}</div>}
                     </td>
                     <td style={{ padding: '11px 12px', textAlign: 'right', fontWeight: 700 }}>{eur(r.total)}</td>
                     <td style={{ padding: '11px 12px' }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: b.bg, color: b.fg, padding: '3px 9px', borderRadius: 20, fontSize: 12, fontWeight: 700 }}>
                         <i className={`ti ${b.ic}`} style={{ fontSize: 13 }} />{b.tx}
                       </span>
-                      {r.statut === 'payee' && r.date_paiement && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>le {fmtD(r.date_paiement)}</div>}
+                      {r.statut === 'payee' && r.date_paiement && <div style={{ fontSize: 11, color: COUL.texteFaible, marginTop: 2 }}>le {fmtD(r.date_paiement)}</div>}
                     </td>
                     <td style={{ padding: '11px 12px', textAlign: 'center' }}>
                       {nbR > 0
-                        ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: nbR >= 2 ? '#dc2626' : '#64748b' }}><i className="ti ti-bell" style={{ fontSize: 14 }} />{nbR}</span>
-                        : <span style={{ color: '#cbd5e1' }}>—</span>}
+                        ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: nbR >= 2 ? '#dc2626' : COUL.texteDoux }}><i className="ti ti-bell" style={{ fontSize: 14 }} />{nbR}</span>
+                        : <span style={{ color: COUL.bordFort }}>—</span>}
                     </td>
                     <td style={{ padding: '9px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      {ibtn(r.statut === 'payee' ? 'ti-rotate' : 'ti-check', r.statut === 'payee' ? 'Annuler le paiement' : 'Marquer payé', () => basculerPaye(r), r.statut === 'payee' ? '#64748b' : '#15803d')}{' '}
+                      {ibtn(r.statut === 'payee' ? 'ti-rotate' : 'ti-check', r.statut === 'payee' ? 'Annuler le paiement' : 'Marquer payé', () => basculerPaye(r), r.statut === 'payee' ? '#64748b' : COUL.succesFonce)}{' '}
                       {ibtn('ti-bell-plus', 'Rappel', () => setRappel(r), '#b45309')}{' '}
                       {ibtn('ti-pencil', 'Éditer', () => ouvrirEdition(r))}{' '}
                       {ibtn('ti-file-type-pdf', 'Télécharger le PDF', () => genererPDF(r), cVIOLET)}{' '}
@@ -519,7 +520,7 @@ export default function HexagroupCotisations() {
         </div>
         )}
 
-        <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ fontSize: 12, color: COUL.texteFaible, marginTop: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
           <i className="ti ti-info-circle" style={{ fontSize: 14 }} />
           Envoi par e-mail depuis Info@hexagroup.be avec le PDF joint. Export Word : bientôt.
         </div>
@@ -528,14 +529,14 @@ export default function HexagroupCotisations() {
       {/* ── Panneau d'édition ── */}
       {edit && form && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 60, overflowY: 'auto', padding: '40px 16px' }}>
-          <div style={{ background: '#fff', borderRadius: 14, width: 'min(680px,100%)', padding: 24 }}>
+          <div style={{ background: COUL.blanc, borderRadius: 14, width: 'min(680px,100%)', padding: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div style={{ fontSize: 18, fontWeight: 700 }}>Cotisation {edit.numero} — {edit.membre?.societe || edit.membre?.contact}</div>
-              <button onClick={() => { setEdit(null); setForm(null) }} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 20, color: '#64748b' }}><i className="ti ti-x" /></button>
+              <button onClick={() => { setEdit(null); setForm(null) }} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 20, color: COUL.texteDoux }}><i className="ti ti-x" /></button>
             </div>
 
             <div style={{ marginBottom: 12 }}>
-              <label style={lbl}>Objet <span style={{ color: '#94a3b8', fontWeight: 400 }}>(facultatif — ex : « Option ... ». Vide = cotisation annuelle)</span></label>
+              <label style={lbl}>Objet <span style={{ color: COUL.texteFaible, fontWeight: 400 }}>(facultatif — ex : « Option ... ». Vide = cotisation annuelle)</span></label>
               <input value={form.objet || ''} onChange={e => setForm(p => ({ ...p, objet: e.target.value }))} placeholder="Cotisation annuelle" style={inp} />
             </div>
 
@@ -558,18 +559,18 @@ export default function HexagroupCotisations() {
                 <input type="number" value={l.quantite} onChange={e => setL(i, 'quantite', e.target.value)} style={inp} />
                 <input type="number" value={l.prix_unitaire} onChange={e => setL(i, 'prix_unitaire', e.target.value)} style={inp} />
                 <div style={{ textAlign: 'right', fontWeight: 700, fontSize: 13 }}>{eur(Number(l.quantite || 0) * Number(l.prix_unitaire || 0))}</div>
-                <button onClick={() => delL(i)} style={{ border: 'none', background: 'none', color: '#dc2626', cursor: 'pointer' }}><i className="ti ti-trash" /></button>
+                <button onClick={() => delL(i)} style={{ border: 'none', background: 'none', color: COUL.danger, cursor: 'pointer' }}><i className="ti ti-trash" /></button>
               </div>
             ))}
-            <button onClick={addL} style={{ marginTop: 4, border: '0.5px dashed #cbd5e1', background: '#f8fafc', borderRadius: 8, padding: '7px 12px', cursor: 'pointer', fontSize: 13, color: '#475569' }}>
+            <button onClick={addL} style={{ marginTop: 4, border: '0.5px dashed #cbd5e1', background: COUL.fond, borderRadius: 8, padding: '7px 12px', cursor: 'pointer', fontSize: 13, color: COUL.texteMoyen }}>
               <i className="ti ti-plus" style={{ fontSize: 14, verticalAlign: -2, marginRight: 4 }} />Ajouter une ligne
             </button>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 18, borderTop: '0.5px solid #eef2f7', paddingTop: 14 }}>
               <div style={{ fontSize: 15, fontWeight: 700 }}>Total : <span style={{ color: cVIOLET }}>{eur(totalForm())}</span></div>
               <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => { setEdit(null); setForm(null) }} style={{ padding: '9px 16px', borderRadius: 8, border: '0.5px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontWeight: 600 }}>Annuler</button>
-                <button onClick={sauverEdition} disabled={busy} style={{ padding: '9px 18px', borderRadius: 8, border: 'none', background: cVIOLET, color: '#fff', cursor: 'pointer', fontWeight: 700 }}>{busy ? 'Enregistrement…' : 'Enregistrer'}</button>
+                <button onClick={() => { setEdit(null); setForm(null) }} style={{ padding: '9px 16px', borderRadius: 8, border: '0.5px solid #e2e8f0', background: COUL.blanc, cursor: 'pointer', fontWeight: 600 }}>Annuler</button>
+                <button onClick={sauverEdition} disabled={busy} style={{ padding: '9px 18px', borderRadius: 8, border: 'none', background: cVIOLET, color: COUL.blanc, cursor: 'pointer', fontWeight: 700 }}>{busy ? 'Enregistrement…' : 'Enregistrer'}</button>
               </div>
             </div>
           </div>
@@ -585,7 +586,7 @@ export default function HexagroupCotisations() {
               <div style={{ fontSize: 18, fontWeight: 700 }}>Cotisation exceptionnelle</div>
               <button onClick={() => setExc(null)} style={closeBtn}><i className="ti ti-x" /></button>
             </div>
-            <div style={{ fontSize: 13, color: '#64748b', marginBottom: 14 }}>Formation payante, option ou prestation ponctuelle facturée à un membre (en plus de sa cotisation annuelle).</div>
+            <div style={{ fontSize: 13, color: COUL.texteDoux, marginBottom: 14 }}>Formation payante, option ou prestation ponctuelle facturée à un membre (en plus de sa cotisation annuelle).</div>
             <div style={{ marginBottom: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                 <label style={{ ...lbl, marginBottom: 0 }}>Membres — {exc.membre_ids.length} sélectionné{exc.membre_ids.length > 1 ? 's' : ''}</label>
@@ -613,11 +614,11 @@ export default function HexagroupCotisations() {
             <div style={{ marginBottom: 18 }}>
               <label style={lbl}>Montant (€)</label>
               <input value={exc.montant} onChange={e => setExc(p => ({ ...p, montant: e.target.value }))} placeholder="100" inputMode="decimal" style={inp} />
-              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>Crée une ligne « intitulé » à ce montant. Laisse vide pour saisir les lignes toi-même ensuite.</div>
+              <div style={{ fontSize: 11, color: COUL.texteFaible, marginTop: 4 }}>Crée une ligne « intitulé » à ce montant. Laisse vide pour saisir les lignes toi-même ensuite.</div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <button onClick={() => setExc(null)} style={{ padding: '9px 16px', borderRadius: 8, border: '0.5px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontWeight: 600 }}>Annuler</button>
-              <button onClick={creerExceptionnelle} disabled={busy || !exc.membre_ids.length} style={{ padding: '9px 18px', borderRadius: 8, border: 'none', background: cVIOLET, color: '#fff', cursor: 'pointer', fontWeight: 700, opacity: exc.membre_ids.length ? 1 : .5 }}>{busy ? 'Création…' : `Créer (${exc.membre_ids.length})`}</button>
+              <button onClick={() => setExc(null)} style={{ padding: '9px 16px', borderRadius: 8, border: '0.5px solid #cbd5e1', background: COUL.blanc, cursor: 'pointer', fontWeight: 600 }}>Annuler</button>
+              <button onClick={creerExceptionnelle} disabled={busy || !exc.membre_ids.length} style={{ padding: '9px 18px', borderRadius: 8, border: 'none', background: cVIOLET, color: COUL.blanc, cursor: 'pointer', fontWeight: 700, opacity: exc.membre_ids.length ? 1 : .5 }}>{busy ? 'Création…' : `Créer (${exc.membre_ids.length})`}</button>
             </div>
           </div>
         </div>
@@ -629,15 +630,15 @@ export default function HexagroupCotisations() {
               <div style={{ fontSize: 18, fontWeight: 700 }}>Nouvelle cotisation {annee}</div>
               <button onClick={() => setPick(false)} style={closeBtn}><i className="ti ti-x" /></button>
             </div>
-            <div style={{ fontSize: 13, color: '#64748b', marginBottom: 12 }}>Choisis le membre à facturer :</div>
+            <div style={{ fontSize: 13, color: COUL.texteDoux, marginBottom: 12 }}>Choisis le membre à facturer :</div>
             <div style={{ maxHeight: 360, overflowY: 'auto' }}>
               {membres.filter(m => m.actif).map(m => {
                 const nb = rows.filter(r => r.membre_id === m.id).length
                 return (
                   <button key={m.id} onClick={() => creerCotisation(m)}
-                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', textAlign: 'left', padding: '10px 12px', border: '0.5px solid #eef2f7', borderRadius: 8, marginBottom: 6, background: '#fff', cursor: 'pointer' }}>
-                    <span style={{ fontWeight: 600 }}>{m.societe || m.contact}{nb > 0 && <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400, marginLeft: 6 }}>· déjà {nb}</span>}</span>
-                    <span style={{ fontSize: 12, color: '#94a3b8' }}>facturer →</span>
+                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', textAlign: 'left', padding: '10px 12px', border: '0.5px solid #eef2f7', borderRadius: 8, marginBottom: 6, background: COUL.blanc, cursor: 'pointer' }}>
+                    <span style={{ fontWeight: 600 }}>{m.societe || m.contact}{nb > 0 && <span style={{ fontSize: 11, color: COUL.texteFaible, fontWeight: 400, marginLeft: 6 }}>· déjà {nb}</span>}</span>
+                    <span style={{ fontSize: 12, color: COUL.texteFaible }}>facturer →</span>
                   </button>
                 )
               })}
@@ -653,28 +654,28 @@ export default function HexagroupCotisations() {
         const echu = f.joursRetard > 0
         return (
           <div style={modalBg} onClick={() => setRappel(null)}>
-            <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, width: 'min(520px,100%)', padding: 22, boxShadow: '0 20px 50px rgba(0,0,0,.25)' }}>
+            <div onClick={e => e.stopPropagation()} style={{ background: COUL.blanc, borderRadius: 14, width: 'min(520px,100%)', padding: 22, boxShadow: '0 20px 50px rgba(0,0,0,.25)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                 <div style={{ fontSize: 18, fontWeight: 800 }}>Rappel — {rappel.numero}</div>
-                <button onClick={() => setRappel(null)} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 20, color: '#94a3b8' }}><i className="ti ti-x" /></button>
+                <button onClick={() => setRappel(null)} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 20, color: COUL.texteFaible }}><i className="ti ti-x" /></button>
               </div>
-              <div style={{ fontSize: 13, color: '#64748b' }}>{rappel.membre?.societe || rappel.membre?.contact}{rappel.membre?.email ? ' · ' + rappel.membre.email : ' · pas d\u2019e-mail'}</div>
-              <div style={{ fontSize: 13, color: echu ? '#b45309' : '#64748b', margin: '6px 0 18px' }}>
+              <div style={{ fontSize: 13, color: COUL.texteDoux }}>{rappel.membre?.societe || rappel.membre?.contact}{rappel.membre?.email ? ' · ' + rappel.membre.email : ' · pas d\u2019e-mail'}</div>
+              <div style={{ fontSize: 13, color: echu ? '#b45309' : COUL.texteDoux, margin: '6px 0 18px' }}>
                 Échéance {fmtD(f.echeance)} · {echu ? `${f.joursRetard} jours de retard` : 'pas encore échu'}
               </div>
               <button onClick={() => envoyerRappel(rappel, 'simple')} disabled={busy}
-                style={{ width: '100%', textAlign: 'left', padding: '12px 14px', border: '0.5px solid #e2e8f0', borderRadius: 10, background: '#fff', cursor: 'pointer', marginBottom: 10 }}>
+                style={{ width: '100%', textAlign: 'left', padding: '12px 14px', border: '0.5px solid #e2e8f0', borderRadius: 10, background: COUL.blanc, cursor: 'pointer', marginBottom: 10 }}>
                 <div style={{ fontWeight: 700, fontSize: 14 }}><i className="ti ti-bell" style={{ verticalAlign: -2, marginRight: 6 }} />Rappel simple</div>
-                <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>Mail courtois, montant inchangé ({eur(rappel.total)}).</div>
+                <div style={{ fontSize: 12, color: COUL.texteDoux, marginTop: 2 }}>Mail courtois, montant inchangé ({eur(rappel.total)}).</div>
               </button>
               <button onClick={() => envoyerRappel(rappel, 'frais')} disabled={busy || !echu}
-                style={{ width: '100%', textAlign: 'left', padding: '12px 14px', border: '0.5px solid ' + (echu ? '#fca5a5' : '#e2e8f0'), borderRadius: 10, background: echu ? '#fef2f2' : '#f8fafc', cursor: echu ? 'pointer' : 'not-allowed', opacity: echu ? 1 : .55 }}>
-                <div style={{ fontWeight: 700, fontSize: 14, color: '#b91c1c' }}><i className="ti ti-gavel" style={{ verticalAlign: -2, marginRight: 6 }} />Rappel avec frais + mention huissier</div>
+                style={{ width: '100%', textAlign: 'left', padding: '12px 14px', border: '0.5px solid ' + (echu ? '#fca5a5' : COUL.bord), borderRadius: 10, background: echu ? '#fef2f2' : COUL.fond, cursor: echu ? 'pointer' : 'not-allowed', opacity: echu ? 1 : .55 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, color: COUL.dangerFonce }}><i className="ti ti-gavel" style={{ verticalAlign: -2, marginRight: 6 }} />Rappel avec frais + mention huissier</div>
                 {echu ? (
                   <div style={{ fontSize: 12, color: '#7f1d1d', marginTop: 4 }}>
                     Cotisation {eur(rappel.total)} + forfait {eur(f.forfait)} + intérêts {eur(f.interets)} (10,5 %) = <strong>{eur(f.totalDu)}</strong>
                   </div>
-                ) : <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>Disponible une fois l'échéance dépassée.</div>}
+                ) : <div style={{ fontSize: 12, color: COUL.texteFaible, marginTop: 4 }}>Disponible une fois l'échéance dépassée.</div>}
               </button>
             </div>
           </div>
@@ -685,11 +686,11 @@ export default function HexagroupCotisations() {
 }
 
 const modalBg = { position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 60, overflowY: 'auto', padding: '40px 16px' }
-const modalCard = { background: '#fff', borderRadius: 14, padding: 24 }
+const modalCard = { background: COUL.blanc, borderRadius: 14, padding: 24 }
 const modalHead = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }
-const closeBtn = { border: 'none', background: 'none', cursor: 'pointer', fontSize: 20, color: '#64748b' }
-const btnGhost = { padding: '9px 16px', borderRadius: 8, border: '0.5px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontWeight: 600 }
-const btnPrim = { padding: '9px 18px', borderRadius: 8, border: 'none', background: '#6E2C91', color: '#fff', cursor: 'pointer', fontWeight: 700 }
+const closeBtn = { border: 'none', background: 'none', cursor: 'pointer', fontSize: 20, color: COUL.texteDoux }
+const btnGhost = { padding: '9px 16px', borderRadius: 8, border: '0.5px solid #e2e8f0', background: COUL.blanc, cursor: 'pointer', fontWeight: 600 }
+const btnPrim = { padding: '9px 18px', borderRadius: 8, border: 'none', background: '#6E2C91', color: COUL.blanc, cursor: 'pointer', fontWeight: 700 }
 
-const lbl = { display: 'block', fontSize: 12, color: '#64748b', marginBottom: 4, fontWeight: 600 }
+const lbl = { display: 'block', fontSize: 12, color: COUL.texteDoux, marginBottom: 4, fontWeight: 600 }
 const inp = { width: '100%', padding: '8px 10px', borderRadius: 8, border: '0.5px solid #cbd5e1', fontSize: 13, boxSizing: 'border-box' }

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import Layout from './Layout'
+import { COUL } from '../lib/theme'
 
 // ─── Coquille commune des outils ───────────────────────────────────────────
 //
@@ -25,7 +26,7 @@ import Layout from './Layout'
 // l'ErrorBoundary de Layout : ici on traite l'erreur *attendue* — un appel
 // Supabase qui échoue, un PDF illisible — que l'outil met dans son état.
 
-const NAVY = '#1A3A6B'
+const NAVY = COUL.marineClair
 
 const texteErreur = e => {
   if (!e) return null
@@ -35,7 +36,7 @@ const texteErreur = e => {
 
 function RetourOutils() {
   return (
-    <Link to="/tools" style={{ fontSize: 12.5, color: '#64748b', textDecoration: 'none' }}>← Outils</Link>
+    <Link to="/tools" style={{ fontSize: 12.5, color: COUL.texteDoux, textDecoration: 'none' }}>← Outils</Link>
   )
 }
 
@@ -43,7 +44,7 @@ export function BandeauErreur({ erreur }) {
   const txt = texteErreur(erreur)
   if (!txt) return null
   return (
-    <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '12px 16px', marginBottom: 14, color: '#991b1b', fontSize: 13, display: 'flex', gap: 9, alignItems: 'flex-start' }}>
+    <div style={{ background: COUL.dangerFondDoux, border: '1px solid #fecaca', borderRadius: 10, padding: '12px 16px', marginBottom: 14, color: '#991b1b', fontSize: 13, display: 'flex', gap: 9, alignItems: 'flex-start' }}>
       <i className="ti ti-alert-circle" style={{ fontSize: 16, marginTop: 1, flexShrink: 0 }} />
       <div>{txt}</div>
     </div>
@@ -52,7 +53,7 @@ export function BandeauErreur({ erreur }) {
 
 export function Chargement({ texte = 'Chargement…' }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#94a3b8', fontSize: 13, padding: '28px 0' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: COUL.texteFaible, fontSize: 13, padding: '28px 0' }}>
       <div style={{ width: 18, height: 18, border: '2px solid rgba(13,47,94,0.15)', borderTopColor: NAVY, borderRadius: '50%', animation: 'spinOutil 0.8s linear infinite' }} />
       {texte}
       <style>{'@keyframes spinOutil { to { transform: rotate(360deg); } }'}</style>

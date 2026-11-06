@@ -1,14 +1,15 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
+import { COUL } from '../lib/theme'
 
-const BLEU = '#0080BD'
+const BLEU = COUL.bleu
 const STATUTS = {
   actif:   { label: 'Actif',    couleur: '#27AE60' },
   runoff:  { label: 'Run-off',  couleur: '#F39C12' },
   cloture: { label: 'Clôturé',  couleur: '#8A9BBE' },
 }
 const td = { padding: '7px 10px', borderBottom: '1px solid #eef2f7', fontSize: 13 }
-const th = { padding: '8px 10px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: .4, background: '#f8fafc' }
+const th = { padding: '8px 10px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: COUL.texteDoux, textTransform: 'uppercase', letterSpacing: .4, background: COUL.fond }
 
 export default function ProducteursView() {
   const [prods, setProds] = useState([])
@@ -66,10 +67,10 @@ export default function ProducteursView() {
           {cies.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
           <option value="__none__">— non rattaché ({nonRatt}) —</option>
         </select>
-        <span style={{ marginLeft: 'auto', fontSize: 12, color: '#64748b' }}>{rows.length} producteur(s)</span>
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: COUL.texteDoux }}>{rows.length} producteur(s)</span>
       </div>
 
-      <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden', background: '#fff' }}>
+      <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden', background: COUL.blanc }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead><tr>
             <th style={th}>N° producteur</th><th style={th}>FSMA</th><th style={th}>Compagnie</th><th style={th}>Statut</th><th style={{ ...th, textAlign: 'right' }}>Actions</th>
@@ -81,8 +82,8 @@ export default function ProducteursView() {
               const st = STATUTS[p.statut] || STATUTS.actif
               return (
                 <tr key={p.id} style={p.statut === 'cloture' ? { opacity: .55 } : undefined}>
-                  <td style={{ ...td, fontFamily: 'monospace', fontWeight: 700, color: '#0D2F5E' }}>{p.numero_producteur}</td>
-                  <td style={{ ...td, color: '#94a3b8' }}>{p.fsma || '—'}</td>
+                  <td style={{ ...td, fontFamily: 'monospace', fontWeight: 700, color: COUL.marine }}>{p.numero_producteur}</td>
+                  <td style={{ ...td, color: COUL.texteFaible }}>{p.fsma || '—'}</td>
                   <td style={td}>
                     <select value={p.compagnie_id || ''} onChange={e => setCompagnie(p.id, e.target.value)}
                       style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 6px', fontSize: 12, maxWidth: 220 }}>
@@ -92,14 +93,14 @@ export default function ProducteursView() {
                   </td>
                   <td style={td}>
                     <select value={p.statut || 'actif'} onChange={e => setStatut(p.id, e.target.value)}
-                      style={{ border: 'none', borderRadius: 5, padding: '3px 8px', fontSize: 12, fontWeight: 600, color: '#fff', background: st.couleur, cursor: 'pointer' }}>
-                      <option value="actif" style={{ color: '#000', background: '#fff' }}>Actif</option>
-                      <option value="runoff" style={{ color: '#000', background: '#fff' }}>Run-off</option>
-                      <option value="cloture" style={{ color: '#000', background: '#fff' }}>Clôturé</option>
+                      style={{ border: 'none', borderRadius: 5, padding: '3px 8px', fontSize: 12, fontWeight: 600, color: COUL.blanc, background: st.couleur, cursor: 'pointer' }}>
+                      <option value="actif" style={{ color: '#000', background: COUL.blanc }}>Actif</option>
+                      <option value="runoff" style={{ color: '#000', background: COUL.blanc }}>Run-off</option>
+                      <option value="cloture" style={{ color: '#000', background: COUL.blanc }}>Clôturé</option>
                     </select>
                   </td>
                   <td style={{ ...td, textAlign: 'right' }}>
-                    <button onClick={() => del(p.id)} style={{ border: 'none', background: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 14 }} title="Supprimer">🗑</button>
+                    <button onClick={() => del(p.id)} style={{ border: 'none', background: 'none', color: COUL.danger, cursor: 'pointer', fontSize: 14 }} title="Supprimer">🗑</button>
                   </td>
                 </tr>
               )
@@ -107,7 +108,7 @@ export default function ProducteursView() {
           </tbody>
         </table>
       </div>
-      <p style={{ marginTop: 8, fontSize: 12, color: '#64748b' }}>
+      <p style={{ marginTop: 8, fontSize: 12, color: COUL.texteDoux }}>
         La gestion fine (ajout de numéros) se fait aussi dans chaque compagnie (onglet Compagnies → ouvrir une compagnie). Ici c'est la vue d'ensemble pour nettoyer.
       </p>
     </div>

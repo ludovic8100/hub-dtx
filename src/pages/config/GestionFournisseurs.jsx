@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
+import { COUL } from '../../lib/theme'
 
 // ─── Fournisseurs ──────────────────────────────────────────────────────────
 //
@@ -51,17 +52,17 @@ function proposerNomCourt(nom) {
 // du téléchargement. Rien n'atterrit sur le disque.
 function ListeFactures({ lignes }) {
   if (!lignes) {
-    return <div style={{ padding: '10px 13px 14px 13px', fontSize: 12, color: '#94a3b8' }}>Chargement…</div>
+    return <div style={{ padding: '10px 13px 14px 13px', fontSize: 12, color: COUL.texteFaible }}>Chargement…</div>
   }
   if (!lignes.length) {
-    return <div style={{ padding: '10px 13px 14px 13px', fontSize: 12, color: '#94a3b8' }}>Aucune facture.</div>
+    return <div style={{ padding: '10px 13px 14px 13px', fontSize: 12, color: COUL.texteFaible }}>Aucune facture.</div>
   }
   const lien = u => {
     if (!u) return null
     return u.includes('?') ? u : u + '?web=1'   // visionneuse en ligne, jamais de téléchargement
   }
   return (
-    <div style={{ background: '#f8fafc', borderTop: '1px solid #eef2f7', padding: '6px 13px 10px 13px' }}>
+    <div style={{ background: COUL.fond, borderTop: '1px solid #eef2f7', padding: '6px 13px 10px 13px' }}>
       {lignes.map(f => {
         const u = lien(f.url)
         return (
@@ -72,17 +73,17 @@ function ListeFactures({ lignes }) {
                       cursor: u ? 'pointer' : 'default' }}
              onMouseEnter={e => { e.currentTarget.style.background = '#eef4fb' }}
              onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
-            <span style={{ fontSize: 11.5, color: '#64748b', width: 82, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ fontSize: 11.5, color: COUL.texteDoux, width: 82, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
               {f.date_facture || '—'}
             </span>
-            <span style={{ fontSize: 11.5, color: '#94a3b8', width: 62, flexShrink: 0 }}>{f.societe}</span>
-            <span style={{ fontSize: 12.5, color: '#1e293b', flex: 1, minWidth: 0,
+            <span style={{ fontSize: 11.5, color: COUL.texteFaible, width: 62, flexShrink: 0 }}>{f.societe}</span>
+            <span style={{ fontSize: 12.5, color: COUL.texte, flex: 1, minWidth: 0,
                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {f.nom}
             </span>
-            {f.a_verifier && <span style={{ fontSize: 10, fontWeight: 700, color: '#b45309', background: '#fef3c7', borderRadius: 4, padding: '1px 5px' }}>à vérifier</span>}
-            {f.transaction_id && <span style={{ fontSize: 10, fontWeight: 700, color: '#15803d', background: '#dcfce7', borderRadius: 4, padding: '1px 5px' }}>payée</span>}
-            <span style={{ fontSize: 12.5, fontWeight: 700, color: '#1e293b', width: 92, textAlign: 'right', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+            {f.a_verifier && <span style={{ fontSize: 10, fontWeight: 700, color: COUL.alerte, background: COUL.alerteFond, borderRadius: 4, padding: '1px 5px' }}>à vérifier</span>}
+            {f.transaction_id && <span style={{ fontSize: 10, fontWeight: 700, color: COUL.succesFonce, background: COUL.succesFond, borderRadius: 4, padding: '1px 5px' }}>payée</span>}
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: COUL.texte, width: 92, textAlign: 'right', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
               {f.montant != null ? fmt(Number(f.montant)) : '—'}
             </span>
           </a>
@@ -189,40 +190,40 @@ export default function GestionFournisseurs() {
   const Onglet = ({ v, libelle }) => (
     <button onClick={() => setFiltre(v)}
       style={{ padding: '7px 13px', borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
-               border: '1px solid ' + (filtre === v ? '#1A3A6B' : '#e2e8f0'),
-               background: filtre === v ? '#1A3A6B' : '#fff',
-               color: filtre === v ? '#fff' : '#64748b' }}>{libelle}</button>
+               border: '1px solid ' + (filtre === v ? '#1A3A6B' : COUL.bord),
+               background: filtre === v ? '#1A3A6B' : COUL.blanc,
+               color: filtre === v ? '#fff' : COUL.texteDoux }}>{libelle}</button>
   )
 
   if (lignes === null) {
-    return <div style={{ padding: 28, color: '#94a3b8', fontSize: 13 }}>Chargement des fournisseurs…</div>
+    return <div style={{ padding: 28, color: COUL.texteFaible, fontSize: 13 }}>Chargement des fournisseurs…</div>
   }
 
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
         <div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: '#1e293b' }}>Fournisseurs</div>
-          <div style={{ fontSize: 12.5, color: '#94a3b8', marginTop: 2 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: COUL.texte }}>Fournisseurs</div>
+          <div style={{ fontSize: 12.5, color: COUL.texteFaible, marginTop: 2 }}>
             Donnez un nom court à chaque fournisseur — c'est lui qui nommera les fichiers
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={accepterVisibles}
             title="Pose la proposition sur toutes les lignes affichées qui n'ont pas encore de nom court"
-            style={{ padding: '7px 13px', borderRadius: 8, border: '1px solid #1A3A6B', background: '#1A3A6B', color: '#fff', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
+            style={{ padding: '7px 13px', borderRadius: 8, border: '1px solid #1A3A6B', background: COUL.marineClair, color: COUL.blanc, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
             Accepter les propositions affichées
           </button>
-          <button onClick={charger} style={{ padding: '7px 13px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Rafraîchir</button>
+          <button onClick={charger} style={{ padding: '7px 13px', borderRadius: 8, border: '1px solid #e2e8f0', background: COUL.blanc, color: COUL.texteDoux, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Rafraîchir</button>
         </div>
       </div>
 
       {erreur && (
-        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '11px 15px', marginBottom: 12, color: '#991b1b', fontSize: 13 }}>
+        <div style={{ background: COUL.dangerFondDoux, border: '1px solid #fecaca', borderRadius: 10, padding: '11px 15px', marginBottom: 12, color: '#991b1b', fontSize: 13 }}>
           {erreur.message || String(erreur)}
         </div>
       )}
-      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 15px', marginBottom: 14, fontSize: 13, color: '#475569', lineHeight: 1.5 }}>
+      <div style={{ background: COUL.fond, border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 15px', marginBottom: 14, fontSize: 13, color: COUL.texteMoyen, lineHeight: 1.5 }}>
         <b>{nommes} / {total}</b> fournisseurs nommés — ils couvrent <b>{couv} %</b> de tes factures.
         {couv < 80 && <> Les premiers de la liste sont les plus rentables à traiter : inutile d'aller jusqu'au bout.</>}
       </div>
@@ -236,7 +237,7 @@ export default function GestionFournisseurs() {
       </div>
 
       {!visibles.length && (
-        <div style={{ padding: 36, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+        <div style={{ padding: 36, textAlign: 'center', color: COUL.texteFaible, fontSize: 13 }}>
           {filtre === 'a_nommer' ? 'Tout est nommé.' : 'Aucun fournisseur ne correspond.'}
         </div>
       )}
@@ -246,24 +247,24 @@ export default function GestionFournisseurs() {
         const valeur  = enCours ? edition[l.id] : (l.nom_court || '')
         const etat    = sauve[l.id]
         return (
-          <div key={l.id} style={{ borderBottom: '1px solid #f1f5f9', background: '#fff' }}>
+          <div key={l.id} style={{ borderBottom: '1px solid #f1f5f9', background: COUL.blanc }}>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '10px 13px' }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13.5, color: '#1e293b', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div style={{ fontSize: 13.5, color: COUL.texte, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {l.nom_officiel}
               </div>
-              <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 2 }}>
+              <div style={{ fontSize: 11.5, color: COUL.texteFaible, marginTop: 2 }}>
                 <button onClick={() => voirFactures(l.id)}
                   disabled={!l.nb_factures}
                   title={l.nb_factures ? 'Voir les factures' : 'Aucune facture'}
                   style={{ border: 'none', background: 'none', padding: 0, font: 'inherit',
-                           color: l.nb_factures ? '#1A3A6B' : '#cbd5e1',
+                           color: l.nb_factures ? '#1A3A6B' : COUL.bordFort,
                            fontWeight: 700, cursor: l.nb_factures ? 'pointer' : 'default',
                            textDecoration: l.nb_factures ? 'underline' : 'none' }}>
                   {l.nb_factures} facture{l.nb_factures > 1 ? 's' : ''}
                 </button>
                 {' · '}{fmt(Number(l.montant_total))}
-                {l.tva ? <> · {l.tva}</> : <> · <span style={{ color: '#b45309' }}>pas de n° TVA</span></>}
+                {l.tva ? <> · {l.tva}</> : <> · <span style={{ color: COUL.alerte }}>pas de n° TVA</span></>}
                 {l.nb_alias > 1 && <> · {l.nb_alias} libellés</>}
               </div>
             </div>
@@ -275,20 +276,20 @@ export default function GestionFournisseurs() {
               onKeyDown={e => { if (e.key === 'Enter') enregistrer(l.id, valeur); if (e.key === 'Escape') setEdition(ed => { const c = { ...ed }; delete c[l.id]; return c }) }}
               onBlur={() => { if (enCours && valeur !== (l.nom_court || '')) enregistrer(l.id, valeur) }}
               style={{ width: 170, padding: '7px 10px', borderRadius: 8, fontSize: 13,
-                       border: '1px solid ' + (etat === 'erreur' ? '#fecaca' : enCours ? '#1A3A6B' : '#e2e8f0'),
-                       background: etat === 'ok' ? '#f0fdf4' : '#fff' }}
+                       border: '1px solid ' + (etat === 'erreur' ? '#fecaca' : enCours ? '#1A3A6B' : COUL.bord),
+                       background: etat === 'ok' ? '#f0fdf4' : COUL.blanc }}
             />
             {!l.nom_court && proposerNomCourt(l.nom_officiel) !== l.nom_officiel && (
               <button
                 onClick={() => enregistrer(l.id, proposerNomCourt(l.nom_officiel))}
                 title={`Accepter « ${proposerNomCourt(l.nom_officiel)} »`}
                 style={{ padding: '6px 10px', borderRadius: 7, border: '1px solid #e2e8f0',
-                         background: '#f8fafc', color: '#64748b', fontSize: 11.5,
+                         background: COUL.fond, color: COUL.texteDoux, fontSize: 11.5,
                          fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
                 Accepter
               </button>
             )}
-            <div style={{ width: 18, fontSize: 14, color: etat === 'ok' ? '#16a34a' : '#cbd5e1' }}>
+            <div style={{ width: 18, fontSize: 14, color: etat === 'ok' ? '#16a34a' : COUL.bordFort }}>
               {etat === 'en_cours' ? '…' : etat === 'ok' ? '✓' : etat === 'erreur' ? '!' : ''}
             </div>
           </div>

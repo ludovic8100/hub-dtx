@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
 import { LOGOS_URL as STORAGE_BASE } from '../config/env'
+import { COUL } from '../lib/theme'
 
 // Liste des fichiers présents dans le bucket logos (fallback si le listing Storage est bloqué)
 const LOGOS_CONNUS = [
@@ -12,14 +13,14 @@ const LOGOS_CONNUS = [
   "TVM.jpg","VIVIUM.jpg","X_LOGO.png",
 ].sort((a,b)=>a.localeCompare(b))
 
-const C = { navy:"#1A3A6B", navyMid:"#1E5799", cyan:"#29ABE2", cyanB:"#00AEEF", bg:"#F4F6F9", white:"#FFFFFF", border:"#DDE3ED", textD:"#1A3A6B", textM:"#4A5568", textL:"#8A9BBE", ok:"#27AE60", warn:"#F39C12", danger:"#E74C3C" }
+const C = { navy:COUL.marineClair, navyMid:"#1E5799", cyan:"#29ABE2", cyanB:"#00AEEF", bg:"#F4F6F9", white:COUL.blanc, border:"#DDE3ED", textD:COUL.marineClair, textM:"#4A5568", textL:"#8A9BBE", ok:"#27AE60", warn:"#F39C12", danger:"#E74C3C" }
 const D = {
   card:{ background:C.white, border:`1px solid ${C.border}`, borderRadius:10, padding:20, marginBottom:16, boxShadow:"0 1px 4px rgba(26,58,107,0.06)" },
   input:{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:7, padding:"7px 10px", color:C.textD, fontSize:13, outline:"none", boxSizing:"border-box" },
-  btn:(v="primary")=>({ padding:"8px 16px", borderRadius:7, cursor:"pointer", fontSize:12, fontWeight:600, transition:"all 0.15s", border:"none", ...(v==="primary"?{ background:`linear-gradient(135deg,${C.cyan},${C.navyMid})`, color:"#fff" }:v==="ghost"?{ background:"transparent", color:C.navy, border:`1px solid ${C.border}` }:{ background:C.bg, color:C.textM, border:`1px solid ${C.border}` }) }),
+  btn:(v="primary")=>({ padding:"8px 16px", borderRadius:7, cursor:"pointer", fontSize:12, fontWeight:600, transition:"all 0.15s", border:"none", ...(v==="primary"?{ background:`linear-gradient(135deg,${C.cyan},${C.navyMid})`, color:COUL.blanc }:v==="ghost"?{ background:"transparent", color:C.navy, border:`1px solid ${C.border}` }:{ background:C.bg, color:C.textM, border:`1px solid ${C.border}` }) }),
   alertBox:(t="warn")=>({ background:t==="warn"?"#FEF3CD":t==="ok"?"#EAF7EC":"#FDECEA", border:`1px solid ${t==="warn"?"#F6D55C":t==="ok"?"#B2DFDB":"#F5C6CB"}`, borderRadius:8, padding:"10px 14px", marginBottom:8, fontSize:13, color:t==="warn"?"#856404":t==="ok"?"#155724":"#721C24" }),
 }
-const EMPTY_CIE = { code:"", nom:"", nom_court:"", numero:"", logo_url:"", couleur:"#1A3A6B", site_web:"", email_contact:"", telephone:"", actif:true, attend_bqt:true, attend_rcp:true, notes:"" }
+const EMPTY_CIE = { code:"", nom:"", nom_court:"", numero:"", logo_url:"", couleur:COUL.marineClair, site_web:"", email_contact:"", telephone:"", actif:true, attend_bqt:true, attend_rcp:true, notes:"" }
 
 const STATUT_PROD = {
   actif:   { label:"Actif",    couleur:"#27AE60" },
@@ -67,8 +68,8 @@ function CieFormModal({ cie, comptes = [], logos = [], onClose, onSave, onDelete
 
   return (
     <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.55)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:16, fontFamily:"'Source Sans Pro', sans-serif" }}>
-      <div style={{ background:"#fff", borderRadius:16, width:"100%", maxWidth:520, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,0.3)" }}>
-        <div style={{ padding:"20px 24px 16px", borderBottom:`1px solid ${C.border}`, display:"flex", alignItems:"center", justifyContent:"space-between", position:"sticky", top:0, background:"#fff", borderRadius:"16px 16px 0 0" }}>
+      <div style={{ background:COUL.blanc, borderRadius:16, width:"100%", maxWidth:520, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,0.3)" }}>
+        <div style={{ padding:"20px 24px 16px", borderBottom:`1px solid ${C.border}`, display:"flex", alignItems:"center", justifyContent:"space-between", position:"sticky", top:0, background:COUL.blanc, borderRadius:"16px 16px 0 0" }}>
           <div style={{ fontSize:16, fontWeight:700, color:C.navy }}>{isNew ? "➕ Nouvelle compagnie" : `✏️ ${cie.nom}`}</div>
           <button onClick={onClose} style={{ border:"none", background:C.bg, borderRadius:8, padding:"6px 10px", cursor:"pointer", fontSize:16 }}>✕</button>
         </div>
@@ -109,7 +110,7 @@ function CieFormModal({ cie, comptes = [], logos = [], onClose, onSave, onDelete
                   {comptes.map(p => {
                     const st = STATUT_PROD[p.statut] || STATUT_PROD.actif
                     return (
-                    <div key={p.id} style={{ display:"flex", alignItems:"center", gap:8, background:"#fff", border:`1px solid ${C.border}`, borderRadius:6, padding:"6px 8px" }}>
+                    <div key={p.id} style={{ display:"flex", alignItems:"center", gap:8, background:COUL.blanc, border:`1px solid ${C.border}`, borderRadius:6, padding:"6px 8px" }}>
                       <span style={{ fontSize:12, fontWeight:700, color:C.navy, fontFamily:"monospace" }}>{p.numero_producteur}</span>
                       {p.fsma && <span style={{ fontSize:10, color:C.textL }}>FSMA {p.fsma}</span>}
                       {/* À quoi sert ce compte : AG en a cinq, Record un PAT et un PH. */}
@@ -117,10 +118,10 @@ function CieFormModal({ cie, comptes = [], logos = [], onClose, onSave, onDelete
                         onBlur={e => { const v = e.target.value.trim(); if (v !== (p.descriptif || "")) onSetDescriptif(p.id, v) }}
                         style={{ ...D.input, flex:1, minWidth:120, fontSize:12, padding:"4px 8px" }} />
                       <select value={p.statut||"actif"} onChange={e => onSetStatut(p.id, e.target.value)}
-                        style={{ border:"none", borderRadius:5, padding:"2px 6px", fontSize:11, fontWeight:600, cursor:"pointer", color:"#fff", background:st.couleur }}>
-                        <option value="actif" style={{ color:"#000", background:"#fff" }}>Actif</option>
-                        <option value="runoff" style={{ color:"#000", background:"#fff" }}>Run-off</option>
-                        <option value="cloture" style={{ color:"#000", background:"#fff" }}>Clôturé</option>
+                        style={{ border:"none", borderRadius:5, padding:"2px 6px", fontSize:11, fontWeight:600, cursor:"pointer", color:COUL.blanc, background:st.couleur }}>
+                        <option value="actif" style={{ color:"#000", background:COUL.blanc }}>Actif</option>
+                        <option value="runoff" style={{ color:"#000", background:COUL.blanc }}>Run-off</option>
+                        <option value="cloture" style={{ color:"#000", background:COUL.blanc }}>Clôturé</option>
                       </select>
                       <button onClick={() => window.confirm(`Supprimer le n° ${p.numero_producteur} ?`) && onDelProd(p.id)}
                         style={{ border:"none", background:"none", color:C.danger, cursor:"pointer", fontSize:14, padding:0 }} title="Supprimer">🗑</button>
@@ -366,7 +367,7 @@ export default function CompagniesView() {
               <div key={c.id} onClick={() => setSelId(choisie ? null : c.id)}
                 style={{ display:"grid", gridTemplateColumns:"1fr 120px 110px 100px 28px", gap:8, alignItems:"center",
                   padding:"10px 16px", borderBottom:`1px solid ${C.bg}`, cursor:"pointer",
-                  background: choisie ? "#EAF4FC" : "#fff",
+                  background: choisie ? "#EAF4FC" : COUL.blanc,
                   borderLeft: choisie ? `3px solid ${C.cyanB}` : "3px solid transparent", opacity:c.actif?1:.55 }}>
                 <div style={{ display:"flex", alignItems:"center", gap:12, minWidth:0 }}>
                   <Logo c={c} />
@@ -377,7 +378,7 @@ export default function CompagniesView() {
                   {comptes.length ? `${comptes.length} compte${comptes.length>1?"s":""}` : "aucun n°"}
                 </span>
                 <span style={{ fontSize:12, fontWeight:700, borderRadius:14, padding:"3px 10px", justifySelf:"start",
-                  background: c.actif ? "#E6F7EC" : "#F1F5F9", color: c.actif ? C.ok : C.textL }}>
+                  background: c.actif ? "#E6F7EC" : COUL.fondDoux, color: c.actif ? C.ok : C.textL }}>
                   {c.actif ? "● Active" : "● Inactive"}
                 </span>
                 <span style={{ color:C.textL, fontSize:16, textAlign:"right" }}>›</span>
@@ -404,7 +405,7 @@ export default function CompagniesView() {
               </div>
             </div>
             <span style={{ display:"inline-block", fontSize:12, fontWeight:700, borderRadius:14, padding:"3px 10px", marginBottom:14,
-              background: selection.actif ? "#E6F7EC" : "#F1F5F9", color: selection.actif ? C.ok : C.textL }}>
+              background: selection.actif ? "#E6F7EC" : COUL.fondDoux, color: selection.actif ? C.ok : C.textL }}>
               {selection.actif ? "● Active" : "● Inactive"}
             </span>
 
@@ -452,7 +453,7 @@ export default function CompagniesView() {
           <div style={{ fontSize:13, fontWeight:700, color:"#856404", marginBottom:10 }}>⚠ {nonRattaches.length} numéro{nonRattaches.length>1?"s":""} de producteur non rattaché{nonRattaches.length>1?"s":""}</div>
           <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
             {nonRattaches.map(p => (
-              <div key={p.id} style={{ display:"flex", alignItems:"center", gap:8, background:"#fff", border:`1px solid ${C.border}`, borderRadius:6, padding:"6px 8px", flexWrap:"wrap" }}>
+              <div key={p.id} style={{ display:"flex", alignItems:"center", gap:8, background:COUL.blanc, border:`1px solid ${C.border}`, borderRadius:6, padding:"6px 8px", flexWrap:"wrap" }}>
                 <span style={{ fontSize:12, fontWeight:700, color:C.navy, fontFamily:"monospace" }}>{p.numero_producteur}</span>
                 <span style={{ fontSize:11, color:C.textM }}>{p.compagnie_nom}</span>
                 {p.fsma && <span style={{ fontSize:10, color:C.textL }}>FSMA {p.fsma}</span>}

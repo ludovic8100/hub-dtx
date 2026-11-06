@@ -1,5 +1,6 @@
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
+import { COUL } from '../lib/theme'
 
 export default function Login() {
   const { user, loading, signInWithMicrosoft, erreurConnexion } = useAuth()
@@ -18,7 +19,7 @@ export default function Login() {
       fontFamily: "'Source Sans Pro', sans-serif"
     }}>
       <div style={{
-        background: '#fff',
+        background: COUL.blanc,
         borderRadius: '16px',
         padding: '48px 40px',
         textAlign: 'center',
@@ -29,22 +30,22 @@ export default function Login() {
         {/* Logo / Titre */}
         <div style={{
           width: '56px', height: '56px',
-          background: '#0080BD',
+          background: COUL.bleu,
           borderRadius: '12px',
           margin: '0 auto 20px',
           display: 'flex', alignItems: 'center', justifyContent: 'center'
         }}>
-          <i className="ti ti-building-bank" style={{ fontSize: '28px', color: '#fff' }} />
+          <i className="ti ti-building-bank" style={{ fontSize: '28px', color: COUL.blanc }} />
         </div>
 
         <h1 style={{
           fontSize: '22px', fontWeight: '700',
-          color: '#0D2F5E', margin: '0 0 6px'
+          color: COUL.marine, margin: '0 0 6px'
         }}>
           Dynassur Hub
         </h1>
         <p style={{
-          fontSize: '14px', color: '#64748b',
+          fontSize: '14px', color: COUL.texteDoux,
           margin: '0 0 32px', lineHeight: '1.5'
         }}>
           Connecte-toi avec ton compte Microsoft
@@ -55,8 +56,8 @@ export default function Login() {
           style={{
             width: '100%',
             padding: '13px 16px',
-            background: '#0080BD',
-            color: '#fff',
+            background: COUL.bleu,
+            color: COUL.blanc,
             border: 'none',
             borderRadius: '8px',
             fontSize: '15px',
@@ -69,7 +70,7 @@ export default function Login() {
             transition: 'background 0.15s'
           }}
           onMouseEnter={e => e.currentTarget.style.background = '#006fa3'}
-          onMouseLeave={e => e.currentTarget.style.background = '#0080BD'}
+          onMouseLeave={e => e.currentTarget.style.background = COUL.bleu}
         >
           <svg width="18" height="18" viewBox="0 0 21 21" fill="none">
             <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
@@ -85,7 +86,7 @@ export default function Login() {
             et une session expirée par la règle des 24 h / 4 h d'inactivité. */}
         {erreurConnexion && (
           <p style={{
-            fontSize: '13px', color: '#b91c1c', background: '#fef2f2',
+            fontSize: '13px', color: COUL.dangerFonce, background: COUL.dangerFondDoux,
             border: '1px solid #fecaca', borderRadius: '8px',
             padding: '10px 12px', marginTop: '16px', marginBottom: 0,
             lineHeight: '1.45', textAlign: 'left', wordBreak: 'break-word',
@@ -94,7 +95,7 @@ export default function Login() {
           </p>
         )}
 
-        <p style={{ fontSize: '12px', color: '#94a3b8', marginTop: '20px' }}>
+        <p style={{ fontSize: '12px', color: COUL.texteFaible, marginTop: '20px' }}>
           Seuls les comptes @dynassur.be et @dtx-group.be sont autorisés
         </p>
       </div>

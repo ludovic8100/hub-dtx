@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import OutilPage from '../../components/OutilPage'
 import BceSearch from '../../components/BceSearch'
+import { COUL } from '../../lib/theme'
 
 // Outil autonome : recherche entreprise BCE/KBO. Réutilise le composant BceSearch.
 export default function ToolBce() {
@@ -18,8 +19,8 @@ export default function ToolBce() {
 
   const Row = ({ label, value }) => value ? (
     <div style={{ display: 'flex', gap: 10, padding: '7px 0', borderBottom: '1px solid #f1f5f9', fontSize: 13 }}>
-      <div style={{ width: 150, flexShrink: 0, color: '#94a3b8', fontWeight: 600 }}>{label}</div>
-      <div style={{ color: '#1e293b' }}>{value}</div>
+      <div style={{ width: 150, flexShrink: 0, color: COUL.texteFaible, fontWeight: 600 }}>{label}</div>
+      <div style={{ color: COUL.texte }}>{value}</div>
     </div>
   ) : null
 
@@ -28,16 +29,16 @@ export default function ToolBce() {
         <BceSearch onSelect={setC} />
 
         {c && (
-          <div style={{ marginTop: 14, border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 18px', background: '#fff' }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#1e293b', marginBottom: 10 }}>{nom}</div>
+          <div style={{ marginTop: 14, border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 18px', background: COUL.blanc }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: COUL.texte, marginBottom: 10 }}>{nom}</div>
             <Row label="N° BCE" value={bce} />
             <Row label="Forme juridique" value={forme} />
             <Row label="Statut" value={statut} />
             <Row label="Adresse" value={ligneRue} />
             <Row label="Localité" value={lieu} />
             <details style={{ marginTop: 12 }}>
-              <summary style={{ fontSize: 12, color: '#64748b', cursor: 'pointer' }}>Voir toutes les données brutes</summary>
-              <pre style={{ marginTop: 8, fontSize: 11, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: 10, overflowX: 'auto', color: '#334155' }}>{JSON.stringify(c, null, 2)}</pre>
+              <summary style={{ fontSize: 12, color: COUL.texteDoux, cursor: 'pointer' }}>Voir toutes les données brutes</summary>
+              <pre style={{ marginTop: 8, fontSize: 11, background: COUL.fond, border: '1px solid #e2e8f0', borderRadius: 8, padding: 10, overflowX: 'auto', color: COUL.texteSombre }}>{JSON.stringify(c, null, 2)}</pre>
             </details>
           </div>
         )}

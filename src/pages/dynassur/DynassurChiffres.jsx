@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
 import { ENTITES } from '../../lib/entites'
 import { StatBanner } from '../../components/ui/AccountableUI'
+import { COUL } from '../../lib/theme'
 
 const BLUE='#0080BD', NAVY='#0D2F5E', GREEN='#16a34a'
 const MOIS=['','Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc']
@@ -11,24 +12,24 @@ const num = v => new Intl.NumberFormat('fr-BE').format(v)
 
 function Kpi({ label, value, col, sub, onClick }) {
   return (
-    <div onClick={onClick} style={{ background:'#fff', borderRadius:10, border:'1px solid #e2e8f0', borderTop:`3px solid ${col}`, padding:'14px 18px',
+    <div onClick={onClick} style={{ background:COUL.blanc, borderRadius:10, border:'1px solid #e2e8f0', borderTop:`3px solid ${col}`, padding:'14px 18px',
       cursor:onClick?'pointer':'default', transition:'box-shadow .15s' }}
       onMouseEnter={e=>{ if(onClick) e.currentTarget.style.boxShadow=`0 4px 14px ${col}25` }}
       onMouseLeave={e=>{ e.currentTarget.style.boxShadow='none' }}>
-      <div style={{ fontSize:10, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:6, display:'flex', justifyContent:'space-between' }}>
-        <span>{label}</span>{onClick && <i className="ti ti-zoom-in" style={{ color:'#cbd5e1' }}/>}
+      <div style={{ fontSize:10, fontWeight:700, color:COUL.texteFaible, textTransform:'uppercase', letterSpacing:'.05em', marginBottom:6, display:'flex', justifyContent:'space-between' }}>
+        <span>{label}</span>{onClick && <i className="ti ti-zoom-in" style={{ color:COUL.bordFort }}/>}
       </div>
-      <div style={{ fontSize:23, fontWeight:800, color:'#0f172a', lineHeight:1 }}>{value}</div>
-      {sub && <div style={{ fontSize:11, color:'#64748b', marginTop:4 }}>{sub}</div>}
+      <div style={{ fontSize:23, fontWeight:800, color:COUL.texteFort, lineHeight:1 }}>{value}</div>
+      {sub && <div style={{ fontSize:11, color:COUL.texteDoux, marginTop:4 }}>{sub}</div>}
     </div>
   )
 }
 
 function Bloc({ titre, children }) {
   return (
-    <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', marginBottom:18, overflow:'hidden' }}>
+    <div style={{ background:COUL.blanc, borderRadius:12, border:'1px solid #e2e8f0', marginBottom:18, overflow:'hidden' }}>
       <div style={{ background:NAVY, padding:'10px 16px' }}>
-        <span style={{ color:'#fff', fontSize:12, fontWeight:700, textTransform:'uppercase', letterSpacing:'.05em' }}>{titre}</span>
+        <span style={{ color:COUL.blanc, fontSize:12, fontWeight:700, textTransform:'uppercase', letterSpacing:'.05em' }}>{titre}</span>
       </div>
       <div style={{ padding:16 }}>{children}</div>
     </div>
@@ -39,9 +40,9 @@ function TableAgg({ rows, label, onRow }) {
   const max = Math.max(...rows.map(r=>r.primes), 1)
   return (
     <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
-      <thead><tr style={{ background:'#f8fafc' }}>
+      <thead><tr style={{ background:COUL.fond }}>
         {[label,'Primes','Commissions','Taux','Quitt.'].map((h,i)=>(
-          <th key={h} style={{ textAlign:i===0?'left':'right', padding:'8px 12px', fontSize:10, fontWeight:700, color:'#94a3b8', textTransform:'uppercase' }}>{h}</th>
+          <th key={h} style={{ textAlign:i===0?'left':'right', padding:'8px 12px', fontSize:10, fontWeight:700, color:COUL.texteFaible, textTransform:'uppercase' }}>{h}</th>
         ))}
       </tr></thead>
       <tbody>
@@ -54,8 +55,8 @@ function TableAgg({ rows, label, onRow }) {
             </td>
             <td style={{ padding:'8px 12px', textAlign:'right', fontWeight:700 }}>{eur(r.primes)}</td>
             <td style={{ padding:'8px 12px', textAlign:'right', color:GREEN, fontWeight:700 }}>{eur(r.commissions)}</td>
-            <td style={{ padding:'8px 12px', textAlign:'right', color:'#64748b' }}>{r.primes?((r.commissions/r.primes)*100).toFixed(1)+'%':'—'}</td>
-            <td style={{ padding:'8px 12px', textAlign:'right', color:'#64748b' }}>{num(r.n)}</td>
+            <td style={{ padding:'8px 12px', textAlign:'right', color:COUL.texteDoux }}>{r.primes?((r.commissions/r.primes)*100).toFixed(1)+'%':'—'}</td>
+            <td style={{ padding:'8px 12px', textAlign:'right', color:COUL.texteDoux }}>{num(r.n)}</td>
           </tr>
         ))}
       </tbody>
@@ -68,7 +69,7 @@ function DetailModal({ titre, rows, onClose }) {
   const totP = rows.reduce((s,r)=>s+(Number(r.prime_totale)||0),0)
   const totC = rows.reduce((s,r)=>s+(Number(r.commission)||0),0)
   const COLS = [
-    { key:'date_comptable', label:'Date',       align:'left',  get:r=>r.date_comptable||'', render:r=><span style={{ color:'#64748b', whiteSpace:'nowrap' }}>{r.date_comptable||'—'}</span> },
+    { key:'date_comptable', label:'Date',       align:'left',  get:r=>r.date_comptable||'', render:r=><span style={{ color:COUL.texteDoux, whiteSpace:'nowrap' }}>{r.date_comptable||'—'}</span> },
     { key:'client',         label:'Client',     align:'left',  get:r=>[r.client_nom,r.client_prenom].filter(Boolean).join(' '), render:r=><span style={{ fontWeight:600, color:NAVY }}>{[r.client_nom,r.client_prenom].filter(Boolean).join(' ')||'—'}</span> },
     { key:'compagnie',      label:'Compagnie',  align:'left',  get:r=>r.compagnie||'', render:r=>r.compagnie||'—' },
     { key:'domaine',        label:'Domaine',    align:'left',  get:r=>r.domaine||'', render:r=>r.domaine||'—' },
@@ -86,19 +87,19 @@ function DetailModal({ titre, rows, onClose }) {
   const click = k => setSort(s => s.key===k ? { key:k, dir:s.dir==='asc'?'desc':'asc' } : { key:k, dir:'asc' })
   return (
     <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(15,23,42,.55)', zIndex:1000, display:'flex', justifyContent:'flex-end' }}>
-      <div onClick={e=>e.stopPropagation()} style={{ width:'min(900px,96vw)', height:'100%', background:'#fff', display:'flex', flexDirection:'column', boxShadow:'-8px 0 30px rgba(0,0,0,.2)' }}>
+      <div onClick={e=>e.stopPropagation()} style={{ width:'min(900px,96vw)', height:'100%', background:COUL.blanc, display:'flex', flexDirection:'column', boxShadow:'-8px 0 30px rgba(0,0,0,.2)' }}>
         <div style={{ background:NAVY, padding:'14px 20px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
           <div>
-            <div style={{ color:'#fff', fontSize:15, fontWeight:800 }}>{titre}</div>
-            <div style={{ color:'#cbd5e1', fontSize:12, marginTop:2 }}>{num(rows.length)} quittance(s) · Primes {eur(totP)} · Commissions {eur(totC)}</div>
+            <div style={{ color:COUL.blanc, fontSize:15, fontWeight:800 }}>{titre}</div>
+            <div style={{ color:COUL.bordFort, fontSize:12, marginTop:2 }}>{num(rows.length)} quittance(s) · Primes {eur(totP)} · Commissions {eur(totC)}</div>
           </div>
-          <button onClick={onClose} style={{ background:'transparent', border:'none', color:'#fff', fontSize:22, cursor:'pointer' }}>✕</button>
+          <button onClick={onClose} style={{ background:'transparent', border:'none', color:COUL.blanc, fontSize:22, cursor:'pointer' }}>✕</button>
         </div>
         <div style={{ flex:1, overflow:'auto' }}>
           <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12.5 }}>
-            <thead><tr style={{ background:'#f8fafc', position:'sticky', top:0 }}>
+            <thead><tr style={{ background:COUL.fond, position:'sticky', top:0 }}>
               {COLS.map(c=>(
-                <th key={c.key} onClick={()=>click(c.key)} style={{ textAlign:c.align, padding:'8px 12px', fontSize:10, fontWeight:700, color: sort.key===c.key?NAVY:'#94a3b8', textTransform:'uppercase', whiteSpace:'nowrap', cursor:'pointer', userSelect:'none' }}>
+                <th key={c.key} onClick={()=>click(c.key)} style={{ textAlign:c.align, padding:'8px 12px', fontSize:10, fontWeight:700, color: sort.key===c.key?NAVY:COUL.texteFaible, textTransform:'uppercase', whiteSpace:'nowrap', cursor:'pointer', userSelect:'none' }}>
                   {c.label}{sort.key===c.key && <span style={{ marginLeft:4 }}>{sort.dir==='asc'?'▲':'▼'}</span>}
                 </th>
               ))}
@@ -107,13 +108,13 @@ function DetailModal({ titre, rows, onClose }) {
               {show.map((r,i)=>(
                 <tr key={i} style={{ borderBottom:'1px solid #f1f5f9' }}>
                   {COLS.map(c=>(
-                    <td key={c.key} style={{ padding:'7px 12px', textAlign:c.align, color:'#475569' }}>{c.render(r)}</td>
+                    <td key={c.key} style={{ padding:'7px 12px', textAlign:c.align, color:COUL.texteMoyen }}>{c.render(r)}</td>
                   ))}
                 </tr>
               ))}
             </tbody>
           </table>
-          {sorted.length>1000 && <p style={{ padding:'12px 16px', color:'#94a3b8', fontSize:12 }}>… et {num(sorted.length-1000)} autres lignes (totaux ci-dessus calculés sur l'ensemble).</p>}
+          {sorted.length>1000 && <p style={{ padding:'12px 16px', color:COUL.texteFaible, fontSize:12 }}>… et {num(sorted.length-1000)} autres lignes (totaux ci-dessus calculés sur l'ensemble).</p>}
         </div>
       </div>
     </div>
@@ -183,20 +184,20 @@ export function ChiffresContent() {
           {(annees.length?annees:[2026,2025]).map(y=>(
             <button key={y} onClick={()=>setAnnee(y)} style={{
               padding:'6px 16px', borderRadius:20, cursor:'pointer', fontSize:13, fontWeight:700,
-              border:`1.5px solid ${annee===y?BLUE:'#e2e8f0'}`, background:annee===y?BLUE:'#fff', color:annee===y?'#fff':'#64748b' }}>{y}</button>
+              border:`1.5px solid ${annee===y?BLUE:COUL.bord}`, background:annee===y?BLUE:COUL.blanc, color:annee===y?'#fff':COUL.texteDoux }}>{y}</button>
           ))}
-          <span style={{ fontSize:12, color:'#94a3b8', marginLeft:8 }}><i className="ti ti-info-circle" style={{ marginRight:4 }}/>Clique un chiffre, une barre ou une ligne pour voir le détail.</span>
+          <span style={{ fontSize:12, color:COUL.texteFaible, marginLeft:8 }}><i className="ti ti-info-circle" style={{ marginRight:4 }}/>Clique un chiffre, une barre ou une ligne pour voir le détail.</span>
         </div>
 
-        {!rows && <p style={{ color:'#94a3b8' }}>Chargement des quittances…</p>}
+        {!rows && <p style={{ color:COUL.texteFaible }}>Chargement des quittances…</p>}
 
         {stats && (
           <>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:14, marginBottom:20 }}>
               <Kpi label="Primes encaissées" value={eur(stats.primes)} col={BLUE} sub={`${num(stats.n)} quittances`} onClick={()=>open(`Toutes les quittances ${annee}`, stats.f)} />
               <Kpi label="Commissions" value={eur(stats.comm)} col={GREEN} onClick={()=>open(`Commissions ${annee} — détail`, stats.f)} />
-              <Kpi label="Taux de commission" value={stats.taux.toFixed(1)+'%'} col="#7c3aed" />
-              <Kpi label="Prime moyenne" value={eur(stats.n?stats.primes/stats.n:0)} col="#f59e0b" sub="par quittance" onClick={()=>open(`Toutes les quittances ${annee}`, stats.f)} />
+              <Kpi label="Taux de commission" value={stats.taux.toFixed(1)+'%'} col={COUL.violet} />
+              <Kpi label="Prime moyenne" value={eur(stats.n?stats.primes/stats.n:0)} col={COUL.alerteVif} sub="par quittance" onClick={()=>open(`Toutes les quittances ${annee}`, stats.f)} />
             </div>
 
             <Bloc titre={`Évolution mensuelle ${annee} — clique une barre`}>
@@ -204,16 +205,16 @@ export function ChiffresContent() {
                 {stats.parMois.map((m,i)=>(
                   <div key={i} onClick={()=>m.primes&&open(`${m.mois} ${annee}`, stats.f.filter(r=>Number(r.date_comptable.slice(5,7))===m.n))}
                     style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4, cursor:m.primes?'pointer':'default' }}>
-                    <div style={{ fontSize:9, color:'#94a3b8' }}>{m.primes?Math.round(m.primes/1000)+'k':''}</div>
+                    <div style={{ fontSize:9, color:COUL.texteFaible }}>{m.primes?Math.round(m.primes/1000)+'k':''}</div>
                     <div title={`Primes ${eur(m.primes)} · Comm ${eur(m.commissions)}`}
                       style={{ width:'100%', position:'relative', height:`${(m.primes/maxMois)*140}px`, background:BLUE, borderRadius:'4px 4px 0 0', minHeight:m.primes?2:0 }}>
                       <div style={{ position:'absolute', bottom:0, left:0, right:0, height:`${m.primes?(m.commissions/m.primes)*100:0}%`, background:GREEN, borderRadius:'0 0 4px 4px' }}/>
                     </div>
-                    <div style={{ fontSize:10, color:'#64748b' }}>{m.mois}</div>
+                    <div style={{ fontSize:10, color:COUL.texteDoux }}>{m.mois}</div>
                   </div>
                 ))}
               </div>
-              <div style={{ display:'flex', gap:16, marginTop:10, fontSize:11, color:'#64748b' }}>
+              <div style={{ display:'flex', gap:16, marginTop:10, fontSize:11, color:COUL.texteDoux }}>
                 <span><i style={{ display:'inline-block', width:10, height:10, background:BLUE, borderRadius:2, marginRight:5 }}/>Primes</span>
                 <span><i style={{ display:'inline-block', width:10, height:10, background:GREEN, borderRadius:2, marginRight:5 }}/>Commissions</span>
               </div>

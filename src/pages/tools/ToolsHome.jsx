@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import { useAuth } from '../../lib/auth'
 import { OUTILS, aDroitOutil } from '../../lib/outils'
+import { COUL } from '../../lib/theme'
 
 // Page d'accueil de la boîte à outils. Elle ne décide rien : elle affiche le
 // registre (src/lib/outils.js), filtré par les droits du collaborateur.
@@ -11,7 +12,7 @@ import { OUTILS, aDroitOutil } from '../../lib/outils'
 const cardBase = {
   border: '1px solid #e2e8f0',
   borderRadius: 14,
-  background: '#fff',
+  background: COUL.blanc,
   overflow: 'hidden',
   display: 'flex',
   flexDirection: 'row',
@@ -41,7 +42,7 @@ export default function ToolsHome() {
       <div style={{ fontFamily: "'Segoe UI', sans-serif", width: '100%' }}>
 
         <div style={{ marginBottom: 20 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#1A3A6B', margin: 0 }}>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: COUL.marineClair, margin: 0 }}>
             Outils
           </h1>
           <div style={{ fontSize: 14, color: '#8A9BBE', marginTop: 2 }}>
@@ -68,7 +69,7 @@ export default function ToolsHome() {
                   }
                 }}
                 onMouseLeave={e => {
-                  e.currentTarget.style.borderColor = '#e2e8f0'
+                  e.currentTarget.style.borderColor = COUL.bord
                   e.currentTarget.style.boxShadow = 'none'
                   e.currentTarget.style.transform = 'none'
                 }}
@@ -111,17 +112,17 @@ export default function ToolsHome() {
                   flexDirection: 'column',
                   justifyContent: 'center',
                 }}>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', marginBottom: 8 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: COUL.texte, marginBottom: 8 }}>
                     {t.titre}
                   </div>
-                  <div style={{ fontSize: 12.5, color: '#64748b', lineHeight: 1.55, flex: 1 }}>
+                  <div style={{ fontSize: 12.5, color: COUL.texteDoux, lineHeight: 1.55, flex: 1 }}>
                     {t.description}
                   </div>
                   <div style={{
                     marginTop: 12,
                     fontSize: 12.5,
                     fontWeight: 700,
-                    color: pret ? '#0ea5e9' : '#94a3b8',
+                    color: pret ? '#0ea5e9' : COUL.texteFaible,
                   }}>
                     {pret ? 'Ouvrir →' : 'Bientôt'}
                   </div>
