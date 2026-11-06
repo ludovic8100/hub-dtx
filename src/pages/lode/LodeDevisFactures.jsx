@@ -598,6 +598,36 @@ function Editeur({ type, doc, onClose, onSaved }) {
   // c'est la seule facon d'avoir un document lisible ET tous les reglages.
   const RangeeDoc = ({ l, idx, cliquable }) => {
     const ht = (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * (1 - (Number(l.remise_pct) || 0) / 100)
+
+    // Six colonnes sur 390 px, ce n'est pas un tableau, c'est une grille de
+    // mots coupes. Sur telephone chaque article devient une carte : le nom en
+    // entier, puis une ligne de chiffres lisible.
+    if (mobE) return (
+      <tr onClick={cliquable ? () => setArticleOuvert(idx) : undefined}
+        style={{ cursor: cliquable ? 'pointer' : 'default', background: l.optionnelle ? COUL.alerteFondDoux : 'transparent' }}>
+        <td colSpan={9} style={{ padding: '11px 2px', borderBottom: `1px solid ${COUL.bord}`, verticalAlign: 'top' }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 700, color: NAVY, fontSize: 13.5 }}>
+                {l.titre || l.description || <span style={{ color: COUL.texteFaible, fontWeight: 500 }}>Article sans nom</span>}
+                {l.optionnelle && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 800, color: COUL.alerte }}>OPTION</span>}
+              </div>
+              {l.descriptif && <div style={{ fontSize: 11.5, color: COUL.texteDoux, marginTop: 2, whiteSpace: 'pre-wrap' }}>{l.descriptif}</div>}
+              <div style={{ fontSize: 11.5, color: COUL.texteDoux, marginTop: 4 }}>
+                {l.quantite} × {eur(l.prix_unitaire)} · TVA {Number(l.tva_pct) || 0}%
+                {Number(l.remise_pct) ? ` · remise ${l.remise_pct}%` : ''}
+                {!!(l.photos || []).length && ` · 📷 ${l.photos.length}`}
+              </div>
+            </div>
+            <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+              <div style={{ fontWeight: 800, color: NAVY, fontSize: 13.5 }}>{eur(ht)}</div>
+              {cliquable && <span onClick={e => { e.stopPropagation(); delLigne(idx) }} style={{ color: COUL.texteFaible, cursor: 'pointer', fontSize: 17, lineHeight: 1 }}>×</span>}
+            </div>
+          </div>
+        </td>
+      </tr>
+    )
+
     return (
       <tr
         onClick={cliquable ? () => setArticleOuvert(idx) : undefined}
@@ -627,7 +657,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
     )
   }
 
-  const EnteteDoc = () => (
+  const EnteteDoc = () => mobE ? null : (
     <thead>
       <tr style={{ background: ORANGE }}>
         <th style={thDoc}>Description</th>
@@ -656,25 +686,30 @@ function Editeur({ type, doc, onClose, onSaved }) {
       {/* ── Barre du haut : identite du document, bascule, actions ── */}
       <div style={{ background: COUL.blanc, borderBottom: `1px solid ${COUL.bord}`, padding: mobE ? '10px 12px' : '11px 20px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
         <button onClick={onClose} title="Fermer" style={{ background: 'none', border: 'none', fontSize: 19, cursor: 'pointer', color: COUL.texteDoux, padding: 0, lineHeight: 1 }}>←</button>
-        <div style={{ fontSize: 15, fontWeight: 800, color: NAVY }}>
-          {doc?.id ? 'Modifier' : 'Créer'} {isDevis ? 'un devis' : (f.type === 'note_credit' ? 'une note de crédit' : 'une facture')}
-          {f.numero && <span style={{ color: ORANGE, marginLeft: 8 }}>{f.numero}</span>}
-        </div>
-
-        <div style={{ display: 'flex', background: COUL.fondDoux, borderRadius: 9, padding: 3, marginLeft: mobE ? 0 : 'auto', marginRight: mobE ? 0 : 'auto' }}>
-          {[['editeur', 'Éditeur'], ['pdf', 'PDF']].map(([v, lab]) => (
-            <button key={v} type="button" onClick={() => setVue(v)}
-              style={{ padding: '6px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700,
-                       background: vue === v ? COUL.blanc : 'transparent', color: vue === v ? NAVY : COUL.texteDoux,
-                       boxShadow: vue === v ? '0 1px 3px rgba(0,0,0,.12)' : 'none' }}>{lab}</button>
-          ))}
+        <div style={{ fontSize: mobE ? 14 : 15, fontWeight: 800, color: NAVY, minWidth: 0 }}>
+          {mobE
+            ? (isDevis ? 'Devis' : (f.type === 'note_credit' ? 'Note de crédit' : 'Facture'))
+            : `${doc?.id ? 'Modifier' : 'Créer'} ${isDevis ? 'un devis' : (f.type === 'note_credit' ? 'une note de crédit' : 'une facture')}`}
+          {f.numero && <span style={{ color: ORANGE, marginLeft: 7 }}>{f.numero}</span>}
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
-          <button onClick={onClose} style={{ background: COUL.blanc, border: `1px solid ${COUL.bord}`, borderRadius: 9, padding: '8px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: COUL.texteMoyen }}>Annuler</button>
-          <button onClick={save} disabled={saving || verrouille} style={{ background: verrouille ? COUL.bordFort : ORANGE, border: 'none', borderRadius: 9, padding: '8px 20px', cursor: (saving || verrouille) ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700, color: COUL.blanc }}>
-            {verrouille ? '🔒 Verrouillée' : (saving ? 'Enregistrement…' : 'Enregistrer')}
+          <button onClick={onClose} style={{ background: COUL.blanc, border: `1px solid ${COUL.bord}`, borderRadius: 9, padding: mobE ? '7px 12px' : '8px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: COUL.texteMoyen }}>Annuler</button>
+          <button onClick={save} disabled={saving || verrouille} style={{ background: verrouille ? COUL.bordFort : ORANGE, border: 'none', borderRadius: 9, padding: mobE ? '7px 14px' : '8px 20px', cursor: (saving || verrouille) ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700, color: COUL.blanc }}>
+            {verrouille ? '🔒' : (saving ? 'Enregistrement…' : 'Enregistrer')}
           </button>
+        </div>
+
+        {/* Sur telephone, les deux panneaux ne tiennent pas cote a cote ni l'un
+            sous l'autre : on les met en onglets. Sur ordinateur, « Details »
+            reste affiche en permanence, l'onglet n'a donc pas lieu d'etre. */}
+        <div style={{ display: 'flex', background: COUL.fondDoux, borderRadius: 9, padding: 3, width: mobE ? '100%' : 'auto', marginLeft: mobE ? 0 : 'auto', marginRight: mobE ? 0 : 'auto', order: mobE ? 3 : 0 }}>
+          {(mobE ? [['editeur', 'Document'], ['details', 'Détails'], ['pdf', 'PDF']] : [['editeur', 'Éditeur'], ['pdf', 'PDF']]).map(([v, lab]) => (
+            <button key={v} type="button" onClick={() => setVue(v)}
+              style={{ flex: mobE ? 1 : 'none', padding: mobE ? '7px 8px' : '6px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700,
+                       background: vue === v ? COUL.blanc : 'transparent', color: vue === v ? NAVY : COUL.texteDoux,
+                       boxShadow: vue === v ? '0 1px 3px rgba(0,0,0,.12)' : 'none' }}>{lab}</button>
+          ))}
         </div>
       </div>
 
@@ -687,7 +722,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
       <div style={{ flex: 1, display: 'flex', minHeight: 0, flexDirection: mobE ? 'column' : 'row' }}>
 
         {/* ══════════ LE DOCUMENT ══════════ */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: mobE ? 12 : '26px 20px', minWidth: 0 }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: mobE ? 12 : '26px 20px', minWidth: 0, display: (mobE && vue === 'details') ? 'none' : 'block' }}>
           {vue === 'pdf' ? (
             <div style={{ maxWidth: 860, margin: '0 auto' }}>
               {pdfUrl ? <>
@@ -834,8 +869,8 @@ function Editeur({ type, doc, onClose, onSaved }) {
         </div>
 
         {/* ══════════ PANNEAU DÉTAILS ══════════ */}
-        <div style={{ width: mobE ? '100%' : 340, flexShrink: 0, background: COUL.blanc, borderLeft: mobE ? 'none' : `1px solid ${COUL.bord}`, borderTop: mobE ? `1px solid ${COUL.bord}` : 'none', overflowY: 'auto' }}>
-          <div style={{ padding: '13px 18px', borderBottom: `1px solid ${COUL.bord}`, fontSize: 13.5, fontWeight: 800, color: NAVY }}>Détails</div>
+        <div style={{ width: mobE ? '100%' : 340, flex: mobE ? 1 : 'none', flexShrink: 0, background: COUL.blanc, borderLeft: mobE ? 'none' : `1px solid ${COUL.bord}`, overflowY: 'auto', display: (mobE && vue !== 'details') ? 'none' : 'block' }}>
+          {!mobE && <div style={{ padding: '13px 18px', borderBottom: `1px solid ${COUL.bord}`, fontSize: 13.5, fontWeight: 800, color: NAVY }}>Détails</div>}
 
           {/* Type / responsable / langue / statut */}
           <div style={blocPanneau}>
