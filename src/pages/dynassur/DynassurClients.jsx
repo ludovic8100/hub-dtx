@@ -1516,20 +1516,33 @@ export default function DynassurClients() {
     }
     setKpiModal('loading')
     if(kind==='sans_contrat'){
-      // dossiers présents dans contrats
-      const set=new Set(); let from=0
-      while(true){ const {data}=await supabase.from('contrats').select('dossier').range(from,from+999); if(!data||!data.length) break; data.forEach(r=>r.dossier&&set.add(String(r.dossier))); if(data.length<1000) break; from+=1000 }
+      // La base rend les 8 189 dossiers distincts en UNE requête. Avant, on
+      // parcourait les 29 955 contrats mille par mille — trente allers-retours,
+      // 3,1 s chacun — pour reconstruire ce distinct en mémoire. Mesuré le
+      // 06/11 : 187 secondes de base pour soixante ouvertures.
+      const { data, error } = await supabase.rpc('dossiers_avec_contrat')
+      if(error){ setKpiModal({ titre:'Clients sans contrat', rows:[], erreur:error.message }); return }
+      const set = new Set((data||[]).map(String))
       const rows = all.filter(c=>!set.has(String(c.dossier)))
       setKpiModal({ titre:`Clients sans contrat (${rows.length})`, rows }); return
     }
     if(kind==='sans_comm'){
-      // dossiers ayant au moins une commission > 0 en 2026
+      // `quittances` est VIDE depuis que le financier ne vient plus de Qlik.
+      // Lister « les clients sans commission » revenait donc a lister les
+      // 10 308 clients, ce que la capture du 05/11 montre noir sur blanc.
+      // Un indicateur faux est pire qu'un indicateur absent : on dit pourquoi.
+      if(kpis?.commissions_source_vide){
+        setKpiModal({ titre:'Commissions 2026 — donnée indisponible', rows:[], explication:
+          "La table des quittances est vide : le financier ne vient plus de Qlik mais des bordereaux, " +
+          "et ce raccordement n'est pas encore fait. Afficher la liste reviendrait à présenter les " +
+          "10 308 clients comme n'ayant rien produit." }); return
+      }
       const set=new Set(); let from=0
       while(true){ const {data}=await supabase.from('quittances').select('dossier,commission,date_comptable').gte('date_comptable','2026-01-01').lte('date_comptable','2026-12-31').range(from,from+999); if(!data||!data.length) break; data.forEach(r=>{ if(r.dossier&&(Number(r.commission)||0)>0) set.add(String(r.dossier)) }); if(data.length<1000) break; from+=1000 }
       const rows = all.filter(c=>!set.has(String(c.dossier)))
       setKpiModal({ titre:`Clients sans commission 2026 (${rows.length})`, rows }); return
     }
-  },[relance])
+  },[relance,kpis])
   const searchRef = useRef(null)
   const deepLink = useRef(new URLSearchParams(window.location.search).get('dossier'))  // fiche à ouvrir via ?dossier= (lien 3CX / dashboard)
   const prevQS = useRef({q:'',scope:'all'})
@@ -1696,7 +1709,12 @@ export default function DynassurClients() {
               stats={[
                 { label: 'Avec alerte', value: kpis?.avec_alerte != null ? kpis.avec_alerte.toLocaleString('fr-BE') : '…', onClick: ()=>openKpi('alerte') },
                 { label: 'Sans contrat', value: kpis?.sans_contrat != null ? kpis.sans_contrat.toLocaleString('fr-BE') : '…', onClick: ()=>openKpi('sans_contrat') },
-                { label: 'Sans comm. 2026', value: kpis?.sans_commissions != null ? kpis.sans_commissions.toLocaleString('fr-BE') : '…', onClick: ()=>openKpi('sans_comm') },
+                // Source vide : « — » et non un total. Un chiffre faux se
+                // lit comme un chiffre vrai.
+                { label: 'Sans comm. 2026',
+                  value: kpis?.commissions_source_vide ? '—'
+                       : kpis?.sans_commissions != null ? kpis.sans_commissions.toLocaleString('fr-BE') : '…',
+                  onClick: ()=>openKpi('sans_comm') },
               ]}
             />
 
@@ -1771,6 +1789,24 @@ export default function DynassurClients() {
               <div style={{flex:1,overflow:'auto'}}>
                 {kpiModal==='loading'?(
                   <div style={{padding:40,textAlign:'center',color:COUL.texteFaible}}>Recherche des clients concernés…</div>
+                ):kpiModal.explication?(
+                  // Pas de tableau vide muet : on dit ce qui manque et pourquoi.
+                  <div style={{padding:'28px 32px',maxWidth:620}}>
+                    <div style={{display:'flex',gap:11,alignItems:'flex-start'}}>
+                      <i className="ti ti-info-circle" style={{fontSize:20,color:COUL.alerte,marginTop:1,flexShrink:0}}/>
+                      <div style={{fontSize:13.5,lineHeight:1.6,color:COUL.texte}}>{kpiModal.explication}</div>
+                    </div>
+                  </div>
+                ):kpiModal.erreur?(
+                  <div style={{padding:'28px 32px',maxWidth:620}}>
+                    <div style={{display:'flex',gap:11,alignItems:'flex-start'}}>
+                      <i className="ti ti-alert-triangle" style={{fontSize:20,color:COUL.danger,marginTop:1,flexShrink:0}}/>
+                      <div style={{fontSize:13.5,lineHeight:1.6,color:COUL.texte}}>
+                        La liste n'a pas pu être calculée.
+                        <div style={{marginTop:6,fontSize:12,color:COUL.texteDoux,fontFamily:'monospace'}}>{kpiModal.erreur}</div>
+                      </div>
+                    </div>
+                  </div>
                 ):(
                   <table style={{width:'100%',borderCollapse:'collapse',fontSize:12.5}}>
                     {/* LES COLONNES SONT DES DONNÉES, pas du balisage recopié.
