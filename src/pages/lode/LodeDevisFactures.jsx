@@ -2543,11 +2543,34 @@ export default function LodeDevisFactures() {
     setTab('factures'); load()
   }
 
+  // Un devis deja converti est reference par sa facture : la cle etrangere est
+  // en NO ACTION, Postgres refuse donc la suppression. On le sait AVANT de
+  // demander confirmation — les factures sont deja chargees.
+  const factureDuDevis = (id) => factures.find(f => f.devis_id === id) || null
+
   const supprimer = async (type, id) => {
     if (type !== 'devis') { alert("Une facture ne peut pas être supprimée (numérotation légale continue). Pour l'annuler, créez une note de crédit."); return }
-    if (!confirm('Supprimer définitivement ?')) return
-    await supabase.from('lode_devis').delete().eq('id', id)
-    load()
+    const doc = devis.find(d => d.id === id)
+    const liee = factureDuDevis(id)
+    if (liee) {
+      alert(`Le devis ${doc?.numero || ''} a été converti en facture ${liee.numero}.\n\n`
+        + `Il ne peut plus être supprimé : la facture y fait référence. Pour annuler `
+        + `la facture, créez une note de crédit.`)
+      return
+    }
+    if (!confirm(`Supprimer définitivement le devis ${doc?.numero || ''} ?`)) return
+
+    // La ligne disparait tout de suite. L'ancien code ignorait l'erreur de la
+    // base, rechargeait, et le devis revenait sans un mot d'explication : on
+    // croyait a un ecran qui ne se rafraichit pas, c'etait un refus silencieux.
+    setDevis(p => p.filter(d => d.id !== id))
+    const { error } = await supabase.from('lode_devis').delete().eq('id', id)
+    if (error) {
+      load()   // la base a le dernier mot : on reprend son etat
+      alert(error.code === '23503'
+        ? `Ce devis est référencé ailleurs dans le Hub (une facture d'achat y renvoie, par exemple) : il ne peut pas être supprimé.`
+        : 'Suppression impossible : ' + error.message)
+    }
   }
 
   const listeBrute = tab === 'devis' ? devis : factures
@@ -2632,7 +2655,9 @@ export default function LodeDevisFactures() {
       tab === 'devis' && doc.statut === 'accepté' && { sep: true },
       tab === 'devis' && doc.statut === 'accepté' && { icon: '→', label: 'Convertir en facture', onClick: () => convertir(doc) },
       tab === 'devis' && { sep: true },
-      tab === 'devis' && { icon: '🗑', label: 'Supprimer', danger: true, onClick: () => supprimer('devis', doc.id) },
+      tab === 'devis' && (factureDuDevis(doc.id)
+        ? { icon: '🔒', label: `Facturé (${factureDuDevis(doc.id).numero})`, disabled: true, onClick: () => {} }
+        : { icon: '🗑', label: 'Supprimer', danger: true, onClick: () => supprimer('devis', doc.id) }),
     ].filter(Boolean)
   }
 
