@@ -7,6 +7,7 @@ import RentabiliteView from './RentabiliteView'
 import VentilationEditor from './VentilationEditor'
 import TraiterFactures from './TraiterFactures'
 import AnomaliesCompta from './AnomaliesCompta'
+import { COUL } from '../lib/theme'
 
 const fmt = (v) => v === null || v === undefined ? '—'
   : new Intl.NumberFormat('fr-BE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 }).format(v)
@@ -41,7 +42,7 @@ function PastilleReleve({ releve }) {
       <a href={releve.url_sharepoint} target="_blank" rel="noreferrer" title={titre}
         onClick={e => e.stopPropagation()}
         style={{ display:'flex', alignItems:'center', justifyContent:'center', width:'30px', height:'30px',
-          borderRadius:'7px', background:'#16a34a', color:'#fff', fontSize:'15px', textDecoration:'none' }}>
+          borderRadius:'7px', background:COUL.succes, color:COUL.blanc, fontSize:'15px', textDecoration:'none' }}>
         <i className="ti ti-file-description" />
       </a>
     )
@@ -49,7 +50,7 @@ function PastilleReleve({ releve }) {
   return (
     <span title="Relevé de compte producteur manquant — à réclamer à la compagnie"
       style={{ display:'flex', alignItems:'center', justifyContent:'center', width:'30px', height:'30px',
-        borderRadius:'7px', border:'1px solid #fde68a', background:'#fffbeb', color:'#b45309', fontSize:'15px' }}>
+        borderRadius:'7px', border:'1px solid #fde68a', background:COUL.alerteFondDoux, color:COUL.alerte, fontSize:'15px' }}>
       <i className="ti ti-file-alert" />
     </span>
   )
@@ -57,7 +58,7 @@ function PastilleReleve({ releve }) {
 
 // ── VUE CONSOLIDÉE GROUPE ──
 function VueConsolidee({ comptes }) {
-  const COLORS = { DYNASSUR:'#0080BD', DTX:'#94a3b8', LODE:'#ea580c', HEXAGROUP:'#dc2626', PRIVE:'#0d9488' }
+  const COLORS = { DYNASSUR:COUL.bleu, DTX:COUL.texteFaible, LODE:COUL.orange, HEXAGROUP:COUL.danger, PRIVE:COUL.teal }
   const LOGOS  = { DYNASSUR:'/logo_dynassur.png', DTX:'/logo_dtx.png', LODE:'/logo_lode.png', HEXAGROUP:'/logo_hexagroup.svg', PRIVE:'/logo_prive.svg' }
 
   const parSociete = {}
@@ -74,13 +75,13 @@ function VueConsolidee({ comptes }) {
     <div style={{ fontFamily:"'Source Sans Pro', sans-serif" }}>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'14px', marginBottom:'24px' }}>
         {[
-          { label:'Trésorerie groupe', value: fmt(soldeTotal), color:'#7c3aed' },
-          { label:'Comptes synchronisés', value: `${comptes.filter(c=>c.ponto_account_id).length} / ${comptes.length}`, color:'#0080BD' },
-          { label:'Entités', value: Object.keys(parSociete).length, color:'#16a34a' },
+          { label:'Trésorerie groupe', value: fmt(soldeTotal), color:COUL.violet },
+          { label:'Comptes synchronisés', value: `${comptes.filter(c=>c.ponto_account_id).length} / ${comptes.length}`, color:COUL.bleu },
+          { label:'Entités', value: Object.keys(parSociete).length, color:COUL.succes },
         ].map(k => (
-          <div key={k.label} style={{ background:'#fff', borderRadius:'10px', border:'1px solid #e2e8f0', borderTop:`3px solid ${k.color}`, padding:'16px 20px' }}>
-            <div style={{ fontSize:'11px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'6px' }}>{k.label}</div>
-            <div style={{ fontSize:'24px', fontWeight:'800', color:'#0f172a' }}>{k.value}</div>
+          <div key={k.label} style={{ background:COUL.blanc, borderRadius:'10px', border:'1px solid #e2e8f0', borderTop:`3px solid ${k.color}`, padding:'16px 20px' }}>
+            <div style={{ fontSize:'11px', fontWeight:'700', color:COUL.texteFaible, textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'6px' }}>{k.label}</div>
+            <div style={{ fontSize:'24px', fontWeight:'800', color:COUL.texteFort }}>{k.value}</div>
           </div>
         ))}
       </div>
@@ -89,21 +90,21 @@ function VueConsolidee({ comptes }) {
           const col = COLORS[code] || '#64748b'
           const logo = LOGOS[code]
           return (
-            <div key={code} style={{ background:'#fff', borderRadius:'12px', border:'1px solid #e2e8f0', overflow:'hidden' }}>
+            <div key={code} style={{ background:COUL.blanc, borderRadius:'12px', border:'1px solid #e2e8f0', overflow:'hidden' }}>
               <div style={{ background:col, padding:'12px 16px', display:'flex', alignItems:'center', gap:'10px' }}>
                 {logo && <img src={logo} alt={code} style={{ width:26, height:26, objectFit:'contain' }} />}
-                <div style={{ flex:1, color:'#fff', fontWeight:'700', fontSize:'13px' }}>{data.nom || code}</div>
-                <div style={{ color:'#fff', fontWeight:'800', fontSize:'18px' }}>{fmt(data.total)}</div>
+                <div style={{ flex:1, color:COUL.blanc, fontWeight:'700', fontSize:'13px' }}>{data.nom || code}</div>
+                <div style={{ color:COUL.blanc, fontWeight:'800', fontSize:'18px' }}>{fmt(data.total)}</div>
               </div>
               {data.comptes.map((c,i) => (
                 <div key={c.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 16px', borderBottom: i<data.comptes.length-1?'1px solid #f1f5f9':'none' }}>
                   <div>
-                    <div style={{ fontSize:'13px', fontWeight:'500', color:'#1e293b' }}>{c.banque}</div>
-                    <div style={{ fontSize:'11px', color:'#94a3b8', fontFamily:'monospace' }}>{c.iban?.replace(/(.{4})/g,'$1 ').trim()}</div>
+                    <div style={{ fontSize:'13px', fontWeight:'500', color:COUL.texte }}>{c.banque}</div>
+                    <div style={{ fontSize:'11px', color:COUL.texteFaible, fontFamily:'monospace' }}>{c.iban?.replace(/(.{4})/g,'$1 ').trim()}</div>
                   </div>
                   <div style={{ textAlign:'right' }}>
-                    <div style={{ fontSize:'15px', fontWeight:'700', color: parseFloat(c.solde_actuel)>=0?'#16a34a':'#dc2626' }}>{fmt(c.solde_actuel)}</div>
-                    {!c.ponto_account_id && <span style={{ fontSize:'10px', background:'#fef3c7', color:'#92400e', padding:'1px 6px', borderRadius:'3px', fontWeight:'700' }}>Non Ponto</span>}
+                    <div style={{ fontSize:'15px', fontWeight:'700', color: parseFloat(c.solde_actuel)>=0?'#16a34a':COUL.danger }}>{fmt(c.solde_actuel)}</div>
+                    {!c.ponto_account_id && <span style={{ fontSize:'10px', background:COUL.alerteFond, color:COUL.alerteFonce, padding:'1px 6px', borderRadius:'3px', fontWeight:'700' }}>Non Ponto</span>}
                   </div>
                 </div>
               ))}
@@ -333,7 +334,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   useEffect(() => { chargerVentilations() }, [])
 
   // Créer une catégorie manuellement (et l'assigner à la transaction en cours si fournie)
-  const [nouvelleCat, setNouvelleCat] = useState({ ouvert: false, nom: '', type: 'depense', couleur: '#0080BD' })
+  const [nouvelleCat, setNouvelleCat] = useState({ ouvert: false, nom: '', type: 'depense', couleur: COUL.bleu })
   async function creerCategorie(txIdAAssigner) {
     const nom = nouvelleCat.nom.trim()
     if (!nom) { alert('Donne un nom à la catégorie.'); return }
@@ -354,7 +355,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       catId = data.id
     }
     await chargerCategories()
-    setNouvelleCat({ ouvert: false, nom: '', type: 'depense', couleur: '#0080BD' })
+    setNouvelleCat({ ouvert: false, nom: '', type: 'depense', couleur: COUL.bleu })
     if (txIdAAssigner && catId) await assignerCategorie(txIdAAssigner, catId)
   }
 
@@ -552,7 +553,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
     setSelecteurFacture({ ids, code, montant })
   }
 
-  if (loading) return <div style={{ padding:'60px', textAlign:'center', color:'#94a3b8', fontFamily:"'Source Sans Pro', sans-serif" }}>Chargement…</div>
+  if (loading) return <div style={{ padding:'60px', textAlign:'center', color:COUL.texteFaible, fontFamily:"'Source Sans Pro', sans-serif" }}>Chargement…</div>
   if (isConsolide) return <VueConsolidee comptes={comptes} />
 
   // KPIs
@@ -714,7 +715,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
           {[['mouvements','Mouvements bancaires'],['achats','Dépenses'],['ventes','Rentrées'],['rentabilite','Rentabilité'],['anomalies','Anomalies']].map(([k,lab]) => (
             <button key={k} onClick={()=>setOnglet(k)} style={{
               padding:'10px 20px', border:'none', background:'none', cursor:'pointer', fontSize:'14px', fontWeight:'700',
-              fontFamily:"'Source Sans Pro', sans-serif", color: onglet===k ? color : '#94a3b8',
+              fontFamily:"'Source Sans Pro', sans-serif", color: onglet===k ? color : COUL.texteFaible,
               borderBottom: onglet===k ? `3px solid ${color}` : '3px solid transparent', marginBottom:'-2px'
             }}>{lab}</button>
           ))}
@@ -733,45 +734,45 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       ) : (<>
 
       {/* En-tête collant : boutons sync + KPIs + filtres restent visibles, seuls les mouvements scrollent */}
-      <div style={{ position:'sticky', top: isMobile ? '-16px' : '-20px', zIndex:60, background:'#f1f5f9', paddingTop: isMobile ? '6px' : '8px', paddingBottom:'2px', marginBottom:'8px' }}>
+      <div style={{ position:'sticky', top: isMobile ? '-16px' : '-20px', zIndex:60, background:COUL.fondDoux, paddingTop: isMobile ? '6px' : '8px', paddingBottom:'2px', marginBottom:'8px' }}>
 
       {/* KPIs */}
       <div style={{ display:'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap:'12px', marginBottom:'10px' }}>
         {[
           { label:'Trésorerie totale', value: fmt(soldeTotal), color, sub:`${comptes.length} comptes`, sensible:true },
-          { label:'Rentrées', value: fmt(totalEntrees), color:'#16a34a', sensible:true },
-          { label:'Dépenses', value: fmt(totalSorties), color:'#dc2626', sensible:true },
+          { label:'Rentrées', value: fmt(totalEntrees), color:COUL.succes, sensible:true },
+          { label:'Dépenses', value: fmt(totalSorties), color:COUL.danger, sensible:true },
           (filtre.facture === 'avec'
-            ? { label:'Factures liées', value: nbAvecFacture, color:'#16a34a', clic:'toggle', sub:`${nbSansFacture} non liées • ${nbAvecFacture+nbSansFacture} au total`, badge:true }
+            ? { label:'Factures liées', value: nbAvecFacture, color:COUL.succes, clic:'toggle', sub:`${nbSansFacture} non liées • ${nbAvecFacture+nbSansFacture} au total`, badge:true }
             : filtre.facture === 'sans'
-            ? { label:'Factures non liées', value: nbSansFacture, color:'#dc2626', clic:'toggle', sub:`${nbAvecFacture} liées • ${nbAvecFacture+nbSansFacture} au total`, badge:true }
+            ? { label:'Factures non liées', value: nbSansFacture, color:COUL.danger, clic:'toggle', sub:`${nbAvecFacture} liées • ${nbAvecFacture+nbSansFacture} au total`, badge:true }
             : filtre.facture === 'attente'
-            ? { label:'En attente de facture', value: nbEnAttente, color:'#64748b', clic:'toggle', sub:`${nbSansFacture} à justifier • ${nbAvecFacture} liées`, badge:true }
+            ? { label:'En attente de facture', value: nbEnAttente, color:COUL.texteDoux, clic:'toggle', sub:`${nbSansFacture} à justifier • ${nbAvecFacture} liées`, badge:true }
             : { label:'Factures (toutes)', value: nbAvecFacture+nbSansFacture+nbSansFactureRequise+nbEnAttente, color, clic:'toggle', sub:`${nbAvecFacture} liées • ${nbSansFacture} à justifier${nbEnAttente?` • ${nbEnAttente} en attente`:''}${nbSansFactureRequise?` • ${nbSansFactureRequise} sans facture`:''}`, badge:true }),
         ].map(k => (
           <div key={k.label} onClick={k.clic ? ()=>setFiltre(f=>({...f, facture: f.facture==='toutes' ? 'sans' : f.facture==='sans' ? 'attente' : f.facture==='attente' ? 'avec' : 'toutes'})) : undefined}
-            style={{ position:'relative', background: (k.clic && filtre.facture!=='toutes') ? '#f8fafc' : '#fff', borderRadius:'10px', border:`1px solid ${(k.clic && filtre.facture!=='toutes') ? '#cbd5e1' : '#e2e8f0'}`, borderTop:`3px solid ${k.color}`, padding:'14px 18px', cursor: k.clic ? 'pointer' : 'default', transition:'all .15s' }}>
-            <div style={{ fontSize:'11px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'6px' }}>{k.label}</div>
+            style={{ position:'relative', background: (k.clic && filtre.facture!=='toutes') ? '#f8fafc' : COUL.blanc, borderRadius:'10px', border:`1px solid ${(k.clic && filtre.facture!=='toutes') ? '#cbd5e1' : COUL.bord}`, borderTop:`3px solid ${k.color}`, padding:'14px 18px', cursor: k.clic ? 'pointer' : 'default', transition:'all .15s' }}>
+            <div style={{ fontSize:'11px', fontWeight:'700', color:COUL.texteFaible, textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'6px' }}>{k.label}</div>
             <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
-              <div style={{ fontSize:'20px', fontWeight:'800', color: k.badge ? k.color : '#0f172a', lineHeight:1 }}>{k.sensible && montantsMasques ? '••••••' : k.value}</div>
+              <div style={{ fontSize:'20px', fontWeight:'800', color: k.badge ? k.color : COUL.texteFort, lineHeight:1 }}>{k.sensible && montantsMasques ? '••••••' : k.value}</div>
               {k.sensible && (
                 <button onClick={(e)=>{ e.stopPropagation(); setMontantsMasques(m=>!m) }} title={montantsMasques?'Afficher les montants':'Masquer les montants'}
-                  style={{ border:'none', background:'none', cursor:'pointer', padding:'2px', color:'#94a3b8', display:'flex', alignItems:'center' }}>
+                  style={{ border:'none', background:'none', cursor:'pointer', padding:'2px', color:COUL.texteFaible, display:'flex', alignItems:'center' }}>
                   <i className={`ti ti-${montantsMasques?'eye':'eye-off'}`} style={{ fontSize:'16px' }} />
                 </button>
               )}
             </div>
-            {k.sub && <div style={{ fontSize:'11px', color:'#94a3b8', marginTop:'5px', fontWeight:'600' }}>{k.sub}</div>}
+            {k.sub && <div style={{ fontSize:'11px', color:COUL.texteFaible, marginTop:'5px', fontWeight:'600' }}>{k.sub}</div>}
           </div>
         ))}
       </div>
 
       {/* Barre de filtres */}
-      <div style={{ background:'#fff', borderRadius:'12px', border:'1px solid #e2e8f0', padding:'14px 16px', marginBottom:'14px', display:'flex', gap:'10px', flexWrap:'nowrap', alignItems:'flex-end', overflowX:'auto' }}>
+      <div style={{ background:COUL.blanc, borderRadius:'12px', border:'1px solid #e2e8f0', padding:'14px 16px', marginBottom:'14px', display:'flex', gap:'10px', flexWrap:'nowrap', alignItems:'flex-end', overflowX:'auto' }}>
 
         {/* Filtre compte */}
         <div style={{ display:'flex', flexDirection:'column', gap:'3px' }}>
-          <label style={{ fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em' }}>Compte</label>
+          <label style={{ fontSize:'10px', fontWeight:'700', color:COUL.texteFaible, textTransform:'uppercase', letterSpacing:'0.05em' }}>Compte</label>
           <select value={filtre.compte} onChange={e=>setFiltre(f=>({...f,compte:e.target.value}))} style={{ padding:'7px 10px', border:'1px solid #e2e8f0', borderRadius:'6px', fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif", minWidth:'140px', cursor:'pointer' }}>
             <option value="tous">Tous</option>
             {comptes.map(c => <option key={c.id} value={c.id}>{c.banque} — {c.iban?.slice(-4)}</option>)}
@@ -780,13 +781,13 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
 
         {/* Filtre type */}
         <div style={{ display:'flex', flexDirection:'column', gap:'3px', flexShrink:0 }}>
-          <label style={{ fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em' }}>Type</label>
+          <label style={{ fontSize:'10px', fontWeight:'700', color:COUL.texteFaible, textTransform:'uppercase', letterSpacing:'0.05em' }}>Type</label>
           <div style={{ display:'flex', gap:'4px' }}>
             {[['tous','Tout'],['entrees','▲ Rentrées'],['sorties','▼ Dépenses']].map(([val,lab]) => (
               <button key={val} onClick={()=>setFiltre(f=>({...f,type:val}))} style={{
                 padding:'7px 12px', borderRadius:'6px', fontSize:'12px', fontWeight:'600', cursor:'pointer', border:'none',
-                background: filtre.type===val ? (val==='entrees'?'#dcfce7':val==='sorties'?'#fee2e2':`${color}18`) : '#f1f5f9',
-                color: filtre.type===val ? (val==='entrees'?'#16a34a':val==='sorties'?'#dc2626':color) : '#64748b',
+                background: filtre.type===val ? (val==='entrees'?'#dcfce7':val==='sorties'?'#fee2e2':`${color}18`) : COUL.fondDoux,
+                color: filtre.type===val ? (val==='entrees'?'#16a34a':val==='sorties'?'#dc2626':color) : COUL.texteDoux,
                 transition:'all 0.15s'
               }}>{lab}</button>
             ))}
@@ -795,7 +796,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
 
         {/* Filtre recherche (sur toutes les données du mouvement) */}
         <div style={{ display:'flex', flexDirection:'column', gap:'3px', flex:1, minWidth:'130px' }}>
-          <label style={{ fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em' }}>Recherche</label>
+          <label style={{ fontSize:'10px', fontWeight:'700', color:COUL.texteFaible, textTransform:'uppercase', letterSpacing:'0.05em' }}>Recherche</label>
           <input type="text" placeholder="Contrepartie, IBAN, communication, montant, date…" value={filtre.libelle}
             onChange={e=>setFiltre(f=>({...f,libelle:e.target.value}))}
             style={{ padding:'7px 10px', border:'1px solid #e2e8f0', borderRadius:'6px', fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif" }}
@@ -804,7 +805,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
 
         {/* Filtre période (Année > Trimestre > Mois, sélection multiple) */}
         <div style={{ display:'flex', flexDirection:'column', gap:'3px', flexShrink:0, position:'relative' }}>
-          <label style={{ fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em' }}>Période</label>
+          <label style={{ fontSize:'10px', fontWeight:'700', color:COUL.texteFaible, textTransform:'uppercase', letterSpacing:'0.05em' }}>Période</label>
           <button ref={periodeBtnRef} onClick={()=>{
             if (!periodeOuverte && periodeBtnRef.current) {
               const r = periodeBtnRef.current.getBoundingClientRect()
@@ -813,7 +814,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
             setPeriodeOuverte(o=>!o)
           }} style={{
             padding:'7px 10px', border:'1px solid #e2e8f0', borderRadius:'6px', fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif",
-            cursor:'pointer', background:'#fff', color: filtre.periodes.length ? '#0f172a' : '#94a3b8', minWidth:'180px', maxWidth:'240px',
+            cursor:'pointer', background:COUL.blanc, color: filtre.periodes.length ? '#0f172a' : COUL.texteFaible, minWidth:'180px', maxWidth:'240px',
             display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px', whiteSpace:'nowrap', overflow:'hidden'
           }}>
             <span style={{ overflow:'hidden', textOverflow:'ellipsis' }}>{periodeLabel()}</span>
@@ -823,17 +824,17 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
             <>
               <div onClick={()=>setPeriodeOuverte(false)} style={{ position:'fixed', inset:0, zIndex:1000 }} />
               <div ref={periodePanelRef} style={{
-                position:'fixed', top: periodePos.top, left: periodePos.left, zIndex:1001, background:'#fff',
+                position:'fixed', top: periodePos.top, left: periodePos.left, zIndex:1001, background:COUL.blanc,
                 border:'1px solid #e2e8f0', borderRadius:'10px', boxShadow:'0 12px 32px rgba(0,0,0,0.15)',
                 padding:'8px', width:'280px', maxHeight:'380px', overflowY:'auto'
               }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 6px 8px', borderBottom:'1px solid #f1f5f9', marginBottom:'6px' }}>
-                  <span style={{ fontSize:'12px', fontWeight:'700', color:'#334155' }}>Sélection multiple</span>
+                  <span style={{ fontSize:'12px', fontWeight:'700', color:COUL.texteSombre }}>Sélection multiple</span>
                   {filtre.periodes.length > 0 && (
                     <button onClick={()=>setPeriodes([])} style={{ fontSize:'11px', color:color, background:'none', border:'none', cursor:'pointer', fontWeight:'600' }}>Tout effacer</button>
                   )}
                 </div>
-                {anneesDispo.length === 0 && <div style={{ padding:'10px', fontSize:'12px', color:'#94a3b8' }}>Aucune donnée</div>}
+                {anneesDispo.length === 0 && <div style={{ padding:'10px', fontSize:'12px', color:COUL.texteFaible }}>Aucune donnée</div>}
                 {anneesDispo.map(an => {
                   const etatA = anneeEtat(an)
                   const deplie = anneesDepliees[an] !== false // déplié par défaut
@@ -842,8 +843,8 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                       <div style={{ display:'flex', alignItems:'center', gap:'6px', padding:'5px 6px', borderRadius:'6px', background: etatA!=='none' ? `${color}0c` : 'transparent' }}>
                         <input type="checkbox" checked={etatA==='all'} ref={el=>{ if(el) el.indeterminate = etatA==='some' }}
                           onChange={()=>toggleAnnee(an)} style={{ width:'15px', height:'15px', cursor:'pointer', accentColor:color }} />
-                        <span onClick={()=>setAnneesDepliees(d=>({...d,[an]: d[an]===false ? true : false}))} style={{ flex:1, cursor:'pointer', fontSize:'14px', fontWeight:'700', color:'#0f172a', display:'flex', alignItems:'center', gap:'5px' }}>
-                          <i className={`ti ti-chevron-${deplie?'down':'right'}`} style={{ fontSize:'13px', color:'#94a3b8' }} />{an}
+                        <span onClick={()=>setAnneesDepliees(d=>({...d,[an]: d[an]===false ? true : false}))} style={{ flex:1, cursor:'pointer', fontSize:'14px', fontWeight:'700', color:COUL.texteFort, display:'flex', alignItems:'center', gap:'5px' }}>
+                          <i className={`ti ti-chevron-${deplie?'down':'right'}`} style={{ fontSize:'13px', color:COUL.texteFaible }} />{an}
                         </span>
                       </div>
                       {deplie && (
@@ -855,14 +856,14 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                                 <div style={{ display:'flex', alignItems:'center', gap:'6px', padding:'3px 6px' }}>
                                   <input type="checkbox" checked={etatT==='all'} ref={el=>{ if(el) el.indeterminate = etatT==='some' }}
                                     onChange={()=>toggleTrimestre(an, tr.mois)} style={{ width:'14px', height:'14px', cursor:'pointer', accentColor:color }} />
-                                  <span style={{ fontSize:'12.5px', fontWeight:'600', color:'#475569' }}>T{tr.q}</span>
+                                  <span style={{ fontSize:'12.5px', fontWeight:'600', color:COUL.texteMoyen }}>T{tr.q}</span>
                                 </div>
                                 <div style={{ display:'flex', flexWrap:'wrap', gap:'2px', paddingLeft:'20px' }}>
                                   {tr.mois.map(m => {
                                     const ym = `${an}-${String(m).padStart(2,'0')}`
                                     const on = periodesSet.has(ym)
                                     return (
-                                      <label key={ym} style={{ display:'flex', alignItems:'center', gap:'4px', padding:'3px 6px', borderRadius:'5px', cursor:'pointer', fontSize:'12px', color: on?color:'#64748b', background: on?`${color}10`:'transparent', minWidth:'62px' }}>
+                                      <label key={ym} style={{ display:'flex', alignItems:'center', gap:'4px', padding:'3px 6px', borderRadius:'5px', cursor:'pointer', fontSize:'12px', color: on?color:COUL.texteDoux, background: on?`${color}10`:'transparent', minWidth:'62px' }}>
                                         <input type="checkbox" checked={on} onChange={()=>toggleMois(ym)} style={{ width:'13px', height:'13px', cursor:'pointer', accentColor:color }} />
                                         {MOIS_NOMS[m-1]}
                                       </label>
@@ -884,7 +885,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
 
         {/* Filtre catégorie */}
         <div style={{ display:'flex', flexDirection:'column', gap:'3px' }}>
-          <label style={{ fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em' }}>Catégorie</label>
+          <label style={{ fontSize:'10px', fontWeight:'700', color:COUL.texteFaible, textTransform:'uppercase', letterSpacing:'0.05em' }}>Catégorie</label>
           <select value={filtre.categorie} onChange={e=>setFiltre(f=>({...f,categorie:e.target.value}))} style={{ padding:'7px 10px', border:'1px solid #e2e8f0', borderRadius:'6px', fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif", cursor:'pointer' }}>
             <option value="toutes">Toutes</option>
             <option value="sans">⚠️ Sans catégorie</option>
@@ -905,7 +906,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
         {/* Filtre employé (bénéficiaire) */}
         {employes.length > 0 && (
           <div style={{ display:'flex', flexDirection:'column', gap:'3px' }}>
-            <label style={{ fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em' }}>Employé</label>
+            <label style={{ fontSize:'10px', fontWeight:'700', color:COUL.texteFaible, textTransform:'uppercase', letterSpacing:'0.05em' }}>Employé</label>
             <select value={filtre.employe} onChange={e=>setFiltre(f=>({...f,employe:e.target.value}))} style={{ padding:'7px 10px', border:'1px solid #e2e8f0', borderRadius:'6px', fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif", cursor:'pointer' }}>
               <option value="tous">Tous</option>
               <option value="aucun">— Sans bénéficiaire —</option>
@@ -916,7 +917,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
 
         {activitesSoc.length > 0 && (
           <div style={{ display:'flex', flexDirection:'column', gap:'3px' }}>
-            <label style={{ fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em' }}>Activité</label>
+            <label style={{ fontSize:'10px', fontWeight:'700', color:COUL.texteFaible, textTransform:'uppercase', letterSpacing:'0.05em' }}>Activité</label>
             <select value={filtre.activite} onChange={e=>setFiltre(f=>({...f,activite:e.target.value}))} style={{ padding:'7px 10px', border:'1px solid #e2e8f0', borderRadius:'6px', fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif", cursor:'pointer' }}>
               <option value="toutes">Toutes</option>
               <option value="none">— Non tagué —</option>
@@ -927,14 +928,14 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
 
         {/* Filtre facture */}
         <div style={{ display:'flex', flexDirection:'column', gap:'3px' }}>
-          <label style={{ fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em' }}>Facture</label>
+          <label style={{ fontSize:'10px', fontWeight:'700', color:COUL.texteFaible, textTransform:'uppercase', letterSpacing:'0.05em' }}>Facture</label>
           <div style={{ display:'flex', gap:'4px' }}>
             {[['toutes','Toutes','#64748b','#f1f5f9'],['avec','✓ Liées','#16a34a','#dcfce7'],['sans','✕ Non liées','#dc2626','#fee2e2'],['attente','⏳ En attente','#475569','#e2e8f0']].map(([val,lab,c,bg]) => (
               <button key={val} onClick={()=>setFiltre(f=>({...f,facture:val}))} style={{
                 padding:'7px 11px', borderRadius:'6px', border:'none', cursor:'pointer', fontSize:'13px', fontWeight:'600',
                 fontFamily:"'Source Sans Pro', sans-serif",
-                background: filtre.facture===val ? bg : '#f1f5f9',
-                color: filtre.facture===val ? c : '#94a3b8'
+                background: filtre.facture===val ? bg : COUL.fondDoux,
+                color: filtre.facture===val ? c : COUL.texteFaible
               }}>{lab}</button>
             ))}
           </div>
@@ -944,7 +945,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
         {(filtre.compte!=='tous'||filtre.type!=='tous'||filtre.libelle||filtre.periodes.length>0||filtre.categorie!=='toutes'||filtre.facture!=='toutes'||filtre.employe!=='tous'||filtre.activite!=='toutes') && (
           <div style={{ display:'flex', flexDirection:'column', gap:'3px' }}>
             <label style={{ fontSize:'10px', color:'transparent' }}>.</label>
-            <button onClick={()=>setFiltre({compte:'tous',type:'tous',libelle:'',periodes:[],categorie:'toutes',facture:'toutes',employe:'tous',activite:'toutes'})} style={{ padding:'7px 12px', borderRadius:'6px', fontSize:'12px', fontWeight:'600', cursor:'pointer', border:'1px solid #e2e8f0', background:'#fff', color:'#64748b' }}>
+            <button onClick={()=>setFiltre({compte:'tous',type:'tous',libelle:'',periodes:[],categorie:'toutes',facture:'toutes',employe:'tous',activite:'toutes'})} style={{ padding:'7px 12px', borderRadius:'6px', fontSize:'12px', fontWeight:'600', cursor:'pointer', border:'1px solid #e2e8f0', background:COUL.blanc, color:COUL.texteDoux }}>
               ✕ Reset
             </button>
           </div>
@@ -955,30 +956,30 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
 
       {empFiltre && (
         <div style={{ display:'flex', alignItems:'center', gap:'16px', flexWrap:'wrap', background:`${color}0d`, border:`1px solid ${color}33`, borderRadius:'12px', padding:'14px 18px', marginBottom:'12px' }}>
-          <div style={{ fontSize:'13px', fontWeight:'700', color:'#334155' }}>
+          <div style={{ fontSize:'13px', fontWeight:'700', color:COUL.texteSombre }}>
             <i className="ti ti-user" style={{ marginRight:'6px', color }} />
             Total attribué à {empFiltre.nom_complet || empFiltre.code}
           </div>
           <div style={{ fontSize:'22px', fontWeight:'800', color }}>{fmt(totalAttribue)}</div>
-          <div style={{ fontSize:'12px', color:'#64748b' }}>
+          <div style={{ fontSize:'12px', color:COUL.texteDoux }}>
             {nbDirect} dépense(s) directe(s){nbVentile > 0 ? ` · ${nbVentile} part(s) de facture partagée` : ''}
           </div>
-          <div style={{ fontSize:'11px', color:'#94a3b8', flexBasis:'100%' }}>
+          <div style={{ fontSize:'11px', color:COUL.texteFaible, flexBasis:'100%' }}>
             Pour les factures partagées, seule la part de {empFiltre.nom_complet || empFiltre.code} est comptée ici (la liste ci-dessous affiche le montant total de chaque ligne bancaire).
           </div>
         </div>
       )}
 
       {/* Tableau transactions pleine largeur */}
-      <div style={{ background:'#fff', borderRadius:'12px', border:'1px solid #e2e8f0', overflow:'hidden' }}>
+      <div style={{ background:COUL.blanc, borderRadius:'12px', border:'1px solid #e2e8f0', overflow:'hidden' }}>
         {/* En-tête (desktop) */}
         {!isMobile && (
-        <div style={{ display:'grid', gridTemplateColumns:'95px 100px 110px 220px 1fr 140px 110px', padding:'9px 16px', background:'#f8fafc', borderBottom:'1px solid #e2e8f0', fontSize:'10px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.06em' }}>
+        <div style={{ display:'grid', gridTemplateColumns:'95px 100px 110px 220px 1fr 140px 110px', padding:'9px 16px', background:COUL.fond, borderBottom:'1px solid #e2e8f0', fontSize:'10px', fontWeight:'700', color:COUL.texteFaible, textTransform:'uppercase', letterSpacing:'0.06em' }}>
           {(() => {
             const trier = (col) => setTri(t => ({ col, sens: t.col === col && t.sens === 'desc' ? 'asc' : 'desc' }))
             const fleche = (col) => tri.col === col ? (tri.sens === 'desc' ? ' ↓' : ' ↑') : ''
             const Th = ({ col, children, align }) => (
-              <div onClick={()=>trier(col)} style={{ cursor:'pointer', textAlign:align||'left', color: tri.col===col?color:'#94a3b8', userSelect:'none' }}>{children}{fleche(col)}</div>
+              <div onClick={()=>trier(col)} style={{ cursor:'pointer', textAlign:align||'left', color: tri.col===col?color:COUL.texteFaible, userSelect:'none' }}>{children}{fleche(col)}</div>
             )
             return <>
               <div style={{ textAlign:'center' }}>Facture</div>
@@ -994,9 +995,9 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
         )}
         {/* Tri compact (mobile) */}
         {isMobile && (
-          <div style={{ display:'flex', gap:'6px', padding:'10px 12px', background:'#f8fafc', borderBottom:'1px solid #e2e8f0', overflowX:'auto' }}>
+          <div style={{ display:'flex', gap:'6px', padding:'10px 12px', background:COUL.fond, borderBottom:'1px solid #e2e8f0', overflowX:'auto' }}>
             {[['date','Date'],['montant','Montant'],['contrepartie','Tiers'],['categorie','Catégorie']].map(([col,lab]) => (
-              <button key={col} onClick={()=>setTri(t => ({ col, sens: t.col===col && t.sens==='desc' ? 'asc' : 'desc' }))} style={{ flexShrink:0, padding:'5px 10px', borderRadius:'6px', fontSize:'12px', fontWeight:'600', border:'1px solid #e2e8f0', background: tri.col===col?`${color}14`:'#fff', color: tri.col===col?color:'#64748b', cursor:'pointer' }}>
+              <button key={col} onClick={()=>setTri(t => ({ col, sens: t.col===col && t.sens==='desc' ? 'asc' : 'desc' }))} style={{ flexShrink:0, padding:'5px 10px', borderRadius:'6px', fontSize:'12px', fontWeight:'600', border:'1px solid #e2e8f0', background: tri.col===col?`${color}14`:COUL.blanc, color: tri.col===col?color:COUL.texteDoux, cursor:'pointer' }}>
                 {lab}{tri.col===col?(tri.sens==='desc'?' ↓':' ↑'):''}
               </button>
             ))}
@@ -1004,12 +1005,12 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
         )}
 
         {loadingTx ? (
-          <div style={{ padding:'60px', textAlign:'center', color:'#94a3b8' }}>Chargement des transactions…</div>
+          <div style={{ padding:'60px', textAlign:'center', color:COUL.texteFaible }}>Chargement des transactions…</div>
         ) : txFiltrees.length === 0 ? (
           <div style={{ padding:'60px', textAlign:'center' }}>
             <div style={{ fontSize:'36px', marginBottom:'10px' }}>📭</div>
-            <div style={{ fontSize:'14px', fontWeight:'600', color:'#64748b', marginBottom:'4px' }}>Aucune transaction</div>
-            <div style={{ fontSize:'12px', color:'#94a3b8' }}>
+            <div style={{ fontSize:'14px', fontWeight:'600', color:COUL.texteDoux, marginBottom:'4px' }}>Aucune transaction</div>
+            <div style={{ fontSize:'12px', color:COUL.texteFaible }}>
               {transactions.length === 0 ? 'Synchronisation Ponto en attente.' : 'Aucun résultat pour ces filtres.'}
             </div>
           </div>
@@ -1023,18 +1024,18 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                   <div key={t.id} onClick={() => setTxSelection(t)} style={{
                     padding:'12px 14px', cursor:'pointer',
                     borderBottom: i < txPage.length-1 ? '1px solid #f1f5f9' : 'none',
-                    background: t.facture_url ? '#f0fdf4' : '#fff'
+                    background: t.facture_url ? '#f0fdf4' : COUL.blanc
                   }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:'10px' }}>
                       <div style={{ minWidth:0, flex:1 }}>
-                        <div style={{ fontSize:'14px', fontWeight:'600', color:'#1e293b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                        <div style={{ fontSize:'14px', fontWeight:'600', color:COUL.texte, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                           {t.contrepartie_nom || t.information_paiement || t.description || '—'}
                         </div>
-                        <div style={{ fontSize:'12px', color:'#94a3b8', marginTop:'2px' }}>
+                        <div style={{ fontSize:'12px', color:COUL.texteFaible, marginTop:'2px' }}>
                           {fmtDate(t._date)} · {t.comptes_bancaires?.banque || '—'}
                         </div>
                       </div>
-                      <div style={{ fontSize:'15px', fontWeight:'700', color: positif?'#16a34a':'#dc2626', flexShrink:0 }}>
+                      <div style={{ fontSize:'15px', fontWeight:'700', color: positif?'#16a34a':COUL.danger, flexShrink:0 }}>
                         {positif?'+':''}{fmt(t.montant)}
                       </div>
                     </div>
@@ -1042,7 +1043,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                       {cat ? (
                         <span style={{ fontSize:'11px', fontWeight:'600', padding:'2px 8px', borderRadius:'10px', background:`${cat.couleur}18`, color:cat.couleur }}>{cat.nom}</span>
                       ) : (
-                        <span style={{ fontSize:'11px', color:'#cbd5e1' }}>Sans catégorie</span>
+                        <span style={{ fontSize:'11px', color:COUL.bordFort }}>Sans catégorie</span>
                       )}
                       <div style={{ display:'flex', alignItems:'center', gap:'8px' }} onClick={e=>e.stopPropagation()}>
                         {estRentreeCompagnie(t) ? (
@@ -1051,26 +1052,26 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
 <span style={{ position:'relative', display:'inline-flex' }}>
                           <button onClick={()=>ouvrirFactureLiee(t)} title={`Facture liée :\n${cheminFacture(t.facture_url)}\n\nCliquer pour ouvrir`} style={{
                             display:'flex', alignItems:'center', justifyContent:'center', width:'30px', height:'30px',
-                            borderRadius:'7px', border:'none', background:'#16a34a', color:'#fff', cursor:'pointer', fontSize:'16px', fontWeight:'700'
+                            borderRadius:'7px', border:'none', background:COUL.succes, color:COUL.blanc, cursor:'pointer', fontSize:'16px', fontWeight:'700'
                           }}>✓</button>
                           {facturesParTx[t.id] > 1 && (
-                            <span title={`${facturesParTx[t.id]} factures liées à ce mouvement`} style={{ position:'absolute', top:'-6px', right:'-7px', minWidth:'17px', height:'17px', padding:'0 3px', boxSizing:'border-box', borderRadius:'9px', background:'#0f172a', color:'#fff', fontSize:'10px', fontWeight:'800', lineHeight:'17px', textAlign:'center', boxShadow:'0 0 0 2px #fff' }}>+{facturesParTx[t.id] - 1}</span>
+                            <span title={`${facturesParTx[t.id]} factures liées à ce mouvement`} style={{ position:'absolute', top:'-6px', right:'-7px', minWidth:'17px', height:'17px', padding:'0 3px', boxSizing:'border-box', borderRadius:'9px', background:COUL.texteFort, color:COUL.blanc, fontSize:'10px', fontWeight:'800', lineHeight:'17px', textAlign:'center', boxShadow:'0 0 0 2px #fff' }}>+{facturesParTx[t.id] - 1}</span>
                           )}
                           </span>
                         ) : t.sans_facture ? (
                           <button onClick={()=>marquerSansFacture(t, false)} title="Sans facture nécessaire — cliquer pour annuler" style={{
                             display:'flex', alignItems:'center', justifyContent:'center', width:'30px', height:'30px',
-                            borderRadius:'7px', border:'1px solid #99f6e4', background:'#f0fdfa', color:'#0d9488', cursor:'pointer', fontSize:'15px', fontWeight:'700'
+                            borderRadius:'7px', border:'1px solid #99f6e4', background:COUL.tealFond, color:COUL.teal, cursor:'pointer', fontSize:'15px', fontWeight:'700'
                           }}><i className="ti ti-file-off" /></button>
                         ) : t.en_attente_facture ? (
                           <button onClick={(e)=>ouvrirMenuCroix(e, t)} title="En attente de facture — cliquer pour lier ou changer" style={{
                             display:'flex', alignItems:'center', justifyContent:'center', width:'30px', height:'30px',
-                            borderRadius:'7px', border:'1px solid #e2e8f0', background:'#f1f5f9', color:'#64748b', cursor:'pointer', fontSize:'16px', fontWeight:'700'
+                            borderRadius:'7px', border:'1px solid #e2e8f0', background:COUL.fondDoux, color:COUL.texteDoux, cursor:'pointer', fontSize:'16px', fontWeight:'700'
                           }}><i className="ti ti-clock" /></button>
                         ) : (
                           <button onClick={(e)=>ouvrirMenuCroix(e, t)} title="Aucune facture — cliquer pour choisir" style={{
                             display:'flex', alignItems:'center', justifyContent:'center', width:'30px', height:'30px',
-                            borderRadius:'7px', border:'none', background:'#fee2e2', color:'#dc2626', cursor:'pointer', fontSize:'16px', fontWeight:'700'
+                            borderRadius:'7px', border:'none', background:COUL.dangerFond, color:COUL.danger, cursor:'pointer', fontSize:'16px', fontWeight:'700'
                           }}>✕</button>
                         )}
                       </div>
@@ -1097,75 +1098,75 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
 <span style={{ position:'relative', display:'inline-flex' }}>
                     <button onClick={()=>ouvrirFactureLiee(t)} title={`Facture liée :\n${cheminFacture(t.facture_url)}\n\nCliquer pour ouvrir dans SharePoint`} style={{
                       display:'flex', alignItems:'center', justifyContent:'center', width:'26px', height:'26px',
-                      borderRadius:'6px', border:'none', background:'#16a34a', color:'#fff', cursor:'pointer', fontSize:'15px', fontWeight:'700'
+                      borderRadius:'6px', border:'none', background:COUL.succes, color:COUL.blanc, cursor:'pointer', fontSize:'15px', fontWeight:'700'
                     }}>✓</button>
                     {facturesParTx[t.id] > 1 && (
-                      <span title={`${facturesParTx[t.id]} factures liées à ce mouvement`} style={{ position:'absolute', top:'-6px', right:'-7px', minWidth:'16px', height:'16px', padding:'0 3px', boxSizing:'border-box', borderRadius:'8px', background:'#0f172a', color:'#fff', fontSize:'10px', fontWeight:'800', lineHeight:'16px', textAlign:'center', boxShadow:'0 0 0 2px #fff' }}>+{facturesParTx[t.id] - 1}</span>
+                      <span title={`${facturesParTx[t.id]} factures liées à ce mouvement`} style={{ position:'absolute', top:'-6px', right:'-7px', minWidth:'16px', height:'16px', padding:'0 3px', boxSizing:'border-box', borderRadius:'8px', background:COUL.texteFort, color:COUL.blanc, fontSize:'10px', fontWeight:'800', lineHeight:'16px', textAlign:'center', boxShadow:'0 0 0 2px #fff' }}>+{facturesParTx[t.id] - 1}</span>
                     )}
                     </span>
                   ) : t.sans_facture ? (
                     <button onClick={()=>marquerSansFacture(t, false)} title="Sans facture nécessaire — cliquer pour annuler" style={{
                       display:'flex', alignItems:'center', justifyContent:'center', width:'26px', height:'26px',
-                      borderRadius:'6px', border:'1px solid #99f6e4', background:'#f0fdfa', color:'#0d9488', cursor:'pointer', fontSize:'14px', fontWeight:'700'
+                      borderRadius:'6px', border:'1px solid #99f6e4', background:COUL.tealFond, color:COUL.teal, cursor:'pointer', fontSize:'14px', fontWeight:'700'
                     }}><i className="ti ti-file-off" /></button>
                   ) : t.en_attente_facture ? (
                     <button onClick={(e)=>ouvrirMenuCroix(e, t)} title="En attente de facture — cliquer pour lier ou changer" style={{
                       display:'flex', alignItems:'center', justifyContent:'center', width:'26px', height:'26px',
-                      borderRadius:'6px', border:'1px solid #e2e8f0', background:'#f1f5f9', color:'#64748b', cursor:'pointer', fontSize:'15px', fontWeight:'700'
+                      borderRadius:'6px', border:'1px solid #e2e8f0', background:COUL.fondDoux, color:COUL.texteDoux, cursor:'pointer', fontSize:'15px', fontWeight:'700'
                     }}><i className="ti ti-clock" /></button>
                   ) : (
                     <button onClick={(e)=>ouvrirMenuCroix(e, t)} title="Aucune facture — cliquer pour choisir" style={{
                       display:'flex', alignItems:'center', justifyContent:'center', width:'26px', height:'26px',
-                      borderRadius:'6px', border:'none', background:'#fee2e2', color:'#dc2626', cursor:'pointer', fontSize:'15px', fontWeight:'700'
+                      borderRadius:'6px', border:'none', background:COUL.dangerFond, color:COUL.danger, cursor:'pointer', fontSize:'15px', fontWeight:'700'
                     }}>✕</button>
                   )}
                 </div>
-                <div style={{ fontSize:'12px', color:'#64748b' }}>
+                <div style={{ fontSize:'12px', color:COUL.texteDoux }}>
                   {fmtDate(t._date)}
                 </div>
-                <div style={{ fontSize:'11px', color:'#94a3b8', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                <div style={{ fontSize:'11px', color:COUL.texteFaible, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                   {t.comptes_bancaires?.banque || '—'}
                 </div>
                 <div
                   onMouseEnter={() => t.facture_url && setApercuFacture({ thumb: apercuUrl(fichierParTx[t.id]), lien: urlVisionneuse(t.facture_url), nom: cheminFacture(t.facture_url) })}
                   onMouseLeave={() => setApercuFacture(null)}
-                  style={{ fontSize:'12px', color: t.facture_url ? '#16a34a' : '#64748b', fontWeight: t.facture_url ? '600' : '400', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', cursor: t.facture_url ? 'zoom-in' : 'default' }}>
+                  style={{ fontSize:'12px', color: t.facture_url ? '#16a34a' : COUL.texteDoux, fontWeight: t.facture_url ? '600' : '400', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', cursor: t.facture_url ? 'zoom-in' : 'default' }}>
                   {t.contrepartie_nom || '—'}{t.facture_url ? ' 🔍' : ''}
                 </div>
-                <div style={{ fontSize:'13px', color:'#1e293b', fontWeight:'500', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', paddingRight:'12px' }}>
+                <div style={{ fontSize:'13px', color:COUL.texte, fontWeight:'500', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', paddingRight:'12px' }}>
                   {t.information_paiement || t.description || '—'}
                 </div>
                 <div style={{ overflow:'hidden' }}>
                   {cat ? (
                     <span style={{ fontSize:'11px', fontWeight:'600', padding:'2px 8px', borderRadius:'10px', background:`${cat.couleur}18`, color:cat.couleur, whiteSpace:'nowrap' }}>{cat.nom}</span>
                   ) : (
-                    <span style={{ fontSize:'11px', color:'#cbd5e1' }}>—</span>
+                    <span style={{ fontSize:'11px', color:COUL.bordFort }}>—</span>
                   )}
                 </div>
                 <div
                   onMouseEnter={e=>setApercu({ tx:t, x:e.clientX, y:e.clientY })}
                   onMouseMove={e=>setApercu(a=>a&&a.tx.id===t.id?{ ...a, x:e.clientX, y:e.clientY }:a)}
                   onMouseLeave={()=>setApercu(null)}
-                  style={{ textAlign:'right', fontSize:'14px', fontWeight:'700', color: parseFloat(t.montant)>=0?'#16a34a':'#dc2626', cursor:'help' }}>
+                  style={{ textAlign:'right', fontSize:'14px', fontWeight:'700', color: parseFloat(t.montant)>=0?'#16a34a':COUL.danger, cursor:'help' }}>
                   {parseFloat(t.montant)>=0?'+':''}{fmt(t.montant)}
                 </div>
               </div>
             )})}
             {/* Footer totaux */}
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:'10px', padding:'10px 16px', background:'#f8fafc', borderTop:'2px solid #e2e8f0', fontSize:'12px', fontWeight:'700' }}>
-              <div style={{ color:'#64748b' }}>{txFiltrees.length} transaction{txFiltrees.length>1?'s':''}</div>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:'10px', padding:'10px 16px', background:COUL.fond, borderTop:'2px solid #e2e8f0', fontSize:'12px', fontWeight:'700' }}>
+              <div style={{ color:COUL.texteDoux }}>{txFiltrees.length} transaction{txFiltrees.length>1?'s':''}</div>
               <div style={{ textAlign:'right' }}>
-                <span style={{ color:'#16a34a' }}>+{fmt(totalEntrees)}</span>
-                <span style={{ color:'#94a3b8', margin:'0 4px' }}>·</span>
-                <span style={{ color:'#dc2626' }}>{fmt(totalSorties)}</span>
+                <span style={{ color:COUL.succes }}>+{fmt(totalEntrees)}</span>
+                <span style={{ color:COUL.texteFaible, margin:'0 4px' }}>·</span>
+                <span style={{ color:COUL.danger }}>{fmt(totalSorties)}</span>
               </div>
             </div>
             {/* Pagination */}
             {totalPages > 1 && (
               <div style={{ display:'flex', justifyContent:'center', alignItems:'center', gap:'8px', padding:'14px 16px', borderTop:'1px solid #f1f5f9' }}>
-                <button onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={pageActuelle<=1} style={{ padding:'6px 14px', borderRadius:'6px', fontSize:'13px', fontWeight:'600', border:'1px solid #e2e8f0', background: pageActuelle<=1?'#f1f5f9':'#fff', color: pageActuelle<=1?'#cbd5e1':color, cursor: pageActuelle<=1?'default':'pointer' }}>← Précédent</button>
-                <span style={{ fontSize:'13px', color:'#64748b', fontWeight:'600', minWidth:'120px', textAlign:'center' }}>Page {pageActuelle} / {totalPages}</span>
-                <button onClick={()=>setPage(p=>Math.min(totalPages,p+1))} disabled={pageActuelle>=totalPages} style={{ padding:'6px 14px', borderRadius:'6px', fontSize:'13px', fontWeight:'600', border:'1px solid #e2e8f0', background: pageActuelle>=totalPages?'#f1f5f9':'#fff', color: pageActuelle>=totalPages?'#cbd5e1':color, cursor: pageActuelle>=totalPages?'default':'pointer' }}>Suivant →</button>
+                <button onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={pageActuelle<=1} style={{ padding:'6px 14px', borderRadius:'6px', fontSize:'13px', fontWeight:'600', border:'1px solid #e2e8f0', background: pageActuelle<=1?'#f1f5f9':COUL.blanc, color: pageActuelle<=1?'#cbd5e1':color, cursor: pageActuelle<=1?'default':'pointer' }}>← Précédent</button>
+                <span style={{ fontSize:'13px', color:COUL.texteDoux, fontWeight:'600', minWidth:'120px', textAlign:'center' }}>Page {pageActuelle} / {totalPages}</span>
+                <button onClick={()=>setPage(p=>Math.min(totalPages,p+1))} disabled={pageActuelle>=totalPages} style={{ padding:'6px 14px', borderRadius:'6px', fontSize:'13px', fontWeight:'600', border:'1px solid #e2e8f0', background: pageActuelle>=totalPages?'#f1f5f9':COUL.blanc, color: pageActuelle>=totalPages?'#cbd5e1':color, cursor: pageActuelle>=totalPages?'default':'pointer' }}>Suivant →</button>
               </div>
             )}
           </>
@@ -1177,36 +1178,36 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
         <>
           <div onClick={()=>setMenuCroix(null)} style={{ position:'fixed', inset:0, zIndex:1000 }} />
           <div style={{
-            position:'fixed', top: menuCroix.top, left: menuCroix.left, zIndex:1001, background:'#fff',
+            position:'fixed', top: menuCroix.top, left: menuCroix.left, zIndex:1001, background:COUL.blanc,
             border:'1px solid #e2e8f0', borderRadius:'10px', boxShadow:'0 12px 32px rgba(0,0,0,0.18)',
             padding:'6px', minWidth:'220px', fontFamily:"'Source Sans Pro', sans-serif"
           }}>
             <button onClick={()=>{ const tx = menuCroix.tx; setMenuCroix(null); lierFactureManuelle(tx) }} style={{
               display:'flex', alignItems:'center', gap:'10px', width:'100%', padding:'9px 12px', border:'none', background:'none',
-              cursor:'pointer', fontSize:'13px', fontWeight:'600', color:'#0f172a', borderRadius:'7px', textAlign:'left'
+              cursor:'pointer', fontSize:'13px', fontWeight:'600', color:COUL.texteFort, borderRadius:'7px', textAlign:'left'
             }} onMouseEnter={e=>e.currentTarget.style.background='#f1f5f9'} onMouseLeave={e=>e.currentTarget.style.background='none'}>
               <i className="ti ti-paperclip" style={{ fontSize:'17px', color:color }} /> Lier une facture
             </button>
             {menuCroix.tx.en_attente_facture ? (
               <button onClick={()=>{ const tx = menuCroix.tx; setMenuCroix(null); marquerEnAttente(tx, false) }} style={{
                 display:'flex', alignItems:'center', gap:'10px', width:'100%', padding:'9px 12px', border:'none', background:'none',
-                cursor:'pointer', fontSize:'13px', fontWeight:'600', color:'#0f172a', borderRadius:'7px', textAlign:'left'
+                cursor:'pointer', fontSize:'13px', fontWeight:'600', color:COUL.texteFort, borderRadius:'7px', textAlign:'left'
               }} onMouseEnter={e=>e.currentTarget.style.background='#f1f5f9'} onMouseLeave={e=>e.currentTarget.style.background='none'}>
-                <i className="ti ti-arrow-back-up" style={{ fontSize:'17px', color:'#64748b' }} /> Repasser à justifier
+                <i className="ti ti-arrow-back-up" style={{ fontSize:'17px', color:COUL.texteDoux }} /> Repasser à justifier
               </button>
             ) : (
               <button onClick={()=>{ const tx = menuCroix.tx; setMenuCroix(null); marquerEnAttente(tx, true) }} style={{
                 display:'flex', alignItems:'center', gap:'10px', width:'100%', padding:'9px 12px', border:'none', background:'none',
-                cursor:'pointer', fontSize:'13px', fontWeight:'600', color:'#0f172a', borderRadius:'7px', textAlign:'left'
+                cursor:'pointer', fontSize:'13px', fontWeight:'600', color:COUL.texteFort, borderRadius:'7px', textAlign:'left'
               }} onMouseEnter={e=>e.currentTarget.style.background='#f1f5f9'} onMouseLeave={e=>e.currentTarget.style.background='none'}>
-                <i className="ti ti-clock" style={{ fontSize:'17px', color:'#64748b' }} /> En attente de facture
+                <i className="ti ti-clock" style={{ fontSize:'17px', color:COUL.texteDoux }} /> En attente de facture
               </button>
             )}
             <button onClick={()=>{ const tx = menuCroix.tx; setMenuCroix(null); marquerSansFacture(tx, true) }} style={{
               display:'flex', alignItems:'center', gap:'10px', width:'100%', padding:'9px 12px', border:'none', background:'none',
-              cursor:'pointer', fontSize:'13px', fontWeight:'600', color:'#0f172a', borderRadius:'7px', textAlign:'left'
+              cursor:'pointer', fontSize:'13px', fontWeight:'600', color:COUL.texteFort, borderRadius:'7px', textAlign:'left'
             }} onMouseEnter={e=>e.currentTarget.style.background='#f1f5f9'} onMouseLeave={e=>e.currentTarget.style.background='none'}>
-              <i className="ti ti-file-off" style={{ fontSize:'17px', color:'#0d9488' }} /> Sans facture nécessaire
+              <i className="ti ti-file-off" style={{ fontSize:'17px', color:COUL.teal }} /> Sans facture nécessaire
             </button>
           </div>
         </>
@@ -1236,25 +1237,25 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
         return (
         <div style={{
           position:'fixed', bottom:'24px', left:'50%', transform:'translateX(-50%)', zIndex:200,
-          background:'#0f172a', color:'#fff', borderRadius:'12px', padding:'12px 18px',
+          background:COUL.texteFort, color:COUL.blanc, borderRadius:'12px', padding:'12px 18px',
           display:'flex', alignItems:'center', gap:'16px', boxShadow:'0 8px 30px rgba(0,0,0,0.25)',
           fontFamily:"'Source Sans Pro', sans-serif"
         }}>
           <span style={{ fontSize:'14px', fontWeight:'600' }}>
             {selection.size} mouvement{selection.size>1?'s':''}
-            <span style={{ color:'#94a3b8', margin:'0 8px' }}>·</span>
+            <span style={{ color:COUL.texteFaible, margin:'0 8px' }}>·</span>
             <span style={{ fontWeight:'800' }}>{fmt(totalSel)}</span>
           </span>
           <button onClick={justifierSelection} style={{
-            padding:'8px 16px', borderRadius:'8px', border:'none', background:color, color:'#fff',
+            padding:'8px 16px', borderRadius:'8px', border:'none', background:color, color:COUL.blanc,
             cursor:'pointer', fontSize:'13px', fontWeight:'700', fontFamily:"'Source Sans Pro', sans-serif"
           }}>🔗 Justifier avec une facture</button>
           <button onClick={marquerSelectionSansFacture} style={{
-            padding:'8px 16px', borderRadius:'8px', border:'none', background:'#0d9488', color:'#fff',
+            padding:'8px 16px', borderRadius:'8px', border:'none', background:COUL.teal, color:COUL.blanc,
             cursor:'pointer', fontSize:'13px', fontWeight:'700', fontFamily:"'Source Sans Pro', sans-serif"
           }}>Sans facture nécessaire</button>
           <button onClick={viderSelection} style={{
-            padding:'8px 12px', borderRadius:'8px', border:'1px solid #334155', background:'transparent', color:'#cbd5e1',
+            padding:'8px 12px', borderRadius:'8px', border:'1px solid #334155', background:'transparent', color:COUL.bordFort,
             cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif"
           }}>Annuler</button>
         </div>
@@ -1265,20 +1266,20 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       {apercuFacture && !isMobile && (
         <div style={{
           position:'fixed', top:'50%', right:'32px', transform:'translateY(-50%)', zIndex:250,
-          width:'440px', maxWidth:'40vw', maxHeight:'86vh', background:'#fff', borderRadius:'14px',
+          width:'440px', maxWidth:'40vw', maxHeight:'86vh', background:COUL.blanc, borderRadius:'14px',
           boxShadow:'0 20px 60px rgba(0,0,0,0.35)', border:'1px solid #e2e8f0', overflow:'hidden',
           display:'flex', flexDirection:'column', pointerEvents:'none'
         }}>
-          <div style={{ padding:'10px 14px', background:'#0f172a', color:'#fff', fontSize:'12px', fontWeight:'600',
+          <div style={{ padding:'10px 14px', background:COUL.texteFort, color:COUL.blanc, fontSize:'12px', fontWeight:'600',
             fontFamily:"'Source Sans Pro', sans-serif", whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
             📄 {apercuFacture.nom}
           </div>
           {apercuFacture.thumb ? (
             <img src={apercuFacture.thumb} alt="Aperçu facture" style={{ width:'100%', height:'auto', display:'block', objectFit:'contain' }} />
           ) : apercuFacture.lien ? (
-            <iframe src={apercuFacture.lien} title="Aperçu facture" style={{ width:'100%', height:'70vh', border:'none', display:'block', background:'#fff' }} />
+            <iframe src={apercuFacture.lien} title="Aperçu facture" style={{ width:'100%', height:'70vh', border:'none', display:'block', background:COUL.blanc }} />
           ) : (
-            <div style={{ padding:'30px 20px', textAlign:'center', color:'#94a3b8', fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif" }}>
+            <div style={{ padding:'30px 20px', textAlign:'center', color:COUL.texteFaible, fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif" }}>
               Aucun aperçu disponible<br/><span style={{ fontSize:'11px' }}>Cliquez sur le ✓ pour ouvrir la facture</span>
             </div>
           )}
@@ -1295,19 +1296,19 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
         const top = Math.min(apercu.y + 16, (typeof window!=='undefined'?window.innerHeight:800) - 260)
         const L = ({ k, v }) => v ? (
           <div style={{ display:'flex', gap:'8px', padding:'3px 0' }}>
-            <span style={{ fontSize:'11px', color:'#94a3b8', fontWeight:'700', minWidth:'92px', textTransform:'uppercase', letterSpacing:'0.03em' }}>{k}</span>
-            <span style={{ fontSize:'12px', color:'#1e293b', wordBreak:'break-word' }}>{v}</span>
+            <span style={{ fontSize:'11px', color:COUL.texteFaible, fontWeight:'700', minWidth:'92px', textTransform:'uppercase', letterSpacing:'0.03em' }}>{k}</span>
+            <span style={{ fontSize:'12px', color:COUL.texte, wordBreak:'break-word' }}>{v}</span>
           </div>
         ) : null
         return (
           <div style={{
             position:'fixed', left, top, zIndex:1500, width:'320px',
-            background:'#fff', border:'1px solid #e2e8f0', borderRadius:'12px',
+            background:COUL.blanc, border:'1px solid #e2e8f0', borderRadius:'12px',
             boxShadow:'0 12px 40px rgba(15,23,42,0.22)', padding:'14px 16px', pointerEvents:'none'
           }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'8px', paddingBottom:'8px', borderBottom:'1px solid #f1f5f9' }}>
-              <span style={{ fontSize:'12px', color:'#64748b', fontWeight:'600' }}>{fmtDate(t._date)}</span>
-              <span style={{ fontSize:'18px', fontWeight:'800', color: positif?'#16a34a':'#dc2626' }}>{positif?'+':''}{fmt(t.montant)}</span>
+              <span style={{ fontSize:'12px', color:COUL.texteDoux, fontWeight:'600' }}>{fmtDate(t._date)}</span>
+              <span style={{ fontSize:'18px', fontWeight:'800', color: positif?'#16a34a':COUL.danger }}>{positif?'+':''}{fmt(t.montant)}</span>
             </div>
             <L k="Contrepartie" v={t.contrepartie_nom} />
             <L k="Communication" v={t.information_paiement} />
@@ -1315,7 +1316,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
             <L k="Compte" v={t.comptes_bancaires?.banque} />
             <L k="Catégorie" v={cat?.nom} />
             <L k="Type" v={t.type_transaction} />
-            <div style={{ marginTop:'8px', paddingTop:'8px', borderTop:'1px solid #f1f5f9', fontSize:'11px', color:'#cbd5e1', textAlign:'center' }}>
+            <div style={{ marginTop:'8px', paddingTop:'8px', borderTop:'1px solid #f1f5f9', fontSize:'11px', color:COUL.bordFort, textAlign:'center' }}>
               Cliquez pour figer le détail
             </div>
           </div>
@@ -1328,38 +1329,38 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
         const positif = parseFloat(t.montant) >= 0
         const Row = ({ label, value }) => (
           <div style={{ display:'flex', padding:'10px 0', borderBottom:'1px solid #f1f5f9' }}>
-            <div style={{ width:'160px', flexShrink:0, fontSize:'12px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.04em' }}>{label}</div>
-            <div style={{ fontSize:'14px', color:'#1e293b', wordBreak:'break-word' }}>{value || '—'}</div>
+            <div style={{ width:'160px', flexShrink:0, fontSize:'12px', fontWeight:'700', color:COUL.texteFaible, textTransform:'uppercase', letterSpacing:'0.04em' }}>{label}</div>
+            <div style={{ fontSize:'14px', color:COUL.texte, wordBreak:'break-word' }}>{value || '—'}</div>
           </div>
         )
         return (
           <div onClick={()=>setTxSelection(null)} style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:'20px' }}>
-            <div onClick={e=>e.stopPropagation()} style={{ background:'#fff', borderRadius:'16px', maxWidth:'560px', width:'100%', maxHeight:'85vh', overflow:'auto', boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }}>
+            <div onClick={e=>e.stopPropagation()} style={{ background:COUL.blanc, borderRadius:'16px', maxWidth:'560px', width:'100%', maxHeight:'85vh', overflow:'auto', boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }}>
               <div style={{ padding:'20px 24px', background:`linear-gradient(135deg, ${color}, ${colorDark||color})`, borderRadius:'16px 16px 0 0', display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
                 <div>
                   <div style={{ fontSize:'12px', color:'rgba(255,255,255,0.7)', fontWeight:'600' }}>{fmtDate(t._date)}</div>
-                  <div style={{ fontSize:'28px', fontWeight:'800', color:'#fff' }}>{positif?'+':''}{fmt(t.montant)}</div>
+                  <div style={{ fontSize:'28px', fontWeight:'800', color:COUL.blanc }}>{positif?'+':''}{fmt(t.montant)}</div>
                 </div>
-                <button onClick={()=>setTxSelection(null)} style={{ background:'rgba(255,255,255,0.2)', border:'none', borderRadius:'8px', width:'32px', height:'32px', color:'#fff', fontSize:'18px', cursor:'pointer' }}>×</button>
+                <button onClick={()=>setTxSelection(null)} style={{ background:'rgba(255,255,255,0.2)', border:'none', borderRadius:'8px', width:'32px', height:'32px', color:COUL.blanc, fontSize:'18px', cursor:'pointer' }}>×</button>
               </div>
               <div style={{ padding:'20px 24px' }}>
                 {/* Rapprochement facture */}
-                <div style={{ marginBottom:'18px', padding:'14px', border:`1px solid ${t.facture_url?'#bbf7d0':t.sans_facture?'#99f6e4':t.en_attente_facture?'#e2e8f0':'#fecaca'}`, borderRadius:'10px', background: t.facture_url?'#f0fdf4':t.sans_facture?'#f0fdfa':t.en_attente_facture?'#f1f5f9':'#fef2f2' }}>
-                  <div style={{ fontSize:'12px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'10px' }}>Facture</div>
+                <div style={{ marginBottom:'18px', padding:'14px', border:`1px solid ${t.facture_url?'#bbf7d0':t.sans_facture?'#99f6e4':t.en_attente_facture?'#e2e8f0':COUL.dangerBord}`, borderRadius:'10px', background: t.facture_url?'#f0fdf4':t.sans_facture?'#f0fdfa':t.en_attente_facture?'#f1f5f9':COUL.dangerFondDoux }}>
+                  <div style={{ fontSize:'12px', fontWeight:'700', color:COUL.texteFaible, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'10px' }}>Facture</div>
                   {t.facture_url ? (
                     <div>
                       <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'10px' }}>
-                        <span style={{ display:'flex', alignItems:'center', justifyContent:'center', width:'22px', height:'22px', borderRadius:'6px', background:'#16a34a', color:'#fff', fontSize:'13px', fontWeight:'700' }}>✓</span>
-                        <span style={{ fontSize:'14px', color:'#16a34a', fontWeight:'700' }}>Facture liée</span>
+                        <span style={{ display:'flex', alignItems:'center', justifyContent:'center', width:'22px', height:'22px', borderRadius:'6px', background:COUL.succes, color:COUL.blanc, fontSize:'13px', fontWeight:'700' }}>✓</span>
+                        <span style={{ fontSize:'14px', color:COUL.succes, fontWeight:'700' }}>Facture liée</span>
                       </div>
                       <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
-                        <button onClick={()=>ouvrirFactureLiee(t)} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', borderRadius:'8px', border:'none', background:'#16a34a', color:'#fff', cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                        <button onClick={()=>ouvrirFactureLiee(t)} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', borderRadius:'8px', border:'none', background:COUL.succes, color:COUL.blanc, cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
                           📄 Ouvrir la facture
                         </button>
-                        <button onClick={()=>lierFactureManuelle(t)} style={{ padding:'8px 14px', borderRadius:'8px', border:'1px solid #cbd5e1', background:'#fff', color:'#475569', cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                        <button onClick={()=>lierFactureManuelle(t)} style={{ padding:'8px 14px', borderRadius:'8px', border:'1px solid #cbd5e1', background:COUL.blanc, color:COUL.texteMoyen, cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
                           Changer le lien
                         </button>
-                        <button onClick={()=>retirerLienFacture(t)} style={{ padding:'8px 14px', borderRadius:'8px', border:'1px solid #fecaca', background:'#fff', color:'#dc2626', cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                        <button onClick={()=>retirerLienFacture(t)} style={{ padding:'8px 14px', borderRadius:'8px', border:'1px solid #fecaca', background:COUL.blanc, color:COUL.danger, cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
                           Retirer
                         </button>
                       </div>
@@ -1367,14 +1368,14 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                   ) : t.sans_facture ? (
                     <div>
                       <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'10px' }}>
-                        <span style={{ display:'flex', alignItems:'center', justifyContent:'center', width:'22px', height:'22px', borderRadius:'6px', background:'#f0fdfa', border:'1px solid #99f6e4', color:'#0d9488', fontSize:'12px', fontWeight:'700' }}><i className="ti ti-file-off" /></span>
-                        <span style={{ fontSize:'14px', color:'#0d9488', fontWeight:'700' }}>Sans facture nécessaire</span>
+                        <span style={{ display:'flex', alignItems:'center', justifyContent:'center', width:'22px', height:'22px', borderRadius:'6px', background:COUL.tealFond, border:'1px solid #99f6e4', color:COUL.teal, fontSize:'12px', fontWeight:'700' }}><i className="ti ti-file-off" /></span>
+                        <span style={{ fontSize:'14px', color:COUL.teal, fontWeight:'700' }}>Sans facture nécessaire</span>
                       </div>
                       <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
-                        <button onClick={()=>lierFactureManuelle(t)} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', borderRadius:'8px', border:'none', background:color, color:'#fff', cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                        <button onClick={()=>lierFactureManuelle(t)} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', borderRadius:'8px', border:'none', background:color, color:COUL.blanc, cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
                           🔗 Lier une facture finalement
                         </button>
-                        <button onClick={()=>marquerSansFacture(t, false)} style={{ padding:'8px 14px', borderRadius:'8px', border:'1px solid #cbd5e1', background:'#fff', color:'#475569', cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                        <button onClick={()=>marquerSansFacture(t, false)} style={{ padding:'8px 14px', borderRadius:'8px', border:'1px solid #cbd5e1', background:COUL.blanc, color:COUL.texteMoyen, cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
                           Annuler « sans facture »
                         </button>
                       </div>
@@ -1382,14 +1383,14 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                   ) : t.en_attente_facture ? (
                     <div>
                       <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'10px' }}>
-                        <span style={{ display:'flex', alignItems:'center', justifyContent:'center', width:'22px', height:'22px', borderRadius:'6px', background:'#f1f5f9', border:'1px solid #e2e8f0', color:'#64748b', fontSize:'12px', fontWeight:'700' }}><i className="ti ti-clock" /></span>
-                        <span style={{ fontSize:'14px', color:'#64748b', fontWeight:'700' }}>En attente de facture</span>
+                        <span style={{ display:'flex', alignItems:'center', justifyContent:'center', width:'22px', height:'22px', borderRadius:'6px', background:COUL.fondDoux, border:'1px solid #e2e8f0', color:COUL.texteDoux, fontSize:'12px', fontWeight:'700' }}><i className="ti ti-clock" /></span>
+                        <span style={{ fontSize:'14px', color:COUL.texteDoux, fontWeight:'700' }}>En attente de facture</span>
                       </div>
                       <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
-                        <button onClick={()=>lierFactureManuelle(t)} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', borderRadius:'8px', border:'none', background:color, color:'#fff', cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                        <button onClick={()=>lierFactureManuelle(t)} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', borderRadius:'8px', border:'none', background:color, color:COUL.blanc, cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
                           🔗 La facture est arrivée — la lier
                         </button>
-                        <button onClick={()=>marquerEnAttente(t, false)} style={{ padding:'8px 14px', borderRadius:'8px', border:'1px solid #cbd5e1', background:'#fff', color:'#475569', cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                        <button onClick={()=>marquerEnAttente(t, false)} style={{ padding:'8px 14px', borderRadius:'8px', border:'1px solid #cbd5e1', background:COUL.blanc, color:COUL.texteMoyen, cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
                           Repasser à justifier
                         </button>
                       </div>
@@ -1397,17 +1398,17 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                   ) : (
                     <div>
                       <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'10px' }}>
-                        <span style={{ display:'flex', alignItems:'center', justifyContent:'center', width:'22px', height:'22px', borderRadius:'6px', background:'#fee2e2', color:'#dc2626', fontSize:'13px', fontWeight:'700' }}>✕</span>
-                        <span style={{ fontSize:'14px', color:'#dc2626', fontWeight:'700' }}>Aucune facture liée</span>
+                        <span style={{ display:'flex', alignItems:'center', justifyContent:'center', width:'22px', height:'22px', borderRadius:'6px', background:COUL.dangerFond, color:COUL.danger, fontSize:'13px', fontWeight:'700' }}>✕</span>
+                        <span style={{ fontSize:'14px', color:COUL.danger, fontWeight:'700' }}>Aucune facture liée</span>
                       </div>
                       <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
-                        <button onClick={()=>lierFactureManuelle(t)} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', borderRadius:'8px', border:'none', background:color, color:'#fff', cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                        <button onClick={()=>lierFactureManuelle(t)} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', borderRadius:'8px', border:'none', background:color, color:COUL.blanc, cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
                           🔗 Ajouter le lien de la facture
                         </button>
-                        <button onClick={()=>marquerEnAttente(t, true)} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', borderRadius:'8px', border:'1px solid #e2e8f0', background:'#f1f5f9', color:'#64748b', cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                        <button onClick={()=>marquerEnAttente(t, true)} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', borderRadius:'8px', border:'1px solid #e2e8f0', background:COUL.fondDoux, color:COUL.texteDoux, cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
                           <i className="ti ti-clock" /> En attente de facture
                         </button>
-                        <button onClick={()=>marquerSansFacture(t, true)} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', borderRadius:'8px', border:'none', background:'#0d9488', color:'#fff', cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                        <button onClick={()=>marquerSansFacture(t, true)} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', borderRadius:'8px', border:'none', background:COUL.teal, color:COUL.blanc, cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
                           <i className="ti ti-file-off" /> Sans facture nécessaire
                         </button>
                       </div>
@@ -1416,12 +1417,12 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                 </div>
                 {activitesSoc.length > 0 && (
                   <div style={{ marginBottom:'18px' }}>
-                    <div style={{ fontSize:'12px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'8px' }}>Activité</div>
+                    <div style={{ fontSize:'12px', fontWeight:'700', color:COUL.texteFaible, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'8px' }}>Activité</div>
                     <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
                       {activitesSoc.map(a => {
                         const on = t.activite === a.code
                         return (
-                          <button key={a.code} onClick={()=>assignerActivite(t.id, on ? null : a.code)} style={{ flex:'1 1 0', minWidth:'90px', padding:'9px 12px', borderRadius:'8px', fontSize:'13px', fontWeight:'700', cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif", border: on ? `2px solid ${a.couleur||'#1e293b'}` : '1px solid #e2e8f0', background: on ? (a.couleur||'#1e293b')+'22' : '#fff', color: on ? '#1e293b' : '#64748b' }}>
+                          <button key={a.code} onClick={()=>assignerActivite(t.id, on ? null : a.code)} style={{ flex:'1 1 0', minWidth:'90px', padding:'9px 12px', borderRadius:'8px', fontSize:'13px', fontWeight:'700', cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif", border: on ? `2px solid ${a.couleur||'#1e293b'}` : '1px solid #e2e8f0', background: on ? (a.couleur||'#1e293b')+'22' : COUL.blanc, color: on ? '#1e293b' : COUL.texteDoux }}>
                             {a.label}
                           </button>
                         )
@@ -1432,7 +1433,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                 <VentilationEditor tx={t} categories={categories} activitesSoc={activitesSoc} color={color} onSaved={chargerVentilations} />
                 {/* Sélecteur catégorie */}
                 <div style={{ marginBottom:'18px' }}>
-                  <div style={{ fontSize:'12px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'8px' }}>Catégorie</div>
+                  <div style={{ fontSize:'12px', fontWeight:'700', color:COUL.texteFaible, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'8px' }}>Catégorie</div>
                   <select value={parentIdDe(t.categorie_id)} onChange={e=>assignerCategorie(t.id, e.target.value || null)} style={{ width:'100%', padding:'10px 12px', border:'1px solid #e2e8f0', borderRadius:'8px', fontSize:'14px', fontFamily:"'Source Sans Pro', sans-serif", cursor:'pointer' }}>
                     <option value="">— Non catégorisé —</option>
                     <optgroup label="Rentrées">
@@ -1460,12 +1461,12 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                   )}
                   {/* Création manuelle de catégorie */}
                   {!nouvelleCat.ouvert ? (
-                    <button onClick={()=>setNouvelleCat(s=>({...s, ouvert:true}))} style={{ marginTop:'8px', width:'100%', padding:'9px 12px', borderRadius:'8px', fontSize:'13px', fontWeight:'600', border:'1px dashed #cbd5e1', background:'#f8fafc', color:'#475569', cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                    <button onClick={()=>setNouvelleCat(s=>({...s, ouvert:true}))} style={{ marginTop:'8px', width:'100%', padding:'9px 12px', borderRadius:'8px', fontSize:'13px', fontWeight:'600', border:'1px dashed #cbd5e1', background:COUL.fond, color:COUL.texteMoyen, cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>
                       ➕ Nouvelle catégorie
                     </button>
                   ) : (
-                    <div style={{ marginTop:'10px', padding:'12px', border:'1px solid #e2e8f0', borderRadius:'8px', background:'#f8fafc' }}>
-                      <div style={{ fontSize:'11px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'8px' }}>Nouvelle catégorie</div>
+                    <div style={{ marginTop:'10px', padding:'12px', border:'1px solid #e2e8f0', borderRadius:'8px', background:COUL.fond }}>
+                      <div style={{ fontSize:'11px', fontWeight:'700', color:COUL.texteFaible, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'8px' }}>Nouvelle catégorie</div>
                       <input
                         value={nouvelleCat.nom}
                         onChange={e=>setNouvelleCat(s=>({...s, nom:e.target.value}))}
@@ -1480,10 +1481,10 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                         <input type="color" value={nouvelleCat.couleur} onChange={e=>setNouvelleCat(s=>({...s, couleur:e.target.value}))} title="Couleur" style={{ width:'40px', height:'36px', border:'1px solid #e2e8f0', borderRadius:'6px', padding:'2px', cursor:'pointer' }} />
                       </div>
                       <div style={{ display:'flex', gap:'8px' }}>
-                        <button onClick={()=>creerCategorie(t.id)} style={{ flex:1, padding:'9px 12px', borderRadius:'7px', fontSize:'13px', fontWeight:'600', border:'none', background:'#0080BD', color:'#fff', cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                        <button onClick={()=>creerCategorie(t.id)} style={{ flex:1, padding:'9px 12px', borderRadius:'7px', fontSize:'13px', fontWeight:'600', border:'none', background:COUL.bleu, color:COUL.blanc, cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>
                           Créer et assigner
                         </button>
-                        <button onClick={()=>setNouvelleCat({ ouvert:false, nom:'', type:'depense', couleur:'#0080BD' })} style={{ padding:'9px 12px', borderRadius:'7px', fontSize:'13px', fontWeight:'600', border:'1px solid #e2e8f0', background:'#fff', color:'#64748b', cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                        <button onClick={()=>setNouvelleCat({ ouvert:false, nom:'', type:'depense', couleur:COUL.bleu })} style={{ padding:'9px 12px', borderRadius:'7px', fontSize:'13px', fontWeight:'600', border:'1px solid #e2e8f0', background:COUL.blanc, color:COUL.texteDoux, cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>
                           Annuler
                         </button>
                       </div>
@@ -1491,10 +1492,10 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                   )}
                 </div>
                 <div style={{ marginBottom:'18px' }}>
-                  <div style={{ fontSize:'12px', fontWeight:'700', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'8px' }}>Bénéficiaire (employé)</div>
+                  <div style={{ fontSize:'12px', fontWeight:'700', color:COUL.texteFaible, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'8px' }}>Bénéficiaire (employé)</div>
                   {(() => {
                     const selSt = { width:'100%', padding:'10px 12px', border:'1px solid #e2e8f0', borderRadius:'8px', fontSize:'14px', fontFamily:"'Source Sans Pro', sans-serif", cursor:'pointer' }
-                    const linkSt = { marginTop:'8px', width:'100%', padding:'9px 12px', borderRadius:'8px', fontSize:'13px', fontWeight:'600', border:'1px dashed #cbd5e1', background:'#f8fafc', color:'#475569', cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }
+                    const linkSt = { marginTop:'8px', width:'100%', padding:'9px 12px', borderRadius:'8px', fontSize:'13px', fontWeight:'600', border:'1px dashed #cbd5e1', background:COUL.fond, color:COUL.texteMoyen, cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }
                     const ventil = ventilations[t.id] || []
                     const enEdition = ventilDraft && ventilDraft.txId === t.id
                     if (enEdition) {
@@ -1502,7 +1503,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                       const abs = Math.abs(Number(t.montant) || 0)
                       const reste = abs - total
                       return (
-                        <div style={{ border:'1px solid #e2e8f0', borderRadius:'8px', padding:'12px', background:'#f8fafc' }}>
+                        <div style={{ border:'1px solid #e2e8f0', borderRadius:'8px', padding:'12px', background:COUL.fond }}>
                           {ventilDraft.lignes.map((l, i) => (
                             <div key={i} style={{ display:'flex', gap:'8px', marginBottom:'8px' }}>
                               <select value={l.employe_id || ''} onChange={e => { const v = e.target.value; setVentilDraft(d => ({ ...d, lignes: d.lignes.map((x, j) => j === i ? { ...x, employe_id: v } : x) })) }} style={{ ...selSt, flex:1, padding:'8px 10px', fontSize:'13px' }}>
@@ -1510,18 +1511,18 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                                 {employes.map(em => <option key={em.id} value={em.id}>{em.nom_complet || em.code}</option>)}
                               </select>
                               <input type="number" step="0.01" value={l.montant} onChange={e => { const v = e.target.value; setVentilDraft(d => ({ ...d, lignes: d.lignes.map((x, j) => j === i ? { ...x, montant: v } : x) })) }} placeholder="Montant €" style={{ width:'110px', padding:'8px 10px', border:'1px solid #e2e8f0', borderRadius:'6px', fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif", boxSizing:'border-box' }} />
-                              <button onClick={() => setVentilDraft(d => ({ ...d, lignes: d.lignes.filter((_, j) => j !== i) }))} title="Retirer" style={{ width:'34px', border:'1px solid #fecaca', borderRadius:'6px', background:'#fff', color:'#dc2626', cursor:'pointer', flexShrink:0 }}>✕</button>
+                              <button onClick={() => setVentilDraft(d => ({ ...d, lignes: d.lignes.filter((_, j) => j !== i) }))} title="Retirer" style={{ width:'34px', border:'1px solid #fecaca', borderRadius:'6px', background:COUL.blanc, color:COUL.danger, cursor:'pointer', flexShrink:0 }}>✕</button>
                             </div>
                           ))}
                           <div style={{ display:'flex', gap:'8px', marginBottom:'10px' }}>
-                            <button onClick={() => setVentilDraft(d => ({ ...d, lignes: [...d.lignes, { employe_id:'', montant:'' }] }))} style={{ flex:1, padding:'8px', borderRadius:'6px', fontSize:'12.5px', fontWeight:'600', border:'1px dashed #cbd5e1', background:'#fff', color:'#475569', cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>+ Ajouter un employé</button>
-                            <button onClick={() => { const n = ventilDraft.lignes.length || 1; const part = (abs / n); setVentilDraft(d => ({ ...d, lignes: d.lignes.map(x => ({ ...x, montant: part.toFixed(2) })) })) }} style={{ flex:1, padding:'8px', borderRadius:'6px', fontSize:'12.5px', fontWeight:'600', border:'1px solid #e2e8f0', background:'#fff', color:'#475569', cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>Répartir également</button>
+                            <button onClick={() => setVentilDraft(d => ({ ...d, lignes: [...d.lignes, { employe_id:'', montant:'' }] }))} style={{ flex:1, padding:'8px', borderRadius:'6px', fontSize:'12.5px', fontWeight:'600', border:'1px dashed #cbd5e1', background:COUL.blanc, color:COUL.texteMoyen, cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>+ Ajouter un employé</button>
+                            <button onClick={() => { const n = ventilDraft.lignes.length || 1; const part = (abs / n); setVentilDraft(d => ({ ...d, lignes: d.lignes.map(x => ({ ...x, montant: part.toFixed(2) })) })) }} style={{ flex:1, padding:'8px', borderRadius:'6px', fontSize:'12.5px', fontWeight:'600', border:'1px solid #e2e8f0', background:COUL.blanc, color:COUL.texteMoyen, cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>Répartir également</button>
                           </div>
-                          <div style={{ fontSize:'13px', marginBottom:'10px', color:'#475569' }}>Réparti : <b>{fmt(total)}</b> / {fmt(abs)} — reste : <b style={{ color: Math.abs(reste) < 0.01 ? '#16a34a' : '#dc2626' }}>{fmt(reste)}</b></div>
+                          <div style={{ fontSize:'13px', marginBottom:'10px', color:COUL.texteMoyen }}>Réparti : <b>{fmt(total)}</b> / {fmt(abs)} — reste : <b style={{ color: Math.abs(reste) < 0.01 ? '#16a34a' : COUL.danger }}>{fmt(reste)}</b></div>
                           <div style={{ display:'flex', gap:'8px' }}>
-                            <button onClick={enregistrerVentilation} style={{ flex:1, padding:'9px 12px', borderRadius:'7px', fontSize:'13px', fontWeight:'700', border:'none', background:'#16a34a', color:'#fff', cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>Enregistrer la répartition</button>
-                            <button onClick={() => setVentilDraft(null)} style={{ padding:'9px 12px', borderRadius:'7px', fontSize:'13px', fontWeight:'600', border:'1px solid #e2e8f0', background:'#fff', color:'#64748b', cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>Annuler</button>
-                            {ventil.length > 0 && <button onClick={() => supprimerVentilation(t.id)} title="Supprimer la répartition" style={{ padding:'9px 12px', borderRadius:'7px', fontSize:'13px', fontWeight:'600', border:'1px solid #fecaca', background:'#fff', color:'#dc2626', cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>Supprimer</button>}
+                            <button onClick={enregistrerVentilation} style={{ flex:1, padding:'9px 12px', borderRadius:'7px', fontSize:'13px', fontWeight:'700', border:'none', background:COUL.succes, color:COUL.blanc, cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>Enregistrer la répartition</button>
+                            <button onClick={() => setVentilDraft(null)} style={{ padding:'9px 12px', borderRadius:'7px', fontSize:'13px', fontWeight:'600', border:'1px solid #e2e8f0', background:COUL.blanc, color:COUL.texteDoux, cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>Annuler</button>
+                            {ventil.length > 0 && <button onClick={() => supprimerVentilation(t.id)} title="Supprimer la répartition" style={{ padding:'9px 12px', borderRadius:'7px', fontSize:'13px', fontWeight:'600', border:'1px solid #fecaca', background:COUL.blanc, color:COUL.danger, cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>Supprimer</button>}
                           </div>
                         </div>
                       )
@@ -1529,8 +1530,8 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                     if (ventil.length > 0) {
                       return (
                         <div>
-                          <div style={{ border:'1px solid #e2e8f0', borderRadius:'8px', padding:'10px 12px', marginBottom:'8px', background:'#fff' }}>
-                            <div style={{ fontSize:'12px', color:'#64748b', marginBottom:'6px' }}>⚖️ Réparti entre {ventil.length} employé(s) :</div>
+                          <div style={{ border:'1px solid #e2e8f0', borderRadius:'8px', padding:'10px 12px', marginBottom:'8px', background:COUL.blanc }}>
+                            <div style={{ fontSize:'12px', color:COUL.texteDoux, marginBottom:'6px' }}>⚖️ Réparti entre {ventil.length} employé(s) :</div>
                             {ventil.map(v => { const em = employes.find(e => String(e.id) === String(v.employe_id)); return <div key={v.id} style={{ display:'flex', justifyContent:'space-between', fontSize:'13px', padding:'2px 0' }}><span>{em?.nom_complet || em?.code || ('#' + v.employe_id)}</span><b>{fmt(v.montant)}</b></div> })}
                           </div>
                           <button onClick={() => ouvrirVentil(t)} style={linkSt}>Modifier la répartition</button>

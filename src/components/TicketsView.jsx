@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 
-const NAVY = '#1A3A6B', CYAN = '#29ABE2', MID = '#1E5799'
-const C = { bg: '#F4F6F9', white: '#fff', border: '#DDE3ED', textM: '#4A5568', textL: '#8A9BBE', ok: '#27AE60', warn: '#F39C12', danger: '#E74C3C' }
+const NAVY = COUL.marineClair, CYAN = '#29ABE2', MID = '#1E5799'
+const C = { bg: '#F4F6F9', white: COUL.blanc, border: '#DDE3ED', textM: '#4A5568', textL: '#8A9BBE', ok: '#27AE60', warn: '#F39C12', danger: '#E74C3C' }
 
 const CATEGORIES = ['Gestion client', 'Sinistre', 'Commercial', 'Demande développement', 'Bug hub', 'Problème Outlook/M365', 'Demande administrative', 'Autre']
 const SOCIETES = [
@@ -30,7 +30,7 @@ const PRIOS = [
 ]
 const st = k => STATUTS.find(s => s.k === k) || STATUTS[0]
 const pr = k => PRIOS.find(p => p.k === k) || PRIOS[1]
-const URGENT_STYLE = { display: 'inline-block', background: '#E74C3C', color: '#fff', fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 6, marginRight: 8, letterSpacing: '.5px', verticalAlign: 'middle' }
+const URGENT_STYLE = { display: 'inline-block', background: '#E74C3C', color: COUL.blanc, fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 6, marginRight: 8, letterSpacing: '.5px', verticalAlign: 'middle' }
 
 const fmtDT = d => d ? new Date(d).toLocaleString('fr-BE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''
 const fmtD = d => d ? new Date(d).toLocaleDateString('fr-BE') : '—'
@@ -47,8 +47,8 @@ const isMobile = () => typeof window !== 'undefined' && window.innerWidth < 768
 
 const S = {
   badge: (b, f) => ({ display: 'inline-block', padding: '3px 10px', borderRadius: 12, fontSize: 11, fontWeight: 700, background: b, color: f }),
-  avatar: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, borderRadius: '50%', background: MID, color: '#fff', fontSize: 10, fontWeight: 700 },
-  btn: (v = 'primary') => ({ padding: '9px 16px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 700, border: 'none', ...(v === 'primary' ? { background: `linear-gradient(135deg,${CYAN},${MID})`, color: '#fff' } : v === 'ok' ? { background: `linear-gradient(135deg,#27AE60,#1e8449)`, color: '#fff' } : { background: '#fff', color: NAVY, border: `1px solid ${C.border}` }) }),
+  avatar: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, borderRadius: '50%', background: MID, color: COUL.blanc, fontSize: 10, fontWeight: 700 },
+  btn: (v = 'primary') => ({ padding: '9px 16px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 700, border: 'none', ...(v === 'primary' ? { background: `linear-gradient(135deg,${CYAN},${MID})`, color: COUL.blanc } : v === 'ok' ? { background: `linear-gradient(135deg,#27AE60,#1e8449)`, color: COUL.blanc } : { background: COUL.blanc, color: NAVY, border: `1px solid ${C.border}` }) }),
   input: { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '9px 11px', fontSize: 13, color: NAVY, width: '100%', boxSizing: 'border-box', outline: 'none' },
   label: { fontSize: 11, fontWeight: 700, color: C.textM, textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 5, display: 'block' },
 }
@@ -64,11 +64,11 @@ function StatCard({ label, count, tickets, color }) {
   const total = count || 1
   return (
     <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ position: 'relative', background: '#fff', border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', flex: 1, minWidth: 0, textAlign: 'center', cursor: 'default' }}>
+      style={{ position: 'relative', background: COUL.blanc, border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', flex: 1, minWidth: 0, textAlign: 'center', cursor: 'default' }}>
       <div style={{ fontSize: 10, color: C.textL, marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</div>
       <div style={{ fontSize: 19, fontWeight: 800, color: color || NAVY, lineHeight: 1.1 }}>{count}</div>
       {hover && lignes.length > 0 && (
-        <div style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', zIndex: 50, marginTop: 4, background: '#fff', border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', minWidth: 180, boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}>
+        <div style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', zIndex: 50, marginTop: 4, background: COUL.blanc, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', minWidth: 180, boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}>
           <div style={{ fontSize: 10, textTransform: 'uppercase', color: C.textL, fontWeight: 700, marginBottom: 6 }}>Répartition</div>
           {lignes.map(([code, n]) => (
             <div key={code} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 12, padding: '2px 0' }}>
@@ -83,6 +83,7 @@ function StatCard({ label, count, tickets, color }) {
 }
 
 import { HUB_URL } from '../config/env'
+import { COUL } from '../lib/theme'
 // Envoi via la fonction serverless Vercel (Microsoft Graph), plus par n8n.
 const ALERTE_ENDPOINT = '/api/ticket-alerte'
 
@@ -327,7 +328,7 @@ export default function TicketsView() {
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }}>
         {[['mine', 'Mes tickets'], ['unassigned', 'À attribuer'], ...(isAdmin ? [['all', 'Tous']] : [])].map(([k, l]) => (
           <button key={k} onClick={() => { setScope(k); setFStatut(k === 'all' ? 'tous' : 'actifs') }} style={{ ...S.btn(scope === k ? 'primary' : 'ghost'), padding: '8px 14px', borderRadius: 20, position: 'relative' }}>
-            {l}{k === 'unassigned' && nbUnassigned > 0 && <span style={{ background: C.danger, color: '#fff', borderRadius: 10, padding: '1px 7px', fontSize: 10, marginLeft: 5 }}>{nbUnassigned}</span>}
+            {l}{k === 'unassigned' && nbUnassigned > 0 && <span style={{ background: C.danger, color: COUL.blanc, borderRadius: 10, padding: '1px 7px', fontSize: 10, marginLeft: 5 }}>{nbUnassigned}</span>}
           </button>
         ))}
         <div style={{ flex: 1 }} />
@@ -381,13 +382,13 @@ export default function TicketsView() {
 
       {/* Liste */}
       {visibles.length === 0 ? (
-        <div style={{ background: '#fff', border: `1px solid ${C.border}`, borderRadius: 12, padding: 40, textAlign: 'center', color: C.textL }}>
+        <div style={{ background: COUL.blanc, border: `1px solid ${C.border}`, borderRadius: 12, padding: 40, textAlign: 'center', color: C.textL }}>
           Aucun ticket. Cliquez sur « + Nouvelle demande » pour en créer un.
         </div>
       ) : mobile ? (
         <div>{visibles.map(t => <TicketCard key={t.id} t={t} codeLabel={codeLabel} onOpen={() => setSel(t)} />)}</div>
       ) : (
-        <div style={{ background: '#fff', border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', overflowX: 'auto' }}>
+        <div style={{ background: COUL.blanc, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead><tr style={{ background: C.bg, color: C.textM }}>
               {COLS.map(c => (
@@ -402,7 +403,7 @@ export default function TicketsView() {
                 return (
                   <tr key={t.id} onClick={() => setSel(t)} style={{ borderTop: `1px solid #EEF1F6`, cursor: 'pointer', opacity: ['cloture', 'resolu'].includes(t.ticket_statut) ? 0.6 : 1 }}>
                     <td style={{ padding: '11px 14px', fontFamily: 'monospace', color: C.textL, fontWeight: 700, whiteSpace: 'nowrap' }}>{unread[t.id] ? <span title={`${unread[t.id]} message(s) non lu(s)`} style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: C.danger, marginRight: 6, verticalAlign: 'middle' }} /> : null}#{t.id}</td>
-                    <td style={{ padding: '11px 14px', fontWeight: unread[t.id] ? 800 : 600, color: NAVY }}>{t.priorite === 'urgente' && <span style={URGENT_STYLE}>URGENT</span>}{t.ticket_echeance && !['cloture', 'resolu'].includes(t.ticket_statut) && new Date(t.ticket_echeance) < new Date(new Date().toDateString()) && <span style={{ display: 'inline-block', background: '#E74C3C', color: '#fff', fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 5, marginRight: 6 }}>⏱ RETARD</span>}<span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: p.col, marginRight: 8 }} />{t.titre}</td>
+                    <td style={{ padding: '11px 14px', fontWeight: unread[t.id] ? 800 : 600, color: NAVY }}>{t.priorite === 'urgente' && <span style={URGENT_STYLE}>URGENT</span>}{t.ticket_echeance && !['cloture', 'resolu'].includes(t.ticket_statut) && new Date(t.ticket_echeance) < new Date(new Date().toDateString()) && <span style={{ display: 'inline-block', background: '#E74C3C', color: COUL.blanc, fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 5, marginRight: 6 }}>⏱ RETARD</span>}<span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: p.col, marginRight: 8 }} />{t.titre}</td>
                     <td style={{ padding: '11px 14px', fontSize: 12, color: C.textM }}>{socLabel(t.entite)}</td>
                     <td style={{ padding: '11px 14px', color: C.textL, fontSize: 12 }}>{t.ticket_categorie || '—'}</td>
                     <td style={{ padding: '11px 14px' }}><span style={{ fontSize: 11, fontWeight: 700, color: p.col }}>{p.label}</span></td>
@@ -430,7 +431,7 @@ export default function TicketsView() {
 function TicketCard({ t, codeLabel, onOpen }) {
   const s = st(t.ticket_statut), p = pr(t.priorite)
   return (
-    <div onClick={onOpen} style={{ background: '#fff', border: `1px solid ${C.border}`, borderRadius: 12, padding: 14, marginBottom: 10, cursor: 'pointer', opacity: ['cloture', 'resolu'].includes(t.ticket_statut) ? 0.65 : 1 }}>
+    <div onClick={onOpen} style={{ background: COUL.blanc, border: `1px solid ${C.border}`, borderRadius: 12, padding: 14, marginBottom: 10, cursor: 'pointer', opacity: ['cloture', 'resolu'].includes(t.ticket_statut) ? 0.65 : 1 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
         <span style={{ fontFamily: 'monospace', fontSize: 12, color: C.textL, fontWeight: 700 }}>#{t.id}</span>
         <span style={S.badge(s.bg, s.fg)}>{s.label}</span>
@@ -449,7 +450,7 @@ function TicketCard({ t, codeLabel, onOpen }) {
 function Overlay({ children, onClose, wide }) {
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: wide ? 760 : 520, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>{children}</div>
+      <div onClick={e => e.stopPropagation()} style={{ background: COUL.blanc, borderRadius: 16, width: '100%', maxWidth: wide ? 760 : 520, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>{children}</div>
     </div>
   )
 }
@@ -551,7 +552,7 @@ function CreateModal({ collabs, cats = CATEGORIES, catType = {}, lockedSociete =
               {cbusy && <div style={{ fontSize: 11, color: C.textL, marginTop: 4 }}>Recherche…</div>}
               {cres && cres.length === 0 && !cbusy && <div style={{ fontSize: 11, color: C.textL, marginTop: 4 }}>Aucun client trouvé.</div>}
               {cres && cres.length > 0 && (
-                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 30, marginTop: 4, background: '#fff', border: `1px solid ${C.border}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.12)', maxHeight: 240, overflowY: 'auto' }}>
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 30, marginTop: 4, background: COUL.blanc, border: `1px solid ${C.border}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.12)', maxHeight: 240, overflowY: 'auto' }}>
                   {cres.map(c => (
                     <div key={c.id} onClick={() => pickClient(c)} style={{ padding: '8px 11px', cursor: 'pointer', borderBottom: `1px solid #F1F4F8`, fontSize: 13 }}>
                       <span style={{ fontWeight: 700, color: NAVY }}>{c.nom} {c.prenom}</span> <span style={{ color: C.textL }}>#{c.dossier} · {c.cp} {c.localite}</span>
@@ -820,24 +821,24 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
             {canManage && !estClos
               ? <input type="date" value={t.ticket_echeance || ''} onChange={e => setEcheance(e.target.value)} style={{ ...S.input, width: 'auto', padding: '3px 6px', fontSize: 12 }} />
               : <b>{t.ticket_echeance ? fmtD(t.ticket_echeance) : '—'}</b>}
-            {enRetard && <span style={{ background: C.danger, color: '#fff', fontWeight: 800, fontSize: 10, padding: '2px 7px', borderRadius: 6 }}>EN RETARD</span>}
+            {enRetard && <span style={{ background: C.danger, color: COUL.blanc, fontWeight: 800, fontSize: 10, padding: '2px 7px', borderRadius: 6 }}>EN RETARD</span>}
           </span>
         </div>
       </div>
 
       {/* Statut — pleine largeur, coloré (Résolu = clôture auto) */}
-      <div style={{ display: 'flex', gap: 6, padding: '10px 20px', background: '#fff', borderBottom: `1px solid #EEF1F6` }}>
+      <div style={{ display: 'flex', gap: 6, padding: '10px 20px', background: COUL.blanc, borderBottom: `1px solid #EEF1F6` }}>
         {STATUTS.filter(x => x.k !== 'cloture').map(x => {
           const active = t.ticket_statut === x.k || (x.k === 'resolu' && t.ticket_statut === 'cloture')
           const col = STATUT_BAR[x.k]
           return (
-            <button key={x.k} onClick={() => { if (!canManage || active) return; if (x.k === 'resolu') resoudre(); else changeStatut(x.k) }} disabled={!canManage} style={{ flex: 1, padding: '9px 6px', borderRadius: 8, border: `1.5px solid ${col}`, background: active ? col : '#fff', color: active ? '#fff' : col, fontWeight: 700, fontSize: 12, cursor: canManage ? 'pointer' : 'default', opacity: (!active && !canManage) ? 0.4 : 1 }}>{x.label}</button>
+            <button key={x.k} onClick={() => { if (!canManage || active) return; if (x.k === 'resolu') resoudre(); else changeStatut(x.k) }} disabled={!canManage} style={{ flex: 1, padding: '9px 6px', borderRadius: 8, border: `1.5px solid ${col}`, background: active ? col : COUL.blanc, color: active ? '#fff' : col, fontWeight: 700, fontSize: 12, cursor: canManage ? 'pointer' : 'default', opacity: (!active && !canManage) ? 0.4 : 1 }}>{x.label}</button>
           )
         })}
       </div>
 
       {/* Assigné + Société */}
-      <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', padding: '12px 20px', background: '#fff', borderBottom: `1px solid #EEF1F6`, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', padding: '12px 20px', background: COUL.blanc, borderBottom: `1px solid #EEF1F6`, alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
           <span style={{ fontSize: 11, textTransform: 'uppercase', color: C.textL, fontWeight: 700 }}>Assigné</span>
           {canManage ? (
@@ -859,7 +860,7 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
       </div>
 
       {/* Participants */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '12px 20px', background: '#fff', borderBottom: `1px solid #EEF1F6`, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '12px 20px', background: COUL.blanc, borderBottom: `1px solid #EEF1F6`, alignItems: 'center' }}>
         <span style={{ fontSize: 11, textTransform: 'uppercase', color: C.textL, fontWeight: 700 }}>Participants</span>
         {parts.map(pc => (
           <span key={pc} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#E3F2FD', color: '#1565C0', borderRadius: 14, padding: '4px 11px', fontSize: 12, fontWeight: 600 }}>
@@ -877,13 +878,13 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
       </div>
 
       {/* Description initiale */}
-      {t.description && <div style={{ padding: '12px 20px', fontSize: 13, color: '#2D3748', borderBottom: `1px solid #EEF1F6`, background: '#fff' }}>{t.description}</div>}
+      {t.description && <div style={{ padding: '12px 20px', fontSize: 13, color: '#2D3748', borderBottom: `1px solid #EEF1F6`, background: COUL.blanc }}>{t.description}</div>}
 
       {/* Barre historique */}
-      <div style={{ display: 'flex', gap: 6, padding: '8px 20px', background: '#fff', borderBottom: `1px solid #EEF1F6`, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 6, padding: '8px 20px', background: COUL.blanc, borderBottom: `1px solid #EEF1F6`, alignItems: 'center' }}>
         <span style={{ fontSize: 11, textTransform: 'uppercase', color: C.textL, fontWeight: 700, marginRight: 4 }}>Historique</span>
         {[['tout', 'Tout'], ['conversation', 'Conversation'], ['historique', 'Journal']].map(([k, lbl]) => (
-          <button key={k} onClick={() => setFilFiltre(k)} style={{ border: `1px solid ${filFiltre === k ? MID : C.border}`, background: filFiltre === k ? MID : '#fff', color: filFiltre === k ? '#fff' : C.textM, borderRadius: 14, padding: '3px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{lbl}</button>
+          <button key={k} onClick={() => setFilFiltre(k)} style={{ border: `1px solid ${filFiltre === k ? MID : C.border}`, background: filFiltre === k ? MID : COUL.blanc, color: filFiltre === k ? '#fff' : C.textM, borderRadius: 14, padding: '3px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{lbl}</button>
         ))}
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: 20, background: C.bg, minHeight: 200 }}>
@@ -897,7 +898,7 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
                   <span style={{ fontWeight: 700, fontSize: 12 }}>{m.auteur_nom || m.auteur_code}</span>
                   <span style={{ fontSize: 10, color: C.textL }}>{fmtDT(m.created_at)}</span>
                 </div>
-                <div style={{ display: 'inline-block', textAlign: 'left', maxWidth: '80%', background: '#fff', border: `1px solid #EEF1F6`, borderRadius: 10, padding: '9px 12px' }}>
+                <div style={{ display: 'inline-block', textAlign: 'left', maxWidth: '80%', background: COUL.blanc, border: `1px solid #EEF1F6`, borderRadius: 10, padding: '9px 12px' }}>
                   <PieceJointe path={m.piece_jointe_path} nom={m.piece_jointe_nom} />
                 </div>
               </div>
@@ -913,7 +914,7 @@ function DetailModal({ ticket, collabs, codeLabel, myCode, myNom, myEmail, isAdm
                 {m.type === 'email' && <span style={{ fontSize: 9, fontWeight: 700, color: '#1565C0', background: '#E3F2FD', borderRadius: 8, padding: '1px 6px' }}>✉ MAIL</span>}
                 {own && <span style={{ ...S.avatar, width: 22, height: 22 }}>{(m.auteur_code || '?').slice(0, 3)}</span>}
               </div>
-              <div style={{ display: 'inline-block', textAlign: 'left', maxWidth: '80%', background: own ? '#E3F2FD' : '#fff', border: own ? 'none' : `1px solid #EEF1F6`, borderRadius: 10, padding: '9px 12px', fontSize: 13, color: '#2D3748' }}>{m.message}</div>
+              <div style={{ display: 'inline-block', textAlign: 'left', maxWidth: '80%', background: own ? '#E3F2FD' : COUL.blanc, border: own ? 'none' : `1px solid #EEF1F6`, borderRadius: 10, padding: '9px 12px', fontSize: 13, color: '#2D3748' }}>{m.message}</div>
             </div>
           )
         }))}

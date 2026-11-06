@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { COUL } from '../lib/theme'
 
 const FONT = "'Source Sans Pro', sans-serif"
 const r2 = (v) => Math.round((v + Number.EPSILON) * 100) / 100
 const eur = (v) => r2(v).toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
 const inp = { padding: '7px 9px', border: '1px solid #e2e8f0', borderRadius: '7px', fontSize: '13px', fontFamily: FONT, boxSizing: 'border-box' }
 
-export default function VentilationEditor({ tx, categories = [], activitesSoc = [], color = '#0080BD', onSaved }) {
+export default function VentilationEditor({ tx, categories = [], activitesSoc = [], color = COUL.bleu, onSaved }) {
   const [ouvert, setOuvert] = useState(false)
   const [lignes, setLignes] = useState([])
   const [factures, setFactures] = useState([])
@@ -106,7 +107,7 @@ export default function VentilationEditor({ tx, categories = [], activitesSoc = 
   if (!ouvert) {
     return (
       <div style={{ marginBottom: '18px' }}>
-        <button onClick={ouvrir} style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: FONT, border: nbExistant > 0 ? `1px solid ${color}` : '1px dashed #cbd5e1', background: nbExistant > 0 ? `${color}0d` : '#f8fafc', color: nbExistant > 0 ? color : '#475569' }}>
+        <button onClick={ouvrir} style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: FONT, border: nbExistant > 0 ? `1px solid ${color}` : '1px dashed #cbd5e1', background: nbExistant > 0 ? `${color}0d` : COUL.fond, color: nbExistant > 0 ? color : COUL.texteMoyen }}>
           {nbExistant > 0 ? `\u25A4 Paiement ventilé en ${nbExistant} ligne(s) — modifier` : '\u25A4 Découper ce paiement (plusieurs factures / activités)'}
         </button>
       </div>
@@ -115,16 +116,16 @@ export default function VentilationEditor({ tx, categories = [], activitesSoc = 
 
   return (
     <div style={{ marginBottom: '18px', border: `1px solid ${color}`, borderRadius: '10px', padding: '12px', background: '#fbfdff' }}>
-      <div style={{ fontSize: '12px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>Ventilation du paiement — {eur(absTx)}</div>
+      <div style={{ fontSize: '12px', fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>Ventilation du paiement — {eur(absTx)}</div>
 
       {lignes.map((l, i) => (
-        <div key={i} style={{ border: '1px solid #eef2f7', borderRadius: '8px', padding: '8px', marginBottom: '8px', background: '#fff' }}>
+        <div key={i} style={{ border: '1px solid #eef2f7', borderRadius: '8px', padding: '8px', marginBottom: '8px', background: COUL.blanc }}>
           <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '6px' }}>
             <input type="number" step="0.01" value={l.pct} onChange={e => setPct(i, e.target.value)} placeholder="%" style={{ ...inp, width: '68px' }} />
-            <span style={{ fontSize: '12px', color: '#94a3b8' }}>%</span>
+            <span style={{ fontSize: '12px', color: COUL.texteFaible }}>%</span>
             <input type="number" step="0.01" value={l.montant} onChange={e => setMontant(i, e.target.value)} placeholder="Montant" style={{ ...inp, width: '108px' }} />
-            <span style={{ fontSize: '12px', color: '#94a3b8' }}>€</span>
-            <button onClick={() => retirer(i)} title="Retirer" style={{ marginLeft: 'auto', width: '28px', height: '28px', border: '1px solid #fecaca', borderRadius: '7px', background: '#fff', color: '#dc2626', cursor: 'pointer' }}>×</button>
+            <span style={{ fontSize: '12px', color: COUL.texteFaible }}>€</span>
+            <button onClick={() => retirer(i)} title="Retirer" style={{ marginLeft: 'auto', width: '28px', height: '28px', border: '1px solid #fecaca', borderRadius: '7px', background: COUL.blanc, color: COUL.danger, cursor: 'pointer' }}>×</button>
           </div>
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
             <select value={l.categorie_id} onChange={e => setField(i, 'categorie_id', e.target.value)} style={{ ...inp, flex: '1 1 150px' }}>
@@ -148,23 +149,23 @@ export default function VentilationEditor({ tx, categories = [], activitesSoc = 
       ))}
 
       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
-        <button onClick={ajouter} style={{ padding: '7px 12px', borderRadius: '7px', fontSize: '12.5px', fontWeight: 600, border: '1px dashed #cbd5e1', background: '#fff', color: '#475569', cursor: 'pointer', fontFamily: FONT }}>+ Ligne</button>
-        {lignes.length > 1 && <button onClick={repartirEgal} style={{ padding: '7px 12px', borderRadius: '7px', fontSize: '12.5px', fontWeight: 600, border: '1px solid #e2e8f0', background: '#fff', color: '#475569', cursor: 'pointer', fontFamily: FONT }}>Répartir également ({lignes.length})</button>}
-        {factures.length > 1 && <button onClick={repartirParFacture} style={{ padding: '7px 12px', borderRadius: '7px', fontSize: '12.5px', fontWeight: 600, border: '1px solid #e2e8f0', background: '#fff', color: '#475569', cursor: 'pointer', fontFamily: FONT }}>Répartir par facture ({factures.length})</button>}
+        <button onClick={ajouter} style={{ padding: '7px 12px', borderRadius: '7px', fontSize: '12.5px', fontWeight: 600, border: '1px dashed #cbd5e1', background: COUL.blanc, color: COUL.texteMoyen, cursor: 'pointer', fontFamily: FONT }}>+ Ligne</button>
+        {lignes.length > 1 && <button onClick={repartirEgal} style={{ padding: '7px 12px', borderRadius: '7px', fontSize: '12.5px', fontWeight: 600, border: '1px solid #e2e8f0', background: COUL.blanc, color: COUL.texteMoyen, cursor: 'pointer', fontFamily: FONT }}>Répartir également ({lignes.length})</button>}
+        {factures.length > 1 && <button onClick={repartirParFacture} style={{ padding: '7px 12px', borderRadius: '7px', fontSize: '12.5px', fontWeight: 600, border: '1px solid #e2e8f0', background: COUL.blanc, color: COUL.texteMoyen, cursor: 'pointer', fontFamily: FONT }}>Répartir par facture ({factures.length})</button>}
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px', padding: '8px 4px', borderTop: '1px solid #eef2f7' }}>
-        <span style={{ color: '#64748b' }}>Total{sommePct ? ` · ${r2(sommePct)} %` : ''}</span>
-        <span style={{ fontWeight: 700, color: equilibre ? '#16a34a' : '#dc2626' }}>{eur(somme)} / {eur(absTx)}{!equilibre && ` (écart ${eur(Math.abs(ecart))})`}</span>
+        <span style={{ color: COUL.texteDoux }}>Total{sommePct ? ` · ${r2(sommePct)} %` : ''}</span>
+        <span style={{ fontWeight: 700, color: equilibre ? '#16a34a' : COUL.danger }}>{eur(somme)} / {eur(absTx)}{!equilibre && ` (écart ${eur(Math.abs(ecart))})`}</span>
       </div>
 
-      {msg && <div style={{ fontSize: '12.5px', color: '#dc2626', margin: '4px 0' }}>{msg}</div>}
+      {msg && <div style={{ fontSize: '12.5px', color: COUL.danger, margin: '4px 0' }}>{msg}</div>}
 
       <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-        <button onClick={enregistrer} disabled={busy || !equilibre} style={{ flex: 1, padding: '9px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, border: 'none', background: (busy || !equilibre) ? '#94a3b8' : '#16a34a', color: '#fff', cursor: (busy || !equilibre) ? 'not-allowed' : 'pointer', fontFamily: FONT }}>Enregistrer la ventilation</button>
-        <button onClick={() => setOuvert(false)} style={{ padding: '9px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, border: '1px solid #e2e8f0', background: '#fff', color: '#475569', cursor: 'pointer', fontFamily: FONT }}>Fermer</button>
+        <button onClick={enregistrer} disabled={busy || !equilibre} style={{ flex: 1, padding: '9px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, border: 'none', background: (busy || !equilibre) ? '#94a3b8' : COUL.succes, color: COUL.blanc, cursor: (busy || !equilibre) ? 'not-allowed' : 'pointer', fontFamily: FONT }}>Enregistrer la ventilation</button>
+        <button onClick={() => setOuvert(false)} style={{ padding: '9px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, border: '1px solid #e2e8f0', background: COUL.blanc, color: COUL.texteMoyen, cursor: 'pointer', fontFamily: FONT }}>Fermer</button>
       </div>
-      {nbExistant > 0 && <button onClick={annulerVentilation} style={{ marginTop: '8px', width: '100%', padding: '7px', borderRadius: '7px', fontSize: '12px', fontWeight: 600, border: '1px solid #fecaca', background: '#fff', color: '#dc2626', cursor: 'pointer', fontFamily: FONT }}>Supprimer la ventilation (repasser en catégorie unique)</button>}
+      {nbExistant > 0 && <button onClick={annulerVentilation} style={{ marginTop: '8px', width: '100%', padding: '7px', borderRadius: '7px', fontSize: '12px', fontWeight: 600, border: '1px solid #fecaca', background: COUL.blanc, color: COUL.danger, cursor: 'pointer', fontFamily: FONT }}>Supprimer la ventilation (repasser en catégorie unique)</button>}
     </div>
   )
 }

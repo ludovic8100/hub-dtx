@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { COUL } from '../../lib/theme'
 
 const FONT = "'Source Sans Pro', sans-serif"
 const TYPES = [['depense', 'Dépense'], ['recette', 'Recette']]
@@ -9,7 +10,7 @@ export default function GestionCategories() {
   const [societes, setSocietes] = useState([])
   const [cats, setCats] = useState([])
   const [filtre, setFiltre] = useState('') // '' = toutes ; sinon code entité
-  const [nouv, setNouv] = useState({ nom: '', type: 'depense', couleur: '#0080BD', entites: [], parent_id: '' })
+  const [nouv, setNouv] = useState({ nom: '', type: 'depense', couleur: COUL.bleu, entites: [], parent_id: '' })
   const [edits, setEdits] = useState({})
   const [flash, setFlash] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -58,7 +59,7 @@ export default function GestionCategories() {
     if (cats.some(c => (c.nom || '').trim().toLowerCase() === nom.toLowerCase())) { notify(`« ${nom} » existe déjà. Modifie-la plutôt.`); return }
     const { error } = await supabase.from('categories').insert({ nom, type, couleur: nouv.couleur, entites, parent_id: nouv.parent_id || null })
     if (error) { notify(error.code === '23505' ? `« ${nom} » existe déjà.` : 'Erreur : ' + error.message); return }
-    setNouv({ nom: '', type: 'depense', couleur: '#0080BD', entites: [], parent_id: '' })
+    setNouv({ nom: '', type: 'depense', couleur: COUL.bleu, entites: [], parent_id: '' })
     await charger(); notify(parent ? 'Sous-catégorie ajoutée.' : 'Catégorie ajoutée.')
   }
 
@@ -112,8 +113,8 @@ export default function GestionCategories() {
             <label key={s.code} title={s.nom} style={{
               display: 'flex', alignItems: 'center', gap: 5, padding: '4px 9px', borderRadius: 7, cursor: 'pointer',
               border: on ? `1.5px solid ${s.couleur || '#1e293b'}` : '1px solid #e2e8f0',
-              background: on ? (s.couleur || '#1e293b') + '14' : '#fff', fontSize: 12, fontWeight: 700,
-              color: on ? '#1e293b' : '#94a3b8', userSelect: 'none',
+              background: on ? (s.couleur || '#1e293b') + '14' : COUL.blanc, fontSize: 12, fontWeight: 700,
+              color: on ? '#1e293b' : COUL.texteFaible, userSelect: 'none',
             }}>
               <input type="checkbox" checked={on} onChange={() => onToggle(s.code)} style={{ width: 14, height: 14, cursor: 'pointer', accentColor: s.couleur || '#1e293b' }} />
               {s.code}
@@ -127,8 +128,8 @@ export default function GestionCategories() {
   function Ligne({ cat, enfant }) {
     const parentSelectable = !aDesEnfants(cat.id)
     return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', border: '1px solid #f1f5f9', borderRadius: 9, background: enfant ? '#fbfdff' : '#fff', flexWrap: 'wrap', marginLeft: enfant ? 26 : 0 }}>
-        {enfant && <span style={{ color: '#cbd5e1', fontWeight: 700, flexShrink: 0 }}>↳</span>}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', border: '1px solid #f1f5f9', borderRadius: 9, background: enfant ? '#fbfdff' : COUL.blanc, flexWrap: 'wrap', marginLeft: enfant ? 26 : 0 }}>
+        {enfant && <span style={{ color: COUL.bordFort, fontWeight: 700, flexShrink: 0 }}>↳</span>}
         <input type="color" value={champ(cat, 'couleur') || '#94a3b8'} onChange={e => modifie(cat, 'couleur', e.target.value)} title="Couleur" style={{ width: 30, height: 30, border: 'none', background: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }} />
         <input value={champ(cat, 'nom')} onChange={e => modifie(cat, 'nom', e.target.value)} style={{ ...inp, width: 190, fontWeight: 600 }} />
         <select value={champ(cat, 'type')} onChange={e => modifie(cat, 'type', e.target.value)} style={{ ...inp, width: 100 }} disabled={!!champ(cat, 'parent_id')}>
@@ -139,12 +140,12 @@ export default function GestionCategories() {
             <option value="">— Niveau 1 (aucune mère) —</option>
             {cats.filter(c => !c.parent_id && c.id !== cat.id && c.type === champ(cat, 'type')).map(c => <option key={c.id} value={c.id}>↳ dans « {c.nom} »</option>)}
           </select>
-        ) : <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', width: 175 }}>catégorie mère</span>}
+        ) : <span style={{ fontSize: 11, fontWeight: 700, color: COUL.texteFaible, width: 175 }}>catégorie mère</span>}
         <div style={{ flex: 1, minWidth: 220 }}><CasesEntites selected={catEntites(cat)} onToggle={code => toggleEntite(cat, code)} /></div>
         {estModifie(cat)
-          ? <button onClick={() => enregistrer(cat)} style={{ padding: '7px 12px', border: 'none', borderRadius: 7, background: '#16a34a', color: '#fff', fontWeight: 700, fontSize: 12.5, cursor: 'pointer', fontFamily: FONT }}>Enregistrer</button>
+          ? <button onClick={() => enregistrer(cat)} style={{ padding: '7px 12px', border: 'none', borderRadius: 7, background: COUL.succes, color: COUL.blanc, fontWeight: 700, fontSize: 12.5, cursor: 'pointer', fontFamily: FONT }}>Enregistrer</button>
           : <span style={{ width: 84 }} />}
-        <button onClick={() => supprimer(cat)} title="Supprimer" style={{ width: 32, height: 32, border: '1px solid #fecaca', borderRadius: 7, background: '#fff', color: '#dc2626', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <button onClick={() => supprimer(cat)} title="Supprimer" style={{ width: 32, height: 32, border: '1px solid #fecaca', borderRadius: 7, background: COUL.blanc, color: COUL.danger, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <i className="ti ti-trash" style={{ fontSize: 15 }} />
         </button>
       </div>
@@ -164,13 +165,13 @@ export default function GestionCategories() {
 
   return (
     <div style={{ fontFamily: FONT }}>
-      {flash && <div style={{ position: 'fixed', top: 16, right: 16, background: '#1e293b', color: '#fff', padding: '10px 16px', borderRadius: 10, zIndex: 50, fontWeight: 600 }}>{flash}</div>}
+      {flash && <div style={{ position: 'fixed', top: 16, right: 16, background: COUL.texte, color: COUL.blanc, padding: '10px 16px', borderRadius: 10, zIndex: 50, fontWeight: 600 }}>{flash}</div>}
 
       {reaff && (
         <div onClick={() => setReaff(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, padding: 22, width: 460, maxWidth: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.25)' }}>
-            <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', marginBottom: 8 }}>Réaffecter avant suppression</div>
-            <div style={{ fontSize: 13, color: '#475569', marginBottom: 16, lineHeight: 1.5 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: COUL.blanc, borderRadius: 14, padding: 22, width: 460, maxWidth: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.25)' }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: COUL.texteFort, marginBottom: 8 }}>Réaffecter avant suppression</div>
+            <div style={{ fontSize: 13, color: COUL.texteMoyen, marginBottom: 16, lineHeight: 1.5 }}>
               <b>{reaff.count}</b> transaction(s) utilisent « <b>{reaff.cat.nom}</b> ». Choisis la catégorie vers laquelle les déplacer&nbsp;; « {reaff.cat.nom} » sera ensuite supprimée.
             </div>
             <select value={reaff.cible} onChange={e => setReaff(r => ({ ...r, cible: e.target.value }))} style={{ ...inp, width: '100%', marginBottom: 18 }}>
@@ -178,43 +179,43 @@ export default function GestionCategories() {
               {cats.filter(c => c.type === reaff.cat.type && c.id !== reaff.cat.id).map(c => <option key={c.id} value={c.id}>{c.parent_id ? '↳ ' : ''}{c.nom}</option>)}
             </select>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <button onClick={() => setReaff(null)} style={{ padding: '9px 16px', border: '1px solid #e2e8f0', borderRadius: 8, background: '#fff', color: '#475569', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: FONT }}>Annuler</button>
-              <button onClick={confirmerReaff} disabled={!reaff.cible} style={{ padding: '9px 16px', border: 'none', borderRadius: 8, background: reaff.cible ? '#dc2626' : '#fca5a5', color: '#fff', fontWeight: 700, fontSize: 13, cursor: reaff.cible ? 'pointer' : 'not-allowed', fontFamily: FONT }}>Réaffecter et supprimer</button>
+              <button onClick={() => setReaff(null)} style={{ padding: '9px 16px', border: '1px solid #e2e8f0', borderRadius: 8, background: COUL.blanc, color: COUL.texteMoyen, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: FONT }}>Annuler</button>
+              <button onClick={confirmerReaff} disabled={!reaff.cible} style={{ padding: '9px 16px', border: 'none', borderRadius: 8, background: reaff.cible ? '#dc2626' : '#fca5a5', color: COUL.blanc, fontWeight: 700, fontSize: 13, cursor: reaff.cible ? 'pointer' : 'not-allowed', fontFamily: FONT }}>Réaffecter et supprimer</button>
             </div>
           </div>
         </div>
       )}
 
-      <div style={{ marginBottom: 6, fontSize: 20, fontWeight: 800, color: '#0f172a' }}>Catégories comptables</div>
-      <div style={{ fontSize: 13, color: '#64748b', marginBottom: 16, maxWidth: 780 }}>
+      <div style={{ marginBottom: 6, fontSize: 20, fontWeight: 800, color: COUL.texteFort }}>Catégories comptables</div>
+      <div style={{ fontSize: 13, color: COUL.texteDoux, marginBottom: 16, maxWidth: 780 }}>
         Coche les entités auxquelles chaque catégorie s'applique. Une catégorie peut avoir des <b>sous-catégories</b> (niveau 2) : la nature de la dépense (ex. Salaires › Salaire net). Le <b>bénéficiaire</b> (employé) se choisit séparément lors de la catégorisation d'une transaction.
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 12.5, color: '#64748b', fontWeight: 600 }}>Afficher :</span>
-        <button onClick={() => setFiltre('')} style={{ padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 12.5, fontFamily: FONT, border: filtre === '' ? '2px solid #1e293b' : '1px solid #e2e8f0', background: filtre === '' ? '#f8fafc' : '#fff', color: '#1e293b' }}>Toutes</button>
+        <span style={{ fontSize: 12.5, color: COUL.texteDoux, fontWeight: 600 }}>Afficher :</span>
+        <button onClick={() => setFiltre('')} style={{ padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 12.5, fontFamily: FONT, border: filtre === '' ? '2px solid #1e293b' : '1px solid #e2e8f0', background: filtre === '' ? '#f8fafc' : COUL.blanc, color: COUL.texte }}>Toutes</button>
         {societes.map(s => (
-          <button key={s.code} onClick={() => setFiltre(s.code)} style={{ padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 12.5, fontFamily: FONT, border: filtre === s.code ? `2px solid ${s.couleur || '#1e293b'}` : '1px solid #e2e8f0', background: filtre === s.code ? '#f8fafc' : '#fff', color: '#1e293b' }}>
+          <button key={s.code} onClick={() => setFiltre(s.code)} style={{ padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 12.5, fontFamily: FONT, border: filtre === s.code ? `2px solid ${s.couleur || '#1e293b'}` : '1px solid #e2e8f0', background: filtre === s.code ? '#f8fafc' : COUL.blanc, color: COUL.texte }}>
             <span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: 3, background: s.couleur || '#94a3b8', marginRight: 6 }} />{s.code}
           </button>
         ))}
       </div>
 
-      {loading ? <div style={{ color: '#94a3b8', padding: 20 }}>Chargement…</div> : (
-        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 20 }}>
-          {liste.length === 0 && <div style={{ color: '#94a3b8', fontSize: 13, marginBottom: 14 }}>Aucune catégorie{filtre ? ` pour ${filtre}` : ''}. Ajoute-en une ci-dessous.</div>}
+      {loading ? <div style={{ color: COUL.texteFaible, padding: 20 }}>Chargement…</div> : (
+        <div style={{ background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 14, padding: 20 }}>
+          {liste.length === 0 && <div style={{ color: COUL.texteFaible, fontSize: 13, marginBottom: 14 }}>Aucune catégorie{filtre ? ` pour ${filtre}` : ''}. Ajoute-en une ci-dessous.</div>}
 
           {depenses.length > 0 && <>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.03em', margin: '4px 0 8px' }}>Dépenses</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '0.03em', margin: '4px 0 8px' }}>Dépenses</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 16 }}><Groupe arr={depenses} /></div>
           </>}
           {recettes.length > 0 && <>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.03em', margin: '4px 0 8px' }}>Recettes</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '0.03em', margin: '4px 0 8px' }}>Recettes</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 16 }}><Groupe arr={recettes} /></div>
           </>}
 
           <div style={{ borderTop: '1px dashed #e2e8f0', paddingTop: 16, marginTop: 4 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: '#334155', marginBottom: 10 }}>Nouvelle catégorie ou sous-catégorie</div>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: COUL.texteSombre, marginBottom: 10 }}>Nouvelle catégorie ou sous-catégorie</div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
               <input type="color" value={nouv.couleur} onChange={e => setNouv(n => ({ ...n, couleur: e.target.value }))} style={{ width: 34, height: 34, border: 'none', background: 'none', cursor: 'pointer', padding: 0 }} />
               <input value={nouv.nom} onChange={e => setNouv(n => ({ ...n, nom: e.target.value }))} placeholder="Nom" style={{ ...inp, width: 200 }} />
@@ -231,12 +232,12 @@ export default function GestionCategories() {
             </div>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
               {nouv.parent_id
-                ? <span style={{ fontSize: 12, color: '#64748b', fontStyle: 'italic' }}>Le type et les entités seront hérités de la catégorie mère.</span>
+                ? <span style={{ fontSize: 12, color: COUL.texteDoux, fontStyle: 'italic' }}>Le type et les entités seront hérités de la catégorie mère.</span>
                 : <>
-                    <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>Entités :</span>
+                    <span style={{ fontSize: 12, color: COUL.texteDoux, fontWeight: 600 }}>Entités :</span>
                     <CasesEntites selected={nouv.entites} onToggle={code => setNouv(n => ({ ...n, entites: n.entites.includes(code) ? n.entites.filter(x => x !== code) : [...n.entites, code] }))} />
                   </>}
-              <button onClick={ajouter} style={{ padding: '9px 16px', border: 'none', borderRadius: 8, background: '#1e293b', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: FONT }}>
+              <button onClick={ajouter} style={{ padding: '9px 16px', border: 'none', borderRadius: 8, background: COUL.texte, color: COUL.blanc, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: FONT }}>
                 <i className="ti ti-plus" style={{ fontSize: 14, marginRight: 6 }} />Ajouter
               </button>
             </div>

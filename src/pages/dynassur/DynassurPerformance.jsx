@@ -5,6 +5,7 @@ import { ProductionContent } from './DynassurProduction'
 import { ChiffresContent } from './DynassurChiffres'
 import { RentabiliteContent } from './DynassurRentabilite'
 import ObjectifsView from '../../components/ObjectifsView'
+import { COUL } from '../../lib/theme'
 
 // Fusion du 01/11/2026 : Production, Chiffres et Rentabilité étaient trois entrées
 // séparées dans le menu Dynassur ; elles deviennent trois onglets d'une seule page
@@ -30,7 +31,7 @@ export default function DynassurPerformance() {
           {visibles.map(([k, label, icon]) => (
             <button key={k} onClick={() => setOnglet(k)} style={{
               border: 'none', background: 'none', padding: '10px 14px', fontSize: 15, fontWeight: 700, cursor: 'pointer',
-              color: actif === k ? '#0D2F5E' : '#94a3b8', borderBottom: actif === k ? '2px solid #0080BD' : '2px solid transparent', marginBottom: -2,
+              color: actif === k ? '#0D2F5E' : COUL.texteFaible, borderBottom: actif === k ? '2px solid #0080BD' : '2px solid transparent', marginBottom: -2,
             }}>
               <i className={`ti ${icon}`} style={{ marginRight: 6 }} />{label}
             </button>
@@ -41,7 +42,7 @@ export default function DynassurPerformance() {
         {actif === 'chiffres' && <ChiffresContent />}
         {actif === 'rentabilite' && <RentabiliteContent />}
         {actif === 'objectifs' && <ObjectifsView />}
-        {!actif && <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>Aucun accès à ces écrans.</div>}
+        {!actif && <div style={{ padding: 40, textAlign: 'center', color: COUL.texteFaible }}>Aucun accès à ces écrans.</div>}
       </div>
     </Layout>
   )

@@ -6,6 +6,7 @@ import { useAuth } from '../lib/auth'
 import BlocComptes from './BlocComptes'
 import { ENTITES } from '../lib/entites'
 import { StatBanner, DataCard, StatusBadge } from './ui/AccountableUI'
+import { COUL } from '../lib/theme'
 
 // Tableau de bord type d'une société du groupe (DTX, LODE, Hexagroup, Privé).
 // Remplace quatre pages identiques à la couleur et au code société près : toute
@@ -34,9 +35,9 @@ function KpiCard({ label, value, icon, color, sub, onClick }) {
     <DataCard style={{ padding: 20, borderTop: `3px solid ${color}`, borderRadius: 14 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>{label}</div>
-          <div style={{ fontSize: 28, fontWeight: 800, color: '#0f172a', lineHeight: 1 }}>{value}</div>
-          {sub && <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>{sub}</div>}
+          <div style={{ fontSize: 11, color: COUL.texteFaible, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>{label}</div>
+          <div style={{ fontSize: 28, fontWeight: 800, color: COUL.texteFort, lineHeight: 1 }}>{value}</div>
+          {sub && <div style={{ fontSize: 12, color: COUL.texteFaible, marginTop: 4 }}>{sub}</div>}
         </div>
         <div style={{ width: 44, height: 44, background: color + '18', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <i className={'ti ' + icon} style={{ fontSize: 22, color }} />
@@ -142,7 +143,7 @@ export default function DashboardSociete({ entite, sousTitre }) {
         <div style={{ marginBottom: 20 }} />
 
         {!loading && txStats == null && (
-          <div style={{ marginBottom: 18, padding: '10px 14px', background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 9, fontSize: 12, color: '#92400e', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ marginBottom: 18, padding: '10px 14px', background: COUL.alerteFond, border: '1px solid #fcd34d', borderRadius: 9, fontSize: 12, color: COUL.alerteFonce, display: 'flex', alignItems: 'center', gap: 8 }}>
             <i className="ti ti-alert-triangle" style={{ fontSize: 15 }} />
             Les flux du mois n'ont pas pu être chargés — détail dans la console du navigateur.
           </div>
@@ -150,8 +151,8 @@ export default function DashboardSociete({ entite, sousTitre }) {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14, marginBottom: 22 }}>
           <KpiCard label="Tickets ouverts" value={loading ? '…' : tickets.length} icon="ti-ticket" color="#0ea5e9" sub="cliquer pour voir" onClick={() => navigate('/tickets')} />
-          <KpiCard label="Entrées ce mois" value={valFlux('entrees')} icon="ti-trending-up" color="#16a34a" />
-          <KpiCard label="Sorties ce mois" value={valFlux('sorties')} icon="ti-trending-down" color="#dc2626" />
+          <KpiCard label="Entrées ce mois" value={valFlux('entrees')} icon="ti-trending-up" color={COUL.succes} />
+          <KpiCard label="Sorties ce mois" value={valFlux('sorties')} icon="ti-trending-down" color={COUL.danger} />
         </div>
 
         <div style={{ marginBottom: 22 }}>
@@ -161,19 +162,19 @@ export default function DashboardSociete({ entite, sousTitre }) {
         <DataCard>
           <div style={{ padding: '14px 18px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 8 }}>
             <i className="ti ti-ticket" style={{ fontSize: 15, color: '#0ea5e9' }} />
-            <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>Tickets ouverts</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: COUL.texteFort }}>Tickets ouverts</span>
             <span onClick={() => navigate('/tickets')} style={{ marginLeft: 'auto', fontSize: 12, color: '#0ea5e9', cursor: 'pointer', fontWeight: 600 }}>Tous les tickets →</span>
           </div>
           {loading
-            ? <div style={{ padding: 30, textAlign: 'center', color: '#94a3b8' }}>Chargement…</div>
+            ? <div style={{ padding: 30, textAlign: 'center', color: COUL.texteFaible }}>Chargement…</div>
             : tickets.length === 0
-              ? <div style={{ padding: 30, textAlign: 'center', color: '#16a34a', fontSize: 13 }}>Aucun ticket ouvert</div>
+              ? <div style={{ padding: 30, textAlign: 'center', color: COUL.succes, fontSize: 13 }}>Aucun ticket ouvert</div>
               : <div style={{ maxHeight: 320, overflowY: 'auto' }}>
                   {tickets.map((t, i) => (
                     <div key={t.id} onClick={() => navigate('/tickets?ticket=' + t.id)} style={{ cursor: 'pointer', display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: 8, padding: '10px 18px', borderBottom: i < tickets.length - 1 ? '1px solid #f8fafc' : 'none' }}>
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 500, color: '#1e293b' }}>#{t.id} — {t.titre || '—'}</div>
-                        <div style={{ fontSize: 11, color: '#94a3b8' }}>{t.gestionnaire || 'non assigné'} · {fmtDate(t.derniere_activite)}</div>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: COUL.texte }}>#{t.id} — {t.titre || '—'}</div>
+                        <div style={{ fontSize: 11, color: COUL.texteFaible }}>{t.gestionnaire || 'non assigné'} · {fmtDate(t.derniere_activite)}</div>
                       </div>
                       <StatusBadge tone="blue" label={t.ticket_statut || 'ouvert'} />
                     </div>

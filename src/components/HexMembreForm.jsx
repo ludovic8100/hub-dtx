@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import BceSearch from './BceSearch'
+import { COUL } from '../lib/theme'
 
 // Formulaire modal de création / édition d'un membre Hexagroup.
 // props: initial (membre | null), onSaved(membre), onClose()
@@ -68,10 +69,10 @@ export default function HexMembreForm({ initial, onSaved, onClose }) {
 }
 
 const bg = { position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 60, overflowY: 'auto', padding: '40px 16px' }
-const card = { background: '#fff', borderRadius: 14, padding: 24 }
+const card = { background: COUL.blanc, borderRadius: 14, padding: 24 }
 const head = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }
-const close = { border: 'none', background: 'none', cursor: 'pointer', fontSize: 20, color: '#64748b' }
-const ghost = { padding: '9px 16px', borderRadius: 8, border: '0.5px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontWeight: 600 }
-const prim = { padding: '9px 18px', borderRadius: 8, border: 'none', background: '#6E2C91', color: '#fff', cursor: 'pointer', fontWeight: 700 }
-const lbl = { display: 'block', fontSize: 12, color: '#64748b', marginBottom: 4, fontWeight: 600 }
+const close = { border: 'none', background: 'none', cursor: 'pointer', fontSize: 20, color: COUL.texteDoux }
+const ghost = { padding: '9px 16px', borderRadius: 8, border: '0.5px solid #e2e8f0', background: COUL.blanc, cursor: 'pointer', fontWeight: 600 }
+const prim = { padding: '9px 18px', borderRadius: 8, border: 'none', background: '#6E2C91', color: COUL.blanc, cursor: 'pointer', fontWeight: 700 }
+const lbl = { display: 'block', fontSize: 12, color: COUL.texteDoux, marginBottom: 4, fontWeight: 600 }
 const inp = { width: '100%', padding: '8px 10px', borderRadius: 8, border: '0.5px solid #cbd5e1', fontSize: 13, boxSizing: 'border-box' }

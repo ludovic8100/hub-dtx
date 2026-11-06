@@ -5,9 +5,10 @@ import { LODE } from '../../lib/lodeConfig'
 import { LANGUES } from '../../lib/lodeI18n'
 import { StatBanner, DataCard, ActionButton, PrimaryButton, useMobile } from '../../components/ui/AccountableUI'
 import InternalClientSearch from '../../components/InternalClientSearch'
+import { COUL } from '../../lib/theme'
 
 const ORANGE = LODE.couleur
-const NAVY = '#1e293b'
+const NAVY = COUL.texte
 
 const fmtDate = iso => iso ? new Date(iso).toLocaleDateString('fr-BE') : '—'
 
@@ -137,15 +138,15 @@ function EditeurClient({ client, onClose, onSaved }) {
   }
 
   const inp = { padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' }
-  const lbl = { fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 3, display: 'block' }
+  const lbl = { fontSize: 11, fontWeight: 700, color: COUL.texteDoux, marginBottom: 3, display: 'block' }
   const isEnt = f.type === 'entreprise'
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: 20, overflowY: 'auto' }}>
-      <div style={{ background: '#fff', borderRadius: 14, maxWidth: 720, width: '100%', padding: mobE ? 16 : 24, fontFamily: "'Source Sans Pro', sans-serif" }}>
+      <div style={{ background: COUL.blanc, borderRadius: 14, maxWidth: 720, width: '100%', padding: mobE ? 16 : 24, fontFamily: "'Source Sans Pro', sans-serif" }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
           <h2 style={{ fontSize: 18, fontWeight: 800, color: NAVY, margin: 0 }}>{client?.id ? 'Modifier le client' : 'Nouveau client'}</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#94a3b8' }}>×</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: COUL.texteFaible }}>×</button>
         </div>
 
         {/* Type */}
@@ -154,16 +155,16 @@ function EditeurClient({ client, onClose, onSaved }) {
             <button key={v} onClick={() => set('type', v)} style={{
               flex: 1, padding: '10px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 700,
               border: f.type === v ? `2px solid ${ORANGE}` : '1px solid #e2e8f0',
-              background: f.type === v ? '#fff7ed' : '#fff', color: f.type === v ? ORANGE : '#64748b',
+              background: f.type === v ? '#fff7ed' : COUL.blanc, color: f.type === v ? ORANGE : COUL.texteDoux,
             }}>{l}</button>
           ))}
         </div>
 
         {/* Reprise d'un client déjà encodé dans une autre entité (anti multi-encodage) */}
         <div style={{ background: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: 10, padding: 14, marginBottom: 16 }}>
-          <label style={{ ...lbl, color: '#7c3aed' }}>♻️ Reprendre un client déjà encodé (Dynassur / DTX)</label>
+          <label style={{ ...lbl, color: COUL.violet }}>♻️ Reprendre un client déjà encodé (Dynassur / DTX)</label>
           <InternalClientSearch
-            sources={[{ table: 'dyn_clients', label: 'Dynassur', color: '#0080BD' }, { table: 'dtx_clients', label: 'DTX', color: '#94a3b8' }]}
+            sources={[{ table: 'dyn_clients', label: 'Dynassur', color: COUL.bleu }, { table: 'dtx_clients', label: 'DTX', color: COUL.texteFaible }]}
             onSelect={(rec) => {
               const KEYS = ['type', 'denomination', 'nom', 'prenom', 'adresse', 'cp', 'ville', 'pays', 'tva', 'numero_bce', 'email', 'telephone', 'gsm', 'langue']
               setF(p => { const n = { ...p }; KEYS.forEach(k => { if (rec[k] != null && rec[k] !== '') n[k] = rec[k] }); return n })
@@ -173,25 +174,25 @@ function EditeurClient({ client, onClose, onSaved }) {
 
         {/* Recherche BCE (entreprise uniquement) — autocomplétion temps réel */}
         {isEnt && (
-          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: 14, marginBottom: 16, position: 'relative' }}>
+          <div style={{ background: COUL.fond, border: '1px solid #e2e8f0', borderRadius: 10, padding: 14, marginBottom: 16, position: 'relative' }}>
             <label style={{ ...lbl, color: ORANGE }}>🔍 Rechercher dans la Banque-Carrefour des Entreprises</label>
             <div style={{ position: 'relative' }}>
               <input style={inp} value={bceQuery} onChange={e => setBceQuery(e.target.value)}
                 placeholder="Commencez à taper un nom d'entreprise ou un n° BCE…" autoComplete="off" />
               {bceLoading && <span style={{ position: 'absolute', right: 12, top: 9, fontSize: 12, color: ORANGE }}>⏳</span>}
             </div>
-            {bceError && !bceLoading && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 6 }}>{bceError}</div>}
+            {bceError && !bceLoading && <div style={{ fontSize: 11, color: COUL.texteFaible, marginTop: 6 }}>{bceError}</div>}
             {bceResults && bceResults.length > 0 && (
-              <div style={{ position: 'absolute', left: 14, right: 14, top: 70, zIndex: 10, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 9, boxShadow: '0 6px 20px rgba(0,0,0,0.12)', maxHeight: 260, overflowY: 'auto' }}>
+              <div style={{ position: 'absolute', left: 14, right: 14, top: 70, zIndex: 10, background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 9, boxShadow: '0 6px 20px rgba(0,0,0,0.12)', maxHeight: 260, overflowY: 'auto' }}>
                 {bceResults.map((e, i) => (
                   <div key={i} onClick={() => appliquerBCE(e)} style={{
                     padding: '9px 12px', cursor: 'pointer', fontSize: 12,
                     borderBottom: i < bceResults.length - 1 ? '1px solid #f1f5f9' : 'none',
                   }}
-                    onMouseEnter={ev => ev.currentTarget.style.background = '#fff7ed'}
-                    onMouseLeave={ev => ev.currentTarget.style.background = '#fff'}>
+                    onMouseEnter={ev => ev.currentTarget.style.background = COUL.orangeFond}
+                    onMouseLeave={ev => ev.currentTarget.style.background = COUL.blanc}>
                     <div style={{ fontWeight: 700, color: NAVY }}>{e.denomination_with_legal_form || e.denomination}</div>
-                    <div style={{ color: '#94a3b8', fontSize: 11 }}>{e.cbe_number_formatted || e.cbe_number}{e.address?.city ? ' · ' + e.address.city : ''}</div>
+                    <div style={{ color: COUL.texteFaible, fontSize: 11 }}>{e.cbe_number_formatted || e.cbe_number}{e.address?.city ? ' · ' + e.address.city : ''}</div>
                   </div>
                 ))}
               </div>
@@ -225,16 +226,16 @@ function EditeurClient({ client, onClose, onSaved }) {
             <label style={lbl}>Adresse {addrLoading && <span style={{ color: ORANGE }}>⏳</span>}</label>
             <input style={inp} value={f.adresse} onChange={e => set('adresse', e.target.value)} autoComplete="off" placeholder="Commencez à taper la rue…" />
             {addrResults && addrResults.length > 0 && (
-              <div style={{ position: 'absolute', left: 0, right: 0, top: 60, zIndex: 20, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 9, boxShadow: '0 6px 20px rgba(0,0,0,0.12)', maxHeight: 220, overflowY: 'auto' }}>
+              <div style={{ position: 'absolute', left: 0, right: 0, top: 60, zIndex: 20, background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 9, boxShadow: '0 6px 20px rgba(0,0,0,0.12)', maxHeight: 220, overflowY: 'auto' }}>
                 {addrResults.map((a, i) => (
                   <div key={i} onClick={() => appliquerAdresse(a)} style={{
                     padding: '8px 11px', cursor: 'pointer', fontSize: 12,
                     borderBottom: i < addrResults.length - 1 ? '1px solid #f1f5f9' : 'none',
                   }}
-                    onMouseEnter={ev => ev.currentTarget.style.background = '#fff7ed'}
-                    onMouseLeave={ev => ev.currentTarget.style.background = '#fff'}>
+                    onMouseEnter={ev => ev.currentTarget.style.background = COUL.orangeFond}
+                    onMouseLeave={ev => ev.currentTarget.style.background = COUL.blanc}>
                     <span style={{ fontWeight: 600, color: NAVY }}>{[a.street, a.housenumber].filter(Boolean).join(' ')}</span>
-                    <span style={{ color: '#94a3b8' }}> — {a.postcode} {a.city}</span>
+                    <span style={{ color: COUL.texteFaible }}> — {a.postcode} {a.city}</span>
                   </div>
                 ))}
               </div>
@@ -259,8 +260,8 @@ function EditeurClient({ client, onClose, onSaved }) {
         <div style={{ marginBottom: 18 }}><label style={lbl}>Notes</label><textarea style={{ ...inp, minHeight: 50, resize: 'vertical' }} value={f.notes} onChange={e => set('notes', e.target.value)} /></div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-          <button onClick={onClose} style={{ background: '#f1f5f9', border: 'none', borderRadius: 9, padding: '10px 20px', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#64748b' }}>Annuler</button>
-          <button onClick={save} disabled={saving} style={{ background: ORANGE, border: 'none', borderRadius: 9, padding: '10px 24px', cursor: saving ? 'wait' : 'pointer', fontSize: 13, fontWeight: 700, color: '#fff' }}>{saving ? 'Enregistrement…' : 'Enregistrer'}</button>
+          <button onClick={onClose} style={{ background: COUL.fondDoux, border: 'none', borderRadius: 9, padding: '10px 20px', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: COUL.texteDoux }}>Annuler</button>
+          <button onClick={save} disabled={saving} style={{ background: ORANGE, border: 'none', borderRadius: 9, padding: '10px 24px', cursor: saving ? 'wait' : 'pointer', fontSize: 13, fontWeight: 700, color: COUL.blanc }}>{saving ? 'Enregistrement…' : 'Enregistrer'}</button>
         </div>
       </div>
     </div>
@@ -315,10 +316,10 @@ export default function LodeClientsModule() {
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher (nom, dénomination, BCE, ville)…"
           style={{ width: '100%', maxWidth: 420, padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: 10, fontSize: 13, marginBottom: 16, boxSizing: 'border-box', fontFamily: 'inherit' }} />
 
-        {loading ? <p style={{ color: '#94a3b8' }}>Chargement…</p> :
+        {loading ? <p style={{ color: COUL.texteFaible }}>Chargement…</p> :
           filtered.length === 0 ? (
             <DataCard style={{ padding: '40px 24px', textAlign: 'center' }}>
-              <p style={{ color: '#94a3b8', fontStyle: 'italic', margin: 0 }}>Aucun client. Clique sur « Nouveau client » pour commencer.</p>
+              <p style={{ color: COUL.texteFaible, fontStyle: 'italic', margin: 0 }}>Aucun client. Clique sur « Nouveau client » pour commencer.</p>
             </DataCard>
           ) : mob ? (
             /* === Mobile : cartes === */
@@ -327,11 +328,11 @@ export default function LodeClientsModule() {
                 <DataCard key={c.id} style={{ padding: 14 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, color: '#1e293b', fontSize: 15 }}>
+                      <div style={{ fontWeight: 700, color: COUL.texte, fontSize: 15 }}>
                         <span style={{ marginRight: 6 }}>{c.type === 'entreprise' ? '🏢' : '👤'}</span>{nomAffiche(c) || '—'}
                       </div>
-                      <div style={{ fontFamily: 'monospace', fontSize: 11, color: '#64748b', marginTop: 3 }}>{c.numero_bce || c.tva || '—'}</div>
-                      <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 2 }}>{c.ville || '—'} · {c.email || c.gsm || c.telephone || '—'}</div>
+                      <div style={{ fontFamily: 'monospace', fontSize: 11, color: COUL.texteDoux, marginTop: 3 }}>{c.numero_bce || c.tva || '—'}</div>
+                      <div style={{ fontSize: 12.5, color: COUL.texteDoux, marginTop: 2 }}>{c.ville || '—'} · {c.email || c.gsm || c.telephone || '—'}</div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 6, marginTop: 10, borderTop: '1px solid #f1f5f9', paddingTop: 10 }}>
@@ -345,21 +346,21 @@ export default function LodeClientsModule() {
             /* === Desktop : tableau === */
             <DataCard style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 720 }}>
-                <thead style={{ background: '#f8fafc' }}>
+                <thead style={{ background: COUL.fond }}>
                   <tr>{['', 'Nom / Dénomination', 'BCE / TVA', 'Ville', 'Contact', 'Actions'].map(h => (
-                    <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.03em' }}>{h}</th>
+                    <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '0.03em' }}>{h}</th>
                   ))}</tr>
                 </thead>
                 <tbody>
                   {filtered.map(c => (
                     <tr key={c.id} style={{ borderTop: '1px solid #f1f5f9' }}
                       onMouseEnter={e => e.currentTarget.style.background = '#fafbfc'}
-                      onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                      onMouseLeave={e => e.currentTarget.style.background = COUL.blanc}>
                       <td style={{ padding: '11px 14px', fontSize: 18 }}>{c.type === 'entreprise' ? '🏢' : '👤'}</td>
-                      <td style={{ padding: '11px 14px', fontWeight: 600, color: '#1e293b' }}>{nomAffiche(c) || '—'}</td>
-                      <td style={{ padding: '11px 14px', color: '#64748b', fontFamily: 'monospace', fontSize: 11 }}>{c.numero_bce || c.tva || '—'}</td>
-                      <td style={{ padding: '11px 14px', color: '#64748b' }}>{c.ville || '—'}</td>
-                      <td style={{ padding: '11px 14px', color: '#64748b' }}>{c.email || c.gsm || c.telephone || '—'}</td>
+                      <td style={{ padding: '11px 14px', fontWeight: 600, color: COUL.texte }}>{nomAffiche(c) || '—'}</td>
+                      <td style={{ padding: '11px 14px', color: COUL.texteDoux, fontFamily: 'monospace', fontSize: 11 }}>{c.numero_bce || c.tva || '—'}</td>
+                      <td style={{ padding: '11px 14px', color: COUL.texteDoux }}>{c.ville || '—'}</td>
+                      <td style={{ padding: '11px 14px', color: COUL.texteDoux }}>{c.email || c.gsm || c.telephone || '—'}</td>
                       <td style={{ padding: '11px 14px' }}>
                         <div style={{ display: 'flex', gap: 5 }}>
                           <ActionButton tone="grey" onClick={() => setEditing(c)}>Modifier</ActionButton>

@@ -8,16 +8,17 @@ import { useAuth } from '../lib/auth'
 import { ibanEspace } from '../lib/epc'
 import QRCode from 'qrcode'
 import SignaturePad from './ui/SignaturePad'
+import { COUL } from '../lib/theme'
 
-const NAVY = '#0D2F5E'
+const NAVY = COUL.marine
 const KM_TAUX_DEFAUT = 0.4761 // barème belge secteur privé 01/07/2026–30/06/2027 (circ. 767) — ajustable par ligne
 const CAT_KM = 'Kilométrique'
 const CATEGORIES = ['Repas / restaurant', 'Carburant', CAT_KM, 'Parking / péage', 'Hôtel / déplacement', 'Fournitures', 'Télécom', 'Autre']
 const TVA_TAUX = [0, 6, 12, 21]
 const STATUTS = {
-  brouillon: { label: 'Brouillon', bg: '#f1f5f9', color: '#64748b' },
-  soumise: { label: 'Soumise', bg: '#fef3c7', color: '#b45309' },
-  validee: { label: 'Validée', bg: '#dcfce7', color: '#16a34a' },
+  brouillon: { label: 'Brouillon', bg: COUL.fondDoux, color: COUL.texteDoux },
+  soumise: { label: 'Soumise', bg: COUL.alerteFond, color: COUL.alerte },
+  validee: { label: 'Validée', bg: COUL.succesFond, color: COUL.succes },
 }
 
 const num = v => { const n = parseFloat(String(v ?? '').replace(',', '.')); return isNaN(n) ? 0 : n }
@@ -46,18 +47,18 @@ function calcLigne(l) {
 }
 
 // ── styles partagés ──
-const inp = { padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 14, color: '#1e293b', width: '100%', boxSizing: 'border-box', fontFamily: 'inherit' }
-const btn = (bg, col = '#fff', border = 'none') => ({ padding: '9px 16px', borderRadius: 9, border, background: bg, color: col, fontSize: 14, fontWeight: 700, cursor: 'pointer' })
-const sheetInp = { border: 'none', borderBottom: '1px solid #e2e8f0', background: 'transparent', padding: '5px 3px', fontSize: 13, color: '#1e293b', width: '100%', boxSizing: 'border-box', fontFamily: 'inherit' }
+const inp = { padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 14, color: COUL.texte, width: '100%', boxSizing: 'border-box', fontFamily: 'inherit' }
+const btn = (bg, col = COUL.blanc, border = 'none') => ({ padding: '9px 16px', borderRadius: 9, border, background: bg, color: col, fontSize: 14, fontWeight: 700, cursor: 'pointer' })
+const sheetInp = { border: 'none', borderBottom: '1px solid #e2e8f0', background: 'transparent', padding: '5px 3px', fontSize: 13, color: COUL.texte, width: '100%', boxSizing: 'border-box', fontFamily: 'inherit' }
 const tdS = { padding: '6px 8px', borderBottom: '1px solid #eef2f7', verticalAlign: 'middle' }
-const thS = { padding: '9px 8px', textAlign: 'left', fontSize: 10, fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: '.03em', whiteSpace: 'nowrap' }
-const infoLbl = { fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 3 }
-const infoVal = { fontSize: 14, fontWeight: 700, color: '#1e293b' }
+const thS = { padding: '9px 8px', textAlign: 'left', fontSize: 10, fontWeight: 800, color: COUL.blanc, textTransform: 'uppercase', letterSpacing: '.03em', whiteSpace: 'nowrap' }
+const infoLbl = { fontSize: 10, fontWeight: 800, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 3 }
+const infoVal = { fontSize: 14, fontWeight: 700, color: COUL.texte }
 function Card({ titre, sous, right, children }) {
   return (
-    <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden', marginBottom: 20 }}>
-      {titre && <div style={{ padding: '11px 15px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <div><div style={{ fontSize: 14, fontWeight: 800, color: NAVY }}>{titre}</div>{sous && <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 2 }}>{sous}</div>}</div>
+    <div style={{ background: COUL.blanc, borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden', marginBottom: 20 }}>
+      {titre && <div style={{ padding: '11px 15px', background: COUL.fond, borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div><div style={{ fontSize: 14, fontWeight: 800, color: NAVY }}>{titre}</div>{sous && <div style={{ fontSize: 11.5, color: COUL.texteDoux, marginTop: 2 }}>{sous}</div>}</div>
         {right}
       </div>}
       <div style={{ padding: 15 }}>{children}</div>
@@ -65,12 +66,12 @@ function Card({ titre, sous, right, children }) {
   )
 }
 function Kpi({ label, value, col }) {
-  return <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #e2e8f0', borderTop: `3px solid ${col}`, padding: '12px 16px' }}>
-    <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 5 }}>{label}</div>
-    <div style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', lineHeight: 1 }}>{value}</div>
+  return <div style={{ background: COUL.blanc, borderRadius: 10, border: '1px solid #e2e8f0', borderTop: `3px solid ${col}`, padding: '12px 16px' }}>
+    <div style={{ fontSize: 10, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 5 }}>{label}</div>
+    <div style={{ fontSize: 22, fontWeight: 800, color: COUL.texteFort, lineHeight: 1 }}>{value}</div>
   </div>
 }
-function Field({ l, children }) { return <div><div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 4 }}>{l}</div>{children}</div> }
+function Field({ l, children }) { return <div><div style={{ fontSize: 11, fontWeight: 700, color: COUL.texteDoux, marginBottom: 4 }}>{l}</div>{children}</div> }
 function Badge({ s }) { const st = STATUTS[s] || STATUTS.brouillon; return <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 6, background: st.bg, color: st.color }}>{st.label}</span> }
 
 export default function NotesFraisView({ entiteKey = 'dynassur' }) {
@@ -310,10 +311,10 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
         {!sel && (
           <>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 12, margin: '18px 0' }}>
-              <Kpi label="Brouillons" value={nBrouillon} col="#64748b" />
-              <Kpi label="Validées" value={nValidee} col="#16a34a" />
+              <Kpi label="Brouillons" value={nBrouillon} col={COUL.texteDoux} />
+              <Kpi label="Validées" value={nValidee} col={COUL.succes} />
               <Kpi label="Total en cours" value={eur(totEnCours)} col={ACCENT} />
-              <Kpi label="Total validé" value={eur(totValide)} col="#16a34a" />
+              <Kpi label="Total validé" value={eur(totValide)} col={COUL.succes} />
             </div>
 
             <Card titre="Mes notes de frais" sous={isAdmin ? 'Admin : vous voyez toutes les notes de cette société.' : 'Vous voyez et gérez vos propres notes.'}
@@ -322,15 +323,15 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
                 <input value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher (titre, période, auteur…)" style={{ ...inp, maxWidth: 300 }} />
                 {isAdmin && <div style={{ display: 'flex', gap: 0, border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
                   {[['mine', 'Mes notes'], ['all', 'Toutes']].map(([v, l]) => (
-                    <button key={v} onClick={() => setScope(v)} style={{ padding: '8px 14px', border: 'none', background: scope === v ? ACCENT : '#fff', color: scope === v ? '#fff' : '#64748b', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>{l}</button>
+                    <button key={v} onClick={() => setScope(v)} style={{ padding: '8px 14px', border: 'none', background: scope === v ? ACCENT : COUL.blanc, color: scope === v ? '#fff' : COUL.texteDoux, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>{l}</button>
                   ))}
                 </div>}
               </div>
-              {loading ? <div style={{ padding: 20, color: '#94a3b8' }}>Chargement…</div>
-                : !visibles.length ? <div style={{ padding: 20, color: '#94a3b8' }}>Aucune note de frais pour le moment.</div>
+              {loading ? <div style={{ padding: 20, color: COUL.texteFaible }}>Chargement…</div>
+                : !visibles.length ? <div style={{ padding: 20, color: COUL.texteFaible }}>Aucune note de frais pour le moment.</div>
                   : <div style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}>
-                      <thead><tr style={{ textAlign: 'left', color: '#94a3b8', fontSize: 11, textTransform: 'uppercase' }}>
+                      <thead><tr style={{ textAlign: 'left', color: COUL.texteFaible, fontSize: 11, textTransform: 'uppercase' }}>
                         <th style={{ padding: '8px 10px' }}>N°</th>
                         <th style={{ padding: '8px 10px' }}>Titre</th>
                         {isGroupe && <th style={{ padding: '8px 10px' }}>Société</th>}
@@ -344,14 +345,14 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
                       <tbody>
                         {visibles.map(n => (
                           <tr key={n.id} style={{ borderTop: '1px solid #eef2f7' }}>
-                            <td style={{ padding: '9px 10px', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap' }}>{n.numero || <span style={{ color: '#cbd5e1' }}>—</span>}</td>
-                            <td style={{ padding: '9px 10px', fontWeight: 600, color: '#1e293b' }}>{n.titre || <span style={{ color: '#cbd5e1' }}>(sans titre)</span>}</td>
-                            {isGroupe && <td style={{ padding: '9px 10px', color: '#475569', fontSize: 12.5 }}>{(ENTITES[n.societe] || {}).label || n.societe}</td>}
-                            <td style={{ padding: '9px 10px', color: '#475569' }}>{n.periode || '—'}</td>
-                            {isAdmin && scope === 'all' && <td style={{ padding: '9px 10px', color: '#475569' }}>{n.auteur_nom || n.auteur_code || n.auteur_email}</td>}
-                            <td style={{ padding: '9px 10px', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>{eur(n.total)}</td>
+                            <td style={{ padding: '9px 10px', color: COUL.texteDoux, fontWeight: 600, whiteSpace: 'nowrap' }}>{n.numero || <span style={{ color: COUL.bordFort }}>—</span>}</td>
+                            <td style={{ padding: '9px 10px', fontWeight: 600, color: COUL.texte }}>{n.titre || <span style={{ color: COUL.bordFort }}>(sans titre)</span>}</td>
+                            {isGroupe && <td style={{ padding: '9px 10px', color: COUL.texteMoyen, fontSize: 12.5 }}>{(ENTITES[n.societe] || {}).label || n.societe}</td>}
+                            <td style={{ padding: '9px 10px', color: COUL.texteMoyen }}>{n.periode || '—'}</td>
+                            {isAdmin && scope === 'all' && <td style={{ padding: '9px 10px', color: COUL.texteMoyen }}>{n.auteur_nom || n.auteur_code || n.auteur_email}</td>}
+                            <td style={{ padding: '9px 10px', textAlign: 'right', fontWeight: 700, color: COUL.texteFort }}>{eur(n.total)}</td>
                             <td style={{ padding: '9px 10px' }}><Badge s={n.statut} /></td>
-                            <td style={{ padding: '9px 10px', color: '#94a3b8' }}>{fmtD(n.created_at)}</td>
+                            <td style={{ padding: '9px 10px', color: COUL.texteFaible }}>{fmtD(n.created_at)}</td>
                             <td style={{ padding: '9px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>
                               <button onClick={() => openNote(n)} style={{ ...btn('#fff', ACCENT, `1px solid ${ACCENT}`), padding: '5px 12px', fontSize: 12.5 }}>{n.statut === 'validee' ? 'Voir' : 'Ouvrir'}</button>
                               {n.statut === 'brouillon' && <button onClick={() => delNote(n)} title="Supprimer le brouillon" style={{ ...btn('#fff', '#dc2626', '1px solid #fecaca'), padding: '5px 9px', fontSize: 12.5, marginLeft: 6 }}>🗑</button>}
@@ -373,36 +374,36 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
               <div style={{ fontSize: 16, fontWeight: 800, color: NAVY }}>{sel.numero || (sel.id ? 'Note de frais' : 'Nouvelle note de frais')}</div>
               <Badge s={sel.statut} />
               {sel.id && isAdmin && scope === 'all' && sel.auteur_email?.toLowerCase() !== myEmail &&
-                <span style={{ fontSize: 12, color: '#64748b' }}>· {sel.auteur_nom || sel.auteur_email}</span>}
+                <span style={{ fontSize: 12, color: COUL.texteDoux }}>· {sel.auteur_nom || sel.auteur_email}</span>}
             </div>
 
-            {sel.statut === 'soumise' && <div style={{ background: '#fffbeb', border: '1px solid #fde68a', color: '#b45309', padding: '10px 14px', borderRadius: 10, marginBottom: 16, fontSize: 13 }}>
+            {sel.statut === 'soumise' && <div style={{ background: COUL.alerteFondDoux, border: '1px solid #fde68a', color: COUL.alerte, padding: '10px 14px', borderRadius: 10, marginBottom: 16, fontSize: 13 }}>
               Note soumise le {fmtD(sel.soumise_at)} — en attente de validation par un administrateur (lecture seule).
             </div>}
-            {sel.statut === 'validee' && <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', padding: '10px 14px', borderRadius: 10, marginBottom: 16, fontSize: 13, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            {sel.statut === 'validee' && <div style={{ background: COUL.succesFondDoux, border: '1px solid #bbf7d0', color: '#166534', padding: '10px 14px', borderRadius: 10, marginBottom: 16, fontSize: 13, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               <span>Note validée le {fmtD(sel.validee_at)}{sel.valide_par_nom ? ` par ${sel.valide_par_nom}` : ''} — lecture seule.</span>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {sel.piece_pdf_path && <button onClick={telechargerPiece} style={{ ...btn('#166534'), padding: '6px 12px', fontSize: 12.5 }}>Télécharger la pièce PDF</button>}
                 <button onClick={rouvrir} style={{ ...btn('#fff', '#166534', '1px solid #86efac'), padding: '6px 12px', fontSize: 12.5 }}>Repasser en brouillon</button>
               </div>
             </div>}
-            {sel.statut === 'brouillon' && sel.refus_motif && <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', padding: '10px 14px', borderRadius: 10, marginBottom: 16, fontSize: 13, lineHeight: 1.5 }}>
+            {sel.statut === 'brouillon' && sel.refus_motif && <div style={{ background: COUL.dangerFondDoux, border: '1px solid #fecaca', color: COUL.dangerFonce, padding: '10px 14px', borderRadius: 10, marginBottom: 16, fontSize: 13, lineHeight: 1.5 }}>
               <b>Note renvoyée</b>{sel.refus_at ? ` le ${fmtD(sel.refus_at)}` : ''} : {sel.refus_motif}<br />Corrigez puis soumettez à nouveau.
             </div>}
 
-            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 3px rgba(15,23,42,.07)' }}>
+            <div style={{ background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 3px rgba(15,23,42,.07)' }}>
 
               {(() => { const NE = ENTITES[sel.societe] || ENT; return (
               <div style={{ background: NE.color, padding: '18px 24px', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-                <div style={{ width: 54, height: 54, borderRadius: 12, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+                <div style={{ width: 54, height: 54, borderRadius: 12, background: COUL.blanc, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
                   {NE.logo ? <img src={NE.logo} alt="" style={{ maxWidth: '78%', maxHeight: '78%', objectFit: 'contain' }} />
                     : <span style={{ fontSize: 26, fontWeight: 800, color: NE.color }}>{(NE.label || '?').trim()[0]}</span>}
                 </div>
                 <div style={{ flex: 1, minWidth: 160 }}>
-                  <div style={{ color: '#fff', fontSize: 20, fontWeight: 800, letterSpacing: '.01em' }}>NOTE DE FRAIS</div>
+                  <div style={{ color: COUL.blanc, fontSize: 20, fontWeight: 800, letterSpacing: '.01em' }}>NOTE DE FRAIS</div>
                   <div style={{ color: 'rgba(255,255,255,.85)', fontSize: 12.5 }}>Pièce justificative de remboursement</div>
                 </div>
-                <div style={{ textAlign: 'right', color: '#fff' }}>
+                <div style={{ textAlign: 'right', color: COUL.blanc }}>
                   <div style={{ fontWeight: 800, fontSize: 14 }}>{NE.label}</div>
                   {sel.numero && <div style={{ fontSize: 12, opacity: .85, marginTop: 2 }}>{sel.numero}</div>}
                 </div>
@@ -415,21 +416,21 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 16 }}>
                   <div><div style={infoLbl}>Société</div>
                     {isGroupe && isAdmin && sel.statut === 'brouillon'
-                      ? <select value={sel.societe || 'dynassur'} onChange={e => setSel(s => ({ ...s, societe: e.target.value }))} style={{ ...sheetInp, fontWeight: 700, color: '#1e293b' }}>
+                      ? <select value={sel.societe || 'dynassur'} onChange={e => setSel(s => ({ ...s, societe: e.target.value }))} style={{ ...sheetInp, fontWeight: 700, color: COUL.texte }}>
                           {Object.values(ENTITES).filter(e => e.key !== 'groupe').map(e => <option key={e.key} value={e.key}>{e.label}</option>)}
                         </select>
                       : <div style={infoVal}>{(ENTITES[sel.societe] || ENT).label}</div>}
                   </div>
                   <div><div style={infoLbl}>Bénéficiaire</div>
                     {isAdmin && sel.statut === 'brouillon' && collabList.length > 0
-                      ? <select value={sel.auteur_email || myEmail} onChange={e => changeBenef(e.target.value)} style={{ ...sheetInp, fontWeight: 700, color: '#1e293b' }}>
+                      ? <select value={sel.auteur_email || myEmail} onChange={e => changeBenef(e.target.value)} style={{ ...sheetInp, fontWeight: 700, color: COUL.texte }}>
                           {!collabList.find(c => c.email === (sel.auteur_email || myEmail)) && <option value={sel.auteur_email || myEmail}>{sel.auteur_nom || myNom || myEmail}</option>}
                           {collabList.map(c => <option key={c.email} value={c.email}>{c.nom_complet || c.email}{c.code ? ` (${c.code})` : ''}</option>)}
                         </select>
                       : <div style={infoVal}>{sel.auteur_nom || myNom || myEmail}</div>}
                   </div>
                   <div><div style={infoLbl}>Période</div><input disabled={lockEdit} value={sel.periode || ''} onChange={e => setSel(s => ({ ...s, periode: e.target.value }))} placeholder="Ex : Juillet 2026" style={{ ...sheetInp, borderBottom: lockEdit ? '1px solid transparent' : '1px solid #e2e8f0' }} /></div>
-                  <div><div style={infoLbl}>Statut</div><div style={{ ...infoVal, display: 'flex', alignItems: 'center', gap: 8 }}><Badge s={sel.statut} />{sel.validee_at && <span style={{ fontSize: 12, fontWeight: 500, color: '#94a3b8' }}>le {fmtD(sel.validee_at)}</span>}</div></div>
+                  <div><div style={infoLbl}>Statut</div><div style={{ ...infoVal, display: 'flex', alignItems: 'center', gap: 8 }}><Badge s={sel.statut} />{sel.validee_at && <span style={{ fontSize: 12, fontWeight: 500, color: COUL.texteFaible }}>le {fmtD(sel.validee_at)}</span>}</div></div>
                 </div>
                 <div style={{ marginTop: 14 }}><div style={infoLbl}>Commentaire</div><input disabled={lockEdit} value={sel.note || ''} onChange={e => setSel(s => ({ ...s, note: e.target.value }))} placeholder="Remarque éventuelle" style={{ ...sheetInp, borderBottom: lockEdit ? '1px solid transparent' : '1px solid #e2e8f0' }} /></div>
               </div>
@@ -437,7 +438,7 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
               <div style={{ padding: '16px 24px 8px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8, gap: 10, flexWrap: 'wrap' }}>
                   <div style={{ fontSize: 13, fontWeight: 800, color: NAVY }}>Détail des dépenses</div>
-                  <div style={{ fontSize: 11.5, color: '#94a3b8' }}>Un justificatif par ligne (sauf lignes kilométriques).</div>
+                  <div style={{ fontSize: 11.5, color: COUL.texteFaible }}>Un justificatif par ligne (sauf lignes kilométriques).</div>
                 </div>
                 <div style={{ overflowX: 'auto', border: '1px solid #eef2f7', borderRadius: 10 }}>
                   <table style={{ width: '100%', minWidth: 760, borderCollapse: 'collapse', fontSize: 13 }}>
@@ -455,13 +456,13 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {!calc.length && <tr><td colSpan={9} style={{ padding: 18, textAlign: 'center', color: '#94a3b8' }}>Aucune ligne. Ajoutez une première dépense ci-dessous.</td></tr>}
+                      {!calc.length && <tr><td colSpan={9} style={{ padding: 18, textAlign: 'center', color: COUL.texteFaible }}>Aucune ligne. Ajoutez une première dépense ci-dessous.</td></tr>}
                       {calc.map(l => {
                         const raw = lignes.find(x => x._key === l._key) || l
                         const km = isKm(l)
                         const jm = !km && !l.justificatif_path
                         return (
-                          <tr key={l._key} style={{ background: jm ? '#fff7f7' : '#fff' }}>
+                          <tr key={l._key} style={{ background: jm ? '#fff7f7' : COUL.blanc }}>
                             <td style={tdS}><input type="date" disabled={lockEdit} value={l.date || ''} onChange={e => updLigne(l._key, { date: e.target.value })} style={{ ...sheetInp, minWidth: 118 }} /></td>
                             <td style={tdS}>
                               <select disabled={lockEdit} value={l.categorie || ''} onChange={e => setCategorie(l._key, e.target.value)} style={{ ...sheetInp, minWidth: 118 }}>
@@ -474,21 +475,21 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
                               {km
                                 ? <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                                     <input disabled={lockEdit} value={raw.km_distance ?? ''} onChange={e => updLigne(l._key, { km_distance: e.target.value })} placeholder="km" style={{ ...sheetInp, width: 46 }} />
-                                    <span style={{ color: '#94a3b8', fontSize: 11 }}>×</span>
+                                    <span style={{ color: COUL.texteFaible, fontSize: 11 }}>×</span>
                                     <input disabled={lockEdit} value={raw.km_taux ?? ''} onChange={e => updLigne(l._key, { km_taux: e.target.value })} style={{ ...sheetInp, width: 56 }} />
                                   </div>
                                 : <input disabled={lockEdit} value={raw.montant_ttc ?? ''} onChange={e => updLigne(l._key, { montant_ttc: e.target.value })} placeholder="0,00" style={{ ...sheetInp, width: 78 }} />}
                             </td>
-                            {showTVA && <td style={tdS}>{km ? <span style={{ color: '#cbd5e1' }}>—</span>
+                            {showTVA && <td style={tdS}>{km ? <span style={{ color: COUL.bordFort }}>—</span>
                               : <select disabled={lockEdit} value={l.taux_tva} onChange={e => updLigne(l._key, { taux_tva: e.target.value })} style={{ ...sheetInp, width: 62 }}>{TVA_TAUX.map(t => <option key={t} value={t}>{t}%</option>)}</select>}</td>}
-                            {showTVA && <td style={{ ...tdS, textAlign: 'right', color: '#475569', whiteSpace: 'nowrap' }}>{eur(l.montant_ht)}</td>}
+                            {showTVA && <td style={{ ...tdS, textAlign: 'right', color: COUL.texteMoyen, whiteSpace: 'nowrap' }}>{eur(l.montant_ht)}</td>}
                             <td style={{ ...tdS, textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>{eur(l.montant_ttc)}</td>
                             <td style={tdS}>
-                              {km ? <span style={{ color: '#cbd5e1' }}>—</span>
+                              {km ? <span style={{ color: COUL.bordFort }}>—</span>
                                 : l.justificatif_path
                                   ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
                                       <button onClick={() => viewJustif(l.justificatif_path)} title={l.justificatif_nom || 'Justificatif'} style={{ ...btn('#fff', noteAccent, `1px solid ${noteAccent}`), padding: '3px 9px', fontSize: 11.5 }}>📎 Voir</button>
-                                      {pieceNom(l) && <span title={pieceNom(l)} style={{ maxWidth: 170, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11.5, color: '#64748b', display: 'inline-block', verticalAlign: 'middle' }}>{pieceNom(l)}</span>}
+                                      {pieceNom(l) && <span title={pieceNom(l)} style={{ maxWidth: 170, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11.5, color: COUL.texteDoux, display: 'inline-block', verticalAlign: 'middle' }}>{pieceNom(l)}</span>}
                                       {!lockEdit && <button onClick={() => removeJustif(l._key, l.justificatif_path)} title="Retirer" style={{ ...btn('#fff', '#dc2626', '1px solid #fecaca'), padding: '3px 8px', fontSize: 11.5 }}>✕</button>}
                                     </span>
                                   : (!lockEdit
@@ -496,9 +497,9 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
                                           📎 Joindre
                                           <input type="file" accept="image/*,application/pdf" style={{ display: 'none' }} onChange={e => { uploadJustif(l._key, e.target.files?.[0]); e.target.value = '' }} />
                                         </label>
-                                      : <span style={{ color: '#dc2626', fontSize: 12 }}>manquant</span>)}
+                                      : <span style={{ color: COUL.danger, fontSize: 12 }}>manquant</span>)}
                             </td>
-                            <td style={{ ...tdS, textAlign: 'center' }}>{!lockEdit && <button onClick={() => delLigne(l._key)} title="Supprimer la ligne" style={{ border: 'none', background: 'transparent', color: '#cbd5e1', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 2 }}>✕</button>}</td>
+                            <td style={{ ...tdS, textAlign: 'center' }}>{!lockEdit && <button onClick={() => delLigne(l._key)} title="Supprimer la ligne" style={{ border: 'none', background: 'transparent', color: COUL.bordFort, cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 2 }}>✕</button>}</td>
                           </tr>
                         )
                       })}
@@ -514,22 +515,22 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
                 <div style={{ textAlign: 'right' }}><div style={infoLbl}>Total à rembourser</div><div style={{ fontSize: 22, fontWeight: 800, color: noteAccent }}>{eur(totTTC)}</div></div>
               </div>
               {sel.statut === 'validee' && (
-                <div style={{ borderTop: '1px solid #eef2f7', background: '#f8fafc', padding: '18px 24px', display: 'flex', gap: 22, alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ borderTop: '1px solid #eef2f7', background: COUL.fond, padding: '18px 24px', display: 'flex', gap: 22, alignItems: 'center', flexWrap: 'wrap' }}>
                   <div style={{ flex: 1, minWidth: 200 }}>
                     <div style={{ fontSize: 13, fontWeight: 800, color: NAVY, marginBottom: 8 }}>Remboursement</div>
-                    <div style={{ fontSize: 13, color: '#475569', lineHeight: 1.8 }}>
-                      Bénéficiaire : <b style={{ color: '#1e293b' }}>{sel.auteur_nom || myNom || '—'}</b><br />
-                      IBAN : {benefIban ? <b style={{ color: '#1e293b' }}>{ibanEspace(benefIban)}</b> : <b style={{ color: '#dc2626' }}>à renseigner</b>}<br />
-                      Communication : <b style={{ color: '#1e293b' }}>{sel.numero || '—'}</b><br />
+                    <div style={{ fontSize: 13, color: COUL.texteMoyen, lineHeight: 1.8 }}>
+                      Bénéficiaire : <b style={{ color: COUL.texte }}>{sel.auteur_nom || myNom || '—'}</b><br />
+                      IBAN : {benefIban ? <b style={{ color: COUL.texte }}>{ibanEspace(benefIban)}</b> : <b style={{ color: COUL.danger }}>à renseigner</b>}<br />
+                      Communication : <b style={{ color: COUL.texte }}>{sel.numero || '—'}</b><br />
                       Montant : <b style={{ color: noteAccent }}>{eur(sel.total || totTTC)}</b>
                     </div>
                   </div>
                   {qrUrl
                     ? <div style={{ textAlign: 'center' }}>
-                        <img src={qrUrl} alt="QR paiement SEPA" style={{ width: 154, height: 154, border: '1px solid #e2e8f0', borderRadius: 12, background: '#fff', padding: 6, boxSizing: 'border-box' }} />
-                        <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 5 }}>Scannez avec votre appli bancaire</div>
+                        <img src={qrUrl} alt="QR paiement SEPA" style={{ width: 154, height: 154, border: '1px solid #e2e8f0', borderRadius: 12, background: COUL.blanc, padding: 6, boxSizing: 'border-box' }} />
+                        <div style={{ fontSize: 11, color: COUL.texteFaible, marginTop: 5 }}>Scannez avec votre appli bancaire</div>
                       </div>
-                    : <div style={{ maxWidth: 230, fontSize: 12.5, color: '#dc2626', background: '#fff', border: '1px solid #fecaca', borderRadius: 12, padding: 14, lineHeight: 1.5 }}>
+                    : <div style={{ maxWidth: 230, fontSize: 12.5, color: COUL.danger, background: COUL.blanc, border: '1px solid #fecaca', borderRadius: 12, padding: 14, lineHeight: 1.5 }}>
                         Pas de QR : renseignez l'IBAN du bénéficiaire dans <b>Administration › Utilisateurs</b>, puis rouvrez cette note (le QR s'affiche ici). Pour que le PDF téléchargeable contienne aussi le QR, repassez ensuite la note en brouillon et re-validez.
                       </div>}
                 </div>
@@ -546,9 +547,9 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
 
             {showSig && (
               <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 1000 }}>
-                <div style={{ background: '#fff', borderRadius: 14, padding: 22, width: 'min(520px,100%)', boxShadow: '0 10px 40px rgba(0,0,0,.25)' }}>
+                <div style={{ background: COUL.blanc, borderRadius: 14, padding: 22, width: 'min(520px,100%)', boxShadow: '0 10px 40px rgba(0,0,0,.25)' }}>
                   <div style={{ fontSize: 16, fontWeight: 800, color: NAVY, marginBottom: 6 }}>Signature — soumission de la note</div>
-                  <div style={{ fontSize: 13, color: '#475569', marginBottom: 14, lineHeight: 1.5 }}>En signant, vous certifiez que les frais déclarés sont exacts et réellement engagés. Cette signature sera apposée sur la pièce justificative.</div>
+                  <div style={{ fontSize: 13, color: COUL.texteMoyen, marginBottom: 14, lineHeight: 1.5 }}>En signant, vous certifiez que les frais déclarés sont exacts et réellement engagés. Cette signature sera apposée sur la pièce justificative.</div>
                   <SignaturePad width={472} height={170} onChange={setSigImage} />
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
                     <button onClick={() => { setShowSig(false); setSigImage('') }} disabled={busy} style={btn('#fff', '#475569', '1px solid #e2e8f0')}>Annuler</button>

@@ -3,6 +3,7 @@ import { useEffect, useRef, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
 import OutilPage from '../../components/OutilPage'
 import { useAuth } from '../../lib/auth'
+import { COUL } from '../../lib/theme'
 
 export default function ToolsSuccession() {
   const { user } = useAuth()
@@ -1309,21 +1310,21 @@ function buildSchemaSuccession(r) {
   let svg = \`<div class="card"><h3>Schéma de succession</h3><div class="schema-svg">\`;
   svg += \`<svg viewBox="0 0 \${totalW} \${svgH}" width="\${Math.min(totalW, 900)}" xmlns="http://www.w3.org/2000/svg">\`;
 
-  svg += \`<defs><marker id="ah" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6Z" fill="#2563eb"/></marker>
-    <marker id="ah-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6Z" fill="#dc2626"/></marker>
-    <marker id="ah-grey" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6Z" fill="#94a3b8"/></marker></defs>\`;
+  svg += \`<defs><marker id="ah" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6Z" fill={COUL.info}/></marker>
+    <marker id="ah-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6Z" fill={COUL.danger}/></marker>
+    <marker id="ah-grey" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6Z" fill={COUL.texteFaible}/></marker></defs>\`;
 
   const personName = document.getElementById('personName').value || 'DÉFUNT';
   svg += \`<rect x="\${defuntX - masseW/2}" y="\${defuntY - 22}" width="\${masseW}" height="44" rx="10" fill="#1a2744"/>\`;
-  svg += \`<text x="\${defuntX}" y="\${defuntY - 2}" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">\${personName.toUpperCase()}</text>\`;
+  svg += \`<text x="\${defuntX}" y="\${defuntY - 2}" text-anchor="middle" fill={COUL.blanc} font-size="12" font-weight="700">\${personName.toUpperCase()}</text>\`;
   svg += \`<text x="\${defuntX}" y="\${defuntY + 14}" text-anchor="middle" fill="#8b9dc3" font-size="11">Masse : \${fmt(r.masseTotaleAvecAssur)}</text>\`;
 
   if (r.partnerExcluded && r.hasPartner) {
     const exX = totalW - 150;
-    svg += \`<rect x="\${exX - 70}" y="\${defuntY - 18}" width="140" height="36" rx="6" fill="#fef2f2" stroke="#fecaca"/>\`;
-    svg += \`<text x="\${exX}" y="\${defuntY - 2}" text-anchor="middle" fill="#dc2626" font-size="10" font-weight="600">\${partner?.name || 'Partenaire de fait'}</text>\`;
+    svg += \`<rect x="\${exX - 70}" y="\${defuntY - 18}" width="140" height="36" rx="6" fill={COUL.dangerFondDoux} stroke={COUL.dangerBord}/>\`;
+    svg += \`<text x="\${exX}" y="\${defuntY - 2}" text-anchor="middle" fill={COUL.danger} font-size="10" font-weight="600">\${partner?.name || 'Partenaire de fait'}</text>\`;
     svg += \`<text x="\${exX}" y="\${defuntY + 12}" text-anchor="middle" fill="#991b1b" font-size="10">Aucun droit successoral</text>\`;
-    svg += \`<line x1="\${defuntX + masseW/2}" y1="\${defuntY}" x2="\${exX - 70}" y2="\${defuntY}" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#ah-grey)"/>\`;
+    svg += \`<line x1="\${defuntX + masseW/2}" y1="\${defuntY}" x2="\${exX - 70}" y2="\${defuntY}" stroke={COUL.texteFaible} stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#ah-grey)"/>\`;
   }
 
   for (let i = 0; i < n; i++) {
@@ -1331,19 +1332,19 @@ function buildSchemaSuccession(r) {
     const cx = startX + i * (colW + colGap) + colW / 2;
     const bx = startX + i * (colW + colGap);
     const isExcludedPartner = h.relation === 'autres' && h.isPartner;
-    const arrowColor = isExcludedPartner ? '#dc2626' : '#2563eb';
+    const arrowColor = isExcludedPartner ? '#dc2626' : COUL.info;
     const marker = isExcludedPartner ? 'url(#ah-red)' : 'url(#ah)';
     svg += \`<line x1="\${defuntX}" y1="\${defuntY + 22}" x2="\${cx}" y2="\${heirY}" stroke="\${arrowColor}" stroke-width="2" marker-end="\${marker}"/>\`;
     svg += \`<text x="\${(defuntX + cx) / 2}" y="\${(defuntY + 22 + heirY) / 2 - 6}" text-anchor="middle" fill="\${arrowColor}" font-size="10" font-weight="600">\${fmt(h.baseTaxable)}</text>\`;
-    const fillColor = isExcludedPartner ? '#fef2f2' : '#f0f9ff';
+    const fillColor = isExcludedPartner ? '#fef2f2' : COUL.infoFondDoux;
     const strokeColor = isExcludedPartner ? '#fecaca' : '#bfdbfe';
     svg += \`<rect x="\${bx}" y="\${heirY}" width="\${colW}" height="\${boxH}" rx="8" fill="\${fillColor}" stroke="\${strokeColor}" stroke-width="1.5"/>\`;
     const nameStr = h.nom.length > 18 ? h.nom.slice(0, 18) + '…' : h.nom;
     svg += \`<text x="\${cx}" y="\${heirY + 18}" text-anchor="middle" fill="#1a2744" font-size="12" font-weight="700">\${nameStr}</text>\`;
     svg += \`<text x="\${cx}" y="\${heirY + 34}" text-anchor="middle" fill="#6b7a99" font-size="10">\${h.type} · \${h.part}</text>\`;
-    svg += \`<text x="\${cx}" y="\${heirY + 52}" text-anchor="middle" fill="#dc2626" font-size="11" font-weight="600">Droits : \${fmt(h.droits)}</text>\`;
+    svg += \`<text x="\${cx}" y="\${heirY + 52}" text-anchor="middle" fill={COUL.danger} font-size="11" font-weight="600">Droits : \${fmt(h.droits)}</text>\`;
     svg += \`<text x="\${cx}" y="\${heirY + 67}" text-anchor="middle" fill="#6b7a99" font-size="10">Taux eff. : \${pct(h.tauxEffectif)}</text>\`;
-    svg += \`<text x="\${cx}" y="\${heirY + 82}" text-anchor="middle" fill="#16a34a" font-size="10" font-weight="600">Net : \${fmt(h.baseTaxable - h.droits)}</text>\`;
+    svg += \`<text x="\${cx}" y="\${heirY + 82}" text-anchor="middle" fill={COUL.succes} font-size="10" font-weight="600">Net : \${fmt(h.baseTaxable - h.droits)}</text>\`;
   }
 
   svg += \`<text x="\${padX}" y="\${svgH - 20}" fill="#6b7a99" font-size="10">Héritier légal (bleu) · Assurance au partenaire de fait (rouge)</text>\`;
@@ -1445,7 +1446,7 @@ function update() {
 
   // COMPARAISON RÉGIONS
   const maxReg = Math.max(...Object.values(r.compRegions), 1);
-  const regColors = { wallonie: '#2563eb', bruxelles: '#7c3aed', flandre: '#ea580c' };
+  const regColors = { wallonie: COUL.info, bruxelles: COUL.violet, flandre: COUL.orange };
   html += \`<div class="card"><h3>Comparaison régionale</h3><div class="bar-chart">\`;
   for (const [reg, val] of Object.entries(r.compRegions)) {
     const w = (val / maxReg * 100).toFixed(1);

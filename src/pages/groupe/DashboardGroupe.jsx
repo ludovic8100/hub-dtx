@@ -6,14 +6,15 @@ import Layout from '../../components/Layout'
 import { ENTITES } from '../../lib/entites'
 import { StatBanner, PrimaryButton } from '../../components/ui/AccountableUI'
 import VueFactures from '../../components/VueFactures'
+import { COUL } from '../../lib/theme'
 
 // ── Constantes ──
 const SOCIETES = {
-  dynassur:  { label:'Dynassur SRL',   color:'#0080BD', colorDark:'#0D2F5E', short:'DYN' },
-  dtx:       { label:'DTX SRL',        color:'#94a3b8', colorDark:'#334155', short:'DTX' },
-  lode:      { label:'LODE SRL',       color:'#ea580c', colorDark:'#7c2d12', short:'LODE' },
-  hexagroup: { label:'Hexagroup ASBL', color:'#dc2626', colorDark:'#7f1d1d', short:'HEX' },
-  prive:     { label:'Privé',          color:'#0d9488', colorDark:'#134e4a', short:'PRV' },
+  dynassur:  { label:'Dynassur SRL',   color:COUL.bleu, colorDark:COUL.marine, short:'DYN' },
+  dtx:       { label:'DTX SRL',        color:COUL.texteFaible, colorDark:COUL.texteSombre, short:'DTX' },
+  lode:      { label:'LODE SRL',       color:COUL.orange, colorDark:'#7c2d12', short:'LODE' },
+  hexagroup: { label:'Hexagroup ASBL', color:COUL.danger, colorDark:'#7f1d1d', short:'HEX' },
+  prive:     { label:'Privé',          color:COUL.teal, colorDark:'#134e4a', short:'PRV' },
 }
 
 const SOC_ROUTES = {
@@ -28,11 +29,11 @@ function Bar({ pct, col }) {
   const p = Math.min(pct||0, 100)
   return (
     <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-      <div style={{ flex:1, background:'#e2e8f0', borderRadius:4, height:6, overflow:'hidden' }}>
+      <div style={{ flex:1, background:COUL.bord, borderRadius:4, height:6, overflow:'hidden' }}>
         <div style={{ width:`${p}%`, height:'100%', borderRadius:4, transition:'width 0.4s',
-          background: p>=100?'#16a34a':p>=70?(col||'#0080BD'):'#f59e0b' }} />
+          background: p>=100?'#16a34a':p>=70?(col||'#0080BD'):COUL.alerteVif }} />
       </div>
-      <span style={{ fontSize:11, fontWeight:700, minWidth:32, color:p>=100?'#16a34a':p>=70?(col||'#0080BD'):'#f59e0b' }}>
+      <span style={{ fontSize:11, fontWeight:700, minWidth:32, color:p>=100?'#16a34a':p>=70?(col||'#0080BD'):COUL.alerteVif }}>
         {Math.round(p)}%
       </span>
     </div>
@@ -48,7 +49,7 @@ function KpiCard({ label, value, sub, col, icon, onClick }) {
       onMouseEnter={() => onClick && setHov(true)}
       onMouseLeave={() => setHov(false)}
       style={{
-        background:'#fff', borderRadius:10,
+        background:COUL.blanc, borderRadius:10,
         border: hov ? `1px solid ${col||'#0080BD'}50` : '1px solid #e2e8f0',
         borderTop:`3px solid ${col||'#0080BD'}`, padding:'16px 20px',
         cursor: onClick ? 'pointer' : 'default',
@@ -58,11 +59,11 @@ function KpiCard({ label, value, sub, col, icon, onClick }) {
         position:'relative',
       }}>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
-        <div style={{ fontSize:11, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'.05em' }}>{label}</div>
+        <div style={{ fontSize:11, fontWeight:700, color:COUL.texteFaible, textTransform:'uppercase', letterSpacing:'.05em' }}>{label}</div>
         {icon && <i className={`ti ${icon}`} style={{ fontSize:18, color:col+'60' }} />}
       </div>
-      <div style={{ fontSize:24, fontWeight:800, color:'#0f172a', lineHeight:1 }}>{value}</div>
-      {sub && <div style={{ fontSize:12, color:'#64748b', marginTop:4 }}>{sub}</div>}
+      <div style={{ fontSize:24, fontWeight:800, color:COUL.texteFort, lineHeight:1 }}>{value}</div>
+      {sub && <div style={{ fontSize:12, color:COUL.texteDoux, marginTop:4 }}>{sub}</div>}
       {onClick && (
         <div style={{
           marginTop:8, fontSize:11, color:col||'#0080BD', fontWeight:600,
@@ -87,7 +88,7 @@ function VoirTout({ label, to, col }) {
       onMouseLeave={() => setHov(false)}
       style={{
         background: hov ? (col||'#0080BD')+'12' : 'transparent',
-        border:`1px solid ${hov?(col||'#0080BD'):'#e2e8f0'}`,
+        border:`1px solid ${hov?(col||'#0080BD'):COUL.bord}`,
         borderRadius:6, padding:'3px 9px', cursor:'pointer',
         fontSize:11, color: col||'#0080BD', fontWeight:600,
         display:'flex', alignItems:'center', gap:4,
@@ -104,10 +105,10 @@ function VoirTout({ label, to, col }) {
 // ── Header de bloc — fond noir, texte blanc ──
 function BlocHeader({ icon, title, right }) {
   return (
-    <div style={{ background:'#0f172a', padding:'11px 18px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+    <div style={{ background:COUL.texteFort, padding:'11px 18px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
       <div style={{ display:'flex', alignItems:'center', gap:8 }}>
         {icon && <i className={`ti ${icon}`} style={{ fontSize:15, color:'rgba(255,255,255,0.7)' }} />}
-        <span style={{ fontSize:13, fontWeight:700, color:'#fff', textTransform:'uppercase', letterSpacing:'.06em' }}>{title}</span>
+        <span style={{ fontSize:13, fontWeight:700, color:COUL.blanc, textTransform:'uppercase', letterSpacing:'.06em' }}>{title}</span>
       </div>
       {right && <div>{right}</div>}
     </div>
@@ -118,7 +119,7 @@ function BlocBanque({ comptes, loading, onRafraichir }) {
   const navigate = useNavigate()
   const [revealed, setRevealed] = useState({})
 
-  const SOC_COLOR = { DYNASSUR:'#0080BD', DTX:'#94a3b8', LODE:'#ea580c', HEXAGROUP:'#dc2626', PRIVE:'#0d9488' }
+  const SOC_COLOR = { DYNASSUR:COUL.bleu, DTX:COUL.texteFaible, LODE:COUL.orange, HEXAGROUP:COUL.danger, PRIVE:COUL.teal }
 
   const parSociete = {}
   comptes.forEach(c => {
@@ -135,7 +136,7 @@ function BlocBanque({ comptes, loading, onRafraichir }) {
     && !!revealed['__total__']
 
   return (
-    <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
+    <div style={{ background:COUL.blanc, borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
       <BlocHeader icon="ti-credit-card" title="Comptes bancaires"
         right={(
           <div style={{ display:'flex', alignItems:'center', gap:8 }}>
@@ -156,9 +157,9 @@ function BlocBanque({ comptes, loading, onRafraichir }) {
       />
 
       {loading ? (
-        <div style={{ padding:30, textAlign:'center', color:'#94a3b8' }}>Chargement…</div>
+        <div style={{ padding:30, textAlign:'center', color:COUL.texteFaible }}>Chargement…</div>
       ) : comptes.length === 0 ? (
-        <div style={{ padding:30, textAlign:'center', color:'#94a3b8', fontSize:13 }}>
+        <div style={{ padding:30, textAlign:'center', color:COUL.texteFaible, fontSize:13 }}>
           <i className="ti ti-plug-off" style={{ fontSize:28, display:'block', marginBottom:8 }} />
           Aucun compte — synchronisation Ponto requise
         </div>
@@ -170,20 +171,20 @@ function BlocBanque({ comptes, loading, onRafraichir }) {
               const socRevealed = revealed[`soc_${code}`]
               const route = SOC_ROUTES[code]
               return (
-                <div key={code} style={{ border:`1px solid #e2e8f0`, borderTop:`3px solid ${soc.color}`, borderRadius:10, overflow:'hidden', background:'#f8fafc' }}>
+                <div key={code} style={{ border:`1px solid #e2e8f0`, borderTop:`3px solid ${soc.color}`, borderRadius:10, overflow:'hidden', background:COUL.fond }}>
                   {/* En-tête société */}
-                  <div style={{ padding:'9px 14px', display:'flex', alignItems:'center', gap:8, background:'#fff', borderBottom:`1px solid ${soc.color}15` }}>
+                  <div style={{ padding:'9px 14px', display:'flex', alignItems:'center', gap:8, background:COUL.blanc, borderBottom:`1px solid ${soc.color}15` }}>
                     <div style={{ width:9, height:9, borderRadius:'50%', background:soc.color, flexShrink:0 }} />
                     <span onClick={() => route && navigate(route)}
-                      style={{ fontSize:13, fontWeight:700, color:'#1e293b', flex:1, cursor:route?'pointer':'default' }}>
+                      style={{ fontSize:13, fontWeight:700, color:COUL.texte, flex:1, cursor:route?'pointer':'default' }}>
                       {soc.nom}
                       {route && <i className="ti ti-arrow-up-right" style={{ fontSize:11, opacity:0.4, marginLeft:4 }} />}
                     </span>
-                    <span style={{ fontSize:14, fontWeight:800, color:socRevealed?(soc.total<0?'#dc2626':soc.color):'#cbd5e1', letterSpacing:socRevealed?'.01em':'.1em' }}>
+                    <span style={{ fontSize:14, fontWeight:800, color:socRevealed?(soc.total<0?'#dc2626':soc.color):COUL.bordFort, letterSpacing:socRevealed?'.01em':'.1em' }}>
                       {socRevealed ? fmt(soc.total) : '● ● ●'}
                     </span>
                     <button onClick={() => setRevealed(r => ({ ...r, [`soc_${code}`]: !r[`soc_${code}`] }))}
-                      style={{ background:socRevealed?'#f0fdf4':'#f8fafc', border:`1px solid ${socRevealed?'#bbf7d0':'#e2e8f0'}`, borderRadius:5, padding:'3px 6px', cursor:'pointer', color:socRevealed?'#16a34a':'#94a3b8', fontSize:12 }}>
+                      style={{ background:socRevealed?'#f0fdf4':COUL.fond, border:`1px solid ${socRevealed?'#bbf7d0':COUL.bord}`, borderRadius:5, padding:'3px 6px', cursor:'pointer', color:socRevealed?'#16a34a':COUL.texteFaible, fontSize:12 }}>
                       <i className={`ti ${socRevealed?'ti-eye-off':'ti-eye'}`} />
                     </button>
                   </div>
@@ -196,16 +197,16 @@ function BlocBanque({ comptes, loading, onRafraichir }) {
                         <div key={c.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 14px', borderBottom:i<soc.comptes.length-1?'1px solid #f1f5f9':'none' }}>
                           <div style={{ flex:1 }}>
                             <div style={{ fontSize:12, fontWeight:500, color:'#374151' }}>{c.banque}</div>
-                            <div style={{ fontSize:10, color:'#94a3b8', fontFamily:'monospace' }}>
+                            <div style={{ fontSize:10, color:COUL.texteFaible, fontFamily:'monospace' }}>
                               {c.iban ? `${c.iban.slice(0,4)} •• ${c.iban.slice(-4)}` : '—'}
-                              {!c.ponto_account_id && <span style={{ marginLeft:5, background:'#fef3c7', color:'#92400e', padding:'1px 4px', borderRadius:3, fontSize:9, fontWeight:700 }}>Non Ponto</span>}
+                              {!c.ponto_account_id && <span style={{ marginLeft:5, background:COUL.alerteFond, color:COUL.alerteFonce, padding:'1px 4px', borderRadius:3, fontSize:9, fontWeight:700 }}>Non Ponto</span>}
                             </div>
                           </div>
-                          <span style={{ fontSize:13, fontWeight:700, color:show?(bal<0?'#dc2626':soc.color):'#cbd5e1', letterSpacing:show?'.01em':'.1em' }}>
+                          <span style={{ fontSize:13, fontWeight:700, color:show?(bal<0?'#dc2626':soc.color):COUL.bordFort, letterSpacing:show?'.01em':'.1em' }}>
                             {show ? fmt(bal) : '● ●'}
                           </span>
                           <button onClick={() => setRevealed(r => ({ ...r, [c.id]: !r[c.id] }))}
-                            style={{ background:show?'#f0fdf4':'#fff', border:`1px solid ${show?'#bbf7d0':'#e2e8f0'}`, borderRadius:5, padding:'3px 6px', cursor:'pointer', color:show?'#16a34a':'#94a3b8', fontSize:11 }}>
+                            style={{ background:show?'#f0fdf4':COUL.blanc, border:`1px solid ${show?'#bbf7d0':COUL.bord}`, borderRadius:5, padding:'3px 6px', cursor:'pointer', color:show?'#16a34a':COUL.texteFaible, fontSize:11 }}>
                             <i className={`ti ${show?'ti-eye-off':'ti-eye'}`} />
                           </button>
                         </div>
@@ -218,7 +219,7 @@ function BlocBanque({ comptes, loading, onRafraichir }) {
           </div>
 
           {/* Total groupe */}
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 16px', background:'#0f172a', borderRadius:9 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 16px', background:COUL.texteFort, borderRadius:9 }}>
             <span style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,0.45)', textTransform:'uppercase', letterSpacing:'.05em' }}>Total Groupe</span>
             <div style={{ display:'flex', alignItems:'center', gap:10 }}>
               <span style={{ fontSize:16, fontWeight:800, color:revealed['__total__']?(totalGroupe<0?'#f87171':'#86efac'):'#374151' }}>
@@ -272,25 +273,25 @@ function BlocTresorerie({ comptes, transactions, loading }) {
   const maxFlow = Math.max(...flowData.map(f=>Math.max(f.entrees,f.sorties)), 1)
 
   return (
-    <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
+    <div style={{ background:COUL.blanc, borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
       <div style={{ padding:'14px 18px', borderBottom:'1px solid #f1f5f9', display:'flex', alignItems:'center', gap:8 }}>
-        <i className="ti ti-chart-line" style={{ fontSize:16, color:'#0d9488' }} />
-        <span style={{ fontSize:13, fontWeight:700, color:'#0f172a' }}>Trésorerie consolidée</span>
+        <i className="ti ti-chart-line" style={{ fontSize:16, color:COUL.teal }} />
+        <span style={{ fontSize:13, fontWeight:700, color:COUL.texteFort }}>Trésorerie consolidée</span>
       </div>
 
       <div style={{ padding:18 }}>
         {/* Total groupe */}
         <div style={{ marginBottom:18, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
           <div>
-            <div style={{ fontSize:11, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:4 }}>Solde total groupe</div>
+            <div style={{ fontSize:11, fontWeight:700, color:COUL.texteFaible, textTransform:'uppercase', letterSpacing:'.05em', marginBottom:4 }}>Solde total groupe</div>
             <div style={{ fontSize:32, fontWeight:900,
-              color: allRevealed?(totalGroupe<0?'#dc2626':'#0f172a'):'#cbd5e1',
+              color: allRevealed?(totalGroupe<0?'#dc2626':COUL.texteFort):COUL.bordFort,
               letterSpacing: allRevealed?'normal':'.1em' }}>
               {allRevealed ? fmt(totalGroupe) : '● ● ● ● ●'}
             </div>
           </div>
           <button onClick={() => { const all={}; soldesParSoc.forEach(s=>{all[s.key]=!allRevealed}); setRevealed(all) }}
-            style={{ fontSize:11, color:'#0d9488', background:'#f0fdfa', border:'1px solid #99f6e4', borderRadius:6, padding:'5px 10px', cursor:'pointer', fontWeight:600 }}>
+            style={{ fontSize:11, color:COUL.teal, background:COUL.tealFond, border:'1px solid #99f6e4', borderRadius:6, padding:'5px 10px', cursor:'pointer', fontWeight:600 }}>
             {allRevealed ? '🔒 Masquer' : '👁 Révéler'}
           </button>
         </div>
@@ -301,59 +302,59 @@ function BlocTresorerie({ comptes, transactions, loading }) {
             const show = revealed[s.key]
             const route = SOC_ROUTES[s.key.toUpperCase()]
             return (
-              <div key={s.key} style={{ display:'flex', alignItems:'center', gap:10, padding:'7px 10px', borderRadius:8, background:'#f8fafc',
+              <div key={s.key} style={{ display:'flex', alignItems:'center', gap:10, padding:'7px 10px', borderRadius:8, background:COUL.fond,
                 cursor: route?'pointer':'default', transition:'background 0.12s' }}
                 onClick={() => route && navigate(route)}
                 onMouseEnter={e => { if(route) e.currentTarget.style.background = s.color+'12' }}
-                onMouseLeave={e => e.currentTarget.style.background = '#f8fafc'}
+                onMouseLeave={e => e.currentTarget.style.background = COUL.fond}
                 title={route ? `Voir ${s.label}` : ''}
               >
                 <div style={{ width:10, height:10, borderRadius:'50%', background:s.color, flexShrink:0 }} />
-                <span style={{ fontSize:12, color:'#64748b', flex:1, display:'flex', alignItems:'center', gap:4 }}>
+                <span style={{ fontSize:12, color:COUL.texteDoux, flex:1, display:'flex', alignItems:'center', gap:4 }}>
                   {s.label}
                   {route && <i className="ti ti-arrow-up-right" style={{ fontSize:10, opacity:0.4 }} />}
                 </span>
                 <span style={{ fontSize:13, fontWeight:700, minWidth:90, textAlign:'right',
-                  color: show?(s.total<0?'#dc2626':s.color):'#cbd5e1',
+                  color: show?(s.total<0?'#dc2626':s.color):COUL.bordFort,
                   letterSpacing: show?'normal':'.1em' }}>
                   {show ? fmt(s.total) : '● ● ●'}
                 </span>
                 <div style={{ width:70 }}>
-                  <div style={{ background:'#e2e8f0', borderRadius:3, height:5, overflow:'hidden' }}>
+                  <div style={{ background:COUL.bord, borderRadius:3, height:5, overflow:'hidden' }}>
                     <div style={{ width: show?`${Math.abs(s.total)/Math.max(Math.abs(totalGroupe),1)*100}%`:'0%', height:'100%', background:s.color, borderRadius:3, transition:'width 0.4s' }} />
                   </div>
                 </div>
                 <button onClick={e => { e.stopPropagation(); setRevealed(r => ({ ...r, [s.key]: !r[s.key] })) }}
-                  style={{ background:show?'#f0fdf4':'#fff', border:`1px solid ${show?'#bbf7d0':'#e2e8f0'}`,
-                    borderRadius:6, padding:'3px 6px', cursor:'pointer', color:show?'#16a34a':'#94a3b8', fontSize:12 }}>
+                  style={{ background:show?'#f0fdf4':COUL.blanc, border:`1px solid ${show?'#bbf7d0':COUL.bord}`,
+                    borderRadius:6, padding:'3px 6px', cursor:'pointer', color:show?'#16a34a':COUL.texteFaible, fontSize:12 }}>
                   <i className={`ti ${show?'ti-eye-off':'ti-eye'}`} />
                 </button>
               </div>
             )
           })}
           {soldesParSoc.length === 0 && (
-            <div style={{ fontSize:12, color:'#94a3b8', padding:'12px 0' }}>Synchronisation Ponto requise pour afficher les soldes</div>
+            <div style={{ fontSize:12, color:COUL.texteFaible, padding:'12px 0' }}>Synchronisation Ponto requise pour afficher les soldes</div>
           )}
         </div>
 
         {/* Mini graphe flux 6 mois */}
         {flowData.some(f=>f.entrees>0||f.sorties>0) && (
           <div>
-            <div style={{ fontSize:11, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:10 }}>Flux 6 derniers mois</div>
+            <div style={{ fontSize:11, fontWeight:700, color:COUL.texteFaible, textTransform:'uppercase', letterSpacing:'.05em', marginBottom:10 }}>Flux 6 derniers mois</div>
             <div style={{ display:'flex', alignItems:'flex-end', gap:6, height:60 }}>
               {flowData.map((f,i) => (
                 <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
                   <div style={{ width:'100%', display:'flex', gap:2, alignItems:'flex-end', height:50 }}>
-                    <div style={{ flex:1, background:'#bbf7d0', borderRadius:'3px 3px 0 0', height:`${f.entrees/maxFlow*100}%`, minHeight: f.entrees>0?3:0, transition:'height 0.3s' }} title={`Entrées: ${fmt(f.entrees)}`} />
-                    <div style={{ flex:1, background:'#fecaca', borderRadius:'3px 3px 0 0', height:`${f.sorties/maxFlow*100}%`, minHeight: f.sorties>0?3:0, transition:'height 0.3s' }} title={`Sorties: ${fmt(f.sorties)}`} />
+                    <div style={{ flex:1, background:COUL.succesBord, borderRadius:'3px 3px 0 0', height:`${f.entrees/maxFlow*100}%`, minHeight: f.entrees>0?3:0, transition:'height 0.3s' }} title={`Entrées: ${fmt(f.entrees)}`} />
+                    <div style={{ flex:1, background:COUL.dangerBord, borderRadius:'3px 3px 0 0', height:`${f.sorties/maxFlow*100}%`, minHeight: f.sorties>0?3:0, transition:'height 0.3s' }} title={`Sorties: ${fmt(f.sorties)}`} />
                   </div>
-                  <span style={{ fontSize:9, color:'#94a3b8' }}>{f.label}</span>
+                  <span style={{ fontSize:9, color:COUL.texteFaible }}>{f.label}</span>
                 </div>
               ))}
             </div>
             <div style={{ display:'flex', gap:12, marginTop:6 }}>
-              <span style={{ fontSize:10, color:'#16a34a' }}>■ Entrées</span>
-              <span style={{ fontSize:10, color:'#dc2626' }}>■ Sorties</span>
+              <span style={{ fontSize:10, color:COUL.succes }}>■ Entrées</span>
+              <span style={{ fontSize:10, color:COUL.danger }}>■ Sorties</span>
             </div>
           </div>
         )}
@@ -374,12 +375,12 @@ function BlocProduction({ loading: loadingExt }) {
   const mois = String(now.getMonth() + 1).padStart(2, '0')
 
   const TYPES = {
-    'N.A.':                    { label:'Nouvelles Affaires',  col:'#16a34a', sign:+1 },
-    'Mandat faveur':            { label:'Mandats faveur',      col:'#0080BD', sign:+1 },
-    'Mandat défaveur':          { label:'Mandats défaveur',    col:'#f59e0b', sign:-1 },
-    'Renon':                    { label:'Résiliations',        col:'#dc2626', sign:-1 },
-    'Résiliation Non paiement': { label:'Résil. non-paiement', col:'#dc2626', sign:-1 },
-    'Avenant':                  { label:'Avenants',            col:'#94a3b8', sign:0  },
+    'N.A.':                    { label:'Nouvelles Affaires',  col:COUL.succes, sign:+1 },
+    'Mandat faveur':            { label:'Mandats faveur',      col:COUL.bleu, sign:+1 },
+    'Mandat défaveur':          { label:'Mandats défaveur',    col:COUL.alerteVif, sign:-1 },
+    'Renon':                    { label:'Résiliations',        col:COUL.danger, sign:-1 },
+    'Résiliation Non paiement': { label:'Résil. non-paiement', col:COUL.danger, sign:-1 },
+    'Avenant':                  { label:'Avenants',            col:COUL.texteFaible, sign:0  },
   }
 
   useEffect(() => {
@@ -410,15 +411,15 @@ function BlocProduction({ loading: loadingExt }) {
 
   return (
     <div
-      style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}
+      style={{ background:COUL.blanc, borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}
     >
       {/* Header */}
       <BlocHeader icon="ti-chart-line" title="Production 2026"
-        right={<span style={{ fontSize:11, fontWeight:700, color:'#0080BD', background:'#eff6ff', padding:'3px 10px', borderRadius:6, cursor:'pointer' }}
+        right={<span style={{ fontSize:11, fontWeight:700, color:COUL.bleu, background:COUL.infoFond, padding:'3px 10px', borderRadius:6, cursor:'pointer' }}
           onClick={() => navigate('/dynassur/production')}>DYNASSUR →</span>}
       />
       {loadingExt ? (
-        <div style={{ padding:30, textAlign:'center', color:'#94a3b8' }}>Chargement…</div>
+        <div style={{ padding:30, textAlign:'center', color:COUL.texteFaible }}>Chargement…</div>
       ) : (
         <div style={{ padding:16 }}>
       {/* Solde net + NA ce mois — cliquables */}
@@ -428,22 +429,22 @@ function BlocProduction({ loading: loadingExt }) {
               style={{
                 background: soldeNet>=0?'#f0fdf4':'#fff5f5',
                 borderRadius:8, padding:'12px 14px',
-                border:`1px solid ${soldeNet>=0?'#bbf7d0':'#fecaca'}`,
+                border:`1px solid ${soldeNet>=0?'#bbf7d0':COUL.dangerBord}`,
                 cursor:'pointer', transition:'box-shadow 0.15s, transform 0.1s',
               }}
               onMouseEnter={e => { e.currentTarget.style.boxShadow='0 3px 12px rgba(0,0,0,0.08)'; e.currentTarget.style.transform='translateY(-1px)' }}
               onMouseLeave={e => { e.currentTarget.style.boxShadow=''; e.currentTarget.style.transform='' }}
               title="Voir la production"
             >
-              <div style={{ fontSize:10, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:4 }}>Solde net {annee}</div>
-              <div style={{ fontSize:26, fontWeight:900, color: soldeNet>=0?'#16a34a':'#dc2626' }}>{soldeNet>0?'+':''}{fmtN(soldeNet)}</div>
-              <div style={{ fontSize:11, color:'#64748b' }}>{fmtN(naAnnee)} NA − {fmtN(renonAnnee)} résil.</div>
-              <div style={{ fontSize:10, color:'#0080BD', marginTop:6, fontWeight:600 }}>Voir détail →</div>
+              <div style={{ fontSize:10, fontWeight:700, color:COUL.texteFaible, textTransform:'uppercase', letterSpacing:'.05em', marginBottom:4 }}>Solde net {annee}</div>
+              <div style={{ fontSize:26, fontWeight:900, color: soldeNet>=0?'#16a34a':COUL.danger }}>{soldeNet>0?'+':''}{fmtN(soldeNet)}</div>
+              <div style={{ fontSize:11, color:COUL.texteDoux }}>{fmtN(naAnnee)} NA − {fmtN(renonAnnee)} résil.</div>
+              <div style={{ fontSize:10, color:COUL.bleu, marginTop:6, fontWeight:600 }}>Voir détail →</div>
             </div>
             <div
               onClick={() => navigate('/dynassur/production')}
               style={{
-                background:'#eff6ff', borderRadius:8, padding:'12px 14px',
+                background:COUL.infoFond, borderRadius:8, padding:'12px 14px',
                 border:'1px solid #bfdbfe', cursor:'pointer',
                 transition:'box-shadow 0.15s, transform 0.1s',
               }}
@@ -451,10 +452,10 @@ function BlocProduction({ loading: loadingExt }) {
               onMouseLeave={e => { e.currentTarget.style.boxShadow=''; e.currentTarget.style.transform='' }}
               title="Voir la production"
             >
-              <div style={{ fontSize:10, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:4 }}>NA ce mois</div>
-              <div style={{ fontSize:26, fontWeight:900, color:'#0080BD' }}>{fmtN(byType['N.A.']?.mois||0)}</div>
-              <div style={{ fontSize:11, color:'#64748b' }}>Mois {mois}/{annee}</div>
-              <div style={{ fontSize:10, color:'#0080BD', marginTop:6, fontWeight:600 }}>Voir détail →</div>
+              <div style={{ fontSize:10, fontWeight:700, color:COUL.texteFaible, textTransform:'uppercase', letterSpacing:'.05em', marginBottom:4 }}>NA ce mois</div>
+              <div style={{ fontSize:26, fontWeight:900, color:COUL.bleu }}>{fmtN(byType['N.A.']?.mois||0)}</div>
+              <div style={{ fontSize:11, color:COUL.texteDoux }}>Mois {mois}/{annee}</div>
+              <div style={{ fontSize:10, color:COUL.bleu, marginTop:6, fontWeight:600 }}>Voir détail →</div>
             </div>
           </div>
 
@@ -473,8 +474,8 @@ function BlocProduction({ loading: loadingExt }) {
                   onMouseLeave={e => e.currentTarget.style.background=''}
                 >
                   <div style={{ width:6, height:6, borderRadius:'50%', background:cfg.col, flexShrink:0 }} />
-                  <span style={{ fontSize:12, color:'#64748b', flex:1 }}>{cfg.label}</span>
-                  <span style={{ fontSize:11, color:'#94a3b8' }}>ce mois : <strong style={{ color:cfg.col }}>{d.mois}</strong></span>
+                  <span style={{ fontSize:12, color:COUL.texteDoux, flex:1 }}>{cfg.label}</span>
+                  <span style={{ fontSize:11, color:COUL.texteFaible }}>ce mois : <strong style={{ color:cfg.col }}>{d.mois}</strong></span>
                   <span style={{ fontSize:12, fontWeight:700, color:cfg.col, minWidth:30, textAlign:'right' }}>{d.annee}</span>
                 </div>
               )
@@ -484,14 +485,14 @@ function BlocProduction({ loading: loadingExt }) {
           {/* Top agents NA ce mois */}
           {topAgents.length > 0 && (
             <div>
-              <div style={{ fontSize:10, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:8 }}>Top NA — mois en cours</div>
+              <div style={{ fontSize:10, fontWeight:700, color:COUL.texteFaible, textTransform:'uppercase', letterSpacing:'.05em', marginBottom:8 }}>Top NA — mois en cours</div>
               {topAgents.map(([code, nb]) => (
                 <div key={code} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:5 }}>
-                  <span style={{ fontSize:11, color:'#64748b', flex:1 }}>{AGENT_NOMS[code]||code}</span>
-                  <div style={{ flex:2, background:'#f1f5f9', borderRadius:3, height:6, overflow:'hidden' }}>
-                    <div style={{ width:`${nb/Math.max(...topAgents.map(a=>a[1]))*100}%`, height:'100%', background:'#0080BD', borderRadius:3 }} />
+                  <span style={{ fontSize:11, color:COUL.texteDoux, flex:1 }}>{AGENT_NOMS[code]||code}</span>
+                  <div style={{ flex:2, background:COUL.fondDoux, borderRadius:3, height:6, overflow:'hidden' }}>
+                    <div style={{ width:`${nb/Math.max(...topAgents.map(a=>a[1]))*100}%`, height:'100%', background:COUL.bleu, borderRadius:3 }} />
                   </div>
-                  <span style={{ fontSize:12, fontWeight:700, color:'#0080BD', minWidth:20, textAlign:'right' }}>{nb}</span>
+                  <span style={{ fontSize:12, fontWeight:700, color:COUL.bleu, minWidth:20, textAlign:'right' }}>{nb}</span>
                 </div>
               ))}
             </div>
@@ -499,7 +500,7 @@ function BlocProduction({ loading: loadingExt }) {
 
           {/* Lien bas de bloc */}
           <div style={{ marginTop:14, textAlign:'center' }}>
-            <VoirTout label="Production complète" to="/dynassur/production" col="#0080BD" />
+            <VoirTout label="Production complète" to="/dynassur/production" col={COUL.bleu} />
           </div>
         </div>
       )}
@@ -565,8 +566,8 @@ export default function DashboardGroupe() {
 
         {/* 2 — KPIs */}
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:14, marginBottom:24 }}>
-          <KpiCard label="Comptes connectés" value={comptes.length} col="#7c3aed" icon="ti-credit-card" sub="via Ponto / ING" onClick={() => navigate('/dynassur')} />
-          <KpiCard label="Objectifs 2026"    value={nbObjectifs != null ? nbObjectifs : '…'} col="#0080BD" icon="ti-target" sub={nbObjectifs ? `${nbObjectifs} objectif${nbObjectifs>1?'s':''} configuré${nbObjectifs>1?'s':''}` : 'Aucun objectif — configurer'} onClick={() => navigate('/dynassur/objectifs')} />
+          <KpiCard label="Comptes connectés" value={comptes.length} col={COUL.violet} icon="ti-credit-card" sub="via Ponto / ING" onClick={() => navigate('/dynassur')} />
+          <KpiCard label="Objectifs 2026"    value={nbObjectifs != null ? nbObjectifs : '…'} col={COUL.bleu} icon="ti-target" sub={nbObjectifs ? `${nbObjectifs} objectif${nbObjectifs>1?'s':''} configuré${nbObjectifs>1?'s':''}` : 'Aucun objectif — configurer'} onClick={() => navigate('/dynassur/objectifs')} />
         </div>
 
         {/* 3 — Comptes bancaires pleine largeur */}
@@ -583,7 +584,7 @@ export default function DashboardGroupe() {
         </div>
 
         {/* 3b — Factures à pointer (toutes sociétés, tous comptes) */}
-        <div style={{ marginBottom:24, background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
+        <div style={{ marginBottom:24, background:COUL.blanc, borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
           <BlocHeader icon="ti-file-invoice" title="Factures à pointer" />
           <div style={{ padding:16 }}>
             <VueFactures societeCodes={['DYNASSUR','DTX','LODE','HEXAGROUP','PRIVE']} color={ENTITES.groupe.color} tousComptes statutDefaut="nonpayees" masquerMontant />

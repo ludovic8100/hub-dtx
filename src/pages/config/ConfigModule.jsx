@@ -8,21 +8,22 @@ import { bootstrapConfigs } from '../../lib/bootstrapConfigs'
 import GestionCategories from './GestionCategories'
 import GestionFournisseurs from './GestionFournisseurs'
 import BceSearch from '../../components/BceSearch'
+import { COUL } from '../../lib/theme'
 
 // ─── Présentation des sociétés (libellé et couleur de la carte) ─────────────
 // La LISTE des modules, elle, n'est plus écrite ici : elle vient de la base
 // (ref_modules + ref_modules_societes). Ajouter un module au catalogue le fait
 // apparaître dans cet écran, sans toucher au code.
 const SOC_UI = {
-  DYNASSUR:    { label: 'Dynassur',           couleur: '#0080BD', ordre: 1 },
+  DYNASSUR:    { label: 'Dynassur',           couleur: COUL.bleu, ordre: 1 },
   DTX:         { label: 'DTX',                couleur: '#1B3A6B', ordre: 2 },
   LODE:        { label: 'LODE',               couleur: '#F97316', ordre: 3 },
   HEXAGROUP:   { label: 'Hexagroup',          couleur: '#ec4899', ordre: 4 },
   PRIVE:       { label: 'Privé',              couleur: '#22c55e', ordre: 5 },
-  HOL:         { label: 'Groupe (consolidé)', couleur: '#7c3aed', ordre: 6 },
+  HOL:         { label: 'Groupe (consolidé)', couleur: COUL.violet, ordre: 6 },
   TRANSVERSAL: { label: 'Outils',             couleur: '#0ea5e9', ordre: 7 },
 }
-const socUi = code => SOC_UI[code] || { label: code, couleur: '#64748b', ordre: 99 }
+const socUi = code => SOC_UI[code] || { label: code, couleur: COUL.texteDoux, ordre: 99 }
 
 
 const FIELDS_SOC = [
@@ -496,9 +497,9 @@ export default function ConfigModule() {
 
   if (!isAdmin) return (
     <Layout currentPage="Configuration">
-      <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>
+      <div style={{ padding: 40, textAlign: 'center', color: COUL.texteDoux }}>
         <div style={{ fontSize: 40 }}>🔒</div>
-        <h2 style={{ color: '#1e293b' }}>Accès réservé aux administrateurs</h2>
+        <h2 style={{ color: COUL.texte }}>Accès réservé aux administrateurs</h2>
       </div>
     </Layout>
   )
@@ -545,13 +546,13 @@ export default function ConfigModule() {
           {TABS.map(([k, l]) => (
             <button key={k} onClick={() => setTab(k)} style={{
               border: 'none', background: 'none', padding: '10px 14px', fontSize: 15, fontWeight: 700, cursor: 'pointer',
-              color: tab === k ? '#1e293b' : '#94a3b8', borderBottom: tab === k ? '2px solid #1e293b' : '2px solid transparent', marginBottom: -2,
+              color: tab === k ? '#1e293b' : COUL.texteFaible, borderBottom: tab === k ? '2px solid #1e293b' : '2px solid transparent', marginBottom: -2,
             }}>{l}</button>
           ))}
         </div>
 
-        {flash && <div style={{ position: 'fixed', top: 16, right: 16, background: '#1e293b', color: '#fff', padding: '10px 16px', borderRadius: 10, zIndex: 50, fontWeight: 600 }}>{flash}</div>}
-        {loading && <div style={{ color: '#94a3b8', padding: 20 }}>Chargement…</div>}
+        {flash && <div style={{ position: 'fixed', top: 16, right: 16, background: COUL.texte, color: COUL.blanc, padding: '10px 16px', borderRadius: 10, zIndex: 50, fontWeight: 600 }}>{flash}</div>}
+        {loading && <div style={{ color: COUL.texteFaible, padding: 20 }}>Chargement…</div>}
 
         {tab === 'categories' && <GestionCategories />}
         {tab === 'fournisseurs' && <GestionFournisseurs />}
@@ -565,16 +566,16 @@ export default function ConfigModule() {
                 <button key={s.id} onClick={() => setSelSoc({ ...s })} style={{
                   textAlign: 'left', padding: '10px 12px', borderRadius: 10, cursor: 'pointer', fontWeight: 700,
                   border: selSoc?.id === s.id ? `2px solid ${s.couleur || '#1e293b'}` : '1px solid #e2e8f0',
-                  background: selSoc?.id === s.id ? '#f8fafc' : '#fff', color: '#1e293b',
+                  background: selSoc?.id === s.id ? '#f8fafc' : COUL.blanc, color: COUL.texte,
                 }}>
                   <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 3, background: s.couleur || '#94a3b8', marginRight: 8 }} />
-                  {s.nom}{s.entite_key && <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600 }}> · devis</span>}
+                  {s.nom}{s.entite_key && <span style={{ fontSize: 10, color: COUL.texteFaible, fontWeight: 600 }}> · devis</span>}
                 </button>
               ))}
             </div>
 
             {selSoc && (
-              <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 20 }}>
+              <div style={{ background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 14, padding: 20 }}>
                 {tab === 'societes' ? (
                   <>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 12 }}>
@@ -586,14 +587,14 @@ export default function ConfigModule() {
                       <div>
                         <Lbl>Couleur</Lbl>
                         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                          <input type="color" value={selSoc.couleur || '#1e293b'} onChange={e => setSelSoc(s => ({ ...s, couleur: e.target.value }))} style={{ width: 44, height: 38, border: '1px solid #e2e8f0', borderRadius: 8, background: '#fff' }} />
+                          <input type="color" value={selSoc.couleur || '#1e293b'} onChange={e => setSelSoc(s => ({ ...s, couleur: e.target.value }))} style={{ width: 44, height: 38, border: '1px solid #e2e8f0', borderRadius: 8, background: COUL.blanc }} />
                           <input value={selSoc.couleur || ''} onChange={e => setSelSoc(s => ({ ...s, couleur: e.target.value }))} style={inp} />
                         </div>
                       </div>
                       <div>
                         <Lbl>Logo</Lbl>
                         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                          {selSoc.logo_url && <img src={selSoc.logo_url} alt="" style={{ height: 38, background: '#f1f5f9', borderRadius: 8, padding: 3 }} />}
+                          {selSoc.logo_url && <img src={selSoc.logo_url} alt="" style={{ height: 38, background: COUL.fondDoux, borderRadius: 8, padding: 3 }} />}
                           <label style={{ ...btnGhost, cursor: 'pointer' }}>
                             Changer…
                             <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => uploadLogo(e.target.files?.[0])} />
@@ -655,16 +656,16 @@ export default function ConfigModule() {
               )}
               <button onClick={() => { setSelUser({ _nouveau: true, nom_complet: '', email: '', est_admin: false, compte_hub_actif: false, actif: true, type: 'physique' }); setSelTaux({}); setAccesSel(new Set()) }} style={{ ...btn('#16a34a'), padding: '8px 14px', fontSize: 13 }}>➕ Nouvel utilisateur</button>
               <button onClick={() => setShowBureaux(v => !v)} style={{ ...btnGhost }}>🏢 Gérer les bureaux</button>
-              <button onClick={() => setTriBureau(v => !v)} style={{ ...btnGhost, ...(triBureau ? { background: '#1e293b', color: '#fff', borderColor: '#1e293b' } : {}) }}>🏢 Trier par bureau</button>
-              <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 'auto' }}>{usersFiltres.length} / {users.length}</span>
+              <button onClick={() => setTriBureau(v => !v)} style={{ ...btnGhost, ...(triBureau ? { background: COUL.texte, color: COUL.blanc, borderColor: COUL.texte } : {}) }}>🏢 Trier par bureau</button>
+              <span style={{ fontSize: 12, color: COUL.texteFaible, marginLeft: 'auto' }}>{usersFiltres.length} / {users.length}</span>
             </div>
 
             {showBureaux && (
-              <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 16, marginBottom: 14 }}>
-                <div style={{ fontSize: 11, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 10 }}>
+              <div style={{ background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 12, padding: 16, marginBottom: 14 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 10 }}>
                   Bureaux — adresse complète (devoirs d'information, courriers clients)
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr 60px 70px 90px 1fr 32px', gap: 8, fontSize: 10.5, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr 60px 70px 90px 1fr 32px', gap: 8, fontSize: 10.5, fontWeight: 800, color: COUL.texteFaible, textTransform: 'uppercase', marginBottom: 6 }}>
                   <span>Nom</span><span>Rue</span><span>N°</span><span>Bte</span><span>CP</span><span>Ville</span><span></span>
                 </div>
                 {bureaux.map(b => (
@@ -675,7 +676,7 @@ export default function ConfigModule() {
                     <input style={inp} value={b.boite || ''} onChange={e => majBureauChamp(b.id, 'boite', e.target.value)} placeholder="Bte" />
                     <input style={inp} value={b.code_postal || ''} onChange={e => majBureauChamp(b.id, 'code_postal', e.target.value)} placeholder="CP" />
                     <input style={inp} value={b.ville || ''} onChange={e => majBureauChamp(b.id, 'ville', e.target.value)} placeholder="Ville" />
-                    <button onClick={() => supprimerBureau(b.id)} title="Retirer" style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 16 }}>✕</button>
+                    <button onClick={() => supprimerBureau(b.id)} title="Retirer" style={{ background: 'none', border: 'none', color: COUL.danger, cursor: 'pointer', fontSize: 16 }}>✕</button>
                   </div>
                 ))}
                 <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 8, flexWrap: 'wrap' }}>
@@ -689,15 +690,15 @@ export default function ConfigModule() {
                 {resultatBureaux && (
                   <div style={{
                     marginTop: 9, padding: '8px 12px', borderRadius: 8, fontSize: 12.5, fontWeight: 600,
-                    border: `1px solid ${resultatBureaux.ok ? '#86efac' : '#fecaca'}`,
-                    background: resultatBureaux.ok ? '#f0fdf4' : '#fef2f2',
-                    color: resultatBureaux.ok ? '#15803d' : '#b91c1c',
+                    border: `1px solid ${resultatBureaux.ok ? '#86efac' : COUL.dangerBord}`,
+                    background: resultatBureaux.ok ? '#f0fdf4' : COUL.dangerFondDoux,
+                    color: resultatBureaux.ok ? '#15803d' : COUL.dangerFonce,
                   }}>{resultatBureaux.ok ? '✓ ' : '✕ '}{resultatBureaux.message}</div>
                 )}
               </div>
             )}
 
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 14, alignItems: 'center', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 10, padding: '8px 12px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 14, alignItems: 'center', background: COUL.infoFondDoux, border: '1px solid #bae6fd', borderRadius: 10, padding: '8px 12px' }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: '#0369a1' }}>Attribution groupée d'un module</span>
               <select value={bulkAcces} onChange={e => setBulkAcces(e.target.value)} style={{ ...inp, width: 'auto' }}>
                 <option value="">— Choisir un module —</option>
@@ -710,10 +711,10 @@ export default function ConfigModule() {
               })()}
               <button onClick={() => { if (!bulkAcces) { notify('❌ Choisis d\'abord une page'); return } setSel(new Set(usersFiltres.filter(u => u[bulkAcces]).map(u => u.id))) }} style={{ ...btnGhost }}>Pré-cocher les détenteurs</button>
               <button onClick={() => bulkAccesApply(true)} disabled={saving || !sel.size} style={{ ...btn('#0284c7'), opacity: (saving || !sel.size) ? .5 : 1 }}>✓ Donner aux cochés ({sel.size})</button>
-              <button onClick={() => bulkAccesApply(false)} disabled={saving || !sel.size} style={{ ...btnGhost, color: '#dc2626', borderColor: '#fecaca', opacity: (saving || !sel.size) ? .5 : 1 }}>✕ Retirer aux cochés</button>
+              <button onClick={() => bulkAccesApply(false)} disabled={saving || !sel.size} style={{ ...btnGhost, color: COUL.danger, borderColor: COUL.dangerBord, opacity: (saving || !sel.size) ? .5 : 1 }}>✕ Retirer aux cochés</button>
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 14, alignItems: 'center', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '8px 12px' }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#475569' }}>Attribution groupée d'un bureau</span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 14, alignItems: 'center', background: COUL.fond, border: '1px solid #e2e8f0', borderRadius: 10, padding: '8px 12px' }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: COUL.texteMoyen }}>Attribution groupée d'un bureau</span>
               <button onClick={() => setSel(new Set(usersFiltres.map(u => u.id)))} style={{ ...btnGhost }}>Tout cocher ({usersFiltres.length})</button>
               {sel.size > 0 && <button onClick={() => setSel(new Set())} style={{ ...btnGhost }}>Décocher</button>}
               <select value={bulkBureau} onChange={e => setBulkBureau(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 220 }}>
@@ -737,7 +738,7 @@ export default function ConfigModule() {
                 name="collab-rech" autoComplete="off"
                 placeholder="Rechercher (nom, prénom, email, code, n°)…"
                 style={{ ...inp, marginBottom: 6 }} />
-              <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 700, marginBottom: 2 }}>
+              <div style={{ fontSize: 11, color: COUL.texteFaible, fontWeight: 700, marginBottom: 2 }}>
                 {usersFiltres.length} / {users.length}
               </div>
               {usersFiltres.map(u => (
@@ -746,24 +747,24 @@ export default function ConfigModule() {
                   <button onClick={() => pick(u)} style={{
                     flex: 1, minWidth: 0, textAlign: 'left', padding: '9px 12px', borderRadius: 9, cursor: 'pointer',
                     border: selUser?.id === u.id ? '2px solid #1e293b' : '1px solid #e2e8f0',
-                    background: selUser?.id === u.id ? '#f8fafc' : '#fff',
+                    background: selUser?.id === u.id ? '#f8fafc' : COUL.blanc,
                   }}>
                     {/* UNE LIGNE PAR COLLABORATEUR : numero, prenom, nom,
                         initiales. « 003 Ludovic Detilloux - LDE ».
                         Tout le detail est a droite ; la gauche sert a
                         trouver quelqu'un, pas a le decrire. */}
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, minWidth: 0 }}>
-                      <span style={{ fontSize: 11.5, fontWeight: 800, color: '#94a3b8',
+                      <span style={{ fontSize: 11.5, fontWeight: 800, color: COUL.texteFaible,
                                      fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
                         {u.numero != null ? String(u.numero).padStart(3, '0') : '—'}
                       </span>
-                      <span style={{ fontSize: 13.5, color: '#1e293b', flex: 1, minWidth: 0,
+                      <span style={{ fontSize: 13.5, color: COUL.texte, flex: 1, minWidth: 0,
                                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {u.prenom || u.nom
                           ? <>{u.prenom ? u.prenom + ' ' : ''}<strong>{u.nom || ''}</strong></>
-                          : <span style={{ color: '#94a3b8' }}>{u.nom_complet || u.email || '(sans nom)'}</span>}
+                          : <span style={{ color: COUL.texteFaible }}>{u.nom_complet || u.email || '(sans nom)'}</span>}
                       </span>
-                      {u.code && <span style={{ fontSize: 11.5, fontWeight: 700, color: '#64748b', flexShrink: 0 }}>
+                      {u.code && <span style={{ fontSize: 11.5, fontWeight: 700, color: COUL.texteDoux, flexShrink: 0 }}>
                         – {u.code}
                       </span>}
                     </div>
@@ -775,7 +776,7 @@ export default function ConfigModule() {
             {selUser ? (() => {
               const roleMetier = !!(selUser.est_commercial || selUser.est_gestionnaire || selUser.est_sous_agent)
               return (
-              <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 20 }}>
+              <div style={{ background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 14, padding: 20 }}>
 
                 {/* CE QUE CETTE PERSONNE PORTE. C'est ce qui decide si on
                     peut la supprimer : effacee sans reattribution, ses
@@ -785,8 +786,8 @@ export default function ConfigModule() {
                     marginBottom: 12, padding: '10px 13px', borderRadius: 9,
                     background: '#fffaf0', border: '1px solid #f0c478', fontSize: 12.5, lineHeight: 1.5,
                   }}>
-                    <strong style={{ color: '#b45309' }}>Portefeuille rattaché à ce code</strong><br />
-                    <span style={{ color: '#92400e' }}>
+                    <strong style={{ color: COUL.alerte }}>Portefeuille rattaché à ce code</strong><br />
+                    <span style={{ color: COUL.alerteFonce }}>
                       {portefeuilleSel.gestionnaire > 0 && <>{portefeuilleSel.gestionnaire.toLocaleString('fr-BE')} client(s) comme <strong>gestionnaire</strong></>}
                       {portefeuilleSel.gestionnaire > 0 && portefeuilleSel.sousAgent > 0 && ' · '}
                       {portefeuilleSel.sousAgent > 0 && <>{portefeuilleSel.sousAgent.toLocaleString('fr-BE')} client(s) comme <strong>sous-agent</strong></>}
@@ -798,7 +799,7 @@ export default function ConfigModule() {
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
                   <span style={{ flex: 1 }} />
-                  <button onClick={deleteUser} disabled={saving} style={{ padding: '6px 12px', fontSize: 12, fontWeight: 700, borderRadius: 8, cursor: 'pointer', border: '1px solid #fecaca', background: '#fff', color: '#dc2626' }}>
+                  <button onClick={deleteUser} disabled={saving} style={{ padding: '6px 12px', fontSize: 12, fontWeight: 700, borderRadius: 8, cursor: 'pointer', border: '1px solid #fecaca', background: COUL.blanc, color: COUL.danger }}>
                     {selUser.id ? (selUser.code || selUser.est_commercial || selUser.est_gestionnaire || selUser.est_sous_agent || selUser.est_apporteur ? '🗑 Retirer l\'accès Hub' : '🗑 Supprimer le compte') : '✕ Annuler'}
                   </button>
                 </div>
@@ -840,7 +841,7 @@ export default function ConfigModule() {
                     <F label="Ville" value={selUser.ville} onChange={v => setSelUser(u => ({ ...u, ville: v }))} />
                     <F label="Date de naissance" type="date" value={selUser.date_naissance} onChange={v => setSelUser(u => ({ ...u, date_naissance: v }))} />
                   </Grid>
-                  {!selUser.id && <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 600, marginTop: 8 }}>Nouveau compte — reconnu au 1ᵉʳ login Microsoft si un email est renseigné</div>}
+                  {!selUser.id && <div style={{ fontSize: 11, color: COUL.succes, fontWeight: 600, marginTop: 8 }}>Nouveau compte — reconnu au 1ᵉʳ login Microsoft si un email est renseigné</div>}
                 </Section>
 
                 {/* ── Rôle métier & commissions ── */}
@@ -863,14 +864,14 @@ export default function ConfigModule() {
                     <Chk label="Actif (statut métier)" on={selUser.actif !== false} onClick={() => setSelUser(s => ({ ...s, actif: !(s.actif !== false) }))} />
                   </div>
                   {!selUser.est_commercial && !selUser.est_gestionnaire && !selUser.est_sous_agent && !selUser.est_apporteur && (
-                    <div style={{ fontSize: 11.5, color: '#94a3b8', fontStyle: 'italic', marginBottom: 10 }}>Aucun rôle métier coché — employé sans commission, c'est un état normal.</div>
+                    <div style={{ fontSize: 11.5, color: COUL.texteFaible, fontStyle: 'italic', marginBottom: 10 }}>Aucun rôle métier coché — employé sans commission, c'est un état normal.</div>
                   )}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(120px,1fr))', gap: 10, marginBottom: 12 }}>
                     {TYPES_TRAVAIL.map(t => (
                       <div key={t}><Lbl>{t}</Lbl>
                         <div style={{ position: 'relative' }}>
                           <input type="number" step="0.01" value={selTaux[t] ?? ''} onChange={e => setSelTaux(m => ({ ...m, [t]: e.target.value }))} style={{ ...inp, paddingRight: 24 }} />
-                          <span style={{ position: 'absolute', right: 9, top: 9, color: '#94a3b8', fontSize: 12 }}>%</span>
+                          <span style={{ position: 'absolute', right: 9, top: 9, color: COUL.texteFaible, fontSize: 12 }}>%</span>
                         </div>
                       </div>
                     ))}
@@ -907,7 +908,7 @@ export default function ConfigModule() {
                 {/* ── Accès au Hub ── */}
                 <Section titre="Accès au Hub">
                   <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
-                    <label style={{ fontSize: 13, fontWeight: 600, color: '#475569', display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <label style={{ fontSize: 13, fontWeight: 600, color: COUL.texteMoyen, display: 'flex', gap: 6, alignItems: 'center' }}>
                       Rôle
                       <select value={selUser.est_admin ? 'admin' : 'user'} onChange={e => setSelUser(u => ({ ...u, est_admin: e.target.value === 'admin' }))} style={{ ...inp, padding: '6px 8px' }}>
                         <option value="user">Utilisateur</option>
@@ -921,7 +922,7 @@ export default function ConfigModule() {
                   {selUser.id && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
                       <button onClick={renvoyerAcces} disabled={saving} style={{ ...btn('#0080BD'), padding: '8px 14px', fontSize: 13 }}>📧 {selUser.date_envoi_acces ? 'Renvoyer' : 'Envoyer'} les accès</button>
-                      <span style={{ fontSize: 12, color: '#94a3b8' }}>
+                      <span style={{ fontSize: 12, color: COUL.texteFaible }}>
                         {selUser.date_envoi_acces ? `Accès envoyés le ${new Date(selUser.date_envoi_acces).toLocaleDateString('fr-BE')}` : 'Accès jamais envoyés'}
                         {selUser.premiere_connexion ? ` · 1ʳᵉ connexion le ${new Date(selUser.premiere_connexion).toLocaleDateString('fr-BE')}` : ' · pas encore connecté'}
                       </span>
@@ -929,7 +930,7 @@ export default function ConfigModule() {
                   )}
 
                   {selUser.est_admin ? (
-                    <div style={{ background: '#f5f3ff', color: '#6d28d9', borderRadius: 8, padding: '8px 12px', fontSize: 12 }}>
+                    <div style={{ background: COUL.violetFond, color: '#6d28d9', borderRadius: 8, padding: '8px 12px', fontSize: 12 }}>
                       Administrateur du Hub : accès à toutes les sociétés, tous les modules. La grille ci-dessous est sans effet.
                     </div>
                   ) : (
@@ -940,7 +941,7 @@ export default function ConfigModule() {
                         const tout = actifs === c.modules.length && c.modules.length > 0
                         return (
                         <div key={c.societe} style={{ border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
-                          <div style={{ background: ui.couleur, color: '#fff', padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ background: ui.couleur, color: COUL.blanc, padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <span style={{ fontWeight: 700 }}>{ui.label}{tout ? ' — Tout' : ''}</span>
                             <span style={{ fontSize: 11, opacity: .85 }}>{actifs} / {c.modules.length}</span>
                           </div>
@@ -957,7 +958,7 @@ export default function ConfigModule() {
                             ))}
                             {c.societe === 'DYNASSUR' && (
                               <div style={{ borderTop: '1px dashed #e2e8f0', marginTop: 6, paddingTop: 6 }}>
-                                <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Portefeuille clients</div>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Portefeuille clients</div>
                                 <label style={{ display: 'block', marginBottom: 6 }}>
                                   <Lbl>Bureau</Lbl>
                                   <select value={selUser.bureau_id ?? ''} onChange={e => setBureau(e.target.value)} style={{ ...inp, padding: '6px 8px' }} disabled={!selUser.id}>
@@ -972,7 +973,7 @@ export default function ConfigModule() {
                               </div>
                             )}
                             {(c.societe === 'LODE' || c.societe === 'DTX' || c.societe === 'HEXAGROUP') && (
-                              <div style={{ borderTop: '1px dashed #e2e8f0', marginTop: 6, paddingTop: 6, fontSize: 10.5, color: '#94a3b8' }}>Pas de portefeuille par bureau — un seul portefeuille pour {ui.label}.</div>
+                              <div style={{ borderTop: '1px dashed #e2e8f0', marginTop: 6, paddingTop: 6, fontSize: 10.5, color: COUL.texteFaible }}>Pas de portefeuille par bureau — un seul portefeuille pour {ui.label}.</div>
                             )}
                           </div>
                         </div>
@@ -992,9 +993,9 @@ export default function ConfigModule() {
                   {resultatUser && (
                     <div style={{
                       marginTop: 10, padding: '9px 13px', borderRadius: 9, fontSize: 13, fontWeight: 600,
-                      border: `1px solid ${resultatUser.ok ? '#86efac' : '#fecaca'}`,
-                      background: resultatUser.ok ? '#f0fdf4' : '#fef2f2',
-                      color: resultatUser.ok ? '#15803d' : '#b91c1c',
+                      border: `1px solid ${resultatUser.ok ? '#86efac' : COUL.dangerBord}`,
+                      background: resultatUser.ok ? '#f0fdf4' : COUL.dangerFondDoux,
+                      color: resultatUser.ok ? '#15803d' : COUL.dangerFonce,
                     }}>
                       {resultatUser.ok ? '✓ ' : '✕ '}{resultatUser.message}
                     </div>
@@ -1002,33 +1003,33 @@ export default function ConfigModule() {
                 </div>
               </div>
               )
-            })() : <div style={{ color: '#94a3b8', padding: 20 }}>Sélectionne un utilisateur.</div>}
+            })() : <div style={{ color: COUL.texteFaible, padding: 20 }}>Sélectionne un utilisateur.</div>}
             </div>
           </div>
         )}
 
-        <div style={{ marginTop: 24, fontSize: 12 }}><Link to="/" style={{ color: '#64748b' }}>← Retour au Hub</Link></div>
+        <div style={{ marginTop: 24, fontSize: 12 }}><Link to="/" style={{ color: COUL.texteDoux }}>← Retour au Hub</Link></div>
       </div>
     </Layout>
   )
 }
 
 // ─────────── petits composants ───────────
-const inp = { padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 14, color: '#1e293b', width: '100%', boxSizing: 'border-box' }
-const btnGhost = { padding: '8px 14px', border: '1px solid #e2e8f0', borderRadius: 8, background: '#fff', fontSize: 13, fontWeight: 600, color: '#475569', cursor: 'pointer' }
-const btn = c => ({ padding: '11px 22px', border: 'none', borderRadius: 10, background: c || '#1e293b', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' })
+const inp = { padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 14, color: COUL.texte, width: '100%', boxSizing: 'border-box' }
+const btnGhost = { padding: '8px 14px', border: '1px solid #e2e8f0', borderRadius: 8, background: COUL.blanc, fontSize: 13, fontWeight: 600, color: COUL.texteMoyen, cursor: 'pointer' }
+const btn = c => ({ padding: '11px 22px', border: 'none', borderRadius: 10, background: c || '#1e293b', color: COUL.blanc, fontSize: 15, fontWeight: 700, cursor: 'pointer' })
 
 function Section({ titre, children }) {
   return <div style={{ marginBottom: 20 }}>
-    <div style={{ fontSize: 13, fontWeight: 800, color: '#1e293b', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '.03em' }}>{titre}</div>
+    <div style={{ fontSize: 13, fontWeight: 800, color: COUL.texte, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '.03em' }}>{titre}</div>
     {children}
   </div>
 }
 function Grid({ children }) { return <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 12 }}>{children}</div> }
-function Lbl({ children }) { return <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 4 }}>{children}</div> }
+function Lbl({ children }) { return <div style={{ fontSize: 11, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', marginBottom: 4 }}>{children}</div> }
 function F({ label, value, onChange, type = 'text', requis = false }) {
   const vide = requis && !String(value ?? '').trim()
-  return <div><Lbl>{label}{requis && <span style={{ color: vide ? '#dc2626' : '#16a34a' }}> *</span>}</Lbl><input type={type} value={value ?? ''} onChange={e => onChange(e.target.value)} style={vide ? { ...inp, border: '1px solid #fca5a5', background: '#fef2f2' } : inp} /></div>
+  return <div><Lbl>{label}{requis && <span style={{ color: vide ? '#dc2626' : COUL.succes }}> *</span>}</Lbl><input type={type} value={value ?? ''} onChange={e => onChange(e.target.value)} style={vide ? { ...inp, border: '1px solid #fca5a5', background: COUL.dangerFondDoux } : inp} /></div>
 }
 function Field({ label, value, onChange, type = 'text' }) {
   return <div><Lbl>{label}</Lbl><input type={type} value={value} onChange={e => onChange(e.target.value)} style={inp} /></div>
@@ -1036,20 +1037,20 @@ function Field({ label, value, onChange, type = 'text' }) {
 function Chk({ label, on, onClick }) {
   return (
     <button onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-      <span style={{ width: 34, height: 20, borderRadius: 999, background: on ? '#16a34a' : '#cbd5e1', position: 'relative', flexShrink: 0 }}>
-        <span style={{ position: 'absolute', top: 2, left: on ? 16 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left .15s' }} />
+      <span style={{ width: 34, height: 20, borderRadius: 999, background: on ? '#16a34a' : COUL.bordFort, position: 'relative', flexShrink: 0 }}>
+        <span style={{ position: 'absolute', top: 2, left: on ? 16 : 2, width: 16, height: 16, borderRadius: '50%', background: COUL.blanc, transition: 'left .15s' }} />
       </span>
-      <span style={{ fontSize: 14, fontWeight: 600, color: '#475569' }}>{label}</span>
+      <span style={{ fontSize: 14, fontWeight: 600, color: COUL.texteMoyen }}>{label}</span>
     </button>
   )
 }
 function Toggle({ label, on, onClick, small, light }) {
   return (
     <button onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: 8, width: label ? '100%' : 'auto', background: 'none', border: 'none', cursor: 'pointer', padding: small ? '4px 0' : 0, textAlign: 'left' }}>
-      <span style={{ width: 34, height: 20, borderRadius: 999, background: on ? (light ? 'rgba(255,255,255,.9)' : '#16a34a') : (light ? 'rgba(255,255,255,.35)' : '#cbd5e1'), position: 'relative', flexShrink: 0, transition: 'background .15s' }}>
-        <span style={{ position: 'absolute', top: 2, left: on ? 16 : 2, width: 16, height: 16, borderRadius: '50%', background: light && on ? '#16a34a' : '#fff', transition: 'left .15s' }} />
+      <span style={{ width: 34, height: 20, borderRadius: 999, background: on ? (light ? 'rgba(255,255,255,.9)' : COUL.succes) : (light ? 'rgba(255,255,255,.35)' : COUL.bordFort), position: 'relative', flexShrink: 0, transition: 'background .15s' }}>
+        <span style={{ position: 'absolute', top: 2, left: on ? 16 : 2, width: 16, height: 16, borderRadius: '50%', background: light && on ? '#16a34a' : COUL.blanc, transition: 'left .15s' }} />
       </span>
-      {label && <span style={{ fontSize: small ? 13 : 14, fontWeight: 600, color: light ? '#fff' : '#475569' }}>{label}</span>}
+      {label && <span style={{ fontSize: small ? 13 : 14, fontWeight: 600, color: light ? '#fff' : COUL.texteMoyen }}>{label}</span>}
     </button>
   )
 }

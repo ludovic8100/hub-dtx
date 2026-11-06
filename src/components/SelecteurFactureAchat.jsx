@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { sansExtraits } from '../lib/factures'
+import { COUL } from '../lib/theme'
 
 const FONT = "'Source Sans Pro', sans-serif"
 const fmt = (v) => v === null || v === undefined ? '—'
@@ -52,12 +53,12 @@ function ApercuFacture({ fid, nom }) {
   useEffect(() => { setEtat('load') }, [fid])
   const src = `/api/apercu-facture?fid=${encodeURIComponent(fid)}`
   return (
-    <div style={{ position: 'fixed', top: '50%', right: '24px', transform: 'translateY(-50%)', zIndex: 2100, width: '570px', maxWidth: '50vw', maxHeight: '90vh', background: '#fff', borderRadius: '14px', boxShadow: '0 20px 60px rgba(0,0,0,0.35)', border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', pointerEvents: 'none' }}>
-      <div style={{ padding: '10px 14px', background: '#0f172a', color: '#fff', fontSize: '12px', fontWeight: '600', fontFamily: FONT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>📄 {nom}</div>
-      <div style={{ overflowY: 'auto', background: '#f8fafc' }}>
+    <div style={{ position: 'fixed', top: '50%', right: '24px', transform: 'translateY(-50%)', zIndex: 2100, width: '570px', maxWidth: '50vw', maxHeight: '90vh', background: COUL.blanc, borderRadius: '14px', boxShadow: '0 20px 60px rgba(0,0,0,0.35)', border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', pointerEvents: 'none' }}>
+      <div style={{ padding: '10px 14px', background: COUL.texteFort, color: COUL.blanc, fontSize: '12px', fontWeight: '600', fontFamily: FONT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>📄 {nom}</div>
+      <div style={{ overflowY: 'auto', background: COUL.fond }}>
         <img src={src} alt="Apercu facture" onLoad={() => setEtat('ok')} onError={() => setEtat('err')} style={{ width: '100%', height: 'auto', display: etat === 'ok' ? 'block' : 'none' }} />
-        {etat === 'load' && <div style={{ padding: '34px 20px', textAlign: 'center', color: '#94a3b8', fontSize: '13px', fontFamily: FONT }}>Chargement de l'apercu...</div>}
-        {etat === 'err' && <div style={{ padding: '34px 20px', textAlign: 'center', color: '#94a3b8', fontSize: '13px', fontFamily: FONT }}>Apercu indisponible pour ce document.</div>}
+        {etat === 'load' && <div style={{ padding: '34px 20px', textAlign: 'center', color: COUL.texteFaible, fontSize: '13px', fontFamily: FONT }}>Chargement de l'apercu...</div>}
+        {etat === 'err' && <div style={{ padding: '34px 20px', textAlign: 'center', color: COUL.texteFaible, fontSize: '13px', fontFamily: FONT }}>Apercu indisponible pour ce document.</div>}
       </div>
     </div>
   )
@@ -106,51 +107,51 @@ export default function SelecteurFactureAchat({ societeCode, montantCible, dateC
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT }} onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: '14px', width: 'min(620px, 94vw)', maxHeight: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: COUL.blanc, borderRadius: '14px', width: 'min(620px, 94vw)', maxHeight: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
-          <div style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a' }}>{multi ? 'Lier une ou plusieurs factures' : 'Lier une facture'}</div>
-          <div style={{ fontSize: '12.5px', color: '#64748b', marginTop: '3px' }}>{sousTitre ? sousTitre : (<>Mouvement de <strong>{fmt(montantCible)}</strong>{societeCode ? ` · ${societeCode}` : ''}</>)}</div>
+          <div style={{ fontSize: '15px', fontWeight: '800', color: COUL.texteFort }}>{multi ? 'Lier une ou plusieurs factures' : 'Lier une facture'}</div>
+          <div style={{ fontSize: '12.5px', color: COUL.texteDoux, marginTop: '3px' }}>{sousTitre ? sousTitre : (<>Mouvement de <strong>{fmt(montantCible)}</strong>{societeCode ? ` · ${societeCode}` : ''}</>)}</div>
         </div>
         <div style={{ padding: '12px 20px', borderBottom: '1px solid #f1f5f9' }}>
           <input value={recherche} onChange={e => setRecherche(e.target.value)} placeholder="Rechercher sur tout : nom, fournisseur, numéro, montant, date…" autoFocus
             style={{ width: '100%', padding: '9px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', fontFamily: FONT, boxSizing: 'border-box' }} />
-          {!recherche && <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px' }}>{tous.length} factures non liées{cible > 0 ? ` · triées par montant proche de ${fmt(cible)}` : ''}</div>}
-          {recherche && <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px' }}>{factures.length} résultat{factures.length > 1 ? 's' : ''}</div>}
+          {!recherche && <div style={{ fontSize: '11px', color: COUL.texteFaible, marginTop: '6px' }}>{tous.length} factures non liées{cible > 0 ? ` · triées par montant proche de ${fmt(cible)}` : ''}</div>}
+          {recherche && <div style={{ fontSize: '11px', color: COUL.texteFaible, marginTop: '6px' }}>{factures.length} résultat{factures.length > 1 ? 's' : ''}</div>}
         </div>
         <div onMouseLeave={() => setApercu(null)} style={{ overflowY: 'auto', flex: 1 }}>
-          {loading && <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>Recherche…</div>}
-          {!loading && factures.length === 0 && <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>Aucune facture correspondante.</div>}
+          {loading && <div style={{ padding: '40px', textAlign: 'center', color: COUL.texteFaible }}>Recherche…</div>}
+          {!loading && factures.length === 0 && <div style={{ padding: '40px', textAlign: 'center', color: COUL.texteFaible }}>Aucune facture correspondante.</div>}
           {!loading && factures.map(f => {
             const exact = Math.abs((parseFloat(f.montant) || 0) - cible) < 0.01
             const coche = !!selection[f.fichier_id]
             return (
-              <div key={f.fichier_id} onClick={() => multi ? toggle(f) : onChoisir(f)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '11px 20px', borderBottom: '1px solid #f8fafc', cursor: 'pointer', background: coche ? '#eff6ff' : '#fff' }}
-                onMouseEnter={e => { e.currentTarget.style.background = coche ? '#e0efff' : '#f8fafc'; setApercu({ fid: f.fichier_id, nom: (f.nom || '').replace(/\.pdf$/i, '') }) }} onMouseLeave={e => { e.currentTarget.style.background = coche ? '#eff6ff' : '#fff' }}>
+              <div key={f.fichier_id} onClick={() => multi ? toggle(f) : onChoisir(f)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '11px 20px', borderBottom: '1px solid #f8fafc', cursor: 'pointer', background: coche ? '#eff6ff' : COUL.blanc }}
+                onMouseEnter={e => { e.currentTarget.style.background = coche ? '#e0efff' : COUL.fond; setApercu({ fid: f.fichier_id, nom: (f.nom || '').replace(/\.pdf$/i, '') }) }} onMouseLeave={e => { e.currentTarget.style.background = coche ? '#eff6ff' : COUL.blanc }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '11px', minWidth: 0 }}>
-                  {multi && <span style={{ width: '18px', height: '18px', flexShrink: 0, borderRadius: '5px', border: `2px solid ${coche ? '#2563eb' : '#cbd5e1'}`, background: coche ? '#2563eb' : '#fff', color: '#fff', fontSize: '12px', fontWeight: '900', lineHeight: '15px', textAlign: 'center' }}>{coche ? '✓' : ''}</span>}
+                  {multi && <span style={{ width: '18px', height: '18px', flexShrink: 0, borderRadius: '5px', border: `2px solid ${coche ? '#2563eb' : COUL.bordFort}`, background: coche ? '#2563eb' : COUL.blanc, color: COUL.blanc, fontSize: '12px', fontWeight: '900', lineHeight: '15px', textAlign: 'center' }}>{coche ? '✓' : ''}</span>}
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: '13px', fontWeight: '600', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(f.nom || '').replace(/\.pdf$/i, '')}</div>
-                    <div style={{ fontSize: '11.5px', color: '#94a3b8' }}>{fmtDate(f.date_facture)}</div>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: COUL.texteFort, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(f.nom || '').replace(/\.pdf$/i, '')}</div>
+                    <div style={{ fontSize: '11.5px', color: COUL.texteFaible }}>{fmtDate(f.date_facture)}</div>
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-                  {exact && <span style={{ fontSize: '10px', fontWeight: '700', color: '#16a34a', background: '#dcfce7', padding: '2px 7px', borderRadius: '12px' }}>montant exact</span>}
-                  <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#0f172a' }}>{f.montant == null ? '—' : fmt(f.montant)}</span>
+                  {exact && <span style={{ fontSize: '10px', fontWeight: '700', color: COUL.succes, background: COUL.succesFond, padding: '2px 7px', borderRadius: '12px' }}>montant exact</span>}
+                  <span style={{ fontSize: '13.5px', fontWeight: '700', color: COUL.texteFort }}>{f.montant == null ? '—' : fmt(f.montant)}</span>
                 </div>
               </div>
             )
           })}
         </div>
         <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-          <div style={{ fontSize: '12.5px', color: '#64748b', fontWeight: '600' }}>
+          <div style={{ fontSize: '12.5px', color: COUL.texteDoux, fontWeight: '600' }}>
             {multi && selList.length > 0 && (() => {
               const ok = cible > 0 && Math.abs(totalSel - cible) < 0.01
               return <span>{selList.length} sélectionnée{selList.length > 1 ? 's' : ''} · {fmt(totalSel)}{cible > 0 && <span style={{ color: ok ? '#16a34a' : '#d97706', fontWeight: '700' }}>{ok ? ' ✓ = mouvement' : ` ≠ mouvement (${fmt(cible)})`}</span>}</span>
             })()}
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', cursor: 'pointer', fontSize: '13px', fontWeight: '600', fontFamily: FONT }}>Annuler</button>
-            {multi && <button onClick={() => selList.length && onChoisir(selList)} disabled={selList.length === 0} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: selList.length ? '#2563eb' : '#cbd5e1', color: '#fff', cursor: selList.length ? 'pointer' : 'default', fontSize: '13px', fontWeight: '700', fontFamily: FONT }}>Lier {selList.length || ''} facture{selList.length > 1 ? 's' : ''}</button>}
+            <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #e2e8f0', background: COUL.blanc, color: COUL.texteDoux, cursor: 'pointer', fontSize: '13px', fontWeight: '600', fontFamily: FONT }}>Annuler</button>
+            {multi && <button onClick={() => selList.length && onChoisir(selList)} disabled={selList.length === 0} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: selList.length ? '#2563eb' : COUL.bordFort, color: COUL.blanc, cursor: selList.length ? 'pointer' : 'default', fontSize: '13px', fontWeight: '700', fontFamily: FONT }}>Lier {selList.length || ''} facture{selList.length > 1 ? 's' : ''}</button>}
           </div>
         </div>
       </div>

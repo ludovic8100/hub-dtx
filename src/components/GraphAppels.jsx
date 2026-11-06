@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { COUL } from '../lib/theme'
 
 // ─── Graphiques du module Appels ──────────────────────────────────────────
 //
@@ -33,7 +34,7 @@ export const SERIES = [
 ]
 
 const GRILLE = '#e9eef5'
-const AXE = '#94a3b8'
+const AXE = COUL.texteFaible
 
 // Échelle à graduations rondes : un pas pris dans 1/2/2,5/5 × 10ⁿ, visant
 // quatre intervalles. Évite les « 13, 25, 38, 50 » d'une division en quarts.
@@ -51,7 +52,7 @@ export function Legende({ series = SERIES }) {
   return (
     <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 10 }}>
       {series.map(s => (
-        <span key={s.cle} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: '#475569' }}>
+        <span key={s.cle} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: COUL.texteMoyen }}>
           <span style={{ width: 10, height: 10, borderRadius: 3, background: s.couleur, flexShrink: 0 }} />
           {s.icone && <i className={`ti ${s.icone}`} style={{ fontSize: 12, color: s.couleur }} />}
           {s.label}
@@ -70,7 +71,7 @@ export function BarresEmpilees({ donnees, hauteur = 180, series = SERIES, vide =
   const [survol, setSurvol] = useState(null)
 
   if (!donnees.length) {
-    return <div style={{ padding: '32px 0', textAlign: 'center', color: '#94a3b8', fontSize: 12.5 }}>{vide}</div>
+    return <div style={{ padding: '32px 0', textAlign: 'center', color: COUL.texteFaible, fontSize: 12.5 }}>{vide}</div>
   }
 
   const totaux = donnees.map(d => series.reduce((s, k) => s + (d.valeurs[k.cle] || 0), 0))
@@ -143,7 +144,7 @@ export function BarresEmpilees({ donnees, hauteur = 180, series = SERIES, vide =
       {/* Infobulle */}
       {survol != null && (
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
-          <div style={{ background: '#0f172a', color: '#fff', borderRadius: 8, padding: '8px 12px', fontSize: 11.5, boxShadow: '0 6px 20px rgba(15,23,42,0.28)', minWidth: 150 }}>
+          <div style={{ background: COUL.texteFort, color: COUL.blanc, borderRadius: 8, padding: '8px 12px', fontSize: 11.5, boxShadow: '0 6px 20px rgba(15,23,42,0.28)', minWidth: 150 }}>
             <div style={{ fontWeight: 700, marginBottom: 5 }}>{donnees[survol].labelLong ?? donnees[survol].label}</div>
             {series.map(s => (
               <div key={s.cle} style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 2, opacity: (donnees[survol].valeurs[s.cle] || 0) ? 1 : 0.45 }}>
@@ -186,7 +187,7 @@ export function Sparkline({ valeurs, couleur = COULEURS.entrant, largeur = 104, 
       </defs>
       <polygon points={`0,${hauteur} ${pts.join(' ')} ${largeur},${hauteur}`} fill={`url(#${id})`} />
       <polyline points={pts.join(' ')} fill="none" stroke={couleur} strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" />
-      <circle cx={largeur} cy={y(valeurs[valeurs.length - 1])} r="2.6" fill={couleur} stroke="#fff" strokeWidth="1.5" />
+      <circle cx={largeur} cy={y(valeurs[valeurs.length - 1])} r="2.6" fill={couleur} stroke={COUL.blanc} strokeWidth="1.5" />
     </svg>
   )
 }
@@ -221,12 +222,12 @@ export function CarteChaleur({ grille, heures, max, legende = 'appels reçus' })
     <div>
       <div style={{ display: 'flex', gap: 3, marginBottom: 4, paddingLeft: 74 }}>
         {heures.map(h => (
-          <div key={h} style={{ flex: 1, textAlign: 'center', fontSize: 9, color: '#94a3b8', fontVariantNumeric: 'tabular-nums' }}>{String(h).padStart(2, '0')}</div>
+          <div key={h} style={{ flex: 1, textAlign: 'center', fontSize: 9, color: COUL.texteFaible, fontVariantNumeric: 'tabular-nums' }}>{String(h).padStart(2, '0')}</div>
         ))}
       </div>
       {JOURS_SEM.map((nom, j) => (
         <div key={nom} style={{ display: 'flex', gap: 3, alignItems: 'center', marginBottom: 3 }}>
-          <div style={{ width: 70, fontSize: 10.5, color: '#64748b', textAlign: 'right', paddingRight: 4, whiteSpace: 'nowrap' }}>{nom}</div>
+          <div style={{ width: 70, fontSize: 10.5, color: COUL.texteDoux, textAlign: 'right', paddingRight: 4, whiteSpace: 'nowrap' }}>{nom}</div>
           {heures.map(h => {
             const v = grille[j]?.[h] || 0
             const c = teinte(v)
@@ -240,7 +241,7 @@ export function CarteChaleur({ grille, heures, max, legende = 'appels reçus' })
                   boxShadow: actif ? '0 0 0 2px #0f172a' : 'none',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 9.5, fontWeight: 700, fontVariantNumeric: 'tabular-nums',
-                  color: v && v > seuils[3] ? '#fff' : '#475569',
+                  color: v && v > seuils[3] ? '#fff' : COUL.texteMoyen,
                   transition: 'box-shadow .1s', cursor: v ? 'default' : 'default',
                 }}>
                 {v || ''}
@@ -249,7 +250,7 @@ export function CarteChaleur({ grille, heures, max, legende = 'appels reçus' })
           })}
         </div>
       ))}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, fontSize: 10.5, color: '#94a3b8' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, fontSize: 10.5, color: COUL.texteFaible }}>
         <span>Moins</span>
         <div style={{ display: 'flex', gap: 3 }}>
           <div style={{ width: 18, height: 10, borderRadius: 3, background: '#f6f8fb' }} />
@@ -267,7 +268,7 @@ export function CarteChaleur({ grille, heures, max, legende = 'appels reçus' })
    Pour comparer deux séries tranche par tranche, comme sur la maquette. */
 export function BarresGroupees({ donnees, series, hauteur = 190, vide = 'Aucun appel sur la période.' }) {
   const [survol, setSurvol] = useState(null)
-  if (!donnees.length) return <div style={{ padding: '32px 0', textAlign: 'center', color: '#94a3b8', fontSize: 12.5 }}>{vide}</div>
+  if (!donnees.length) return <div style={{ padding: '32px 0', textAlign: 'center', color: COUL.texteFaible, fontSize: 12.5 }}>{vide}</div>
 
   const max = Math.max(1, ...donnees.flatMap(d => series.map(s => d.valeurs[s.cle] || 0)))
   const { haut, ticks } = echelle(max)
@@ -311,7 +312,7 @@ export function BarresGroupees({ donnees, series, hauteur = 190, vide = 'Aucun a
 
       {survol != null && (
         <div style={{ position: 'absolute', top: -4, left: 0, right: 0, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
-          <div style={{ background: '#0f172a', color: '#fff', borderRadius: 8, padding: '7px 11px', fontSize: 11.5, boxShadow: '0 6px 20px rgba(15,23,42,0.28)', minWidth: 130 }}>
+          <div style={{ background: COUL.texteFort, color: COUL.blanc, borderRadius: 8, padding: '7px 11px', fontSize: 11.5, boxShadow: '0 6px 20px rgba(15,23,42,0.28)', minWidth: 130 }}>
             <div style={{ fontWeight: 700, marginBottom: 4 }}>{donnees[survol].labelLong ?? donnees[survol].label}</div>
             {series.map(s => (
               <div key={s.cle} style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 2 }}>

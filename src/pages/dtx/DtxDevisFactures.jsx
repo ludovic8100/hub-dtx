@@ -5,9 +5,10 @@ import Layout from '../../components/Layout'
 import { DTX, TVA_TAUX, CGV, DELAI_PAIEMENT_JOURS } from '../../lib/dtxConfig'
 import { I18N, CGV_I18N, LANGUES } from '../../lib/lodeI18n'
 import { StatBanner, TabsBar, StatusBadge, ActionButton, DataCard, PrimaryButton, useMobile } from '../../components/ui/AccountableUI'
+import { COUL } from '../../lib/theme'
 
 const ORANGE = DTX.couleur
-const NAVY = '#1e293b'
+const NAVY = COUL.texte
 
 // ── Chargement dynamique de libs via CDN (PDF / Excel) ──────────
 function loadScript(src) {
@@ -70,19 +71,19 @@ function calcTotaux(lignes, remiseGlobalePct) {
 }
 
 const STATUTS_DEVIS = {
-  brouillon: { bg: '#f1f5f9', col: '#64748b', label: 'Brouillon' },
-  'envoyé':  { bg: '#dbeafe', col: '#2563eb', label: 'Envoyé' },
-  'accepté': { bg: '#dcfce7', col: '#16a34a', label: 'Accepté' },
-  'refusé':  { bg: '#fee2e2', col: '#dc2626', label: 'Refusé' },
-  'expiré':  { bg: '#fef3c7', col: '#92400e', label: 'Expiré' },
+  brouillon: { bg: COUL.fondDoux, col: COUL.texteDoux, label: 'Brouillon' },
+  'envoyé':  { bg: '#dbeafe', col: COUL.info, label: 'Envoyé' },
+  'accepté': { bg: COUL.succesFond, col: COUL.succes, label: 'Accepté' },
+  'refusé':  { bg: COUL.dangerFond, col: COUL.danger, label: 'Refusé' },
+  'expiré':  { bg: COUL.alerteFond, col: COUL.alerteFonce, label: 'Expiré' },
 }
 const STATUTS_FACT = {
-  brouillon: { bg: '#f1f5f9', col: '#64748b', label: 'Brouillon' },
-  'envoyée': { bg: '#dbeafe', col: '#2563eb', label: 'Envoyée' },
-  'payée':   { bg: '#dcfce7', col: '#16a34a', label: 'Payée' },
-  'partiellement payée': { bg: '#fef3c7', col: '#92400e', label: 'Partielle' },
-  'en retard': { bg: '#fee2e2', col: '#dc2626', label: 'En retard' },
-  'annulée': { bg: '#f1f5f9', col: '#94a3b8', label: 'Annulée' },
+  brouillon: { bg: COUL.fondDoux, col: COUL.texteDoux, label: 'Brouillon' },
+  'envoyée': { bg: '#dbeafe', col: COUL.info, label: 'Envoyée' },
+  'payée':   { bg: COUL.succesFond, col: COUL.succes, label: 'Payée' },
+  'partiellement payée': { bg: COUL.alerteFond, col: COUL.alerteFonce, label: 'Partielle' },
+  'en retard': { bg: COUL.dangerFond, col: COUL.danger, label: 'En retard' },
+  'annulée': { bg: COUL.fondDoux, col: COUL.texteFaible, label: 'Annulée' },
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -256,16 +257,16 @@ function Editeur({ type, doc, onClose, onSaved }) {
   }
 
   const inp = { padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' }
-  const lbl = { fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 3, display: 'block' }
+  const lbl = { fontSize: 11, fontWeight: 700, color: COUL.texteDoux, marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: mobE ? 8 : 20, overflowY: 'auto' }}>
-      <div style={{ background: '#fff', borderRadius: 14, maxWidth: 880, width: '100%', padding: mobE ? 16 : 24, fontFamily: "'Source Sans Pro', sans-serif" }}>
+      <div style={{ background: COUL.blanc, borderRadius: 14, maxWidth: 880, width: '100%', padding: mobE ? 16 : 24, fontFamily: "'Source Sans Pro', sans-serif" }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
           <h2 style={{ fontSize: 18, fontWeight: 800, color: NAVY, margin: 0 }}>
             {doc?.id ? 'Modifier' : 'Nouveau'} {isDevis ? 'devis' : 'facture'} {doc?.numero ? `· ${doc.numero}` : ''}
           </h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#94a3b8' }}>×</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: COUL.texteFaible }}>×</button>
         </div>
 
         {/* Client */}
@@ -274,15 +275,15 @@ function Editeur({ type, doc, onClose, onSaved }) {
           <label style={lbl}>Rechercher un client encodé (nom, prénom, dossier, ville, email, TVA…)</label>
           <input style={inp} value={clientQuery} placeholder="Tapez au moins 2 caractères — ou saisie manuelle ci-dessous" onChange={e => setClientQuery(e.target.value)} />
           {clientQuery.trim().length >= 2 && (
-            <div style={{ position: 'absolute', zIndex: 20, left: 0, right: 0, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, marginTop: 4, maxHeight: 280, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,.12)' }}>
-              {searching && <div style={{ padding: 10, fontSize: 13, color: '#64748b' }}>Recherche…</div>}
-              {!searching && clientResults.length === 0 && <div style={{ padding: 10, fontSize: 13, color: '#64748b' }}>Aucun client trouvé</div>}
+            <div style={{ position: 'absolute', zIndex: 20, left: 0, right: 0, background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 8, marginTop: 4, maxHeight: 280, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,.12)' }}>
+              {searching && <div style={{ padding: 10, fontSize: 13, color: COUL.texteDoux }}>Recherche…</div>}
+              {!searching && clientResults.length === 0 && <div style={{ padding: 10, fontSize: 13, color: COUL.texteDoux }}>Aucun client trouvé</div>}
               {clientResults.map(c => {
                 const L = labelClient(c)
                 return (
-                  <div key={c.id} onClick={() => choisirClient(c)} style={{ padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                  <div key={c.id} onClick={() => choisirClient(c)} style={{ padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = COUL.fond} onMouseLeave={e => e.currentTarget.style.background = COUL.blanc}>
                     <div style={{ fontSize: 13, fontWeight: 700 }}>{L.icon} {L.nom}</div>
-                    {L.sub && <div style={{ fontSize: 11, color: '#64748b' }}>{L.sub}</div>}
+                    {L.sub && <div style={{ fontSize: 11, color: COUL.texteDoux }}>{L.sub}</div>}
                   </div>
                 )
               })}
@@ -313,11 +314,11 @@ function Editeur({ type, doc, onClose, onSaved }) {
             </div>
           ) : (
             <button onClick={creerClient} disabled={creatingClient || !f.client_nom.trim()}
-              style={{ background: f.client_nom.trim() ? ORANGE : '#cbd5e1', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 700, cursor: (f.client_nom.trim() && !creatingClient) ? 'pointer' : 'not-allowed' }}>
+              style={{ background: f.client_nom.trim() ? ORANGE : COUL.bordFort, color: COUL.blanc, border: 'none', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 700, cursor: (f.client_nom.trim() && !creatingClient) ? 'pointer' : 'not-allowed' }}>
               {creatingClient ? 'Création…' : '➕ Créer ce client dans la base'}
             </button>
           )}
-          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 5 }}>
+          <div style={{ fontSize: 11, color: COUL.texteFaible, marginTop: 5 }}>
             {f.client_id
               ? 'Ce client est enregistré dans ta base — réutilisable pour tes prochains devis et factures.'
               : 'Client pas encore encodé. Crée-le pour le retrouver ensuite via la recherche.'}
@@ -339,13 +340,13 @@ function Editeur({ type, doc, onClose, onSaved }) {
         {/* Lignes */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 10 }}>
           <div style={{ fontSize: 13, fontWeight: 800, color: ORANGE }}>Lignes</div>
-          <button type="button" onClick={() => setAfficherTVAC(v => !v)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: afficherTVAC ? ORANGE : '#f1f5f9', color: afficherTVAC ? '#fff' : '#64748b', border: 'none', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>💶 {afficherTVAC ? 'Prix TVAC affichés' : 'Afficher prix TVA comprise'}</button>
+          <button type="button" onClick={() => setAfficherTVAC(v => !v)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: afficherTVAC ? ORANGE : COUL.fondDoux, color: afficherTVAC ? '#fff' : COUL.texteDoux, border: 'none', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>💶 {afficherTVAC ? 'Prix TVAC affichés' : 'Afficher prix TVA comprise'}</button>
         </div>
         <div style={{ border: '1px solid #f1f5f9', borderRadius: 9, overflowX: 'auto', marginBottom: 10 }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: mobE ? 520 : 'auto' }}>
-            <thead style={{ background: '#f8fafc' }}>
+            <thead style={{ background: COUL.fond }}>
               <tr>{['Description', 'Qté', 'P.U. €', 'Rem.%', 'TVA', 'Total HT', ''].map(h => (
-                <th key={h} style={{ padding: '7px 8px', textAlign: h === 'Description' ? 'left' : 'center', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>{h}</th>
+                <th key={h} style={{ padding: '7px 8px', textAlign: h === 'Description' ? 'left' : 'center', fontSize: 10, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase' }}>{h}</th>
               ))}</tr>
             </thead>
             <tbody>
@@ -369,25 +370,25 @@ function Editeur({ type, doc, onClose, onSaved }) {
                       {eur(totLigne)}
                       {afficherTVAC && <div style={{ fontSize: 10, color: ORANGE, marginTop: 2, fontWeight: 700 }}>{eur(totLigne * (1 + (Number(l.tva_pct) || 0) / 100))} TVAC</div>}
                     </td>
-                    <td style={{ padding: 4, width: 30 }}><button onClick={() => delLigne(i)} style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 16 }}>×</button></td>
+                    <td style={{ padding: 4, width: 30 }}><button onClick={() => delLigne(i)} style={{ background: 'none', border: 'none', color: COUL.danger, cursor: 'pointer', fontSize: 16 }}>×</button></td>
                   </tr>
                 )
               })}
             </tbody>
           </table>
         </div>
-        <button onClick={addLigne} style={{ background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 16 }}>+ Ajouter une ligne</button>
+        <button onClick={addLigne} style={{ background: COUL.fond, border: '1px dashed #cbd5e1', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: COUL.texteDoux, marginBottom: 16 }}>+ Ajouter une ligne</button>
 
         {/* Totaux + remise globale */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
           <div style={{ width: 280 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <span style={{ fontSize: 12, color: '#64748b' }}>Remise globale %</span>
+              <span style={{ fontSize: 12, color: COUL.texteDoux }}>Remise globale %</span>
               <input type="number" style={{ ...inp, width: 70, padding: '5px', textAlign: 'center' }} value={f.remise_pct} onChange={e => set('remise_pct', e.target.value)} />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0' }}><span style={{ color: '#64748b' }}>Total HT</span><span style={{ fontWeight: 600 }}>{eur(tot.ht)}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0' }}><span style={{ color: COUL.texteDoux }}>Total HT</span><span style={{ fontWeight: 600 }}>{eur(tot.ht)}</span></div>
             {Object.entries(tot.parTaux).filter(([, v]) => v > 0).map(([t, v]) => (
-              <div key={t} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '2px 0', color: '#64748b' }}><span>TVA {t}%</span><span>{eur(v)}</span></div>
+              <div key={t} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '2px 0', color: COUL.texteDoux }}><span>TVA {t}%</span><span>{eur(v)}</span></div>
             ))}
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 800, color: ORANGE, padding: '8px 0', borderTop: '2px solid #f1f5f9', marginTop: 4 }}><span>Total TTC</span><span>{eur(tot.ttc)}</span></div>
           </div>
@@ -409,8 +410,8 @@ function Editeur({ type, doc, onClose, onSaved }) {
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-          <button onClick={onClose} style={{ background: '#f1f5f9', border: 'none', borderRadius: 9, padding: '10px 20px', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#64748b' }}>Annuler</button>
-          <button onClick={save} disabled={saving} style={{ background: ORANGE, border: 'none', borderRadius: 9, padding: '10px 24px', cursor: saving ? 'wait' : 'pointer', fontSize: 13, fontWeight: 700, color: '#fff' }}>{saving ? 'Enregistrement…' : 'Enregistrer'}</button>
+          <button onClick={onClose} style={{ background: COUL.fondDoux, border: 'none', borderRadius: 9, padding: '10px 20px', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: COUL.texteDoux }}>Annuler</button>
+          <button onClick={save} disabled={saving} style={{ background: ORANGE, border: 'none', borderRadius: 9, padding: '10px 24px', cursor: saving ? 'wait' : 'pointer', fontSize: 13, fontWeight: 700, color: COUL.blanc }}>{saving ? 'Enregistrement…' : 'Enregistrer'}</button>
         </div>
       </div>
     </div>
@@ -601,21 +602,21 @@ async function exportExcel(type, doc, lignes) {
 //  PAGE PRINCIPALE
 // ════════════════════════════════════════════════════════════════
 const STATUT_CHIPS = [
-  { key: 'brouillon', label: 'Pas envoyé', col: '#94a3b8' },
-  { key: 'envoyé',    label: 'Envoyé',     col: '#2563eb' },
-  { key: 'accepté',   label: 'Approuvé',   col: '#16a34a' },
-  { key: 'refusé',    label: 'Rejeté',     col: '#dc2626' },
+  { key: 'brouillon', label: 'Pas envoyé', col: COUL.texteFaible },
+  { key: 'envoyé',    label: 'Envoyé',     col: COUL.info },
+  { key: 'accepté',   label: 'Approuvé',   col: COUL.succes },
+  { key: 'refusé',    label: 'Rejeté',     col: COUL.danger },
 ]
 const EVT = {
-  cree:    { icon: '📝', label: 'Créé',                  col: '#64748b' },
-  envoye:  { icon: '📤', label: 'Envoyé au client',      col: '#2563eb' },
-  ouvert:  { icon: '👁️', label: 'Email ouvert par le client', col: '#7c3aed' },
-  accepte: { icon: '✅', label: 'Accepté par le client', col: '#16a34a' },
-  refuse:  { icon: '✋', label: 'Refusé par le client',   col: '#dc2626' },
+  cree:    { icon: '📝', label: 'Créé',                  col: COUL.texteDoux },
+  envoye:  { icon: '📤', label: 'Envoyé au client',      col: COUL.info },
+  ouvert:  { icon: '👁️', label: 'Email ouvert par le client', col: COUL.violet },
+  accepte: { icon: '✅', label: 'Accepté par le client', col: COUL.succes },
+  refuse:  { icon: '✋', label: 'Refusé par le client',   col: COUL.danger },
 }
 
 function Row2({ l, v }) {
-  return <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', color: '#64748b' }}><span>{l}</span><span>{v}</span></div>
+  return <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', color: COUL.texteDoux }}><span>{l}</span><span>{v}</span></div>
 }
 
 function SuiviModal({ doc, color, onClose, onChanged }) {
@@ -690,35 +691,35 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: mob ? 0 : 20 }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: mob ? '100vw' : 'min(1080px,96vw)', height: mob ? '100vh' : 'min(92vh,900px)', background: '#fff', borderRadius: mob ? 0 : 16, overflow: 'hidden', display: 'flex', flexDirection: mob ? 'column' : 'row', boxShadow: '0 20px 60px rgba(0,0,0,.3)' }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: mob ? '100vw' : 'min(1080px,96vw)', height: mob ? '100vh' : 'min(92vh,900px)', background: COUL.blanc, borderRadius: mob ? 0 : 16, overflow: 'hidden', display: 'flex', flexDirection: mob ? 'column' : 'row', boxShadow: '0 20px 60px rgba(0,0,0,.3)' }}>
 
         {/* ── Colonne gauche : aperçu du document ── */}
-        <div style={{ flex: 1, background: '#f1f5f9', overflow: 'auto', padding: mob ? 14 : 28, order: mob ? 2 : 1 }}>
-          <div style={{ background: '#fff', maxWidth: 620, margin: '0 auto', borderRadius: 10, boxShadow: '0 2px 12px rgba(0,0,0,.08)', padding: mob ? '22px 18px' : '30px 34px', fontSize: 12, color: '#1e293b' }}>
+        <div style={{ flex: 1, background: COUL.fondDoux, overflow: 'auto', padding: mob ? 14 : 28, order: mob ? 2 : 1 }}>
+          <div style={{ background: COUL.blanc, maxWidth: 620, margin: '0 auto', borderRadius: 10, boxShadow: '0 2px 12px rgba(0,0,0,.08)', padding: mob ? '22px 18px' : '30px 34px', fontSize: 12, color: COUL.texte }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 22 }}>
               {DTX.logo_url ? <img src={DTX.logo_url} alt="DTX" style={{ height: 46 }} /> : <div style={{ fontWeight: 800, fontSize: 18, color }}>{DTX.raison_sociale}</div>}
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontWeight: 800, color }}>DEVIS {doc.numero}</div>
-                <div style={{ color: '#64748b' }}>Émis le : {fmtDate(doc.date_devis)}</div>
-                {doc.date_validite && <div style={{ color: '#64748b' }}>Valide jusqu'au : {fmtDate(doc.date_validite)}</div>}
+                <div style={{ color: COUL.texteDoux }}>Émis le : {fmtDate(doc.date_devis)}</div>
+                {doc.date_validite && <div style={{ color: COUL.texteDoux }}>Valide jusqu'au : {fmtDate(doc.date_validite)}</div>}
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 20, marginBottom: 20 }}>
               <div>
-                <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>De</div>
+                <div style={{ fontSize: 9, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase' }}>De</div>
                 <div style={{ fontWeight: 800 }}>{DTX.raison_sociale}</div>
-                <div style={{ color: '#475569' }}>{DTX.adresse}<br />{DTX.cp} {DTX.ville}<br />{DTX.pays}</div>
-                <div style={{ color: '#475569', marginTop: 4 }}>TVA : {DTX.tva}</div>
+                <div style={{ color: COUL.texteMoyen }}>{DTX.adresse}<br />{DTX.cp} {DTX.ville}<br />{DTX.pays}</div>
+                <div style={{ color: COUL.texteMoyen, marginTop: 4 }}>TVA : {DTX.tva}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Pour</div>
+                <div style={{ fontSize: 9, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase' }}>Pour</div>
                 <div style={{ fontWeight: 800 }}>{doc.client_nom}</div>
-                <div style={{ color: '#475569' }}>{doc.client_adresse}<br />{[doc.client_cp, doc.client_ville].filter(Boolean).join(' ')}</div>
-                {doc.client_tva && <div style={{ color: '#475569', marginTop: 4 }}>TVA : {doc.client_tva}</div>}
+                <div style={{ color: COUL.texteMoyen }}>{doc.client_adresse}<br />{[doc.client_cp, doc.client_ville].filter(Boolean).join(' ')}</div>
+                {doc.client_tva && <div style={{ color: COUL.texteMoyen, marginTop: 4 }}>TVA : {doc.client_tva}</div>}
               </div>
             </div>
             <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12 }}>
-              <thead><tr style={{ background: color, color: '#fff' }}>
+              <thead><tr style={{ background: color, color: COUL.blanc }}>
                 {['Description', 'Prix HTVA', 'TVA', 'Qté', 'Total'].map((h, i) => <th key={h} style={{ textAlign: i ? 'right' : 'left', padding: '6px 8px', fontSize: 10, fontWeight: 700 }}>{h}</th>)}
               </tr></thead>
               <tbody>
@@ -740,8 +741,8 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: `2px solid ${color}`, paddingTop: 6, marginTop: 4, fontWeight: 800, color }}><span>Montant</span><span>{eur(doc.total_ttc)}</span></div>
               </div>
             </div>
-            {doc.notes && <><div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginTop: 18 }}>Notes &amp; commentaires</div><div style={{ color: '#475569' }}>{doc.notes}</div></>}
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 22, paddingTop: 12, borderTop: '1px solid #e2e8f0', color: '#64748b', fontSize: 11 }}>
+            {doc.notes && <><div style={{ fontSize: 9, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', marginTop: 18 }}>Notes &amp; commentaires</div><div style={{ color: COUL.texteMoyen }}>{doc.notes}</div></>}
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 22, paddingTop: 12, borderTop: '1px solid #e2e8f0', color: COUL.texteDoux, fontSize: 11 }}>
               <div>{DTX.iban && <>IBAN : {DTX.iban}<br /></>}{DTX.bic && <>BIC : {DTX.bic}</>}</div>
               <div style={{ textAlign: 'right' }}>{DTX.email}{DTX.telephone && <><br />{DTX.telephone}</>}</div>
             </div>
@@ -752,22 +753,22 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
         <div style={{ width: mob ? '100%' : 380, borderLeft: mob ? 'none' : '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', order: mob ? 1 : 2, maxHeight: mob ? '46vh' : 'none' }}>
           <div style={{ background: `linear-gradient(135deg,${color},#7c2d12)`, padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
-              <div style={{ color: '#fff', fontSize: 18, fontWeight: 800 }}>Devis {doc.numero}</div>
-              <div style={{ color: '#fff', opacity: .9, fontSize: 14, marginTop: 2 }}>{eur(doc.total_ttc)} TVA incl.</div>
+              <div style={{ color: COUL.blanc, fontSize: 18, fontWeight: 800 }}>Devis {doc.numero}</div>
+              <div style={{ color: COUL.blanc, opacity: .9, fontSize: 14, marginTop: 2 }}>{eur(doc.total_ttc)} TVA incl.</div>
             </div>
-            <button onClick={onClose} style={{ background: 'rgba(255,255,255,.2)', border: 'none', color: '#fff', width: 30, height: 30, borderRadius: 8, cursor: 'pointer', fontSize: 16 }}>✕</button>
+            <button onClick={onClose} style={{ background: 'rgba(255,255,255,.2)', border: 'none', color: COUL.blanc, width: 30, height: 30, borderRadius: 8, cursor: 'pointer', fontSize: 16 }}>✕</button>
           </div>
 
           <div style={{ flex: 1, overflow: 'auto', padding: 20 }}>
           {/* Statut (chips cliquables, façon Accountable) */}
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 8 }}>Statut</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', marginBottom: 8 }}>Statut</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 22 }}>
             {STATUT_CHIPS.map(c => {
               const actif = statut === c.key
               return (
                 <button key={c.key} onClick={() => changeStatut(c.key)}
                   style={{ padding: '8px 14px', borderRadius: 999, fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                    border: `1.5px solid ${actif ? c.col : '#e2e8f0'}`, background: actif ? c.col : '#fff', color: actif ? '#fff' : '#64748b' }}>
+                    border: `1.5px solid ${actif ? c.col : COUL.bord}`, background: actif ? c.col : COUL.blanc, color: actif ? '#fff' : COUL.texteDoux }}>
                   {c.label}
                 </button>
               )
@@ -775,30 +776,30 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
           </div>
 
           {/* Lien d'acceptation */}
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Lien d'acceptation (client)</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', marginBottom: 6 }}>Lien d'acceptation (client)</div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
-            <input readOnly value={lien} style={{ flex: 1, padding: '9px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 12, fontFamily: 'monospace', color: '#475569', background: '#f8fafc' }} />
-            <button onClick={copier} style={{ padding: '9px 14px', border: 'none', borderRadius: 8, background: color, color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>{copied ? '✓ Copié' : 'Copier'}</button>
+            <input readOnly value={lien} style={{ flex: 1, padding: '9px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 12, fontFamily: 'monospace', color: COUL.texteMoyen, background: COUL.fond }} />
+            <button onClick={copier} style={{ padding: '9px 14px', border: 'none', borderRadius: 8, background: color, color: COUL.blanc, fontWeight: 700, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>{copied ? '✓ Copié' : 'Copier'}</button>
           </div>
 
           {/* Actions d'envoi */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 22 }}>
-            <button onClick={envoyerEmail} disabled={sending} style={{ flex: 1, minWidth: 180, padding: '11px 16px', border: 'none', borderRadius: 10, background: '#16a34a', color: '#fff', fontWeight: 700, fontSize: 14, cursor: sending ? 'wait' : 'pointer' }}>{sending ? '…' : '📧 Envoyer par email'}</button>
-            <button onClick={() => marquerEnvoye(false)} style={{ padding: '11px 16px', border: '1px solid #e2e8f0', borderRadius: 10, background: '#fff', color: '#64748b', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Marquer envoyé</button>
+            <button onClick={envoyerEmail} disabled={sending} style={{ flex: 1, minWidth: 180, padding: '11px 16px', border: 'none', borderRadius: 10, background: COUL.succes, color: COUL.blanc, fontWeight: 700, fontSize: 14, cursor: sending ? 'wait' : 'pointer' }}>{sending ? '…' : '📧 Envoyer par email'}</button>
+            <button onClick={() => marquerEnvoye(false)} style={{ padding: '11px 16px', border: '1px solid #e2e8f0', borderRadius: 10, background: COUL.blanc, color: COUL.texteDoux, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Marquer envoyé</button>
           </div>
 
           {/* Timeline */}
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 12 }}>Historique</div>
-          {events === null ? <p style={{ color: '#94a3b8', fontSize: 13 }}>Chargement…</p> : (
+          <div style={{ fontSize: 11, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', marginBottom: 12 }}>Historique</div>
+          {events === null ? <p style={{ color: COUL.texteFaible, fontSize: 13 }}>Chargement…</p> : (
             <div style={{ position: 'relative', paddingLeft: 26 }}>
-              <div style={{ position: 'absolute', left: 9, top: 4, bottom: 4, width: 2, background: '#e2e8f0' }} />
+              <div style={{ position: 'absolute', left: 9, top: 4, bottom: 4, width: 2, background: COUL.bord }} />
               {timeline.map((ev, i) => {
-                const cfg = EVT[ev.type] || { icon: '•', label: ev.type, col: '#64748b' }
+                const cfg = EVT[ev.type] || { icon: '•', label: ev.type, col: COUL.texteDoux }
                 return (
                   <div key={ev.id || i} style={{ position: 'relative', marginBottom: 18 }}>
-                    <div style={{ position: 'absolute', left: -26, width: 20, height: 20, borderRadius: '50%', background: '#fff', border: `2px solid ${cfg.col}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>{cfg.icon}</div>
-                    <div style={{ fontWeight: 700, color: '#1e293b', fontSize: 14 }}>{cfg.label}</div>
-                    <div style={{ fontSize: 12, color: '#94a3b8' }}>{ev.created_at ? new Date(ev.created_at).toLocaleString('fr-BE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}{ev.detail ? ` · ${ev.detail}` : ''}</div>
+                    <div style={{ position: 'absolute', left: -26, width: 20, height: 20, borderRadius: '50%', background: COUL.blanc, border: `2px solid ${cfg.col}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>{cfg.icon}</div>
+                    <div style={{ fontWeight: 700, color: COUL.texte, fontSize: 14 }}>{cfg.label}</div>
+                    <div style={{ fontSize: 12, color: COUL.texteFaible }}>{ev.created_at ? new Date(ev.created_at).toLocaleString('fr-BE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}{ev.detail ? ` · ${ev.detail}` : ''}</div>
                   </div>
                 )
               })}
@@ -938,10 +939,10 @@ export default function DtxDevisFactures() {
         <TabsBar color={C} active={tab} onChange={setTab}
           tabs={[{ key: 'devis', label: 'Devis', count: devis.length }, { key: 'factures', label: 'Factures', count: factures.length }]} />
 
-        {loading ? <p style={{ color: '#94a3b8' }}>Chargement…</p> :
+        {loading ? <p style={{ color: COUL.texteFaible }}>Chargement…</p> :
           liste.length === 0 ? (
             <DataCard style={{ padding: '48px 24px', textAlign: 'center' }}>
-              <p style={{ color: '#94a3b8', fontStyle: 'italic', margin: 0 }}>Aucun {tab === 'devis' ? 'devis' : 'facture'} pour le moment.</p>
+              <p style={{ color: COUL.texteFaible, fontStyle: 'italic', margin: 0 }}>Aucun {tab === 'devis' ? 'devis' : 'facture'} pour le moment.</p>
             </DataCard>
           ) : mob ? (
             /* === Vue mobile : cartes empilées === */
@@ -954,13 +955,13 @@ export default function DtxDevisFactures() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontFamily: 'monospace', fontWeight: 700, color: C, fontSize: 13 }}>{doc.numero}</div>
-                        <div style={{ color: '#1e293b', fontWeight: 700, fontSize: 15, marginTop: 2 }}>{doc.client_nom}</div>
-                        {doc.objet && <div style={{ color: '#64748b', fontSize: 12.5, marginTop: 2 }}>{doc.objet}</div>}
+                        <div style={{ color: COUL.texte, fontWeight: 700, fontSize: 15, marginTop: 2 }}>{doc.client_nom}</div>
+                        {doc.objet && <div style={{ color: COUL.texteDoux, fontSize: 12.5, marginTop: 2 }}>{doc.objet}</div>}
                       </div>
                       <StatusBadge bg={s.bg} col={s.col} label={s.label} />
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: 8 }}>
-                      <span style={{ color: '#94a3b8', fontSize: 12 }}>{fmtDate(tab === 'devis' ? doc.date_devis : doc.date_facture)}</span>
+                      <span style={{ color: COUL.texteFaible, fontSize: 12 }}>{fmtDate(tab === 'devis' ? doc.date_devis : doc.date_facture)}</span>
                       <span style={{ fontWeight: 800, color: NAVY, fontSize: 16 }}>{eur(doc.total_ttc)}</span>
                     </div>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
@@ -979,9 +980,9 @@ export default function DtxDevisFactures() {
             /* === Vue desktop : tableau === */
             <DataCard style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 760 }}>
-                <thead style={{ background: '#f8fafc' }}>
+                <thead style={{ background: COUL.fond }}>
                   <tr>{['N°', 'Client', 'Objet', 'Date', 'Total TTC', 'Statut', 'Actions'].map(h => (
-                    <th key={h} style={{ padding: '11px 14px', textAlign: h === 'Total TTC' ? 'right' : 'left', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.03em' }}>{h}</th>
+                    <th key={h} style={{ padding: '11px 14px', textAlign: h === 'Total TTC' ? 'right' : 'left', fontSize: 10, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '0.03em' }}>{h}</th>
                   ))}</tr>
                 </thead>
                 <tbody>
@@ -990,11 +991,11 @@ export default function DtxDevisFactures() {
                     return (
                       <tr key={doc.id} style={{ borderTop: '1px solid #f1f5f9' }}
                         onMouseEnter={e => e.currentTarget.style.background = '#fafbfc'}
-                        onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                        onMouseLeave={e => e.currentTarget.style.background = COUL.blanc}>
                         <td style={{ padding: '11px 14px', fontFamily: 'monospace', fontWeight: 700, color: C }}>{doc.numero}</td>
-                        <td style={{ padding: '11px 14px', color: '#1e293b', fontWeight: 600 }}>{doc.client_nom}</td>
-                        <td style={{ padding: '11px 14px', color: '#64748b' }}>{doc.objet || '—'}</td>
-                        <td style={{ padding: '11px 14px', color: '#64748b' }}>{fmtDate(tab === 'devis' ? doc.date_devis : doc.date_facture)}</td>
+                        <td style={{ padding: '11px 14px', color: COUL.texte, fontWeight: 600 }}>{doc.client_nom}</td>
+                        <td style={{ padding: '11px 14px', color: COUL.texteDoux }}>{doc.objet || '—'}</td>
+                        <td style={{ padding: '11px 14px', color: COUL.texteDoux }}>{fmtDate(tab === 'devis' ? doc.date_devis : doc.date_facture)}</td>
                         <td style={{ padding: '11px 14px', textAlign: 'right', fontWeight: 700, color: NAVY }}>{eur(doc.total_ttc)}</td>
                         <td style={{ padding: '11px 14px' }}><StatusBadge bg={s.bg} col={s.col} label={s.label} /></td>
                         <td style={{ padding: '11px 14px' }}>

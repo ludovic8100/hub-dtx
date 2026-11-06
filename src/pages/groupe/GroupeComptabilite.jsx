@@ -12,13 +12,14 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import Layout from '../../components/Layout'
 import { supabase } from '../../lib/supabase'
+import { COUL } from '../../lib/theme'
 
-const NAVY = '#0D2F5E'
+const NAVY = COUL.marine
 const PAR_PAGE = 300
 
 const COULEUR_SOC = {
-  DYNASSUR: '#0080BD', DTX: '#64748b', LODE: '#ea580c',
-  HEXAGROUP: '#dc2626', PRIVE: '#0d9488', HOL: '#7c3aed',
+  DYNASSUR: COUL.bleu, DTX: COUL.texteDoux, LODE: COUL.orange,
+  HEXAGROUP: COUL.danger, PRIVE: COUL.teal, HOL: COUL.violet,
 }
 
 const fmt = v => v == null ? '—'
@@ -144,13 +145,13 @@ export default function GroupeComptabilite() {
 
   const styleChamp = {
     padding: '7px 10px', borderRadius: 8, border: '1px solid #e2e8f0',
-    fontSize: 13, fontFamily: 'inherit', color: NAVY, background: '#fff',
+    fontSize: 13, fontFamily: 'inherit', color: NAVY, background: COUL.blanc,
   }
   const enTete = (col, label, aligne = 'left') => (
     <th onClick={() => trierPar(col)}
       style={{ padding: '8px 10px', fontWeight: 700, textAlign: aligne, cursor: 'pointer', whiteSpace: 'nowrap', userSelect: 'none' }}>
       {label}
-      {tri.col === col && <span style={{ marginLeft: 4, color: '#0080BD' }}>{tri.desc ? '▾' : '▴'}</span>}
+      {tri.col === col && <span style={{ marginLeft: 4, color: COUL.bleu }}>{tri.desc ? '▾' : '▴'}</span>}
     </th>
   )
 
@@ -159,12 +160,12 @@ export default function GroupeComptabilite() {
       <div style={{ fontFamily: "'Source Sans Pro', sans-serif", width: '100%' }}>
 
         <h1 style={{ fontSize: 22, fontWeight: 800, color: NAVY, margin: '0 0 4px' }}>Comptabilité — toutes sociétés</h1>
-        <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 18px' }}>
+        <p style={{ fontSize: 13, color: COUL.texteDoux, margin: '0 0 18px' }}>
           Rechercher un paiement, un virement ou un fournisseur dans les comptes des six entités à la fois.
         </p>
 
         {/* ── Filtres ── */}
-        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 12, padding: 16, marginBottom: 16 }}>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
             <input
               value={recherche} onChange={e => setRecherche(e.target.value)}
@@ -194,8 +195,8 @@ export default function GroupeComptabilite() {
                 return (
                   <button key={code} onClick={() => basculerSociete(code)}
                     style={{ fontSize: 12, fontWeight: 700, padding: '5px 11px', borderRadius: 7,
-                      border: `1px solid ${actif ? col : '#e2e8f0'}`,
-                      background: actif ? col : '#fff', color: actif ? '#fff' : '#64748b',
+                      border: `1px solid ${actif ? col : COUL.bord}`,
+                      background: actif ? col : COUL.blanc, color: actif ? '#fff' : COUL.texteDoux,
                       cursor: 'pointer', fontFamily: 'inherit' }}>
                     {code}
                   </button>
@@ -204,26 +205,26 @@ export default function GroupeComptabilite() {
               {societes.length > 0 && (
                 <button onClick={() => setSocietes([])}
                   style={{ fontSize: 12, padding: '5px 9px', borderRadius: 7, border: '1px solid #e2e8f0',
-                    background: '#f8fafc', color: '#64748b', cursor: 'pointer', fontFamily: 'inherit' }}>
+                    background: COUL.fond, color: COUL.texteDoux, cursor: 'pointer', fontFamily: 'inherit' }}>
                   Toutes
                 </button>
               )}
             </div>
 
-            <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 4 }}>du</span>
+            <span style={{ fontSize: 12, color: COUL.texteFaible, marginLeft: 4 }}>du</span>
             <input type="date" value={du} onChange={e => setDu(e.target.value)} style={styleChamp} />
-            <span style={{ fontSize: 12, color: '#94a3b8' }}>au</span>
+            <span style={{ fontSize: 12, color: COUL.texteFaible }}>au</span>
             <input type="date" value={au} onChange={e => setAu(e.target.value)} style={styleChamp} />
             {[['12 mois', 12], ['24 mois', 24], ['Tout', 0]].map(([label, n]) => (
               <button key={label} onClick={() => { setDu(n ? moisEnArriere(n) : ''); setAu('') }}
                 style={{ fontSize: 11.5, padding: '5px 10px', borderRadius: 7, border: '1px solid #e2e8f0',
-                  background: '#fff', color: '#64748b', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
+                  background: COUL.blanc, color: COUL.texteDoux, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
                 {label}
               </button>
             ))}
             <button onClick={reinitialiser}
               style={{ fontSize: 11.5, padding: '5px 10px', borderRadius: 7, border: 'none',
-                background: '#f1f5f9', color: '#64748b', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600, marginLeft: 'auto' }}>
+                background: COUL.fondDoux, color: COUL.texteDoux, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600, marginLeft: 'auto' }}>
               Réinitialiser
             </button>
           </div>
@@ -233,37 +234,37 @@ export default function GroupeComptabilite() {
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
           {[
             { l: 'Opérations', v: `${lignes.length}${tronque ? '+' : ''}`, c: NAVY },
-            { l: 'Rentrées',   v: fmt(totaux.entrees), c: '#16a34a' },
-            { l: 'Dépenses',   v: fmt(totaux.sorties), c: '#dc2626' },
-            { l: 'Solde',      v: fmt(totaux.solde),   c: totaux.solde < 0 ? '#dc2626' : '#16a34a' },
+            { l: 'Rentrées',   v: fmt(totaux.entrees), c: COUL.succes },
+            { l: 'Dépenses',   v: fmt(totaux.sorties), c: COUL.danger },
+            { l: 'Solde',      v: fmt(totaux.solde),   c: totaux.solde < 0 ? '#dc2626' : COUL.succes },
           ].map(k => (
-            <div key={k.l} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 18px', minWidth: 150 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.05em' }}>{k.l}</div>
+            <div key={k.l} style={{ background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 18px', minWidth: 150 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.05em' }}>{k.l}</div>
               <div style={{ fontSize: 19, fontWeight: 800, color: k.c, marginTop: 2 }}>{k.v}</div>
             </div>
           ))}
           {parSociete.length > 1 && parSociete.map(s => (
-            <div key={s.code} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 16px', minWidth: 130 }}>
+            <div key={s.code} style={{ background: COUL.fond, border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 16px', minWidth: 130 }}>
               <div style={{ fontSize: 10, fontWeight: 800, color: COULEUR_SOC[s.code] || '#64748b', textTransform: 'uppercase', letterSpacing: '.05em' }}>{s.code}</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: s.total < 0 ? '#dc2626' : '#16a34a', marginTop: 2 }}>{fmt(s.total)}</div>
-              <div style={{ fontSize: 10.5, color: '#94a3b8' }}>{s.n} opération{s.n > 1 ? 's' : ''}</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: s.total < 0 ? '#dc2626' : COUL.succes, marginTop: 2 }}>{fmt(s.total)}</div>
+              <div style={{ fontSize: 10.5, color: COUL.texteFaible }}>{s.n} opération{s.n > 1 ? 's' : ''}</div>
             </div>
           ))}
         </div>
 
         {/* ── Résultats ── */}
         {chargement ? (
-          <p style={{ color: '#94a3b8', fontSize: 13 }}>Recherche…</p>
+          <p style={{ color: COUL.texteFaible, fontSize: 13 }}>Recherche…</p>
         ) : !lignes.length ? (
-          <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 36, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+          <div style={{ background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 10, padding: 36, textAlign: 'center', color: COUL.texteFaible, fontSize: 13 }}>
             Aucune opération ne correspond. Élargis la période ou retire un filtre.
           </div>
         ) : (
-          <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden' }}>
+          <div style={{ background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden' }}>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
                 <thead>
-                  <tr style={{ textAlign: 'left', color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                  <tr style={{ textAlign: 'left', color: COUL.texteDoux, background: COUL.fond, borderBottom: '1px solid #e2e8f0' }}>
                     {enTete('date_execution', 'Date')}
                     <th style={{ padding: '8px 10px', fontWeight: 700 }}>Société</th>
                     <th style={{ padding: '8px 10px', fontWeight: 700 }}>Compte</th>
@@ -280,28 +281,28 @@ export default function GroupeComptabilite() {
                     const negatif = Number(l.montant) < 0
                     return (
                       <tr key={l.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '7px 10px', whiteSpace: 'nowrap', color: '#475569' }}>{fmtDate(l.date_execution)}</td>
+                        <td style={{ padding: '7px 10px', whiteSpace: 'nowrap', color: COUL.texteMoyen }}>{fmtDate(l.date_execution)}</td>
                         <td style={{ padding: '7px 10px', whiteSpace: 'nowrap' }}>
                           <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 5,
                             background: `${col}15`, color: col, border: `1px solid ${col}35` }}>{code}</span>
                         </td>
-                        <td style={{ padding: '7px 10px', whiteSpace: 'nowrap', color: '#94a3b8', fontSize: 11.5 }}>{libelleCompte(l.compte_id)}</td>
+                        <td style={{ padding: '7px 10px', whiteSpace: 'nowrap', color: COUL.texteFaible, fontSize: 11.5 }}>{libelleCompte(l.compte_id)}</td>
                         <td style={{ padding: '7px 10px', fontWeight: 600, color: NAVY, maxWidth: 220 }}>{l.contrepartie_nom || '—'}</td>
-                        <td style={{ padding: '7px 10px', color: '#64748b', maxWidth: 380, fontSize: 11.5 }}>
+                        <td style={{ padding: '7px 10px', color: COUL.texteDoux, maxWidth: 380, fontSize: 11.5 }}>
                           {(l.information_paiement || l.description || '').slice(0, 160) || '—'}
                         </td>
                         <td style={{ padding: '7px 10px', textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 700,
-                          color: negatif ? '#dc2626' : '#16a34a' }}>{fmt(l.montant)}</td>
+                          color: negatif ? '#dc2626' : COUL.succes }}>{fmt(l.montant)}</td>
                         <td style={{ padding: '7px 10px', textAlign: 'center', whiteSpace: 'nowrap' }}>
                           {l.facture_url ? (
                             <a href={l.facture_url} target="_blank" rel="noreferrer" title="Ouvrir le document"
-                              style={{ color: '#0080BD', textDecoration: 'none' }}>
+                              style={{ color: COUL.bleu, textDecoration: 'none' }}>
                               <i className="ti ti-file-text" style={{ fontSize: 15 }} />
                             </a>
                           ) : l.sans_facture ? (
-                            <span title="Marqué sans document" style={{ color: '#cbd5e1' }}>—</span>
+                            <span title="Marqué sans document" style={{ color: COUL.bordFort }}>—</span>
                           ) : (
-                            <span title="Document manquant" style={{ color: '#f59e0b' }}>
+                            <span title="Document manquant" style={{ color: COUL.alerteVif }}>
                               <i className="ti ti-alert-circle" style={{ fontSize: 14 }} />
                             </span>
                           )}
@@ -313,7 +314,7 @@ export default function GroupeComptabilite() {
               </table>
             </div>
             {tronque && (
-              <div style={{ padding: '10px 14px', background: '#fffbeb', borderTop: '1px solid #fde68a', fontSize: 12, color: '#b45309' }}>
+              <div style={{ padding: '10px 14px', background: COUL.alerteFondDoux, borderTop: '1px solid #fde68a', fontSize: 12, color: COUL.alerte }}>
                 Seules les {PAR_PAGE} premières opérations sont affichées. Affine la recherche ou réduis la période.
               </div>
             )}

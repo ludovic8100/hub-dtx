@@ -6,8 +6,9 @@ import Layout from '../../components/Layout'
 import { ENTITES } from '../../lib/entites'
 import { StatBanner } from '../../components/ui/AccountableUI'
 import { genererPdfNote } from '../../lib/notesFraisPdf'
+import { COUL } from '../../lib/theme'
 
-const NAVY = '#0D2F5E'
+const NAVY = COUL.marine
 const CAT_KM = 'Kilométrique'
 const num = v => { const n = parseFloat(String(v ?? '').replace(',', '.')); return isNaN(n) ? 0 : n }
 const eur = n => (Number(n) || 0).toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
@@ -19,7 +20,7 @@ function calcLigne(l) {
   const tva = Math.round(ttc * t / (100 + t) * 100) / 100
   return { montant_ttc: ttc, taux_tva: t, montant_tva: tva, montant_ht: Math.round((ttc - tva) * 100) / 100 }
 }
-const btn = (bg, col = '#fff', border = 'none') => ({ padding: '9px 16px', borderRadius: 9, border, background: bg, color: col, fontSize: 14, fontWeight: 700, cursor: 'pointer' })
+const btn = (bg, col = COUL.blanc, border = 'none') => ({ padding: '9px 16px', borderRadius: 9, border, background: bg, color: col, fontSize: 14, fontWeight: 700, cursor: 'pointer' })
 const ENT = k => ENTITES[k] || ENTITES.dynassur
 
 export default function AdminNotesFrais() {
@@ -124,19 +125,19 @@ export default function AdminNotesFrais() {
     <Layout>
       <StatBanner color={NAVY} colorDark="#081d3d" title="Validation des notes de frais" subtitle="Administration" />
       <div style={{ padding: '0 4px' }}>
-        {flash && <div style={{ margin: '12px 0', padding: '10px 14px', borderRadius: 10, fontSize: 13.5, background: flash.ok ? '#f0fdf4' : '#fef2f2', color: flash.ok ? '#166534' : '#b91c1c', border: `1px solid ${flash.ok ? '#bbf7d0' : '#fecaca'}` }}>{flash.msg}</div>}
+        {flash && <div style={{ margin: '12px 0', padding: '10px 14px', borderRadius: 10, fontSize: 13.5, background: flash.ok ? '#f0fdf4' : COUL.dangerFondDoux, color: flash.ok ? '#166534' : COUL.dangerFonce, border: `1px solid ${flash.ok ? '#bbf7d0' : COUL.dangerBord}` }}>{flash.msg}</div>}
 
         {!sel && (
           <div style={{ marginTop: 14 }}>
-            {loading ? <div style={{ color: '#64748b', fontSize: 14 }}>Chargement…</div>
-              : rows.length === 0 ? <div style={{ color: '#64748b', fontSize: 14, padding: '30px 0', textAlign: 'center' }}>Aucune note en attente de validation.</div>
+            {loading ? <div style={{ color: COUL.texteDoux, fontSize: 14 }}>Chargement…</div>
+              : rows.length === 0 ? <div style={{ color: COUL.texteDoux, fontSize: 14, padding: '30px 0', textAlign: 'center' }}>Aucune note en attente de validation.</div>
                 : <div style={{ display: 'grid', gap: 10 }}>
                   {rows.map(n => { const e = ENT(n.societe); return (
-                    <div key={n.id} style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '12px 16px' }}>
+                    <div key={n.id} style={{ display: 'flex', alignItems: 'center', gap: 14, background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 12, padding: '12px 16px' }}>
                       <span style={{ width: 10, height: 10, borderRadius: '50%', background: e.color, flexShrink: 0 }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 700, color: NAVY, fontSize: 14 }}>{n.titre || 'Note de frais'} <span style={{ color: '#94a3b8', fontWeight: 500 }}>· {e.label}</span></div>
-                        <div style={{ fontSize: 12.5, color: '#64748b' }}>{n.auteur_nom || n.auteur_email} · {n.periode || '—'} · soumise le {fmtD(n.soumise_at)}</div>
+                        <div style={{ fontWeight: 700, color: NAVY, fontSize: 14 }}>{n.titre || 'Note de frais'} <span style={{ color: COUL.texteFaible, fontWeight: 500 }}>· {e.label}</span></div>
+                        <div style={{ fontSize: 12.5, color: COUL.texteDoux }}>{n.auteur_nom || n.auteur_email} · {n.periode || '—'} · soumise le {fmtD(n.soumise_at)}</div>
                       </div>
                       <div style={{ fontWeight: 800, color: NAVY, fontSize: 15 }}>{eur(n.total)}</div>
                       <button onClick={() => examiner(n)} style={{ ...btn('#fff', NAVY, '1px solid #cbd5e1'), padding: '7px 14px', fontSize: 13 }}>Examiner</button>
@@ -152,21 +153,21 @@ export default function AdminNotesFrais() {
               <button onClick={() => { setSel(null); setLignes([]) }} style={btn('#fff', '#475569', '1px solid #e2e8f0')}>← Retour à la liste</button>
               <button onClick={voirPdf} style={btn('#fff', NAVY, '1px solid #cbd5e1')}>📄 Voir le PDF (note + justificatifs)</button>
             </div>
-            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 22 }}>
+            <div style={{ background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 14, padding: 22 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
                 <div>
                   <div style={{ fontSize: 17, fontWeight: 800, color: NAVY }}>{sel.titre || 'Note de frais'}</div>
-                  <div style={{ fontSize: 13, color: '#64748b', marginTop: 3 }}>{ENT(sel.societe).label} · {sel.auteur_nom || sel.auteur_email} · {sel.periode || '—'}</div>
+                  <div style={{ fontSize: 13, color: COUL.texteDoux, marginTop: 3 }}>{ENT(sel.societe).label} · {sel.auteur_nom || sel.auteur_email} · {sel.periode || '—'}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>Total à rembourser</div>
+                  <div style={{ fontSize: 11, color: COUL.texteFaible, textTransform: 'uppercase', fontWeight: 700 }}>Total à rembourser</div>
                   <div style={{ fontSize: 22, fontWeight: 800, color: ENT(sel.societe).color }}>{eur(sel.total || totTTC)}</div>
                 </div>
               </div>
 
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, marginBottom: 16 }}>
                 <thead><tr>
-                  {['Date', 'Catégorie', 'Description', 'HT', 'TVA', 'TTC', 'Justif.'].map((h, i) => <th key={i} style={{ padding: '8px 8px', textAlign: (i > 2 && i < 6) ? 'right' : (i === 6 ? 'center' : 'left'), fontSize: 10.5, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', borderBottom: '1px solid #e2e8f0' }}>{h}</th>)}
+                  {['Date', 'Catégorie', 'Description', 'HT', 'TVA', 'TTC', 'Justif.'].map((h, i) => <th key={i} style={{ padding: '8px 8px', textAlign: (i > 2 && i < 6) ? 'right' : (i === 6 ? 'center' : 'left'), fontSize: 10.5, fontWeight: 800, color: COUL.texteDoux, textTransform: 'uppercase', borderBottom: '1px solid #e2e8f0' }}>{h}</th>)}
                 </tr></thead>
                 <tbody>
                   {lignes.map((l, i) => (
@@ -184,13 +185,13 @@ export default function AdminNotesFrais() {
               </table>
 
               <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 16 }}>
-                <div style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700, marginBottom: 6 }}>Signature du collaborateur</div>
-                {sel.sig_image ? <img src={sel.sig_image} alt="Signature" style={{ maxWidth: 240, maxHeight: 90, border: '1px solid #e2e8f0', borderRadius: 8, background: '#fff' }} />
-                  : <div style={{ fontSize: 13, color: '#b45309' }}>Aucune signature enregistrée.</div>}
-                <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>{sel.sig_nom || sel.auteur_nom} · signé le {fmtD(sel.sig_at)}</div>
+                <div style={{ fontSize: 11, color: COUL.texteFaible, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6 }}>Signature du collaborateur</div>
+                {sel.sig_image ? <img src={sel.sig_image} alt="Signature" style={{ maxWidth: 240, maxHeight: 90, border: '1px solid #e2e8f0', borderRadius: 8, background: COUL.blanc }} />
+                  : <div style={{ fontSize: 13, color: COUL.alerte }}>Aucune signature enregistrée.</div>}
+                <div style={{ fontSize: 12, color: COUL.texteDoux, marginTop: 4 }}>{sel.sig_nom || sel.auteur_nom} · signé le {fmtD(sel.sig_at)}</div>
               </div>
 
-              {sel.note && <div style={{ marginTop: 14, fontSize: 13, color: '#475569', background: '#f8fafc', borderRadius: 8, padding: '10px 12px' }}><b>Commentaire :</b> {sel.note}</div>}
+              {sel.note && <div style={{ marginTop: 14, fontSize: 13, color: COUL.texteMoyen, background: COUL.fond, borderRadius: 8, padding: '10px 12px' }}><b>Commentaire :</b> {sel.note}</div>}
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>
                 <button onClick={() => setShowRefus(v => !v)} disabled={busy} style={btn('#fff', '#b91c1c', '1px solid #fecaca')}>Renvoyer au brouillon</button>
@@ -198,8 +199,8 @@ export default function AdminNotesFrais() {
               </div>
 
               {showRefus && (
-                <div style={{ marginTop: 14, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: 14 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#b91c1c', marginBottom: 8 }}>Motif du renvoi (visible par le collaborateur)</div>
+                <div style={{ marginTop: 14, background: COUL.dangerFondDoux, border: '1px solid #fecaca', borderRadius: 10, padding: 14 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: COUL.dangerFonce, marginBottom: 8 }}>Motif du renvoi (visible par le collaborateur)</div>
                   <textarea value={motif} onChange={e => setMotif(e.target.value)} rows={3} style={{ width: '100%', boxSizing: 'border-box', border: '1px solid #fecaca', borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', resize: 'vertical' }} placeholder="Ex. : justificatif illisible pour la ligne restaurant du 12/06…" />
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
                     <button onClick={refuser} disabled={busy} style={{ ...btn('#dc2626'), opacity: busy ? .5 : 1 }}>Confirmer le renvoi</button>

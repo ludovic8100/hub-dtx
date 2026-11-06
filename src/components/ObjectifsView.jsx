@@ -1,15 +1,16 @@
 import { useState, useEffect, Component } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
+import { COUL } from '../lib/theme'
 
 const C = {
-  blue: '#0080BD', blueDark: '#005f8e', bluePale: '#e8f4fb',
-  ok: '#16a34a', okPale: '#dcfce7',
-  warn: '#d97706', warnPale: '#fef3c7',
-  danger: '#dc2626', dangerPale: '#fee2e2',
-  grey: '#64748b', greyPale: '#f1f5f9',
-  border: '#e2e8f0', white: '#ffffff', bg: '#f8fafc',
-  text: '#0f172a', textM: '#475569', textL: '#94a3b8',
+  blue: COUL.bleu, blueDark: '#005f8e', bluePale: '#e8f4fb',
+  ok: COUL.succes, okPale: COUL.succesFond,
+  warn: '#d97706', warnPale: COUL.alerteFond,
+  danger: COUL.danger, dangerPale: COUL.dangerFond,
+  grey: COUL.texteDoux, greyPale: COUL.fondDoux,
+  border: COUL.bord, white: COUL.blanc, bg: COUL.fond,
+  text: COUL.texteFort, textM: COUL.texteMoyen, textL: COUL.texteFaible,
 }
 
 const fmt = v => v == null ? '—' : new Intl.NumberFormat('fr-BE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v)
@@ -84,10 +85,10 @@ class DetailBoundary extends Component {
   render() {
     if (this.state.err) return (
       <div onClick={this.props.onClose} style={{ position:'fixed', inset:0, background:'rgba(15,23,42,.55)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
-        <div onClick={e=>e.stopPropagation()} style={{ background:'#fff', padding:24, borderRadius:12, maxWidth:600, width:'100%' }}>
-          <div style={{ fontWeight:800, color:'#dc2626', marginBottom:8, fontSize:15 }}>Erreur d'affichage du détail</div>
-          <pre style={{ fontSize:12, whiteSpace:'pre-wrap', wordBreak:'break-word', color:'#475569', background:'#f8fafc', padding:12, borderRadius:8, maxHeight:300, overflow:'auto' }}>{String(this.state.err?.stack || this.state.err?.message || this.state.err)}</pre>
-          <button onClick={this.props.onClose} style={{ marginTop:14, padding:'8px 18px', border:'none', borderRadius:8, background:'#0080BD', color:'#fff', fontWeight:700, cursor:'pointer' }}>Fermer</button>
+        <div onClick={e=>e.stopPropagation()} style={{ background:COUL.blanc, padding:24, borderRadius:12, maxWidth:600, width:'100%' }}>
+          <div style={{ fontWeight:800, color:COUL.danger, marginBottom:8, fontSize:15 }}>Erreur d'affichage du détail</div>
+          <pre style={{ fontSize:12, whiteSpace:'pre-wrap', wordBreak:'break-word', color:COUL.texteMoyen, background:COUL.fond, padding:12, borderRadius:8, maxHeight:300, overflow:'auto' }}>{String(this.state.err?.stack || this.state.err?.message || this.state.err)}</pre>
+          <button onClick={this.props.onClose} style={{ marginTop:14, padding:'8px 18px', border:'none', borderRadius:8, background:COUL.bleu, color:COUL.blanc, fontWeight:700, cursor:'pointer' }}>Fermer</button>
         </div>
       </div>
     )
@@ -126,15 +127,15 @@ function DetailModal({ titre, kind, rows, onClose }) {
   const click = k => setSort(s => s.key === k ? { key:k, dir:s.dir === 'asc' ? 'desc' : 'asc' } : { key:k, dir:'asc' })
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.55)', zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: 'min(880px,96vw)', height: '100%', background: '#fff', display: 'flex', flexDirection: 'column', boxShadow: '-8px 0 30px rgba(0,0,0,.2)' }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: 'min(880px,96vw)', height: '100%', background: COUL.blanc, display: 'flex', flexDirection: 'column', boxShadow: '-8px 0 30px rgba(0,0,0,.2)' }}>
         <div style={{ background: C.blueDark, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <div style={{ color: '#fff', fontSize: 15, fontWeight: 800 }}>{titre}</div>
-            <div style={{ color: '#cbd5e1', fontSize: 12, marginTop: 2 }}>
+            <div style={{ color: COUL.blanc, fontSize: 15, fontWeight: 800 }}>{titre}</div>
+            <div style={{ color: COUL.bordFort, fontSize: 12, marginTop: 2 }}>
               {fmtN(rows.length)} ligne(s){isQ ? ` · Primes ${fmt(totP)} · Commissions ${fmt(totC)}` : ''}
             </div>
           </div>
-          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer' }}>✕</button>
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: COUL.blanc, fontSize: 22, cursor: 'pointer' }}>✕</button>
         </div>
         <div style={{ flex: 1, overflow: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
@@ -181,9 +182,9 @@ function OngletCommerciaux({ objectifs, reel, loading, raw, onDetail }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 24 }}>
         <KpiCard label="Commission nette Dynassur" value={fmt(totalReel)} sub={`Objectif : ${fmt(totalObj)}`} pct={totalObj > 0 ? totalReel / totalObj * 100 : null} col={C.blue} icon="ti-coin"
           onClick={() => { const x = commerciaux.flatMap(o => raw[o.collaborateur_code]?.quitt || []); x.length && onDetail('Tous commerciaux — commissions 2026', 'quittances', x) }} />
-        <KpiCard label="Nouvelles affaires" value={fmtN(totalReelNA)} sub={`Objectif : ${fmtN(totalObjNA)} NA`} pct={totalObjNA > 0 ? totalReelNA / totalObjNA * 100 : null} col="#7c3aed" icon="ti-file-plus"
+        <KpiCard label="Nouvelles affaires" value={fmtN(totalReelNA)} sub={`Objectif : ${fmtN(totalObjNA)} NA`} pct={totalObjNA > 0 ? totalReelNA / totalObjNA * 100 : null} col={COUL.violet} icon="ti-file-plus"
           onClick={() => { const x = commerciaux.flatMap(o => raw[o.collaborateur_code]?.na || []); x.length && onDetail('Tous commerciaux — Nouvelles Affaires 2026', 'mouvements', x) }} />
-        <KpiCard label="Prime VIE (capital)" value={fmt(totalReelVie)} sub={`Objectif : ${fmt(totalObjVie)}`} pct={totalObjVie > 0 ? totalReelVie / totalObjVie * 100 : null} col="#0d9488" icon="ti-heart"
+        <KpiCard label="Prime VIE (capital)" value={fmt(totalReelVie)} sub={`Objectif : ${fmt(totalObjVie)}`} pct={totalObjVie > 0 ? totalReelVie / totalObjVie * 100 : null} col={COUL.teal} icon="ti-heart"
           onClick={() => { const x = commerciaux.flatMap(o => (raw[o.collaborateur_code]?.quitt || []).filter(r => isVieDom(r.domaine))); x.length && onDetail('Tous commerciaux — quittances VIE 2026', 'quittances', x) }} />
       </div>
 
@@ -244,7 +245,7 @@ function OngletCommerciaux({ objectifs, reel, loading, raw, onDetail }) {
           {[
             { label: 'Palier 1', seuil: '> 200.000 €', bonus: '+5% sur le surplus', col: C.blue },
             { label: 'Palier 2', seuil: '> 250.000 €', bonus: '+8% sur le surplus', col: C.ok },
-            { label: 'Palier 3', seuil: '> 300.000 €', bonus: '+10% sur le surplus', col: '#7c3aed' },
+            { label: 'Palier 3', seuil: '> 300.000 €', bonus: '+10% sur le surplus', col: COUL.violet },
           ].map(p => {
             const tjaReel = reel['TJA']?.com_nette || 0
             const ggoReel = reel['GGO']?.com_nette || 0
@@ -283,7 +284,7 @@ function OngletSousAgents({ objectifs, reel, loading, raw, onDetail }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 24 }}>
         <KpiCard label="Part Dynassur — tous SA" value={fmt(totalReel)} sub={`Objectif : ${fmt(totalObj)}`} pct={totalObj > 0 ? totalReel / totalObj * 100 : null} col={C.blue} icon="ti-coin"
           onClick={() => { const x = sa.flatMap(o => raw[o.collaborateur_code]?.quitt || []); x.length && onDetail('Tous sous-agents — commissions 2026', 'quittances', x) }} />
-        <KpiCard label="SA avec objectif" value={sa.length} col="#7c3aed" icon="ti-users" />
+        <KpiCard label="SA avec objectif" value={sa.length} col={COUL.violet} icon="ti-users" />
         <KpiCard label="SA en difficulté (rét. < 60%)" value={sa.filter(o => (reel[o.collaborateur_code]?.retention || 100) < 60).length} col={C.danger} icon="ti-alert-triangle" />
       </div>
 

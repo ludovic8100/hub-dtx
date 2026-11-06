@@ -1,4 +1,5 @@
 import { LOGOS_URL } from '../config/env'
+import { COUL } from './theme'
 // Coordonnées et paramètres de LODE SRL — utilisés sur devis et factures.
 // ⚠️ Modifier ici met à jour automatiquement tous les documents générés.
 
@@ -16,7 +17,7 @@ export const LODE = {
   banque: 'ING',
   email: 'info@lode-group.be',
   telephone: '0494 24 69 32',
-  couleur: '#ea580c',         // orange LODE
+  couleur: COUL.orange,         // orange LODE
   logo_url: LOGOS_URL + 'lode.png',
 }
 

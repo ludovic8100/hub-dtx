@@ -1,5 +1,6 @@
 import { useState, useEffect, createContext, useContext } from 'react'
 import { supabase } from './supabase'
+import { COUL } from './theme'
 
 const AuthContext = createContext(null)
 
@@ -83,32 +84,32 @@ const MESSAGE_EXPIRATION = {
 export const SOCIETES_CONFIG = {
   groupe: {
     key: 'groupe', label: 'Tableau de bord général', short: 'GRP',
-    color: '#7c3aed', colorDark: '#3b1f6e', colorLight: '#f5f3ff', colorAccent: '#a78bfa',
+    color: COUL.violet, colorDark: '#3b1f6e', colorLight: COUL.violetFond, colorAccent: '#a78bfa',
     acc_key: 'acc_holding',
   },
   dynassur: {
     key: 'dynassur', label: 'Dynassur SRL', short: 'DYN',
-    color: '#0080BD', colorDark: '#0D2F5E', colorLight: '#e0f2fe', colorAccent: '#5DC3E8',
+    color: COUL.bleu, colorDark: COUL.marine, colorLight: '#e0f2fe', colorAccent: '#5DC3E8',
     acc_key: 'acc_dynassur',
   },
   dtx: {
     key: 'dtx', label: 'DTX SRL', short: 'DTX',
-    color: '#94a3b8', colorDark: '#334155', colorLight: '#f8fafc', colorAccent: '#cbd5e1',
+    color: COUL.texteFaible, colorDark: COUL.texteSombre, colorLight: COUL.fond, colorAccent: COUL.bordFort,
     acc_key: 'acc_dtx',
   },
   lode: {
     key: 'lode', label: 'LODE SRL', short: 'LODE',
-    color: '#ea580c', colorDark: '#7c2d12', colorLight: '#fff7ed', colorAccent: '#fb923c',
+    color: COUL.orange, colorDark: '#7c2d12', colorLight: COUL.orangeFond, colorAccent: '#fb923c',
     acc_key: 'acc_lode',
   },
   hexagroup: {
     key: 'hexagroup', label: 'Hexagroup ASBL', short: 'HEX',
-    color: '#dc2626', colorDark: '#7f1d1d', colorLight: '#fef2f2', colorAccent: '#f87171',
+    color: COUL.danger, colorDark: '#7f1d1d', colorLight: COUL.dangerFondDoux, colorAccent: '#f87171',
     acc_key: 'acc_hexagroup',
   },
   prive: {
     key: 'prive', label: 'Privé', short: 'PRV',
-    color: '#0d9488', colorDark: '#134e4a', colorLight: '#f0fdfa', colorAccent: '#2dd4bf',
+    color: COUL.teal, colorDark: '#134e4a', colorLight: COUL.tealFond, colorAccent: '#2dd4bf',
     acc_key: 'acc_prive',
   },
 }

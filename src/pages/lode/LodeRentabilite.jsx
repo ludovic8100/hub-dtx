@@ -3,29 +3,30 @@ import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
 import { LODE } from '../../lib/lodeConfig'
 import { StatBanner } from '../../components/ui/AccountableUI'
+import { COUL } from '../../lib/theme'
 
 const FONT = "'Source Sans Pro', sans-serif"
-const OR = '#ea580c', ORD = '#7c2d12'
+const OR = COUL.orange, ORD = '#7c2d12'
 const eur = v => (Math.round(Number(v) || 0)).toLocaleString('fr-BE') + ' €'
 const pctTxt = v => v == null ? '—' : `${v > 0 ? '+' : ''}${Math.round(v)} %`
-const col = v => v > 0 ? '#16a34a' : v < 0 ? '#dc2626' : '#64748b'
+const col = v => v > 0 ? '#16a34a' : v < 0 ? '#dc2626' : COUL.texteDoux
 const RESP = ['LDE', 'JCL', 'LLO']
 const achHT = (a) => (Number(a.montant) || 0) / (1 + (a.tva_taux == null ? 21 : Number(a.tva_taux)) / 100)
 const MOIS = ['', 'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc']
 
-const card = { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 16, marginTop: 16 }
-const th = { padding: '9px 12px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.04em', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }
+const card = { background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 12, padding: 16, marginTop: 16 }
+const th = { padding: '9px 12px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.04em', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }
 const thR = { ...th, textAlign: 'right' }
-const td = { padding: '9px 12px', borderBottom: '1px solid #f1f5f9', fontSize: 13, color: '#334155' }
+const td = { padding: '9px 12px', borderBottom: '1px solid #f1f5f9', fontSize: 13, color: COUL.texteSombre }
 const tdR = { ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
-const inp = { padding: '8px 10px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, fontFamily: FONT, background: '#fff' }
+const inp = { padding: '8px 10px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, fontFamily: FONT, background: COUL.blanc }
 
 function Kpi({ label, value, c, sub }) {
   return (
-    <div style={{ flex: '1 1 160px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '12px 14px' }}>
-      <div style={{ fontSize: 10.5, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.04em' }}>{label}</div>
+    <div style={{ flex: '1 1 160px', background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 12, padding: '12px 14px' }}>
+      <div style={{ fontSize: 10.5, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.04em' }}>{label}</div>
       <div style={{ fontSize: 22, fontWeight: 800, color: c }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{sub}</div>}
+      {sub && <div style={{ fontSize: 11, color: COUL.texteFaible, marginTop: 2 }}>{sub}</div>}
     </div>
   )
 }
@@ -37,12 +38,12 @@ function ApercuFacture({ fid, nom, pin, onClose }) {
   useEffect(() => { setEtat('load') }, [fid])
   const src = `/api/apercu-facture?fid=${encodeURIComponent(fid)}`
   return (
-    <div style={{ position: 'fixed', top: '50%', right: 24, transform: 'translateY(-50%)', zIndex: 2100, width: 520, maxWidth: '48vw', maxHeight: '88vh', background: '#fff', borderRadius: 14, boxShadow: '0 20px 60px rgba(0,0,0,0.35)', border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', pointerEvents: pin ? 'auto' : 'none' }}>
-      <div style={{ padding: '10px 14px', background: '#0f172a', color: '#fff', fontSize: 12, fontWeight: 600, fontFamily: FONT, display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>📄 {nom}</span>{pin && <button onClick={onClose} style={{ border: 'none', background: 'rgba(255,255,255,0.15)', color: '#fff', borderRadius: 6, padding: '2px 9px', cursor: 'pointer', fontSize: 14, lineHeight: 1.3 }}>✕</button>}</div>
-      <div style={{ overflowY: 'auto', background: '#f8fafc' }}>
+    <div style={{ position: 'fixed', top: '50%', right: 24, transform: 'translateY(-50%)', zIndex: 2100, width: 520, maxWidth: '48vw', maxHeight: '88vh', background: COUL.blanc, borderRadius: 14, boxShadow: '0 20px 60px rgba(0,0,0,0.35)', border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', pointerEvents: pin ? 'auto' : 'none' }}>
+      <div style={{ padding: '10px 14px', background: COUL.texteFort, color: COUL.blanc, fontSize: 12, fontWeight: 600, fontFamily: FONT, display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>📄 {nom}</span>{pin && <button onClick={onClose} style={{ border: 'none', background: 'rgba(255,255,255,0.15)', color: COUL.blanc, borderRadius: 6, padding: '2px 9px', cursor: 'pointer', fontSize: 14, lineHeight: 1.3 }}>✕</button>}</div>
+      <div style={{ overflowY: 'auto', background: COUL.fond }}>
         <img src={src} alt="Apercu facture" onLoad={() => setEtat('ok')} onError={() => setEtat('err')} style={{ width: '100%', height: 'auto', display: etat === 'ok' ? 'block' : 'none' }} />
-        {etat === 'load' && <div style={{ padding: '34px 20px', textAlign: 'center', color: '#94a3b8', fontSize: 13, fontFamily: FONT }}>Chargement de l'aperçu…</div>}
-        {etat === 'err' && <div style={{ padding: '34px 20px', textAlign: 'center', color: '#94a3b8', fontSize: 13, fontFamily: FONT }}>Aperçu indisponible.</div>}
+        {etat === 'load' && <div style={{ padding: '34px 20px', textAlign: 'center', color: COUL.texteFaible, fontSize: 13, fontFamily: FONT }}>Chargement de l'aperçu…</div>}
+        {etat === 'err' && <div style={{ padding: '34px 20px', textAlign: 'center', color: COUL.texteFaible, fontSize: 13, fontFamily: FONT }}>Aperçu indisponible.</div>}
       </div>
     </div>
   )
@@ -176,10 +177,10 @@ export default function LodeRentabilite() {
   }
 
   const tabBtn = (k, label) => (
-    <button onClick={() => setOnglet(k)} style={{ padding: '9px 18px', borderRadius: 10, border: '1px solid ' + (onglet === k ? OR : '#e2e8f0'), background: onglet === k ? OR : '#fff', color: onglet === k ? '#fff' : '#475569', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>{label}</button>
+    <button onClick={() => setOnglet(k)} style={{ padding: '9px 18px', borderRadius: 10, border: '1px solid ' + (onglet === k ? OR : COUL.bord), background: onglet === k ? OR : COUL.blanc, color: onglet === k ? '#fff' : COUL.texteMoyen, fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>{label}</button>
   )
   const yrBtn = (y, label) => (
-    <button key={y} onClick={() => setAnnee(y)} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid ' + (annee === y ? ORD : '#e2e8f0'), background: annee === y ? ORD : '#fff', color: annee === y ? '#fff' : '#475569', fontWeight: 700, cursor: 'pointer', fontSize: 12 }}>{label}</button>
+    <button key={y} onClick={() => setAnnee(y)} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid ' + (annee === y ? ORD : COUL.bord), background: annee === y ? ORD : COUL.blanc, color: annee === y ? '#fff' : COUL.texteMoyen, fontWeight: 700, cursor: 'pointer', fontSize: 12 }}>{label}</button>
   )
 
   return (
@@ -188,16 +189,16 @@ export default function LodeRentabilite() {
         <StatBanner color={LODE.couleur || OR} colorDark={ORD} logoUrl={LODE.logo_url}
           title="Rentabilité LODE" subtitle="Lode Protect (vente) · Lode Rental (locatif)" />
 
-        {loading ? <div style={{ padding: 60, textAlign: 'center', color: '#94a3b8' }}>Calcul…</div> : <>
+        {loading ? <div style={{ padding: 60, textAlign: 'center', color: COUL.texteFaible }}>Calcul…</div> : <>
           <div style={{ display: 'flex', gap: 10, margin: '12px 0 4px', flexWrap: 'wrap' }}>
             {tabBtn('protect', 'Lode Protect — vente')}
             {tabBtn('rental', 'Lode Rental — locatif')}
           </div>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', margin: '10px 0' }}>
-            <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Année</span>
+            <span style={{ fontSize: 11, color: COUL.texteFaible, fontWeight: 700, textTransform: 'uppercase' }}>Année</span>
             {yrBtn('all', 'Toutes')}{annees.map(y => yrBtn(y, y))}
             {onglet === 'protect' && <>
-              <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', marginLeft: 10 }}>Commercial</span>
+              <span style={{ fontSize: 11, color: COUL.texteFaible, fontWeight: 700, textTransform: 'uppercase', marginLeft: 10 }}>Commercial</span>
               <select value={resp} onChange={e => setResp(e.target.value)} style={inp}>
                 <option value="all">Tous</option>
                 {RESP.map(r => <option key={r} value={r}>{r}</option>)}
@@ -205,7 +206,7 @@ export default function LodeRentabilite() {
             </>}
           </div>
 
-          {annee === 'all' && <div style={{ fontSize: 12, color: '#b45309', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '8px 10px', marginBottom: 4 }}>
+          {annee === 'all' && <div style={{ fontSize: 12, color: COUL.alerte, background: COUL.alerteFondDoux, border: '1px solid #fde68a', borderRadius: 8, padding: '8px 10px', marginBottom: 4 }}>
             ⚠️ « Toutes années » : côté Protect, le CA (13 factures 2026) est partiel alors que les achats couvrent 2024→2026. Choisis une année pour une marge cohérente.
           </div>}
 
@@ -214,7 +215,7 @@ export default function LodeRentabilite() {
               <Kpi label="CA facturé (HT)" value={eur(caTot)} c={OR} sub={`${facturesF.length} factures`} />
               <Kpi label="Achats (HT)" value={eur(achTot)} c="#9333ea" sub={`${eur(achTotTTC)} TTC · ${achatsF.length} fact.`} />
               <Kpi label="Marge brute" value={eur(caTot - achTot)} c={col(caTot - achTot)} sub={caTot > 0 ? pctTxt((caTot - achTot) / caTot * 100) : '—'} />
-              <Kpi label="À rattacher" value={`${fraisGenN}`} c="#f59e0b" sub={`${eur(fraisGen)} non affectés`} />
+              <Kpi label="À rattacher" value={`${fraisGenN}`} c={COUL.alerteVif} sub={`${eur(fraisGen)} non affectés`} />
             </div>
 
             {parCommercial.length > 0 && (
@@ -233,37 +234,37 @@ export default function LodeRentabilite() {
 
             <div style={card}>
               <div style={{ fontSize: 14, fontWeight: 800, color: ORD }}>Marge par chantier</div>
-              <div style={{ fontSize: 12, color: '#94a3b8', margin: '4px 0 10px' }}>Marge = CA HT − achats HT rattachés. Les achats (TTC) sont convertis en HT via leur taux de TVA — 21 % par défaut, ajustable dans la liste ci-dessous.</div>
+              <div style={{ fontSize: 12, color: COUL.texteFaible, margin: '4px 0 10px' }}>Marge = CA HT − achats HT rattachés. Les achats (TTC) sont convertis en HT via leur taux de TVA — 21 % par défaut, ajustable dans la liste ci-dessous.</div>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead><tr><th style={th}>Chantier</th><th style={th}>Resp.</th><th style={thR}>CA HT</th><th style={thR}>Achats HT</th><th style={thR}>Marge</th><th style={thR}>%</th></tr></thead>
                   <tbody>
                     {chantiers.filter(c => c.actif).map(c => (
                       <tr key={c.id}>
-                        <td style={td}><span style={{ fontWeight: 600, color: ORD }}>{c.numero}</span> <span style={{ color: '#64748b' }}>{(c.objet || '').slice(0, 40)}</span><div style={{ fontSize: 11, color: '#94a3b8' }}>{c.client_nom}</div></td>
+                        <td style={td}><span style={{ fontWeight: 600, color: ORD }}>{c.numero}</span> <span style={{ color: COUL.texteDoux }}>{(c.objet || '').slice(0, 40)}</span><div style={{ fontSize: 11, color: COUL.texteFaible }}>{c.client_nom}</div></td>
                         <td style={td}>
                           <select value={c.responsable || ''} disabled={saving === c.id} onChange={e => setRespCh(c.id, e.target.value)} style={{ ...inp, padding: '5px 8px', minWidth: 80, opacity: saving === c.id ? 0.5 : 1 }}>
                             <option value="">—</option>
                             {RESP.map(r => <option key={r} value={r}>{r}</option>)}
                           </select>
                         </td>
-                        <td style={tdR}>{eur(c.caHT)}<div style={{ fontSize: 10, color: '#cbd5e1' }}>{c.caN} f.</div></td>
-                        <td style={tdR}>{eur(c.achat)}<div style={{ fontSize: 10, color: '#cbd5e1' }}>{c.achatN} a.</div></td>
+                        <td style={tdR}>{eur(c.caHT)}<div style={{ fontSize: 10, color: COUL.bordFort }}>{c.caN} f.</div></td>
+                        <td style={tdR}>{eur(c.achat)}<div style={{ fontSize: 10, color: COUL.bordFort }}>{c.achatN} a.</div></td>
                         <td style={{ ...tdR, fontWeight: 800, color: col(c.marge) }}>{eur(c.marge)}</td>
                         <td style={{ ...tdR, fontWeight: 700, color: col(c.marge) }}>{pctTxt(c.margePct)}</td>
                       </tr>
                     ))}
                     {resp === 'all' && caHorsCh > 0 && (
-                      <tr style={{ background: '#fffbeb' }}><td style={td}><span style={{ fontWeight: 700, color: '#b45309' }}>Hors chantier</span><div style={{ fontSize: 11, color: '#94a3b8' }}>factures sans devis</div></td><td style={td}>—</td><td style={tdR}>{eur(caHorsCh)}</td><td style={tdR}>—</td><td style={tdR}>—</td><td style={tdR}>—</td></tr>
+                      <tr style={{ background: COUL.alerteFondDoux }}><td style={td}><span style={{ fontWeight: 700, color: COUL.alerte }}>Hors chantier</span><div style={{ fontSize: 11, color: COUL.texteFaible }}>factures sans devis</div></td><td style={td}>—</td><td style={tdR}>{eur(caHorsCh)}</td><td style={tdR}>—</td><td style={tdR}>—</td><td style={tdR}>—</td></tr>
                     )}
-                    {!chantiers.some(c => c.actif) && !(resp === 'all' && caHorsCh > 0) && <tr><td style={td} colSpan={6}><span style={{ color: '#94a3b8' }}>Rien à afficher pour ce filtre.</span></td></tr>}
+                    {!chantiers.some(c => c.actif) && !(resp === 'all' && caHorsCh > 0) && <tr><td style={td} colSpan={6}><span style={{ color: COUL.texteFaible }}>Rien à afficher pour ce filtre.</span></td></tr>}
                   </tbody>
                 </table>
               </div>
               {resp === 'all' && fraisGen > 0 && (
-                <div style={{ marginTop: 12, padding: '10px 12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                  <span style={{ fontSize: 13, color: '#475569' }}><b>Frais généraux</b> — achats non rattachés ({fraisGenN})</span>
-                  <span style={{ fontSize: 15, fontWeight: 800, color: '#dc2626' }}>− {eur(fraisGen)}</span>
+                <div style={{ marginTop: 12, padding: '10px 12px', background: COUL.fond, border: '1px solid #e2e8f0', borderRadius: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                  <span style={{ fontSize: 13, color: COUL.texteMoyen }}><b>Frais généraux</b> — achats non rattachés ({fraisGenN})</span>
+                  <span style={{ fontSize: 15, fontWeight: 800, color: COUL.danger }}>− {eur(fraisGen)}</span>
                 </div>
               )}
             </div>
@@ -276,15 +277,15 @@ export default function LodeRentabilite() {
                   <select value={filtre} onChange={e => setFiltre(e.target.value)} style={inp}><option value="non">Non rattachés</option><option value="tous">Tous</option></select>
                 </div>
               </div>
-              <div style={{ fontSize: 12, color: '#94a3b8', margin: '6px 0 10px' }}>{achatsListe.length} achat(s){achatsListe.length > 80 ? ' — 80 affichés' : ''}.</div>
+              <div style={{ fontSize: 12, color: COUL.texteFaible, margin: '6px 0 10px' }}>{achatsListe.length} achat(s){achatsListe.length > 80 ? ' — 80 affichés' : ''}.</div>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead><tr><th style={th}></th><th style={th}>Date</th><th style={th}>Fournisseur</th><th style={thR}>Montant TTC</th><th style={th}>TVA</th><th style={thR}>HT</th><th style={th}>Chantier</th></tr></thead>
                   <tbody>
                     {achatsListe.slice(0, 80).map(a => (
-                      <tr key={a.id} style={a.lode_devis_id ? { background: '#f0fdf4' } : null}>
+                      <tr key={a.id} style={a.lode_devis_id ? { background: COUL.succesFondDoux } : null}>
                         <td style={{ ...td, textAlign: 'center', width: 44 }}>
-                          {a.fichier_id ? <button title="Aperçu facture" onClick={() => setApercu(c => c && c.pin && c.fid === a.fichier_id ? null : { fid: a.fichier_id, nom: (a.nom || '').replace(/\.pdf$/i, ''), pin: true })} onMouseEnter={() => { if (CAN_HOVER) setApercu(c => c && c.pin ? c : { fid: a.fichier_id, nom: (a.nom || '').replace(/\.pdf$/i, ''), pin: false }) }} onMouseLeave={() => setApercu(c => c && c.pin ? c : null)} style={{ border: '1px solid #e2e8f0', background: '#fff', borderRadius: 8, padding: '4px 8px', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>📄</button> : <span style={{ color: '#cbd5e1' }}>—</span>}
+                          {a.fichier_id ? <button title="Aperçu facture" onClick={() => setApercu(c => c && c.pin && c.fid === a.fichier_id ? null : { fid: a.fichier_id, nom: (a.nom || '').replace(/\.pdf$/i, ''), pin: true })} onMouseEnter={() => { if (CAN_HOVER) setApercu(c => c && c.pin ? c : { fid: a.fichier_id, nom: (a.nom || '').replace(/\.pdf$/i, ''), pin: false }) }} onMouseLeave={() => setApercu(c => c && c.pin ? c : null)} style={{ border: '1px solid #e2e8f0', background: COUL.blanc, borderRadius: 8, padding: '4px 8px', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>📄</button> : <span style={{ color: COUL.bordFort }}>—</span>}
                         </td>
                         <td style={td}>{(a.date_facture || '').slice(0, 10)}</td>
                         <td style={td}>{a.nom || '—'}</td>
@@ -303,7 +304,7 @@ export default function LodeRentabilite() {
                         </td>
                       </tr>
                     ))}
-                    {!achatsListe.length && <tr><td style={td} colSpan={7}><span style={{ color: '#94a3b8' }}>Aucun achat.</span></td></tr>}
+                    {!achatsListe.length && <tr><td style={td} colSpan={7}><span style={{ color: COUL.texteFaible }}>Aucun achat.</span></td></tr>}
                   </tbody>
                 </table>
               </div>
@@ -312,11 +313,11 @@ export default function LodeRentabilite() {
           </> : <>
             {/* RENTAL */}
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 4 }}>
-              <Kpi label="Recettes" value={eur(rRec)} c="#16a34a" sub="Airbnb · Booking · location" />
-              <Kpi label="Charges" value={eur(rDep)} c="#dc2626" sub="loyers · énergie · entretien" />
+              <Kpi label="Recettes" value={eur(rRec)} c={COUL.succes} sub="Airbnb · Booking · location" />
+              <Kpi label="Charges" value={eur(rDep)} c={COUL.danger} sub="loyers · énergie · entretien" />
               <Kpi label="Résultat net" value={eur(rNet)} c={col(rNet)} sub={rRec > 0 ? pctTxt(rNet / rRec * 100) : '—'} />
               <Kpi label="Opérations" value={`${txF.length}`} c="#0891b2" sub="activité « rental »" />
-              <Kpi label="À attribuer" value={`${nbNonAttr}`} c="#f59e0b" sub="sans commercial" />
+              <Kpi label="À attribuer" value={`${nbNonAttr}`} c={COUL.alerteVif} sub="sans commercial" />
             </div>
 
             {rentalParResp.length > 0 && (
@@ -326,7 +327,7 @@ export default function LodeRentabilite() {
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead><tr><th style={th}>Commercial</th><th style={thR}>Recettes</th><th style={thR}>Charges</th><th style={thR}>Net</th></tr></thead>
                     <tbody>{rentalParResp.map(r => (
-                      <tr key={r.resp}><td style={{ ...td, fontWeight: 700, color: r.resp.startsWith('—') ? '#b45309' : ORD }}>{r.resp}</td><td style={{ ...tdR, color: '#16a34a' }}>{eur(r.rec)}</td><td style={{ ...tdR, color: '#dc2626' }}>− {eur(r.dep)}</td><td style={{ ...tdR, fontWeight: 800, color: col(r.net) }}>{eur(r.net)}</td></tr>
+                      <tr key={r.resp}><td style={{ ...td, fontWeight: 700, color: r.resp.startsWith('—') ? '#b45309' : ORD }}>{r.resp}</td><td style={{ ...tdR, color: COUL.succes }}>{eur(r.rec)}</td><td style={{ ...tdR, color: COUL.danger }}>− {eur(r.dep)}</td><td style={{ ...tdR, fontWeight: 800, color: col(r.net) }}>{eur(r.net)}</td></tr>
                     ))}</tbody>
                   </table>
                 </div>
@@ -341,16 +342,16 @@ export default function LodeRentabilite() {
                   <select value={filtreR} onChange={e => setFiltreR(e.target.value)} style={inp}><option value="non">Non attribuées</option><option value="tous">Toutes</option></select>
                 </div>
               </div>
-              <div style={{ fontSize: 12, color: '#94a3b8', margin: '6px 0 10px' }}>{nbNonAttr} opération(s) sans commercial{txAttr.length > 80 ? ' — 80 affichées' : ''}. Attribue au fur et à mesure.</div>
+              <div style={{ fontSize: 12, color: COUL.texteFaible, margin: '6px 0 10px' }}>{nbNonAttr} opération(s) sans commercial{txAttr.length > 80 ? ' — 80 affichées' : ''}. Attribue au fur et à mesure.</div>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead><tr><th style={th}>Date</th><th style={th}>Libellé</th><th style={thR}>Montant</th><th style={th}>Commercial</th></tr></thead>
                   <tbody>
                     {txAttr.slice(0, 80).map(t => (
-                      <tr key={t.id} style={t.responsable ? { background: '#f0fdf4' } : null}>
+                      <tr key={t.id} style={t.responsable ? { background: COUL.succesFondDoux } : null}>
                         <td style={td}>{(t.date_valeur || '').slice(0, 10)}</td>
-                        <td style={td}>{t.contrepartie_nom || cats[t.categorie_id] || '—'}<div style={{ fontSize: 10, color: '#cbd5e1' }}>{cats[t.categorie_id] || ''}</div></td>
-                        <td style={{ ...tdR, color: (Number(t.montant) || 0) >= 0 ? '#16a34a' : '#dc2626' }}>{eur(t.montant)}</td>
+                        <td style={td}>{t.contrepartie_nom || cats[t.categorie_id] || '—'}<div style={{ fontSize: 10, color: COUL.bordFort }}>{cats[t.categorie_id] || ''}</div></td>
+                        <td style={{ ...tdR, color: (Number(t.montant) || 0) >= 0 ? '#16a34a' : COUL.danger }}>{eur(t.montant)}</td>
                         <td style={td}>
                           <select value={t.responsable || ''} disabled={saving === t.id} onChange={e => attribuer(t.id, e.target.value)} style={{ ...inp, minWidth: 140, opacity: saving === t.id ? 0.5 : 1 }}>
                             <option value="">— non attribué</option>
@@ -359,7 +360,7 @@ export default function LodeRentabilite() {
                         </td>
                       </tr>
                     ))}
-                    {!txAttr.length && <tr><td style={td} colSpan={4}><span style={{ color: '#94a3b8' }}>Aucune opération.</span></td></tr>}
+                    {!txAttr.length && <tr><td style={td} colSpan={4}><span style={{ color: COUL.texteFaible }}>Aucune opération.</span></td></tr>}
                   </tbody>
                 </table>
               </div>
@@ -372,9 +373,9 @@ export default function LodeRentabilite() {
                   <thead><tr><th style={th}>Mois</th><th style={thR}>Recettes</th><th style={thR}>Charges</th><th style={thR}>Net</th></tr></thead>
                   <tbody>
                     {rentalMois.map(m => { const [y, mo] = m.mois.split('-'); return (
-                      <tr key={m.mois}><td style={td}>{MOIS[+mo]} {y}</td><td style={{ ...tdR, color: '#16a34a' }}>{eur(m.rec)}</td><td style={{ ...tdR, color: '#dc2626' }}>− {eur(m.dep)}</td><td style={{ ...tdR, fontWeight: 800, color: col(m.net) }}>{eur(m.net)}</td></tr>
+                      <tr key={m.mois}><td style={td}>{MOIS[+mo]} {y}</td><td style={{ ...tdR, color: COUL.succes }}>{eur(m.rec)}</td><td style={{ ...tdR, color: COUL.danger }}>− {eur(m.dep)}</td><td style={{ ...tdR, fontWeight: 800, color: col(m.net) }}>{eur(m.net)}</td></tr>
                     )})}
-                    {!rentalMois.length && <tr><td style={td} colSpan={4}><span style={{ color: '#94a3b8' }}>Aucune opération locative sur la période.</span></td></tr>}
+                    {!rentalMois.length && <tr><td style={td} colSpan={4}><span style={{ color: COUL.texteFaible }}>Aucune opération locative sur la période.</span></td></tr>}
                   </tbody>
                 </table>
               </div>
@@ -387,7 +388,7 @@ export default function LodeRentabilite() {
                   <thead><tr><th style={th}>Catégorie</th><th style={thR}>Montant net</th></tr></thead>
                   <tbody>
                     {rCats.map(r => <tr key={r.nom}><td style={td}>{r.nom}</td><td style={{ ...tdR, fontWeight: 700, color: col(r.v) }}>{eur(r.v)}</td></tr>)}
-                    {!rCats.length && <tr><td style={td} colSpan={2}><span style={{ color: '#94a3b8' }}>—</span></td></tr>}
+                    {!rCats.length && <tr><td style={td} colSpan={2}><span style={{ color: COUL.texteFaible }}>—</span></td></tr>}
                   </tbody>
                 </table>
               </div>

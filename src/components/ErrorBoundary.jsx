@@ -1,4 +1,5 @@
 import { Component } from 'react'
+import { COUL } from '../lib/theme'
 
 // Un déploiement renomme les fichiers de l'application. Un onglet resté ouvert
 // réclame alors des fichiers qui n'existent plus, et l'import de la page
@@ -62,14 +63,14 @@ export default class ErrorBoundary extends Component {
     // on laisse le bouton, plutôt qu'une pile d'appels illisible.
     if (this.state.error && this.state.perime) {
       return (
-        <div style={{ fontFamily: "'Source Sans Pro', sans-serif", maxWidth: 560, padding: 24, color: '#334155' }}>
+        <div style={{ fontFamily: "'Source Sans Pro', sans-serif", maxWidth: 560, padding: 24, color: COUL.texteSombre }}>
           <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 8 }}>L'application vient d'être mise à jour</div>
           <div style={{ fontSize: 14, marginBottom: 14, lineHeight: 1.5 }}>
             Cet onglet utilisait la version précédente. Rechargement en cours…
           </div>
           <button
             onClick={() => window.location.reload()}
-            style={{ padding: '8px 16px', borderRadius: 7, border: 'none', background: '#1E5799', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}
+            style={{ padding: '8px 16px', borderRadius: 7, border: 'none', background: '#1E5799', color: COUL.blanc, fontWeight: 600, cursor: 'pointer', fontSize: 13 }}
           >
             Recharger maintenant
           </button>
@@ -87,10 +88,10 @@ export default class ErrorBoundary extends Component {
             <div style={{ fontSize: 14, marginBottom: 12 }}>
               Le reste de l'application reste utilisable — le menu n'est pas affecté. Détail de l'erreur :
             </div>
-            <pre style={{ background: '#fff', border: '1px solid #F5C6CB', borderRadius: 6, padding: 12, fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#b91c1c', maxHeight: 280, overflow: 'auto' }}>{msg}{stack ? '\n\n' + stack : ''}</pre>
+            <pre style={{ background: COUL.blanc, border: '1px solid #F5C6CB', borderRadius: 6, padding: 12, fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: COUL.dangerFonce, maxHeight: 280, overflow: 'auto' }}>{msg}{stack ? '\n\n' + stack : ''}</pre>
             <button
               onClick={() => window.location.reload()}
-              style={{ marginTop: 12, padding: '8px 16px', borderRadius: 7, border: 'none', background: '#1E5799', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}
+              style={{ marginTop: 12, padding: '8px 16px', borderRadius: 7, border: 'none', background: '#1E5799', color: COUL.blanc, fontWeight: 600, cursor: 'pointer', fontSize: 13 }}
             >
               Recharger la page
             </button>

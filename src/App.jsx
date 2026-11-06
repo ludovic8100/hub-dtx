@@ -9,6 +9,7 @@ import AuthCallback       from './pages/AuthCallback'
 import AccessDenied       from './pages/AccessDenied'
 import BandeauEnv         from './components/BandeauEnv'
 import ErrorBoundary      from './components/ErrorBoundary'
+import { COUL } from './lib/theme'
 
 // Tout le reste : code-splitting — chaque page devient un chunk chargé à la demande
 const AdminNotesFrais     = lazy(() => import('./pages/admin/AdminNotesFrais'))
@@ -65,8 +66,8 @@ const GroupeComptabilite  = lazy(() => import('./pages/groupe/GroupeComptabilite
 function ProtectedRoute({ children, requireAdmin = false, need = null }) {
   const { user, perms, loading } = useAuth()
   if (loading) return (
-    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#0D2F5E' }}>
-      <div style={{ width:'40px', height:'40px', border:'3px solid rgba(255,255,255,0.3)', borderTopColor:'#fff', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
+    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:COUL.marine }}>
+      <div style={{ width:'40px', height:'40px', border:'3px solid rgba(255,255,255,0.3)', borderTopColor:COUL.blanc, borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
@@ -96,7 +97,7 @@ function RootRedirect() {
 function PageLoader() {
   return (
     <div style={{ minHeight:'60vh', display:'flex', alignItems:'center', justifyContent:'center' }}>
-      <div style={{ width:'34px', height:'34px', border:'3px solid rgba(13,47,94,0.15)', borderTopColor:'#0D2F5E', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
+      <div style={{ width:'34px', height:'34px', border:'3px solid rgba(13,47,94,0.15)', borderTopColor:COUL.marine, borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )

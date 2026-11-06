@@ -16,6 +16,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { COUL } from '../lib/theme'
 
 const fmt = (n) => (n == null ? '—' : Number(n).toLocaleString('fr-BE', {
   style: 'currency', currency: 'EUR', minimumFractionDigits: 2,
@@ -39,7 +40,7 @@ function Apercu({ f }) {
   return (
     <div style={{
       position: 'absolute', zIndex: 60, right: 0, top: 'calc(100% + 6px)',
-      minWidth: 260, maxWidth: 360, background: '#fff', border: '1px solid #cbd5e1',
+      minWidth: 260, maxWidth: 360, background: COUL.blanc, border: '1px solid #cbd5e1',
       borderRadius: 9, boxShadow: '0 10px 30px rgba(15,24,38,.18)', padding: '10px 12px',
       textAlign: 'left', fontWeight: 400, cursor: 'default',
     }}>
@@ -54,11 +55,11 @@ function Apercu({ f }) {
       <Ligne cle="Date" valeur={fmtDate(f.date_facture)} />
       {f.numero && <Ligne cle="N°" valeur={f.numero} />}
       {f.societe && <Ligne cle="Société" valeur={f.societe} />}
-      <div style={{ fontSize: 10.5, color: '#8c9cb0', marginTop: 7, wordBreak: 'break-word' }}>
+      <div style={{ fontSize: 10.5, color: COUL.grisBleu, marginTop: 7, wordBreak: 'break-word' }}>
         {f.nom}
       </div>
       {lienEnLigne(f.url) && (
-        <div style={{ fontSize: 11, color: '#0080BD', marginTop: 6, fontWeight: 600 }}>
+        <div style={{ fontSize: 11, color: COUL.bleu, marginTop: 6, fontWeight: 600 }}>
           Cliquer pour ouvrir le PDF
         </div>
       )}
@@ -68,7 +69,7 @@ function Apercu({ f }) {
 
 const Ligne = ({ cle, valeur }) => (
   <div style={{ display: 'flex', gap: 8, fontSize: 11.5, lineHeight: 1.6 }}>
-    <span style={{ color: '#8c9cb0', width: 62, flexShrink: 0 }}>{cle}</span>
+    <span style={{ color: COUL.grisBleu, width: 62, flexShrink: 0 }}>{cle}</span>
     <span style={{ color: '#0f1826', fontWeight: 600, minWidth: 0, wordBreak: 'break-word' }}>{valeur}</span>
   </div>
 )
@@ -97,24 +98,24 @@ function Montant({ f, valeur, couleur }) {
 function Section({ titre, compte, total, explication, prudence, children }) {
   const [ouvert, setOuvert] = useState(true)
   return (
-    <section style={{ border: '1px solid #dce4ec', borderRadius: 12, background: '#fff',
+    <section style={{ border: '1px solid #dce4ec', borderRadius: 12, background: COUL.blanc,
                       overflow: 'hidden', marginBottom: 14 }}>
       <button onClick={() => setOuvert(!ouvert)} style={{
         width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 15px',
         background: '#f7fafc', border: 'none', borderBottom: ouvert ? '1px solid #dce4ec' : 'none',
         cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
       }}>
-        <i className={`ti ti-chevron-${ouvert ? 'down' : 'right'}`} style={{ color: '#8c9cb0', fontSize: 15 }} />
+        <i className={`ti ti-chevron-${ouvert ? 'down' : 'right'}`} style={{ color: COUL.grisBleu, fontSize: 15 }} />
         <span style={{ fontSize: 14.5, fontWeight: 700, color: '#0f1826', flex: 1 }}>{titre}</span>
-        <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12, fontWeight: 700, color: '#56677c' }}>
+        <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12, fontWeight: 700, color: COUL.grisBleuFonce }}>
           {compte} {compte > 1 ? 'cas' : 'cas'}{total != null ? ` · ${fmt(total)}` : ''}
         </span>
       </button>
       {ouvert && (
         <div style={{ padding: '10px 15px 14px' }}>
-          <p style={{ fontSize: 12, color: '#56677c', lineHeight: 1.5, margin: '0 0 4px' }}>{explication}</p>
+          <p style={{ fontSize: 12, color: COUL.grisBleuFonce, lineHeight: 1.5, margin: '0 0 4px' }}>{explication}</p>
           {prudence && (
-            <p style={{ fontSize: 11.5, color: '#b45309', lineHeight: 1.5, margin: '0 0 10px',
+            <p style={{ fontSize: 11.5, color: COUL.alerte, lineHeight: 1.5, margin: '0 0 10px',
                         background: '#fffaf0', border: '1px solid #f0c478', borderRadius: 7, padding: '7px 9px' }}>
               {prudence}
             </p>
@@ -128,7 +129,7 @@ function Section({ titre, compte, total, explication, prudence, children }) {
 
 const TH = ({ children, align }) => (
   <th style={{ textAlign: align || 'left', fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase',
-               letterSpacing: '.05em', color: '#8c9cb0', padding: '6px 8px',
+               letterSpacing: '.05em', color: COUL.grisBleu, padding: '6px 8px',
                borderBottom: '1px solid #dce4ec', whiteSpace: 'nowrap' }}>{children}</th>
 )
 const TD = ({ children, align, style }) => (
@@ -180,12 +181,12 @@ export default function AnomaliesCompta({ societeCodes, color }) {
   }, [JSON.stringify(codes)])
 
   if (erreur) {
-    return <div style={{ padding: 20, fontSize: 13, color: '#b91c1c' }}>
+    return <div style={{ padding: 20, fontSize: 13, color: COUL.dangerFonce }}>
       Lecture impossible : {erreur.message || 'la base n’a pas répondu.'}
     </div>
   }
   if (!doublons || !paiements || !impayees) {
-    return <div style={{ padding: 30, fontSize: 13, color: '#8c9cb0' }}>Chargement des anomalies…</div>
+    return <div style={{ padding: 30, fontSize: 13, color: COUL.grisBleu }}>Chargement des anomalies…</div>
   }
 
   const payesPlusieursFois = doublons.filter(d => d.rapproches > 1)
@@ -205,15 +206,15 @@ export default function AnomaliesCompta({ societeCodes, color }) {
         <div style={{ marginBottom: 8 }}>
           <button onClick={() => setTout(!tout)} style={{
             fontSize: 11.5, fontWeight: 600, padding: '5px 10px', borderRadius: 7,
-            border: '1px solid #c3cfdb', background: tout ? '#e2f1fa' : '#fff',
-            color: '#56677c', cursor: 'pointer', fontFamily: 'inherit',
+            border: '1px solid #c3cfdb', background: tout ? '#e2f1fa' : COUL.blanc,
+            color: COUL.grisBleuFonce, cursor: 'pointer', fontFamily: 'inherit',
           }}>
             {tout ? `Ne montrer que les ${payesPlusieursFois.length} payées plusieurs fois`
                   : `Montrer les ${doublons.length} doublons (actuellement ${payesPlusieursFois.length} payés plusieurs fois)`}
           </button>
         </div>
         {doublonsVus.length === 0 ? (
-          <p style={{ fontSize: 12.5, color: '#8c9cb0', margin: 0 }}>Aucun doublon payé plusieurs fois.</p>
+          <p style={{ fontSize: 12.5, color: COUL.grisBleu, margin: 0 }}>Aucun doublon payé plusieurs fois.</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -224,10 +225,10 @@ export default function AnomaliesCompta({ societeCodes, color }) {
               <tbody>
                 {doublonsVus.map((d, i) => (
                   <tr key={`${d.numero}-${i}`}>
-                    <TD><span style={{ fontSize: 11, color: '#8c9cb0' }}>{d.societe}</span></TD>
+                    <TD><span style={{ fontSize: 11, color: COUL.grisBleu }}>{d.societe}</span></TD>
                     <TD style={{ fontWeight: 600 }}>{d.fournisseur}</TD>
-                    <TD style={{ fontSize: 11.5, color: '#56677c' }}>{d.numero}</TD>
-                    <TD style={{ fontSize: 11.5, color: '#56677c' }}>{fmtDate(d.date_facture)}</TD>
+                    <TD style={{ fontSize: 11.5, color: COUL.grisBleuFonce }}>{d.numero}</TD>
+                    <TD style={{ fontSize: 11.5, color: COUL.grisBleuFonce }}>{fmtDate(d.date_facture)}</TD>
                     <TD align="right">
                       <Montant
                         f={{ ...d, nom: (d.noms || [])[0], url: (d.urls || [])[0] }}
@@ -259,7 +260,7 @@ export default function AnomaliesCompta({ societeCodes, color }) {
         prudence={"Un premier jet à trente jours signalait 322 cas pour 178 000 € : c'étaient des loyers et des abonnements. Les couples qui reviennent plus de deux fois sont désormais écartés ; il reste ceux-ci."}
       >
         {paiements.length === 0 ? (
-          <p style={{ fontSize: 12.5, color: '#8c9cb0', margin: 0 }}>Aucun paiement en double détecté.</p>
+          <p style={{ fontSize: 12.5, color: COUL.grisBleu, margin: 0 }}>Aucun paiement en double détecté.</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -270,13 +271,13 @@ export default function AnomaliesCompta({ societeCodes, color }) {
               <tbody>
                 {paiements.map((p, i) => (
                   <tr key={`${p.premier_id}-${i}`}>
-                    <TD><span style={{ fontSize: 11, color: '#8c9cb0' }}>{p.societe}</span></TD>
+                    <TD><span style={{ fontSize: 11, color: COUL.grisBleu }}>{p.societe}</span></TD>
                     <TD style={{ fontWeight: 600 }}>{p.contrepartie_nom}</TD>
-                    <TD align="right" style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700, color: '#b45309' }}>
+                    <TD align="right" style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700, color: COUL.alerte }}>
                       {fmt(p.montant)}
                     </TD>
-                    <TD style={{ fontSize: 11.5, color: '#56677c' }}>{fmtDate(p.premiere_date)}</TD>
-                    <TD style={{ fontSize: 11.5, color: '#56677c' }}>{fmtDate(p.seconde_date)}</TD>
+                    <TD style={{ fontSize: 11.5, color: COUL.grisBleuFonce }}>{fmtDate(p.premiere_date)}</TD>
+                    <TD style={{ fontSize: 11.5, color: COUL.grisBleuFonce }}>{fmtDate(p.seconde_date)}</TD>
                     <TD align="center">
                       <Etiquette ton={p.jours_ecart <= 3 ? 'rouge' : 'orange'}
                         texte={`${p.jours_ecart} j`} />
@@ -298,7 +299,7 @@ export default function AnomaliesCompta({ societeCodes, color }) {
         prudence={"Une facture dont le montant vient du nom du fichier, et non du PDF, peut porter un montant faux : elle apparaîtra ici à tort. La colonne « source » le dit."}
       >
         {impayees.length === 0 ? (
-          <p style={{ fontSize: 12.5, color: '#8c9cb0', margin: 0 }}>Aucune facture impayée détectée.</p>
+          <p style={{ fontSize: 12.5, color: COUL.grisBleu, margin: 0 }}>Aucune facture impayée détectée.</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -309,11 +310,11 @@ export default function AnomaliesCompta({ societeCodes, color }) {
               <tbody>
                 {impayees.map((f) => (
                   <tr key={f.id}>
-                    <TD><span style={{ fontSize: 11, color: '#8c9cb0' }}>{f.societe}</span></TD>
+                    <TD><span style={{ fontSize: 11, color: COUL.grisBleu }}>{f.societe}</span></TD>
                     <TD style={{ fontWeight: 600 }}>
-                      {f.fournisseur || <span style={{ color: '#8c9cb0', fontWeight: 400 }}>{f.nom}</span>}
+                      {f.fournisseur || <span style={{ color: COUL.grisBleu, fontWeight: 400 }}>{f.nom}</span>}
                     </TD>
-                    <TD style={{ fontSize: 11.5, color: '#56677c' }}>{fmtDate(f.date_facture)}</TD>
+                    <TD style={{ fontSize: 11.5, color: COUL.grisBleuFonce }}>{fmtDate(f.date_facture)}</TD>
                     <TD align="right"><Montant f={f} valeur={fmt(f.montant)} /></TD>
                     <TD align="center">
                       <Etiquette ton={f.jours > 365 ? 'rouge' : f.jours > 120 ? 'orange' : 'gris'}
@@ -329,7 +330,7 @@ export default function AnomaliesCompta({ societeCodes, color }) {
               </tbody>
             </table>
             {impayees.length >= 400 && (
-              <p style={{ fontSize: 11.5, color: '#8c9cb0', marginTop: 8 }}>
+              <p style={{ fontSize: 11.5, color: COUL.grisBleu, marginTop: 8 }}>
                 400 premières affichées, triées par montant décroissant.
               </p>
             )}

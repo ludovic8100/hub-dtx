@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { COUL } from '../lib/theme'
 
-const C = { navy:"#1A3A6B", navyMid:"#1E5799", cyan:"#29ABE2", bg:"#F4F6F9", white:"#FFFFFF", border:"#DDE3ED", textD:"#1A3A6B", textM:"#4A5568", textL:"#8A9BBE", ok:"#27AE60", warn:"#F39C12", danger:"#E74C3C" }
+const C = { navy:COUL.marineClair, navyMid:"#1E5799", cyan:"#29ABE2", bg:"#F4F6F9", white:COUL.blanc, border:"#DDE3ED", textD:COUL.marineClair, textM:"#4A5568", textL:"#8A9BBE", ok:"#27AE60", warn:"#F39C12", danger:"#E74C3C" }
 const D = {
   card:{ background:C.white, border:`1px solid ${C.border}`, borderRadius:10, padding:20, marginBottom:16, boxShadow:"0 1px 4px rgba(26,58,107,0.06)" },
   input:{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:7, padding:"7px 10px", color:C.textD, fontSize:13, outline:"none", boxSizing:"border-box", width:"100%" },
   label:{ fontSize:11, fontWeight:600, color:C.textM, marginBottom:4, display:"block", textTransform:"uppercase", letterSpacing:"0.03em" },
-  btn:(v="primary")=>({ padding:"8px 16px", borderRadius:7, cursor:"pointer", fontSize:12, fontWeight:600, border:"none", ...(v==="primary"?{ background:`linear-gradient(135deg,${C.cyan},${C.navyMid})`, color:"#fff" }:v==="ghost"?{ background:"transparent", color:C.navy, border:`1px solid ${C.border}` }:{ background:C.bg, color:C.textM, border:`1px solid ${C.border}` }) }),
+  btn:(v="primary")=>({ padding:"8px 16px", borderRadius:7, cursor:"pointer", fontSize:12, fontWeight:600, border:"none", ...(v==="primary"?{ background:`linear-gradient(135deg,${C.cyan},${C.navyMid})`, color:COUL.blanc }:v==="ghost"?{ background:"transparent", color:C.navy, border:`1px solid ${C.border}` }:{ background:C.bg, color:C.textM, border:`1px solid ${C.border}` }) }),
 }
 const fmtEUR = n => (n==null||isNaN(n))?"—":new Intl.NumberFormat("fr-BE",{style:"currency",currency:"EUR",maximumFractionDigits:0}).format(n)
 const fmtEUR2 = n => (n==null||isNaN(n))?"—":new Intl.NumberFormat("fr-BE",{style:"currency",currency:"EUR",maximumFractionDigits:2}).format(n)
@@ -77,8 +78,8 @@ function CreditForm({ contrat, existingFin, onClose, onSave }) {
   }
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-      <div style={{background:"#fff",borderRadius:16,width:"100%",maxWidth:560,maxHeight:"90vh",overflowY:"auto"}}>
-        <div style={{padding:"20px 24px 16px",borderBottom:`1px solid ${C.border}`,position:"sticky",top:0,background:"#fff"}}>
+      <div style={{background:COUL.blanc,borderRadius:16,width:"100%",maxWidth:560,maxHeight:"90vh",overflowY:"auto"}}>
+        <div style={{padding:"20px 24px 16px",borderBottom:`1px solid ${C.border}`,position:"sticky",top:0,background:COUL.blanc}}>
           <div style={{fontSize:16,fontWeight:700,color:C.navy}}>Données financières du crédit</div>
           <div style={{fontSize:13,color:C.textL,marginTop:4}}>{contrat.prenom_client} {contrat.nom_client} — {contrat.compagnie} — {contrat.police}</div>
         </div>
@@ -94,7 +95,7 @@ function CreditForm({ contrat, existingFin, onClose, onSave }) {
             <div style={{gridColumn:"1/3"}}><label style={D.label}>Mensualité actuelle (€) — optionnel</label><input style={D.input} type="number" step="0.01" value={form.mensualite_actuelle} onChange={e=>set("mensualite_actuelle",e.target.value)} placeholder="calculée si vide" /></div>
           </div>
         </div>
-        <div style={{padding:"16px 24px",borderTop:`1px solid ${C.border}`,display:"flex",justifyContent:"flex-end",gap:10,position:"sticky",bottom:0,background:"#fff"}}>
+        <div style={{padding:"16px 24px",borderTop:`1px solid ${C.border}`,display:"flex",justifyContent:"flex-end",gap:10,position:"sticky",bottom:0,background:COUL.blanc}}>
           <button style={D.btn("ghost")} onClick={onClose}>Annuler</button>
           <button style={D.btn("primary")} onClick={save} disabled={saving}>{saving?"...":"Enregistrer"}</button>
         </div>
@@ -218,7 +219,7 @@ export default function CreditsView() {
               const {ct,a,complet}=r
               const positif=a&&a.gain>0
               return (
-                <tr key={ct.id||idx} style={{borderBottom:`1px solid ${C.border}`,background:a&&a.interessant?"#EAF7EC":"#fff"}}>
+                <tr key={ct.id||idx} style={{borderBottom:`1px solid ${C.border}`,background:a&&a.interessant?"#EAF7EC":COUL.blanc}}>
                   <td style={{padding:"10px 12px",fontWeight:600,color:C.navy}}>{ct.prenom_client} {ct.nom_client}</td>
                   <td style={{padding:"10px 12px"}}>{ct.compagnie}<div style={{fontSize:11,color:C.textL}}>{ct.police}</div></td>
                   <td style={{padding:"10px 12px"}}><span style={{fontSize:11,padding:"2px 8px",borderRadius:12,background:r.typeC==="PH"?"#E3F2FD":r.typeC==="PAT"?"#FFF3E0":"#EEE",color:r.typeC==="PH"?"#1565C0":r.typeC==="PAT"?"#E65100":"#666"}}>{r.typeC}</span></td>

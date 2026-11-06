@@ -2,6 +2,7 @@ import { supabase } from './supabase'
 
 // Bucket public des logos (identique à CompagniesView / entites.js)
 import { LOGOS_URL } from '../config/env'
+import { COUL } from './theme'
 export const STORAGE_BASE = LOGOS_URL
 
 // URL d'un logo à partir d'un logo_url (nom de fichier du bucket OU URL complète)
@@ -35,7 +36,7 @@ function monogram(nom) {
 
 // Rapproche un nom brut d'une fiche `compagnies`. Renvoie {court, couleur, logoUrl, fiche}.
 export function resolveCie(nomBrut, cies) {
-  const fallback = { court: monogram(nomBrut), couleur: '#64748b', logoUrl: null, fiche: null }
+  const fallback = { court: monogram(nomBrut), couleur: COUL.texteDoux, logoUrl: null, fiche: null }
   if (!nomBrut || !Array.isArray(cies) || !cies.length) return fallback
   const key = normCie(nomBrut)
   if (!key) return fallback

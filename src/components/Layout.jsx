@@ -5,6 +5,7 @@ import Sidebar from './Sidebar'
 import ErrorBoundary from './ErrorBoundary'
 import { useAuth } from '../lib/auth'
 import { bootstrapConfigs } from '../lib/bootstrapConfigs'
+import { COUL } from '../lib/theme'
 
 // Préfixe d'URL → code entité
 const PATH_TO_SOCIETE = [
@@ -71,7 +72,7 @@ export default function Layout({ children, currentPage }) {
             minWidth: '220px',
             display: 'flex',
             flexDirection: 'column',
-            background: '#0f172a',
+            background: COUL.texteFort,
             borderRight: '1px solid rgba(255,255,255,0.07)',
             overflowY: 'auto',
             ...(isMobile ? {
@@ -90,7 +91,7 @@ export default function Layout({ children, currentPage }) {
           width: '100%',
           minWidth: 0,
           overflowY: 'auto',
-          background: '#f1f5f9',
+          background: COUL.fondDoux,
           padding: isMobile ? '16px 14px' : '28px 32px'
         }}>
           <ErrorBoundary resetKey={currentPage}>

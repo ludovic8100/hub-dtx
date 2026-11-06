@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import BoutonSyncPonto from './BoutonSyncPonto'
+import { COUL } from '../lib/theme'
 
 // Les soldes et transactions Ponto sont rafraîchis automatiquement chaque nuit à 00:11
 // (fonction Edge `sync-ponto-comptes` + pg_cron). Le bouton ci-dessous relance la même
@@ -47,7 +48,7 @@ export default function BlocComptes({ societeCode, color }) {
   const allRevealed = comptes.length > 0 && comptes.every(c => revealed[c.id])
 
   if (loading) return (
-    <div style={{ padding:'20px', textAlign:'center', color:'#94a3b8', fontSize:13 }}>Chargement comptes…</div>
+    <div style={{ padding:'20px', textAlign:'center', color:COUL.texteFaible, fontSize:13 }}>Chargement comptes…</div>
   )
 
   return (
@@ -57,8 +58,8 @@ export default function BlocComptes({ societeCode, color }) {
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
           <i className="ti ti-credit-card" style={{ fontSize:15, color }} />
-          <span style={{ fontSize:13, fontWeight:700, color:'#0f172a' }}>Comptes bancaires</span>
-          <span style={{ fontSize:11, background:'#f1f5f9', color:'#64748b', padding:'2px 7px', borderRadius:10, fontWeight:600 }}>
+          <span style={{ fontSize:13, fontWeight:700, color:COUL.texteFort }}>Comptes bancaires</span>
+          <span style={{ fontSize:11, background:COUL.fondDoux, color:COUL.texteDoux, padding:'2px 7px', borderRadius:10, fontWeight:600 }}>
             {comptes.length} compte{comptes.length>1?'s':''}
           </span>
         </div>
@@ -76,8 +77,8 @@ export default function BlocComptes({ societeCode, color }) {
       </div>
 
       {comptes.length === 0 ? (
-        <div style={{ padding:'30px', textAlign:'center', color:'#94a3b8', fontSize:13,
-          background:'#fff', borderRadius:10, border:'1px solid #e2e8f0' }}>
+        <div style={{ padding:'30px', textAlign:'center', color:COUL.texteFaible, fontSize:13,
+          background:COUL.blanc, borderRadius:10, border:'1px solid #e2e8f0' }}>
           <i className="ti ti-plug-off" style={{ fontSize:28, display:'block', marginBottom:8 }} />
           Aucun compte connecté — synchronisation Ponto requise
         </div>
@@ -93,7 +94,7 @@ export default function BlocComptes({ societeCode, color }) {
 
               return (
                 <div key={c.id} style={{
-                  background:'#fff', borderRadius:10,
+                  background:COUL.blanc, borderRadius:10,
                   border:'1px solid #e2e8f0',
                   borderTop:`3px solid ${bcolor}`,
                   padding:'16px',
@@ -107,12 +108,12 @@ export default function BlocComptes({ societeCode, color }) {
                   <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12 }}>
                     <div style={{ width:36, height:36, borderRadius:8, background:bcolor,
                       display:'flex', alignItems:'center', justifyContent:'center',
-                      fontSize:12, fontWeight:800, color:'#fff', flexShrink:0 }}>
+                      fontSize:12, fontWeight:800, color:COUL.blanc, flexShrink:0 }}>
                       {bankInitial(c.banque)}
                     </div>
                     <div>
-                      <div style={{ fontSize:13, fontWeight:700, color:'#1e293b' }}>{c.banque}</div>
-                      <div style={{ fontSize:10, color:'#94a3b8', fontFamily:'monospace' }}>
+                      <div style={{ fontSize:13, fontWeight:700, color:COUL.texte }}>{c.banque}</div>
+                      <div style={{ fontSize:10, color:COUL.texteFaible, fontFamily:'monospace' }}>
                         {c.iban ? `${c.iban.slice(0,4)} •• ${c.iban.slice(-4)}` : 'Compte courant'}
                       </div>
                     </div>
@@ -120,24 +121,24 @@ export default function BlocComptes({ societeCode, color }) {
 
                   {/* Solde */}
                   <div style={{ marginBottom:10 }}>
-                    <div style={{ fontSize:10, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:4 }}>Solde</div>
+                    <div style={{ fontSize:10, fontWeight:700, color:COUL.texteFaible, textTransform:'uppercase', letterSpacing:'.05em', marginBottom:4 }}>Solde</div>
                     <div style={{ fontSize:22, fontWeight:900, letterSpacing: show?'normal':'.1em',
-                      color: show ? (isNeg?'#dc2626':bcolor) : '#e2e8f0' }}>
+                      color: show ? (isNeg?'#dc2626':bcolor) : COUL.bord }}>
                       {show ? fmt(bal) : '● ● ● ●'}
                     </div>
                   </div>
 
                   {/* Footer : sync date + bouton œil */}
                   <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                    <div style={{ fontSize:10, color:'#94a3b8' }}>
+                    <div style={{ fontSize:10, color:COUL.texteFaible }}>
                       {c.ponto_account_id
                         ? <span><i className="ti ti-refresh" style={{ fontSize:10, marginRight:3 }} />Sync {fmtDate(c.updated_at)}</span>
-                        : <span style={{ background:'#fef3c7', color:'#92400e', padding:'1px 5px', borderRadius:3, fontSize:9, fontWeight:700 }}>Non Ponto</span>
+                        : <span style={{ background:COUL.alerteFond, color:COUL.alerteFonce, padding:'1px 5px', borderRadius:3, fontSize:9, fontWeight:700 }}>Non Ponto</span>
                       }
                     </div>
                     <button onClick={() => setRevealed(r => ({...r, [c.id]: !r[c.id]}))}
-                      style={{ background:show?'#f0fdf4':'#f8fafc', border:`1px solid ${show?'#bbf7d0':'#e2e8f0'}`,
-                        borderRadius:6, padding:'4px 8px', cursor:'pointer', color:show?'#16a34a':'#94a3b8',
+                      style={{ background:show?'#f0fdf4':COUL.fond, border:`1px solid ${show?'#bbf7d0':COUL.bord}`,
+                        borderRadius:6, padding:'4px 8px', cursor:'pointer', color:show?'#16a34a':COUL.texteFaible,
                         fontSize:13, transition:'all 0.15s' }}>
                       <i className={`ti ${show?'ti-eye-off':'ti-eye'}`} />
                     </button>
@@ -149,7 +150,7 @@ export default function BlocComptes({ societeCode, color }) {
 
           {/* Total */}
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center',
-            padding:'10px 16px', background:'#0f172a', borderRadius:8 }}>
+            padding:'10px 16px', background:COUL.texteFort, borderRadius:8 }}>
             <span style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', letterSpacing:'.05em' }}>
               Total {comptes.length} compte{comptes.length>1?'s':''}
             </span>

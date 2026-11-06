@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { ENTITES } from '../../lib/entites'
 import { StatBanner } from '../../components/ui/AccountableUI'
+import { COUL } from '../../lib/theme'
 
-const BLUE = '#0080BD'
-const NAVY = '#0D2F5E'
+const BLUE = COUL.bleu
+const NAVY = COUL.marine
 
 const AGENT_NOMS = {
   GGO: 'Gregory Godfroid', TJA: 'Thibault Japsenne', PFQ: 'Priscilla Fernandez',
@@ -18,9 +19,9 @@ const AGENT_NOMS = {
 const fmtE = v => v == null ? '—' : new Intl.NumberFormat('fr-BE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v)
 const fmtP = v => v == null ? '—' : `${v > 0 ? '+' : ''}${Math.round(v)} %`
 
-const th = { padding: '9px 12px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.04em', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }
+const th = { padding: '9px 12px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.04em', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }
 const thR = { ...th, textAlign: 'right' }
-const td = { padding: '9px 12px', borderBottom: '1px solid #f1f5f9', fontSize: 13, color: '#334155' }
+const td = { padding: '9px 12px', borderBottom: '1px solid #f1f5f9', fontSize: 13, color: COUL.texteSombre }
 const tdR = { ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
 
 function useIsMobile() {
@@ -35,19 +36,19 @@ function useIsMobile() {
 
 function Kpi({ label, value, col, sub }) {
   return (
-    <div style={{ flex: '1 1 150px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '12px 14px' }}>
-      <div style={{ fontSize: 10.5, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.04em' }}>{label}</div>
+    <div style={{ flex: '1 1 150px', background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 12, padding: '12px 14px' }}>
+      <div style={{ fontSize: 10.5, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.04em' }}>{label}</div>
       <div style={{ fontSize: 22, fontWeight: 800, color: col }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{sub}</div>}
+      {sub && <div style={{ fontSize: 11, color: COUL.texteFaible, marginTop: 2 }}>{sub}</div>}
     </div>
   )
 }
 
 function Section({ titre, children, note }) {
   return (
-    <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 16, marginTop: 16 }}>
+    <div style={{ background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 12, padding: 16, marginTop: 16 }}>
       <div style={{ fontSize: 14, fontWeight: 800, color: NAVY }}>{titre}</div>
-      {note && <div style={{ fontSize: 12, color: '#94a3b8', margin: '4px 0 10px' }}>{note}</div>}
+      {note && <div style={{ fontSize: 12, color: COUL.texteFaible, margin: '4px 0 10px' }}>{note}</div>}
       {children}
     </div>
   )
@@ -56,7 +57,7 @@ function Section({ titre, children, note }) {
 function Row({ label, value, color, bold }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '3px 0' }}>
-      <span style={{ fontSize: 12, color: '#64748b' }}>{label}</span>
+      <span style={{ fontSize: 12, color: COUL.texteDoux }}>{label}</span>
       <span style={{ fontSize: 14, fontWeight: bold ? 800 : 600, color: color || '#334155', fontVariantNumeric: 'tabular-nums' }}>{value}</span>
     </div>
   )
@@ -90,7 +91,7 @@ export function RentabiliteContent() {
 
   const ecartDe = r => r.paye_reel != null ? r.paye_reel - (r.retro_theorique || 0) : null
   const pctDe = r => { const e = ecartDe(r); return (e != null && r.retro_theorique) ? e / r.retro_theorique * 100 : null }
-  const ecartCol = r => { const p = pctDe(r); return ecartDe(r) == null ? '#cbd5e1' : (p != null && Math.abs(p) >= 20) ? '#dc2626' : '#16a34a' }
+  const ecartCol = r => { const p = pctDe(r); return ecartDe(r) == null ? '#cbd5e1' : (p != null && Math.abs(p) >= 20) ? '#dc2626' : COUL.succes }
 
   return (
     <>
@@ -101,18 +102,18 @@ export function RentabiliteContent() {
         <div style={{ display: 'flex', gap: 8, margin: '8px 0 16px' }}>
           {[2025, 2026].map(y => (
             <button key={y} onClick={() => setAnnee(y)}
-              style={{ padding: '7px 16px', borderRadius: 8, border: '1px solid ' + (annee === y ? BLUE : '#e2e8f0'), background: annee === y ? BLUE : '#fff', color: annee === y ? '#fff' : '#475569', fontWeight: 700, cursor: 'pointer' }}>
+              style={{ padding: '7px 16px', borderRadius: 8, border: '1px solid ' + (annee === y ? BLUE : COUL.bord), background: annee === y ? BLUE : COUL.blanc, color: annee === y ? '#fff' : COUL.texteMoyen, fontWeight: 700, cursor: 'pointer' }}>
               {y}{y === 2026 ? ' (partiel)' : ''}
             </button>
           ))}
         </div>
 
-        {loading ? <div style={{ padding: 60, textAlign: 'center', color: '#94a3b8' }}>Calcul…</div> : <>
+        {loading ? <div style={{ padding: 60, textAlign: 'center', color: COUL.texteFaible }}>Calcul…</div> : <>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             <Kpi label="Commissions" value={fmtE(commTot)} col={BLUE} sub={`année ${annee}`} />
             <Kpi label="Rétro. théorique" value={fmtE(retroTheo)} col="#9333ea" sub="quittances × taux" />
-            <Kpi label="Payé réel (SA)" value={fmtE(payeReel)} col="#ea580c" sub="virements réels" />
-            <Kpi label="Marge théorique" value={fmtE(margeTheo)} col="#16a34a" sub="avant structure" />
+            <Kpi label="Payé réel (SA)" value={fmtE(payeReel)} col={COUL.orange} sub="virements réels" />
+            <Kpi label="Marge théorique" value={fmtE(margeTheo)} col={COUL.succes} sub="avant structure" />
           </div>
 
           <Section titre="Sous-agents — théorique vs réel payé"
@@ -123,10 +124,10 @@ export function RentabiliteContent() {
                   const e = ecartDe(r), p = pctDe(r)
                   return (
                     <div key={r.code} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: '10px 12px', marginBottom: 8 }}>
-                      <div style={{ fontWeight: 700, color: NAVY, marginBottom: 4 }}>{nom(r)} <span style={{ fontSize: 10, color: '#94a3b8' }}>{r.code}</span></div>
+                      <div style={{ fontWeight: 700, color: NAVY, marginBottom: 4 }}>{nom(r)} <span style={{ fontSize: 10, color: COUL.texteFaible }}>{r.code}</span></div>
                       <Row label="Commission" value={fmtE(r.commission)} />
                       <Row label="Rétro. théorique" value={fmtE(r.retro_theorique)} />
-                      <Row label="Payé réel" value={r.paye_reel == null ? '—' : fmtE(r.paye_reel)} color={r.paye_reel == null ? '#f59e0b' : '#334155'} />
+                      <Row label="Payé réel" value={r.paye_reel == null ? '—' : fmtE(r.paye_reel)} color={r.paye_reel == null ? '#f59e0b' : COUL.texteSombre} />
                       <Row label="Écart" value={e == null ? '—' : `${fmtE(e)}${p != null ? ` (${fmtP(p)})` : ''}`} color={ecartCol(r)} bold />
                     </div>
                   )
@@ -143,10 +144,10 @@ export function RentabiliteContent() {
                       const e = ecartDe(r), p = pctDe(r)
                       return (
                         <tr key={r.code}>
-                          <td style={td}><span style={{ fontWeight: 600, color: NAVY }}>{nom(r)}</span> <span style={{ fontSize: 10, color: '#94a3b8' }}>{r.code}</span></td>
+                          <td style={td}><span style={{ fontWeight: 600, color: NAVY }}>{nom(r)}</span> <span style={{ fontSize: 10, color: COUL.texteFaible }}>{r.code}</span></td>
                           <td style={tdR}>{fmtE(r.commission)}</td>
                           <td style={tdR}>{fmtE(r.retro_theorique)}</td>
-                          <td style={tdR}>{r.paye_reel == null ? <span style={{ color: '#f59e0b', fontWeight: 700 }}>—</span> : fmtE(r.paye_reel)}</td>
+                          <td style={tdR}>{r.paye_reel == null ? <span style={{ color: COUL.alerteVif, fontWeight: 700 }}>—</span> : fmtE(r.paye_reel)}</td>
                           <td style={{ ...tdR, fontWeight: 700, color: ecartCol(r) }}>{e == null ? '—' : `${fmtE(e)}${p != null ? ` (${fmtP(p)})` : ''}`}</td>
                         </tr>
                       )
@@ -163,7 +164,7 @@ export function RentabiliteContent() {
               <div>
                 {interne.map(r => (
                   <div key={r.code} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 2px', borderBottom: '1px solid #f1f5f9' }}>
-                    <span style={{ fontWeight: 600, color: NAVY }}>{nom(r)} <span style={{ fontSize: 10, color: '#94a3b8' }}>{r.code}</span></span>
+                    <span style={{ fontWeight: 600, color: NAVY }}>{nom(r)} <span style={{ fontSize: 10, color: COUL.texteFaible }}>{r.code}</span></span>
                     <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{fmtE(r.commission)}</span>
                   </div>
                 ))}
@@ -175,7 +176,7 @@ export function RentabiliteContent() {
                   <tbody>
                     {interne.map(r => (
                       <tr key={r.code}>
-                        <td style={td}><span style={{ fontWeight: 600, color: NAVY }}>{nom(r)}</span> <span style={{ fontSize: 10, color: '#94a3b8' }}>{r.code}</span></td>
+                        <td style={td}><span style={{ fontWeight: 600, color: NAVY }}>{nom(r)}</span> <span style={{ fontSize: 10, color: COUL.texteFaible }}>{r.code}</span></td>
                         <td style={tdR}>{fmtE(r.commission)}</td>
                       </tr>
                     ))}
@@ -185,7 +186,7 @@ export function RentabiliteContent() {
             )}
           </Section>
 
-          <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 12 }}>
+          <div style={{ fontSize: 12, color: COUL.texteFaible, marginTop: 12 }}>
             Base : quittances {annee}. Le CA cash complet (bonus répartis par producteur) viendra de la réconciliation des bordereaux RCP.
           </div>
         </>}
