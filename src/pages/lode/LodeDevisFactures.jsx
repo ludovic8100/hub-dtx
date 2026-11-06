@@ -8,6 +8,7 @@ import { I18N, CGV_I18N, LANGUES } from '../../lib/lodeI18n'
 import { StatBanner, TabsBar, StatusBadge, ActionButton, DataCard, PrimaryButton, useMobile } from '../../components/ui/AccountableUI'
 import { extraireDevis } from '../../lib/devisExtraction'
 import { COUL } from '../../lib/theme'
+import QRCode from 'qrcode'
 
 const ORANGE = LODE.couleur
 const NAVY = COUL.texte
@@ -820,7 +821,12 @@ function Editeur({ type, doc, onClose, onSaved }) {
 
             {/* Pied : paiement */}
             <div style={{ marginTop: 26, paddingTop: 16, borderTop: `1px solid ${COUL.bord}`, fontSize: 11.5, color: COUL.texteDoux, lineHeight: 1.6 }}>
-              Paiement par virement : <strong style={{ color: NAVY }}>{LODE.iban}</strong> ({LODE.bic}) — communication : {f.numero || 'n° du document'}
+              Paiement par virement : <strong style={{ color: NAVY }}>{LODE.iban}</strong> ({LODE.bic})
+              {!isDevis && f.type !== 'note_credit' && (
+                <> — communication structurée : <strong style={{ color: NAVY }}>
+                  {communicationStructuree(f.numero)?.affiche || '(à l’enregistrement)'}
+                </strong></>
+              )}
               {f.notes && <div style={{ marginTop: 8, whiteSpace: 'pre-wrap' }}>{f.notes}</div>}
             </div>
           </div>
@@ -1234,6 +1240,48 @@ function ModalClient({ f, set, clientQuery, setClientQuery, clientResults, searc
 // ════════════════════════════════════════════════════════════════
 // Nom de fichier des pièces de vente : « 2026001 - CLIENT - 980,10 EUR.pdf » (montant TTC).
 // Les devis gardent leur nom habituel.
+// ── Communication structurée belge ──────────────────────────────────────
+// Douze chiffres : dix libres, puis deux de controle = les dix premiers
+// modulo 97, et 97 quand le reste est nul. Elle est DERIVEE du numero de
+// facture, donc stable sans rien stocker : la meme facture rend toujours la
+// meme communication, hier comme dans trois ans.
+// Pas de communication sur un devis (rien a payer) ni sur une note de credit
+// (l'argent va dans l'autre sens).
+function communicationStructuree(numero) {
+  const chiffres = String(numero || '').replace(/\D/g, '')
+  if (!chiffres) return null
+  const base = chiffres.slice(-10).padStart(10, '0')
+  const reste = Number(BigInt(base) % 97n) || 97
+  const douze = base + String(reste).padStart(2, '0')
+  return { brut: douze, affiche: `+++${douze.slice(0, 3)}/${douze.slice(3, 7)}/${douze.slice(7)}+++` }
+}
+
+// ── QR code de paiement EPC (SEPA Credit Transfer) ──────────────────────
+// Douze lignes. Les champs 10 (reference structuree ISO 11649, celles en
+// « RF ») et 11 (communication libre) s'excluent : on n'en remplit qu'un.
+// La communication belge « +++...+++ » n'est PAS une reference ISO 11649,
+// elle part donc en champ 11 — c'est ce que fait deja l'ecran des notes de
+// frais de ce meme Hub.
+// Renvoie null plutot que de lever : un QR manquant est un desagrement, une
+// facture qui refuse de sortir est un blocage.
+async function qrPaiementEPC({ benef, iban, bic, montant, communication }) {
+  const m = Math.round((Number(montant) || 0) * 100) / 100
+  const compte = String(iban || '').replace(/\s+/g, '').toUpperCase()
+  if (!(m > 0) || compte.length < 15) return null
+  const payload = [
+    'BCD', '002', '1', 'SCT',
+    String(bic || '').replace(/\s+/g, ''),
+    String(benef || '').slice(0, 70),
+    compte,
+    `EUR${m.toFixed(2)}`,
+    '', '',
+    String(communication || '').slice(0, 140),
+    '',
+  ].join('\n')
+  try { return await QRCode.toDataURL(payload, { margin: 0, width: 320, errorCorrectionLevel: 'M' }) }
+  catch { return null }
+}
+
 function nomFichierDoc(doc, type, ext) {
   if (type === 'devis') return `Devis_${doc.numero}.${ext}`
   const client = String(doc.client_nom || 'Client').replace(/[\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim()
@@ -1615,10 +1663,37 @@ async function exportPDF(type, doc, lignes, opts = {}) {
     })
   }
 
-  // ---- Paiement ----
-  y += 16; d.setFontSize(9); d.setTextColor(...GREY); d.setFont(undefined, 'normal')
+  // ---- Paiement : IBAN, communication structuree, QR a scanner ----
+  const comm = (!isDevis && doc.type !== 'note_credit') ? communicationStructuree(doc.numero) : null
+  // Le QR annonce LE MONTANT DU, acompte deja recu deduit — pas le total.
+  const duPDF = Math.round((tot.ttc - dejaPaye) * 100) / 100
+  const qrPdf = comm ? await qrPaiementEPC({
+    benef: LODE.raison_sociale, iban: LODE.iban, bic: LODE.bic,
+    montant: duPDF, communication: comm.affiche,
+  }) : null
+
+  const QS = 27
+  y += 16
+  if (y + (qrPdf ? QS + 10 : 16) > BOTTOM) { d.addPage(); y = 22 }
+  const yPaie = y
+  d.setFontSize(9); d.setTextColor(...GREY); d.setFont(undefined, 'normal')
   d.text(`${L.paiement} : ${LODE.iban}  (${LODE.bic} – ${LODE.banque})`, 16, y)
-  if (!isDevis) { y += 5; d.text(`${L.communication} : ${doc.numero}`, 16, y) }
+  if (!isDevis) {
+    y += 5.4
+    d.setFont(undefined, 'bold'); d.setTextColor(...DARK); d.setFontSize(9.5)
+    d.text(`${L.communication} : ${comm ? comm.affiche : doc.numero}`, 16, y)
+    d.setFont(undefined, 'normal'); d.setTextColor(...GREY); d.setFontSize(9)
+  }
+  if (qrPdf) {
+    try {
+      const qx = PW - 16 - QS
+      d.addImage(qrPdf, 'PNG', qx, yPaie - 6, QS, QS)
+      d.setFontSize(7); d.setTextColor(...GREY)
+      d.text('Scannez pour payer', qx + QS / 2, yPaie - 6 + QS + 3.4, { align: 'center' })
+      d.setFontSize(9)
+    } catch (e) { /* un QR absent est un desagrement, une facture bloquee non */ }
+    y = Math.max(y, yPaie - 6 + QS + 4)
+  }
   y += 9; d.setTextColor(...O); d.setFont(undefined, 'bold'); d.setFontSize(10)
   d.text(L.merci, 16, y)
 
@@ -1875,6 +1950,28 @@ async function exportWord(type, doc, lignes) {
     ...cgv.map(c => new Paragraph({ spacing: { after: 80 }, children: [new TextRun({ text: c, size: 15, color: '444444' })] })),
   ]
 
+  // Paiement : IBAN, communication structuree, QR a scanner.
+  const commW = (!isDevis && doc.type !== 'note_credit') ? communicationStructuree(doc.numero) : null
+  const duW = Math.round((tot.ttc - (Number(doc.montant_paye) || 0)) * 100) / 100
+  const paiementPara = [
+    new Paragraph({ spacing: { before: 200 }, children: [new TextRun({ text: `${L.paiement} : ${LODE.iban} (${LODE.bic})`, size: 16, color: GREY })] }),
+  ]
+  if (commW) {
+    paiementPara.push(new Paragraph({ children: [new TextRun({ text: `${L.communication} : ${commW.affiche}`, size: 18, bold: true, color: DARK })] }))
+    const qrW = await qrPaiementEPC({ benef: LODE.raison_sociale, iban: LODE.iban, bic: LODE.bic, montant: duW, communication: commW.affiche })
+    if (qrW) {
+      try {
+        const brut = atob(String(qrW).split(',')[1])
+        const octets = new Uint8Array(brut.length)
+        for (let k = 0; k < brut.length; k++) octets[k] = brut.charCodeAt(k)
+        paiementPara.push(
+          new Paragraph({ spacing: { before: 120 }, children: [new ImageRun({ data: octets, transformation: { width: 96, height: 96 } })] }),
+          new Paragraph({ children: [new TextRun({ text: 'Scannez pour payer', size: 14, color: GREY })] }),
+        )
+      } catch (e) { /* sans QR, le Word sort quand meme */ }
+    }
+  }
+
   const docObj = new Document({
     sections: [{
       properties: { page: { margin: { top: 720, bottom: 720, left: 720, right: 720 } } },
@@ -1886,7 +1983,7 @@ async function exportWord(type, doc, lignes) {
         tableLignes,
         ...totauxPara,
         ...optionsPara,
-        new Paragraph({ spacing: { before: 200 }, children: [new TextRun({ text: `${L.paiement} : ${LODE.iban} (${LODE.bic})`, size: 16, color: GREY })] }),
+        ...paiementPara,
         ...cgvPara,
       ],
     }],
@@ -2137,7 +2234,16 @@ function EnvoiFactureModal({ doc, b64, fileName, onClose, onSent }) {
   const [cc, setCc] = useState('contact@lode-group.be')
   const [cci, setCci] = useState('info@lode-group.be')
   const [subject, setSubject] = useState(`Facture ${doc.numero} de LODE`)
-  const [body, setBody] = useState(`Bonjour ${doc.client_nom || ''},\n\nVeuillez trouver ci-joint notre facture ${doc.numero} d'un montant de ${eur(doc.total_ttc)}.\n\nBien a vous,\nLODE`)
+  // La communication structuree dans le corps du mail : le client qui paie
+  // depuis son ordinateur ne scanne pas le QR du PDF, il recopie.
+  const commMail = communicationStructuree(doc.numero)
+  const duMail = Math.round(((Number(doc.total_ttc) || 0) - (Number(doc.montant_paye) || 0)) * 100) / 100
+  const [body, setBody] = useState(
+    `Bonjour ${doc.client_nom || ''},\n\n`
+    + `Veuillez trouver ci-joint notre facture ${doc.numero} d'un montant de ${eur(duMail)}.\n\n`
+    + `IBAN : ${LODE.iban} (${LODE.bic})\n`
+    + (commMail ? `Communication structuree : ${commMail.affiche}\n` : '')
+    + `\nBien a vous,\nLODE`)
   const [sending, setSending] = useState(false)
   const [err, setErr] = useState('')
 
