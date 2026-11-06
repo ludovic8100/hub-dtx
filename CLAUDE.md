@@ -298,6 +298,55 @@ limite du projet de production, pas du code.
 quatre routes d'envoi de mail — `cotisation-rappel`, `cotisation-send`, `devis-send`,
 `facture-send` — qui font toutes la même chose).
 
+## Trois pièges mesurés le 06/11/2026
+
+### Retirer un droit à `anon` ne retire rien : c'est `PUBLIC` qui le porte
+
+Postgres accorde `EXECUTE` à **`PUBLIC`** sur toute fonction nouvelle. Un
+`revoke execute on function … from anon` laisse donc le droit intact — vérifié :
+`has_function_privilege('anon', …)` rendait toujours `true` après le revoke.
+
+**La forme correcte**, pour toute fonction sensible :
+
+```sql
+revoke execute on function public.f(...) from public;
+grant  execute on function public.f(...) to authenticated;  -- ou service_role
+```
+
+puis **revérifier** avec `has_function_privilege`. Un correctif de sécurité non
+revérifié rassure sans protéger.
+
+Rappel : `anon` est le rôle d'**avant** connexion, et sa clé est dans le bundle
+du navigateur **et dans ce dépôt public**. « Appelable par `anon` » = appelable
+par n'importe qui sur Internet.
+
+### Le planificateur de GitHub n'honore pas un cron horaire
+
+`factures-entrantes.yml` est déclaré en `cron: '23 * * * *'`, soit 24 passages
+par jour. **Mesuré sur 24 h : trois**, à 02h32, 11h05 et 18h48 — toutes les huit
+heures, avec une dérive de −18 à +25 minutes. GitHub abandonne les
+déclenchements planifiés quand ses files sont chargées, et les plannings à
+haute fréquence sont les premiers sacrifiés.
+
+Les trois crons **quotidiens** (`qlik-sync`, `factures-sharepoint`,
+`bordereaux-sharepoint`) passent tous les jours sans faute. Seul l'horaire est
+touché.
+
+**Donc : ne pas compter sur GitHub pour du sous-journalier.** `pg_cron` tient
+Ponto à 03h15, 09h15, 15h15 et 21h15 sans dériver. Une facture déposée dans
+SharePoint n'apparaît pas « dans l'heure » mais en moyenne dans les huit ;
+le bouton **Traiter les factures** reste le seul moyen fiable.
+
+### `quittances` est vide — tout indicateur qui en dépend est faux
+
+Zéro ligne, aucune année. C'est attendu (le financier vient des bordereaux,
+plus de Qlik), mais l'indicateur « Clients sans commission » qui s'en nourrit
+comptait donc **les 10 308 clients**. Il rend désormais `null` et l'écran dit
+pourquoi.
+
+**Règle générale** : un indicateur calculé sur une source vide doit renvoyer
+`null`, jamais un total — et surtout jamais zéro, qui se lit comme une mesure.
+
 ## Environnements & configuration (depuis le 29/10/2026)
 
 - **Aucune URL/clé en dur** dans le code : tout passe par `src/config/env.js` (front, variables `VITE_*`),
