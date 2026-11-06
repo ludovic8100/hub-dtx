@@ -2202,6 +2202,32 @@ function EnvoiFactureModal({ doc, b64, fileName, onClose, onSent }) {
   )
 }
 
+// ════════════════════════════════════════════════════════════════
+//  MENU DE LIGNE — sept boutons sur chaque ligne, c'est sept fois
+//  rien de lisible. Les deux gestes courants restent visibles, le
+//  reste tient ici.
+// ════════════════════════════════════════════════════════════════
+function MenuLigne({ items, onClose }) {
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+      <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 41, background: COUL.blanc, border: `1px solid ${COUL.bord}`, borderRadius: 10, boxShadow: '0 10px 30px rgba(15,23,42,.18)', minWidth: 196, overflow: 'hidden', textAlign: 'left' }}>
+        {items.filter(Boolean).map((it, k) => it.sep ? (
+          <div key={k} style={{ height: 1, background: COUL.bord }} />
+        ) : (
+          <button key={k} type="button" disabled={it.disabled}
+            onClick={() => { onClose(); it.onClick() }}
+            onMouseEnter={e => { if (!it.disabled) e.currentTarget.style.background = COUL.fond }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '9px 13px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', color: it.danger ? COUL.danger : COUL.texteMoyen, cursor: it.disabled ? 'not-allowed' : 'pointer', opacity: it.disabled ? .5 : 1 }}>
+            <span style={{ width: 16, textAlign: 'center' }}>{it.icon}</span>{it.label}
+          </button>
+        ))}
+      </div>
+    </>
+  )
+}
+
 export default function LodeDevisFactures() {
   const [tab, setTab] = useState('devis')
   const [devis, setDevis] = useState([])
@@ -2213,6 +2239,9 @@ export default function LodeDevisFactures() {
   const [apercu, setApercu] = useState(null)      // {fid,nom} apercu PDF au survol
   const [envoi, setEnvoi] = useState(null)        // { doc, b64, fileName } facture a envoyer par email
   const [sort, setSort] = useState({ key: 'numero', dir: 'desc' })
+  const [recherche, setRecherche] = useState('')
+  const [filtreStatut, setFiltreStatut] = useState(null)
+  const [menu, setMenu] = useState(null)        // id du document dont le menu est ouvert
 
   const load = async () => {
     setLoading(true)
@@ -2368,7 +2397,16 @@ export default function LodeDevisFactures() {
     load()
   }
 
-  const liste = tab === 'devis' ? devis : factures
+  const listeBrute = tab === 'devis' ? devis : factures
+  // La recherche porte sur ce qu'on a sous les yeux : numero, client, objet.
+  // Pas de recherche plein texte cote base — la liste tient en memoire.
+  const motsRecherche = recherche.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  const liste = listeBrute.filter(d => {
+    if (filtreStatut && d.statut !== filtreStatut) return false
+    if (!motsRecherche.length) return true
+    const foin = `${d.numero || ''} ${d.client_nom || ''} ${d.objet || ''}`.toLowerCase()
+    return motsRecherche.every(m => foin.includes(m))
+  })
 
   // Suivi acomptes : dossiers (par devis) avec un acompte facture mais un reste a facturer > 0.
   const aSolder = (() => {
@@ -2401,6 +2439,29 @@ export default function LodeDevisFactures() {
       _preselAcomptes: d.grp.filter(x => x.type === 'acompte').map(x => x.id),
     } })
   }
+  // Les gestes d'un document, au meme endroit pour le tableau et les cartes :
+  // deux listes qui divergent, c'est un bouton qui manque d'un cote.
+  const actionsDoc = (doc) => {
+    const t = tab === 'devis' ? 'devis' : 'facture'
+    return [
+      { icon: '✎', label: 'Modifier', onClick: () => setEditing({ type: t, doc }) },
+      tab === 'devis' && { icon: '📊', label: 'Suivi du devis', onClick: () => setSuivi(doc) },
+      { sep: true },
+      { icon: '📄', label: 'Télécharger le PDF', disabled: busy === doc.id + 'pdf',
+        onClick: () => (tab === 'devis' ? doExport('pdf', 'devis', doc) : genererFacturePDF(doc)) },
+      tab === 'devis' && { icon: '📝', label: 'Télécharger le Word', disabled: busy === doc.id + 'word', onClick: () => doExport('word', 'devis', doc) },
+      tab !== 'devis' && doc.pdf_url && { icon: '🔗', label: 'Ouvrir le PDF archivé', onClick: () => window.open(doc.pdf_url, '_blank', 'noopener') },
+      tab !== 'devis' && { sep: true },
+      tab !== 'devis' && { icon: '✉', label: 'Envoyer par mail', disabled: busy === doc.id + 'mail', onClick: () => ouvrirEnvoiFacture(doc) },
+      PEPPOL_ACTIF && tab === 'factures' && doc.client_tva && doc.statut !== 'payée' && doc.statut !== 'annulée'
+        && { icon: '📨', label: 'Envoyer via Peppol', disabled: busy === doc.id + 'peppol', onClick: () => envoyerPeppol(doc) },
+      tab === 'devis' && doc.statut === 'accepté' && { sep: true },
+      tab === 'devis' && doc.statut === 'accepté' && { icon: '→', label: 'Convertir en facture', onClick: () => convertir(doc) },
+      tab === 'devis' && { sep: true },
+      tab === 'devis' && { icon: '🗑', label: 'Supprimer', danger: true, onClick: () => supprimer('devis', doc.id) },
+    ].filter(Boolean)
+  }
+
   const COLS = [
     { h: 'N°', key: 'numero', align: 'left' },
     { h: 'Client', key: 'client_nom', align: 'left' },
@@ -2408,7 +2469,7 @@ export default function LodeDevisFactures() {
     { h: 'Date', key: 'date', align: 'left' },
     { h: 'Total TTC', key: 'total_ttc', align: 'right' },
     { h: 'Statut', key: 'statut', align: 'left' },
-    { h: 'Actions', key: null, align: 'left' },
+    { h: '', key: null, align: 'right' },
   ]
   const sortVal = (doc, k) => k === 'date' ? ((tab === 'devis' ? doc.date_devis : doc.date_facture) || '') : doc[k]
   const listeTriee = [...liste].sort((a, b) => {
@@ -2480,10 +2541,60 @@ export default function LodeDevisFactures() {
           </DataCard>
         )}
 
+        {/* ── Barre d'outils : chercher, filtrer ──────────────────────────
+            Une liste de factures sans recherche oblige a scroller ; passe
+            cinquante lignes, c'est la premiere chose qui manque. */}
+        {!loading && listeBrute.length > 0 && (
+          <DataCard style={{ padding: '11px 13px', marginBottom: 12, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', flex: '1 1 260px', minWidth: 200 }}>
+              <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: COUL.texteFaible, fontSize: 13, pointerEvents: 'none' }}>⌕</span>
+              <input value={recherche} onChange={e => setRecherche(e.target.value)}
+                placeholder={tab === 'devis' ? 'Chercher un devis — client, numéro, objet' : 'Chercher une facture — client, numéro, objet'}
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 30px 9px 28px', border: `1px solid ${COUL.bord}`, borderRadius: 9, fontSize: 13.5, fontFamily: 'inherit', outline: 'none' }}
+                onFocus={e => e.target.style.borderColor = C} onBlur={e => e.target.style.borderColor = COUL.bord} />
+              {recherche && (
+                <button type="button" onClick={() => setRecherche('')} title="Effacer"
+                  style={{ position: 'absolute', right: 7, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: COUL.texteFaible, cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 2 }}>×</button>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {[{ k: null, lab: 'Tous', n: listeBrute.length, col: COUL.texteMoyen },
+                ...Object.entries(STAT)
+                  .map(([k, v]) => ({ k, lab: v.label, n: listeBrute.filter(d => d.statut === k).length, col: v.col }))
+                  .filter(c => c.n > 0),
+              ].map(c => {
+                const on = filtreStatut === c.k
+                return (
+                  <button key={c.k || 'tous'} type="button" onClick={() => setFiltreStatut(on ? null : c.k)}
+                    style={{ padding: '7px 12px', borderRadius: 999, cursor: 'pointer', fontSize: 12.5, fontWeight: 700, fontFamily: 'inherit',
+                             border: `1.5px solid ${on ? c.col : COUL.bord}`, background: on ? c.col : COUL.blanc, color: on ? COUL.blanc : COUL.texteDoux, whiteSpace: 'nowrap' }}>
+                    {c.lab} <span style={{ opacity: .7, fontWeight: 600 }}>{c.n}</span>
+                  </button>
+                )
+              })}
+            </div>
+            {(recherche || filtreStatut) && (
+              <div style={{ fontSize: 12.5, color: COUL.texteDoux, fontWeight: 600, marginLeft: 'auto' }}>
+                {liste.length} sur {listeBrute.length}
+                <button type="button" onClick={() => { setRecherche(''); setFiltreStatut(null) }}
+                  style={{ marginLeft: 8, background: 'none', border: 'none', color: C, cursor: 'pointer', fontSize: 12.5, fontWeight: 700, textDecoration: 'underline', fontFamily: 'inherit' }}>tout afficher</button>
+              </div>
+            )}
+          </DataCard>
+        )}
+
         {loading ? <p style={{ color: COUL.texteFaible }}>Chargement…</p> :
           liste.length === 0 ? (
             <DataCard style={{ padding: '48px 24px', textAlign: 'center' }}>
-              <p style={{ color: COUL.texteFaible, fontStyle: 'italic', margin: 0 }}>Aucun {tab === 'devis' ? 'devis' : 'facture'} pour le moment.</p>
+              {(recherche || filtreStatut) ? (
+                <>
+                  <p style={{ color: COUL.texteDoux, margin: '0 0 10px', fontWeight: 600 }}>Aucun résultat pour cette recherche.</p>
+                  <button type="button" onClick={() => { setRecherche(''); setFiltreStatut(null) }}
+                    style={{ background: C, color: COUL.blanc, border: 'none', borderRadius: 9, padding: '9px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Tout afficher</button>
+                </>
+              ) : (
+                <p style={{ color: COUL.texteFaible, fontStyle: 'italic', margin: 0 }}>Aucun{tab === 'devis' ? ' devis' : 'e facture'} pour le moment.</p>
+              )}
             </DataCard>
           ) : mob ? (
             /* === Vue mobile : cartes empilées === */
@@ -2505,24 +2616,14 @@ export default function LodeDevisFactures() {
                       <span style={{ color: COUL.texteFaible, fontSize: 12 }}>{fmtDate(tab === 'devis' ? doc.date_devis : doc.date_facture)}</span>
                       <span style={{ fontWeight: 800, color: NAVY, fontSize: 16 }}>{eur(doc.total_ttc)}</span>
                     </div>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 10, position: 'relative' }} onClick={e => e.stopPropagation()}>
                       <ActionButton tone="grey" onClick={() => setEditing({ type: t, doc })}>Modifier</ActionButton>
-                      {tab === 'devis' && <ActionButton tone="accent" color={C} onClick={() => setSuivi(doc)}>📊 Suivi</ActionButton>}
                       {tab === 'devis'
-                        ? <>
-                            <ActionButton tone="pdf" disabled={busy === doc.id + 'pdf'} onClick={() => doExport('pdf', t, doc)}>{busy === doc.id + 'pdf' ? '…' : 'PDF'}</ActionButton>
-                            <ActionButton tone="excel" disabled={busy === doc.id + 'word'} onClick={() => doExport('word', t, doc)}>{busy === doc.id + 'word' ? '…' : 'Word'}</ActionButton>
-                          </>
-                        : <>
-                            <ActionButton tone="pdf" disabled={busy === doc.id + 'pdf'} onClick={() => genererFacturePDF(doc)}>{busy === doc.id + 'pdf' ? '…' : 'PDF'}</ActionButton>
-                            <ActionButton tone="accent" color={C} disabled={busy === doc.id + 'mail'} onClick={() => ouvrirEnvoiFacture(doc)}>{busy === doc.id + 'mail' ? '…' : '✉ Envoyer'}</ActionButton>
-                            {doc.pdf_url && <ActionButton tone="pdf" onClick={() => window.open(doc.pdf_url, '_blank', 'noopener')} onMouseEnter={() => doc.pdf_fid && setApercu({ fid: doc.pdf_fid, nom: doc.numero })} onMouseLeave={() => setApercu(null)}>Ouvrir</ActionButton>}
-                          </>}
-                      {PEPPOL_ACTIF && tab === 'factures' && doc.client_tva && doc.statut !== 'payée' && doc.statut !== 'annulée' && (
-                        <ActionButton tone="peppol" disabled={busy === doc.id + 'peppol'} onClick={() => envoyerPeppol(doc)}>{busy === doc.id + 'peppol' ? '…' : '📨 Peppol'}</ActionButton>
-                      )}
-                      {tab === 'devis' && doc.statut === 'accepté' && <ActionButton tone="accent" color={C} onClick={() => convertir(doc)}>→ Facture</ActionButton>}
-                      {t === 'devis' && <ActionButton tone="danger" onClick={() => supprimer(t, doc.id)}>Supprimer</ActionButton>}
+                        ? <ActionButton tone="pdf" disabled={busy === doc.id + 'pdf'} onClick={() => doExport('pdf', t, doc)}>{busy === doc.id + 'pdf' ? '…' : 'PDF'}</ActionButton>
+                        : <ActionButton tone="accent" color={C} disabled={busy === doc.id + 'mail'} onClick={() => ouvrirEnvoiFacture(doc)}>{busy === doc.id + 'mail' ? '…' : '✉ Envoyer'}</ActionButton>}
+                      <button type="button" title="Autres actions" onClick={() => setMenu(menu === doc.id ? null : doc.id)}
+                        style={{ marginLeft: 'auto', background: menu === doc.id ? COUL.fondDoux : 'none', border: `1px solid ${menu === doc.id ? COUL.bordFort : COUL.bord}`, borderRadius: 8, width: 34, height: 30, cursor: 'pointer', color: COUL.texteDoux, fontSize: 17, lineHeight: 1, fontWeight: 800 }}>⋯</button>
+                      {menu === doc.id && <MenuLigne items={actionsDoc(doc)} onClose={() => setMenu(null)} />}
                     </div>
                   </DataCard>
                 )
@@ -2541,35 +2642,28 @@ export default function LodeDevisFactures() {
                   {listeTriee.map((doc) => {
                     const s = STAT[doc.statut] || STAT.brouillon
                     return (
-                      <tr key={doc.id} style={{ borderTop: '1px solid #f1f5f9' }}
+                      <tr key={doc.id} style={{ borderTop: '1px solid #f1f5f9', cursor: 'pointer' }}
+                        onClick={() => setEditing({ type: tab === 'devis' ? 'devis' : 'facture', doc })}
                         onMouseEnter={e => e.currentTarget.style.background = '#fafbfc'}
                         onMouseLeave={e => e.currentTarget.style.background = COUL.blanc}>
                         <td style={{ padding: '11px 14px', fontFamily: 'monospace', fontWeight: 700, color: C }}>{doc.numero}</td>
                         <td style={{ padding: '11px 14px', color: COUL.texte, fontWeight: 600 }}>{doc.client_nom}</td>
                         <td style={{ padding: '11px 14px', color: COUL.texteDoux }}>{doc.objet || '—'}</td>
                         <td style={{ padding: '11px 14px', color: COUL.texteDoux }}>{fmtDate(tab === 'devis' ? doc.date_devis : doc.date_facture)}</td>
-                        <td style={{ padding: '11px 14px', textAlign: 'right', fontWeight: 700, color: NAVY }}>{eur(doc.total_ttc)}</td>
+                        <td style={{ padding: '11px 14px', textAlign: 'right', fontWeight: 700, color: NAVY, fontVariantNumeric: 'tabular-nums' }}>{eur(doc.total_ttc)}</td>
                         <td style={{ padding: '11px 14px' }}><StatusBadge bg={s.bg} col={s.col} label={s.label} /></td>
-                        <td style={{ padding: '11px 14px' }}>
-                          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-                            <ActionButton tone="grey" onClick={() => setEditing({ type: tab === 'devis' ? 'devis' : 'facture', doc })}>Modifier</ActionButton>
-                            {tab === 'devis' && <ActionButton tone="accent" color={C} onClick={() => setSuivi(doc)}>📊 Suivi</ActionButton>}
+                        <td style={{ padding: '11px 14px', position: 'relative' }} onClick={e => e.stopPropagation()}>
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'flex-end' }}>
                             {tab === 'devis'
-                              ? <>
-                                  <ActionButton tone="pdf" disabled={busy === doc.id + 'pdf'} onClick={() => doExport('pdf', 'devis', doc)}>{busy === doc.id + 'pdf' ? '…' : 'PDF'}</ActionButton>
-                                  <ActionButton tone="excel" disabled={busy === doc.id + 'word'} onClick={() => doExport('word', 'devis', doc)}>{busy === doc.id + 'word' ? '…' : 'Word'}</ActionButton>
-                                </>
-                              : <>
-                                  <ActionButton tone="pdf" disabled={busy === doc.id + 'pdf'} onClick={() => genererFacturePDF(doc)}>{busy === doc.id + 'pdf' ? '…' : 'PDF'}</ActionButton>
-                                  <ActionButton tone="accent" color={C} disabled={busy === doc.id + 'mail'} onClick={() => ouvrirEnvoiFacture(doc)}>{busy === doc.id + 'mail' ? '…' : '✉ Envoyer'}</ActionButton>
-                                  {doc.pdf_url && <ActionButton tone="pdf" onClick={() => window.open(doc.pdf_url, '_blank', 'noopener')} onMouseEnter={() => doc.pdf_fid && setApercu({ fid: doc.pdf_fid, nom: doc.numero })} onMouseLeave={() => setApercu(null)}>Ouvrir</ActionButton>}
-                                </>}
-                            {PEPPOL_ACTIF && tab === 'factures' && doc.client_tva && doc.statut !== 'payée' && doc.statut !== 'annulée' && (
-                              <ActionButton tone="peppol" disabled={busy === doc.id + 'peppol'} onClick={() => envoyerPeppol(doc)}>{busy === doc.id + 'peppol' ? '…' : '📨 Peppol'}</ActionButton>
-                            )}
-                            {tab === 'devis' && doc.statut === 'accepté' && <ActionButton tone="accent" color={C} onClick={() => convertir(doc)}>→ Facture</ActionButton>}
-                            {tab === 'devis' && <ActionButton tone="danger" onClick={() => supprimer(tab === 'devis' ? 'devis' : 'facture', doc.id)}>×</ActionButton>}
+                              ? <ActionButton tone="pdf" disabled={busy === doc.id + 'pdf'} onClick={() => doExport('pdf', 'devis', doc)}>{busy === doc.id + 'pdf' ? '…' : 'PDF'}</ActionButton>
+                              : <ActionButton tone="accent" color={C} disabled={busy === doc.id + 'mail'} onClick={() => ouvrirEnvoiFacture(doc)}>{busy === doc.id + 'mail' ? '…' : '✉ Envoyer'}</ActionButton>}
+                            <button type="button" title="Autres actions"
+                              onClick={() => setMenu(menu === doc.id ? null : doc.id)}
+                              style={{ background: menu === doc.id ? COUL.fondDoux : 'none', border: `1px solid ${menu === doc.id ? COUL.bordFort : 'transparent'}`, borderRadius: 8, width: 30, height: 28, cursor: 'pointer', color: COUL.texteDoux, fontSize: 16, lineHeight: 1, fontWeight: 800 }}
+                              onMouseEnter={e => { if (menu !== doc.id) e.currentTarget.style.background = COUL.fondDoux }}
+                              onMouseLeave={e => { if (menu !== doc.id) e.currentTarget.style.background = 'none' }}>⋯</button>
                           </div>
+                          {menu === doc.id && <MenuLigne items={actionsDoc(doc)} onClose={() => setMenu(null)} />}
                         </td>
                       </tr>
                     )
