@@ -2344,6 +2344,154 @@ function EnvoiFactureModal({ doc, b64, fileName, onClose, onSent }) {
 }
 
 // ════════════════════════════════════════════════════════════════
+//  RAPPROCHER UNE FACTURE DE VENTE AVEC LA RENTREE QUI L'A PAYEE
+//
+//  Volontairement MANUEL. Mesure du 06/11 sur les donnees reelles :
+//  sur 22 factures, 4 seulement ont une rentree au montant exact. Les
+//  clients paient en montants ronds, partiellement, ou groupent plusieurs
+//  factures. Un automate se tromperait plus souvent qu'il n'aiderait ;
+//  l'ecran classe les candidats et c'est un humain qui tranche.
+// ════════════════════════════════════════════════════════════════
+function ModalPaiement({ facture, factures, onClose, onLie }) {
+  const [mouvements, setMouvements] = useState(null)
+  const [erreur, setErreur] = useState('')
+  const [q, setQ] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const du = Math.round(((Number(facture.total_ttc) || 0) - (Number(facture.montant_paye) || 0)) * 100) / 100
+
+  useEffect(() => {
+    let vivant = true
+    ;(async () => {
+      try {
+        const { data: soc } = await supabase.from('societes').select('id').eq('code', 'LODE').single()
+        if (!soc) throw new Error('Société LODE introuvable')
+        const { data: comptes } = await supabase.from('comptes_bancaires').select('id').eq('societe_id', soc.id)
+        const ids = (comptes || []).map(c => c.id)
+        if (!ids.length) throw new Error('Aucun compte bancaire LODE')
+        const { data, error } = await supabase
+          .from('transactions')
+          .select('id,date_valeur,montant,contrepartie_nom,description,information_paiement')
+          .in('compte_id', ids).gt('montant', 0)
+          .order('date_valeur', { ascending: false }).limit(400)
+        if (error) throw error
+        if (vivant) setMouvements(data || [])
+      } catch (e) { if (vivant) { setErreur(e.message); setMouvements([]) } }
+    })()
+    return () => { vivant = false }
+  }, [facture.id])
+
+  // Deja pris par une autre facture : on le montre plutot que de le cacher,
+  // sinon on cherche en vain un virement qu'on a deja affecte ailleurs.
+  const prisPar = {}
+  for (const f of (factures || [])) if (f.transaction_id && f.id !== facture.id) prisPar[f.transaction_id] = f.numero
+
+  const sansAccent = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  const motsClient = sansAccent(facture.client_nom).split(/\s+/).filter(m => m.length > 3)
+
+  const classes = (mouvements || [])
+    .map(m => {
+      const montantExact = Math.abs((Number(m.montant) || 0) - du) < 0.01
+      const texte = sansAccent(`${m.contrepartie_nom || ''} ${m.description || ''} ${m.information_paiement || ''}`)
+      const nomColle = motsClient.length > 0 && motsClient.some(mot => texte.includes(mot))
+      const numeroCite = facture.numero && texte.includes(sansAccent(facture.numero))
+      // Le numero cite en communication est le signe le plus sur, loin devant
+      // le montant : c'est le client qui l'a ecrit.
+      const score = (numeroCite ? 100 : 0) + (montantExact ? 40 : 0) + (nomColle ? 20 : 0)
+      return { ...m, montantExact, nomColle, numeroCite, score }
+    })
+    .filter(m => {
+      if (!q.trim()) return true
+      const t = sansAccent(`${m.contrepartie_nom || ''} ${m.description || ''} ${m.information_paiement || ''} ${m.montant}`)
+      return sansAccent(q).split(/\s+/).filter(Boolean).every(mot => t.includes(mot))
+    })
+    .sort((a, b) => b.score - a.score || String(b.date_valeur).localeCompare(String(a.date_valeur)))
+
+  const lier = async (m) => {
+    const couvre = (Number(m.montant) || 0) + 0.01 >= du
+    const txt = `Rapprocher la facture ${facture.numero} de la rentrée du ${fmtDate(m.date_valeur)} ?\n\n`
+      + `Montant reçu : ${eur(m.montant)}\nMontant dû : ${eur(du)}\n\n`
+      + (couvre ? 'La facture sera marquée « payée ».' : 'Le paiement ne couvre pas tout : le statut ne change pas.')
+    if (!window.confirm(txt)) return
+    setBusy(true)
+    const maj = { transaction_id: m.id }
+    if (couvre) maj.statut = 'payée'
+    const { error } = await supabase.from('lode_factures').update(maj).eq('id', facture.id)
+    setBusy(false)
+    if (error) { alert('Rapprochement impossible : ' + error.message); return }
+    onLie({ ...facture, ...maj })
+    onClose()
+  }
+
+  const delier = async () => {
+    if (!window.confirm(`Retirer le paiement rapproché à la facture ${facture.numero} ?`)) return
+    setBusy(true)
+    const { error } = await supabase.from('lode_factures').update({ transaction_id: null }).eq('id', facture.id)
+    setBusy(false)
+    if (error) { alert('Impossible : ' + error.message); return }
+    onLie({ ...facture, transaction_id: null })
+    onClose()
+  }
+
+  const inp2 = { padding: '9px 11px', border: `1px solid ${COUL.bord}`, borderRadius: 9, fontSize: 13.5, fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' }
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', zIndex: 9500, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '5vh 14px', overflowY: 'auto' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: COUL.blanc, borderRadius: 14, width: '100%', maxWidth: 680, boxShadow: '0 20px 60px rgba(0,0,0,.25)', overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '86vh' }}>
+        <div style={{ padding: '15px 20px', borderBottom: `1px solid ${COUL.bord}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: NAVY }}>Rapprocher un paiement</div>
+            <div style={{ fontSize: 12.5, color: COUL.texteDoux, marginTop: 2 }}>
+              Facture {facture.numero} · {facture.client_nom} · <strong style={{ color: ORANGE }}>{eur(du)}</strong> dû
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 21, cursor: 'pointer', color: COUL.texteFaible }}>×</button>
+        </div>
+
+        {facture.transaction_id && (
+          <div style={{ padding: '11px 20px', background: COUL.succesFondDoux, borderBottom: `1px solid ${COUL.succesBord}`, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: COUL.succesFonce }}>✓ Un paiement est déjà rapproché</span>
+            <button onClick={delier} disabled={busy} style={{ marginLeft: 'auto', background: COUL.blanc, border: `1px solid ${COUL.dangerBord}`, color: COUL.danger, borderRadius: 8, padding: '6px 12px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>Le retirer</button>
+          </div>
+        )}
+
+        <div style={{ padding: '12px 20px 0' }}>
+          <input value={q} onChange={e => setQ(e.target.value)} style={inp2} placeholder="Filtrer — nom, communication, montant" />
+        </div>
+
+        <div style={{ padding: '10px 14px 16px', overflowY: 'auto' }}>
+          {mouvements === null && <div style={{ padding: 24, textAlign: 'center', color: COUL.texteDoux, fontSize: 13 }}>Lecture des rentrées…</div>}
+          {erreur && <div style={{ padding: 16, color: COUL.danger, fontSize: 13, fontWeight: 600 }}>{erreur}</div>}
+          {mouvements !== null && !erreur && !classes.length && (
+            <div style={{ padding: 24, textAlign: 'center', color: COUL.texteDoux, fontSize: 13 }}>Aucune rentrée ne correspond.</div>
+          )}
+          {classes.map(m => (
+            <div key={m.id} onClick={() => !busy && lier(m)}
+              style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '10px 12px', borderRadius: 9, cursor: busy ? 'wait' : 'pointer', borderBottom: `1px solid ${COUL.fondDoux}` }}
+              onMouseEnter={e => e.currentTarget.style.background = COUL.fond}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 700, color: NAVY }}>{m.contrepartie_nom || '(sans nom)'}</div>
+                <div style={{ fontSize: 11.5, color: COUL.texteDoux, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {fmtDate(m.date_valeur)}{m.information_paiement ? ' · ' + m.information_paiement : (m.description ? ' · ' + m.description : '')}
+                </div>
+                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 4 }}>
+                  {m.numeroCite && <span style={{ fontSize: 10, fontWeight: 800, color: COUL.succesFonce, background: COUL.succesFond, borderRadius: 4, padding: '1px 6px' }}>N° DE FACTURE CITÉ</span>}
+                  {m.montantExact && <span style={{ fontSize: 10, fontWeight: 800, color: ORANGE, background: COUL.orangeFond, borderRadius: 4, padding: '1px 6px' }}>MONTANT EXACT</span>}
+                  {m.nomColle && <span style={{ fontSize: 10, fontWeight: 800, color: COUL.info, background: COUL.infoFond, borderRadius: 4, padding: '1px 6px' }}>NOM DU CLIENT</span>}
+                  {prisPar[m.id] && <span style={{ fontSize: 10, fontWeight: 800, color: COUL.alerteFonce, background: COUL.alerteFond, borderRadius: 4, padding: '1px 6px' }}>DÉJÀ SUR {prisPar[m.id]}</span>}
+                </div>
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: NAVY, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{eur(m.montant)}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════
 //  MENU DE LIGNE — sept boutons sur chaque ligne, c'est sept fois
 //  rien de lisible. Les deux gestes courants restent visibles, le
 //  reste tient ici.
@@ -2403,6 +2551,7 @@ export default function LodeDevisFactures() {
   const [suivi, setSuivi] = useState(null)      // devis dont on affiche le suivi
   const [apercu, setApercu] = useState(null)      // {fid,nom} apercu PDF au survol
   const [envoi, setEnvoi] = useState(null)        // { doc, b64, fileName } facture a envoyer par email
+  const [paiement, setPaiement] = useState(null)  // facture dont on cherche la rentree bancaire
   const [sort, setSort] = useState({ key: 'numero', dir: 'desc' })
   const [recherche, setRecherche] = useState('')
   const [filtreStatut, setFiltreStatut] = useState(null)
@@ -2678,6 +2827,9 @@ export default function LodeDevisFactures() {
     return [
       { icon: '✎', label: 'Modifier', onClick: () => setEditing({ type: t, doc }) },
       tab === 'devis' && { icon: '📊', label: 'Suivi du devis', onClick: () => setSuivi(doc) },
+      tab !== 'devis' && { icon: doc.transaction_id ? '🔗' : '🏦',
+        label: doc.transaction_id ? 'Paiement rapproché — modifier' : 'Rapprocher un paiement',
+        onClick: () => setPaiement(doc) },
       { sep: true },
       { icon: '📄', label: 'Télécharger le PDF', disabled: busy === doc.id + 'pdf',
         onClick: () => (tab === 'devis' ? doExport('pdf', 'devis', doc) : genererFacturePDF(doc)) },
@@ -2917,6 +3069,14 @@ export default function LodeDevisFactures() {
       {editing && <Editeur type={editing.type} doc={editing.doc} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load() }} />}
       {suivi && <SuiviModal doc={suivi} color={C} onClose={() => setSuivi(null)} onChanged={() => { load() }} />}
       {apercu && <ApercuFacture fid={apercu.fid} nom={apercu.nom} />}
+      {paiement && (
+        <ModalPaiement
+          facture={paiement} factures={factures}
+          onClose={() => setPaiement(null)}
+          onLie={maj => setFactures(prev => prev.map(f => f.id === maj.id ? { ...f, ...maj } : f))}
+        />
+      )}
+
       {envoi && <EnvoiFactureModal doc={envoi.doc} b64={envoi.b64} fileName={envoi.fileName} onClose={() => setEnvoi(null)} onSent={() => { setEnvoi(null); load() }} />}
     </Layout>
   )
