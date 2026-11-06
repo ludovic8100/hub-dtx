@@ -300,21 +300,27 @@ quatre routes d'envoi de mail — `cotisation-rappel`, `cotisation-send`, `devis
 
 ## Trois pièges mesurés le 06/11/2026
 
-### Retirer un droit à `anon` ne retire rien : c'est `PUBLIC` qui le porte
+### Fermer une fonction demande DEUX révocations, pas une
 
-Postgres accorde `EXECUTE` à **`PUBLIC`** sur toute fonction nouvelle. Un
-`revoke execute on function … from anon` laisse donc le droit intact — vérifié :
-`has_function_privilege('anon', …)` rendait toujours `true` après le revoke.
+`anon` tient son droit d'exécution de **deux sources à la fois**, et il faut
+couper les deux. Je me suis fait prendre une fois par chacune, le même jour.
+
+1. **`PUBLIC`** — Postgres accorde `EXECUTE` à `PUBLIC` sur toute fonction
+   nouvelle. Un `revoke … from anon` seul laisse donc le droit intact.
+2. **Le privilège par défaut de Supabase** — il accorde `EXECUTE` à `anon`,
+   `authenticated` et `service_role` sur toute fonction nouvelle du schéma
+   `public`. Un `revoke … from public` seul laisse donc le droit intact aussi.
 
 **La forme correcte**, pour toute fonction sensible :
 
 ```sql
-revoke execute on function public.f(...) from public;
+revoke execute on function public.f(...) from public, anon;
 grant  execute on function public.f(...) to authenticated;  -- ou service_role
 ```
 
-puis **revérifier** avec `has_function_privilege`. Un correctif de sécurité non
-revérifié rassure sans protéger.
+puis **revérifier** avec `has_function_privilege('anon', …)`. La vérification
+n'est pas une précaution de style : elle a rattrapé l'erreur les deux fois.
+Un correctif de sécurité non revérifié rassure sans protéger.
 
 Rappel : `anon` est le rôle d'**avant** connexion, et sa clé est dans le bundle
 du navigateur **et dans ce dépôt public**. « Appelable par `anon` » = appelable
@@ -346,6 +352,45 @@ pourquoi.
 
 **Règle générale** : un indicateur calculé sur une source vide doit renvoyer
 `null`, jamais un total — et surtout jamais zéro, qui se lit comme une mesure.
+
+## Le Hub est derrière le login Microsoft — vérifié le 06/11/2026
+
+Question de Ludovic : *« l'entièreté du Hub doit passer par l'authentificateur
+Microsoft ? Plus aucune page ne peut être accessible sans ce login. »*
+
+**Oui, et c'est vérifié par un test, pas par une lecture du code** : les
+50 routes ouvertes une à une dans un contexte de navigateur **neuf** (ni
+cookie, ni `localStorage`, ni session héritée — l'équivalent strict d'une
+navigation privée), en cherchant dans la page rendue à la fois l'écran de
+connexion et toute trace de contenu applicatif.
+
+**47 sur 50 affichent l'écran de connexion. Zéro fuite de contenu.** Les trois
+autres sont voulues :
+
+| Route | Ce qu'elle montre |
+|---|---|
+| `/auth/callback` | « Connexion en cours… » — c'est l'étape du login |
+| `/access-denied` | « Ton compte n'a pas encore accès au Hub » — aucune donnée |
+| `/devis/:token` | **la seule vraie page publique** |
+
+`ACCES_LIBRE_TEMPORAIRE` (la porte dérobée de `src/lib/auth.jsx`) est bien à
+`false`.
+
+### `/devis/:token` : la seule exception, et elle est voulue
+
+Un client qui reçoit un devis n'a pas de compte Microsoft. La page est donc
+ouverte, protégée par un jeton UUID imprévisible — testé avec un UUID au
+hasard : « Lien indisponible », aucune fuite.
+
+**Deux limites à connaître** (constatées, non corrigées — c'est un choix
+métier) :
+
+- **Le lien n'expire jamais.** `lode_devis.date_validite` existe mais
+  `lode_devis_public()` ne la regarde pas.
+- **La fonction renvoie toute la ligne** (`to_jsonb(d)`), donc aussi `notes`,
+  `responsable`, `opened_at`, `relance_sent_at`. Pas de colonne de marge ni de
+  prix de revient — rien de confidentiel — mais si `notes` sert à des
+  remarques internes, le client les lit.
 
 ## Environnements & configuration (depuis le 29/10/2026)
 
