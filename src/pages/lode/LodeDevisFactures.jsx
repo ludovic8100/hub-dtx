@@ -1,5 +1,5 @@
 import { n8nWebhook } from '../../config/env'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useLayoutEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { PEPPOL_ACTIF } from '../../lib/peppol'
 import Layout from '../../components/Layout'
@@ -2207,11 +2207,35 @@ function EnvoiFactureModal({ doc, b64, fileName, onClose, onSent }) {
 //  rien de lisible. Les deux gestes courants restent visibles, le
 //  reste tient ici.
 // ════════════════════════════════════════════════════════════════
-function MenuLigne({ items, onClose }) {
+function MenuLigne({ anchor, items, onClose }) {
+  const ref = useRef(null)
+  const [pos, setPos] = useState({ top: 0, pret: false })
+
+  // Le tableau vit dans une carte `overflow-x: auto`, qui decoupe tout ce qui
+  // depasse — un menu ouvert sur la derniere ligne etait simplement invisible.
+  // On le sort donc du flux : position fixe, calee sur le bouton a l'ecran.
+  useLayoutEffect(() => {
+    const h = ref.current ? ref.current.offsetHeight : 0
+    const sousLeBouton = anchor.bottom + 4
+    const place = (sousLeBouton + h > window.innerHeight - 8 && anchor.top - 4 - h > 8)
+      ? anchor.top - 4 - h                                   // il tient au-dessus
+      : Math.max(8, Math.min(sousLeBouton, window.innerHeight - 8 - h))
+    setPos({ top: place, pret: true })
+  }, [anchor])
+
+  // Un menu fixe ne suit pas le defilement : plutot que de le voir deriver
+  // loin de sa ligne, on le ferme.
+  useEffect(() => {
+    const fermer = () => onClose()
+    window.addEventListener('scroll', fermer, true)
+    window.addEventListener('resize', fermer)
+    return () => { window.removeEventListener('scroll', fermer, true); window.removeEventListener('resize', fermer) }
+  }, [onClose])
+
   return (
     <>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
-      <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 41, background: COUL.blanc, border: `1px solid ${COUL.bord}`, borderRadius: 10, boxShadow: '0 10px 30px rgba(15,23,42,.18)', minWidth: 196, overflow: 'hidden', textAlign: 'left' }}>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1200 }} />
+      <div ref={ref} style={{ position: 'fixed', top: pos.top, right: Math.max(8, window.innerWidth - anchor.right), zIndex: 1201, visibility: pos.pret ? 'visible' : 'hidden', background: COUL.blanc, border: `1px solid ${COUL.bord}`, borderRadius: 10, boxShadow: '0 10px 30px rgba(15,23,42,.18)', minWidth: 206, overflow: 'hidden', textAlign: 'left' }}>
         {items.filter(Boolean).map((it, k) => it.sep ? (
           <div key={k} style={{ height: 1, background: COUL.bord }} />
         ) : (
@@ -2242,6 +2266,7 @@ export default function LodeDevisFactures() {
   const [recherche, setRecherche] = useState('')
   const [filtreStatut, setFiltreStatut] = useState(null)
   const [menu, setMenu] = useState(null)        // id du document dont le menu est ouvert
+  const [menuStatut, setMenuStatut] = useState(null)  // id du document dont le menu de statut est ouvert
 
   const load = async () => {
     setLoading(true)
@@ -2367,6 +2392,21 @@ export default function LodeDevisFactures() {
     finally { setBusy(null) }
   }
 
+  // Changer le statut sans ouvrir le document : c'est le geste le plus
+  // frequent de la liste (« le client a dit oui »), il ne doit pas couter
+  // l'ouverture de l'editeur.
+  const changerStatut = async (doc, nouveau) => {
+    const table = tab === 'devis' ? 'lode_devis' : 'lode_factures'
+    const avant = doc.statut
+    const maj = (st) => {
+      const appliquer = (arr) => arr.map(x => x.id === doc.id ? { ...x, statut: st } : x)
+      if (tab === 'devis') setDevis(appliquer); else setFactures(appliquer)
+    }
+    maj(nouveau)                                   // on montre tout de suite
+    const { error } = await supabase.from(table).update({ statut: nouveau }).eq('id', doc.id)
+    if (error) { maj(avant); alert('Statut non enregistré : ' + error.message) }
+  }
+
   const convertir = async (devisDoc) => {
     if (!confirm(`Convertir le devis ${devisDoc.numero} en facture ?`)) return
     const lignes = await getLignes('devis', devisDoc.id)
@@ -2382,8 +2422,15 @@ export default function LodeDevisFactures() {
     }).select('id').single()
     if (error) { alert('Erreur : ' + error.message); return }
     if (lignes.length) {
+      // Le devis porte titre, descriptif, photos et options ; la facture a les
+      // memes colonnes. Ne recopier que `description` vidait la facture de tout
+      // ce que le client avait lu dans son devis.
       await supabase.from('lode_factures_lignes').insert(lignes.map((l, i) => ({
-        facture_id: fact.id, position: i, description: l.description, quantite: l.quantite,
+        facture_id: fact.id, position: i,
+        titre: l.titre || '', descriptif: l.descriptif || '',
+        description: l.description || l.titre || '',
+        photos: l.photos || [], optionnelle: !!l.optionnelle,
+        quantite: l.quantite,
         prix_unitaire: l.prix_unitaire, remise_pct: l.remise_pct, tva_pct: l.tva_pct, tva_categorie: l.tva_categorie || ((Number(l.tva_pct) || 0) > 0 ? 'S' : 'AE'), total_ht: l.total_ht,
       })))
     }
@@ -2439,6 +2486,27 @@ export default function LodeDevisFactures() {
       _preselAcomptes: d.grp.filter(x => x.type === 'acompte').map(x => x.id),
     } })
   }
+  // Le menu du statut. Quand un devis est accepte, l'action qui suit n'est
+  // pas « changer le statut » mais « facturer » : elle passe en tete.
+  const itemsStatut = (doc) => {
+    const suite = []
+    if (tab === 'devis' && doc.statut === 'accepté') {
+      suite.push({ icon: '→', label: 'Convertir en facture', onClick: () => convertir(doc) }, { sep: true })
+    }
+    if (tab === 'devis' && doc.statut === 'envoyé') {
+      suite.push({ icon: '📊', label: 'Voir si le client a ouvert', onClick: () => setSuivi(doc) }, { sep: true })
+    }
+    return [
+      ...suite,
+      ...Object.entries(STAT).map(([k, v]) => ({
+        icon: doc.statut === k ? '✓' : ' ',
+        label: v.label,
+        disabled: doc.statut === k,
+        onClick: () => changerStatut(doc, k),
+      })),
+    ]
+  }
+
   // Les gestes d'un document, au meme endroit pour le tableau et les cartes :
   // deux listes qui divergent, c'est un bouton qui manque d'un cote.
   const actionsDoc = (doc) => {
@@ -2621,9 +2689,9 @@ export default function LodeDevisFactures() {
                       {tab === 'devis'
                         ? <ActionButton tone="pdf" disabled={busy === doc.id + 'pdf'} onClick={() => doExport('pdf', t, doc)}>{busy === doc.id + 'pdf' ? '…' : 'PDF'}</ActionButton>
                         : <ActionButton tone="accent" color={C} disabled={busy === doc.id + 'mail'} onClick={() => ouvrirEnvoiFacture(doc)}>{busy === doc.id + 'mail' ? '…' : '✉ Envoyer'}</ActionButton>}
-                      <button type="button" title="Autres actions" onClick={() => setMenu(menu === doc.id ? null : doc.id)}
-                        style={{ marginLeft: 'auto', background: menu === doc.id ? COUL.fondDoux : 'none', border: `1px solid ${menu === doc.id ? COUL.bordFort : COUL.bord}`, borderRadius: 8, width: 34, height: 30, cursor: 'pointer', color: COUL.texteDoux, fontSize: 17, lineHeight: 1, fontWeight: 800 }}>⋯</button>
-                      {menu === doc.id && <MenuLigne items={actionsDoc(doc)} onClose={() => setMenu(null)} />}
+                      <button type="button" title="Autres actions" onClick={e => setMenu(menu?.id === doc.id ? null : { id: doc.id, rect: e.currentTarget.getBoundingClientRect() })}
+                        style={{ marginLeft: 'auto', background: menu?.id === doc.id ? COUL.fondDoux : 'none', border: `1px solid ${menu?.id === doc.id ? COUL.bordFort : COUL.bord}`, borderRadius: 8, width: 34, height: 30, cursor: 'pointer', color: COUL.texteDoux, fontSize: 17, lineHeight: 1, fontWeight: 800 }}>⋯</button>
+                      {menu?.id === doc.id && <MenuLigne anchor={menu.rect} items={actionsDoc(doc)} onClose={() => setMenu(null)} />}
                     </div>
                   </DataCard>
                 )
@@ -2651,19 +2719,26 @@ export default function LodeDevisFactures() {
                         <td style={{ padding: '11px 14px', color: COUL.texteDoux }}>{doc.objet || '—'}</td>
                         <td style={{ padding: '11px 14px', color: COUL.texteDoux }}>{fmtDate(tab === 'devis' ? doc.date_devis : doc.date_facture)}</td>
                         <td style={{ padding: '11px 14px', textAlign: 'right', fontWeight: 700, color: NAVY, fontVariantNumeric: 'tabular-nums' }}>{eur(doc.total_ttc)}</td>
-                        <td style={{ padding: '11px 14px' }}><StatusBadge bg={s.bg} col={s.col} label={s.label} /></td>
+                        <td style={{ padding: '11px 14px', position: 'relative' }} onClick={e => e.stopPropagation()}>
+                          <button type="button" title="Changer le statut"
+                            onClick={e => setMenuStatut(menuStatut?.id === doc.id ? null : { id: doc.id, rect: e.currentTarget.getBoundingClientRect() })}
+                            style={{ background: s.bg, color: s.col, border: `1px solid ${menuStatut?.id === doc.id ? s.col : 'transparent'}`, borderRadius: 999, padding: '4px 10px 4px 11px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
+                            {s.label}<span style={{ fontSize: 9, opacity: .75 }}>▾</span>
+                          </button>
+                          {menuStatut?.id === doc.id && <MenuLigne anchor={menuStatut.rect} items={itemsStatut(doc)} onClose={() => setMenuStatut(null)} />}
+                        </td>
                         <td style={{ padding: '11px 14px', position: 'relative' }} onClick={e => e.stopPropagation()}>
                           <div style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'flex-end' }}>
                             {tab === 'devis'
                               ? <ActionButton tone="pdf" disabled={busy === doc.id + 'pdf'} onClick={() => doExport('pdf', 'devis', doc)}>{busy === doc.id + 'pdf' ? '…' : 'PDF'}</ActionButton>
                               : <ActionButton tone="accent" color={C} disabled={busy === doc.id + 'mail'} onClick={() => ouvrirEnvoiFacture(doc)}>{busy === doc.id + 'mail' ? '…' : '✉ Envoyer'}</ActionButton>}
                             <button type="button" title="Autres actions"
-                              onClick={() => setMenu(menu === doc.id ? null : doc.id)}
-                              style={{ background: menu === doc.id ? COUL.fondDoux : 'none', border: `1px solid ${menu === doc.id ? COUL.bordFort : 'transparent'}`, borderRadius: 8, width: 30, height: 28, cursor: 'pointer', color: COUL.texteDoux, fontSize: 16, lineHeight: 1, fontWeight: 800 }}
-                              onMouseEnter={e => { if (menu !== doc.id) e.currentTarget.style.background = COUL.fondDoux }}
-                              onMouseLeave={e => { if (menu !== doc.id) e.currentTarget.style.background = 'none' }}>⋯</button>
+                              onClick={e => setMenu(menu?.id === doc.id ? null : { id: doc.id, rect: e.currentTarget.getBoundingClientRect() })}
+                              style={{ background: menu?.id === doc.id ? COUL.fondDoux : 'none', border: `1px solid ${menu?.id === doc.id ? COUL.bordFort : 'transparent'}`, borderRadius: 8, width: 30, height: 28, cursor: 'pointer', color: COUL.texteDoux, fontSize: 16, lineHeight: 1, fontWeight: 800 }}
+                              onMouseEnter={e => { if (menu?.id !== doc.id) e.currentTarget.style.background = COUL.fondDoux }}
+                              onMouseLeave={e => { if (menu?.id !== doc.id) e.currentTarget.style.background = 'none' }}>⋯</button>
                           </div>
-                          {menu === doc.id && <MenuLigne items={actionsDoc(doc)} onClose={() => setMenu(null)} />}
+                          {menu?.id === doc.id && <MenuLigne anchor={menu.rect} items={actionsDoc(doc)} onClose={() => setMenu(null)} />}
                         </td>
                       </tr>
                     )
