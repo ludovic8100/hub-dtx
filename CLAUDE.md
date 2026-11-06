@@ -287,16 +287,19 @@ Ce qui continue d'exiger un accord explicite, parce que ce n'est pas réversible
 `git revert` : les écritures massives en base de production, les suppressions, et tout
 geste qui sort du dépôt (envoi de courrier, publication, appel à une API tierce qui écrit).
 
-### Plafond des fonctions serverless : 12 sur 12
+### Le plafond des fonctions serverless est levé (06/11/2026)
 
-`api/` contient **exactement 12 fonctions** pour une limite de 12 sur le plan Vercel
-gratuit. **La treizième casse tous les déploiements de production** — c'est ce qui s'est
-produit les 4 et 5/11. Un environnement de test ne protège pas de ça : le plafond est une
-limite du projet de production, pas du code.
+Le projet Vercel est passé en **plan Pro**. La limite de 12 fonctions
+serverless, qui a cassé tous les déploiements de production les 4 et 5/11
+(13 fonctions pour une limite de 12), n'existe plus.
 
-**Ne pas ajouter de fichier dans `api/` sans arbitrage humain** (plan Pro, ou fusion des
-quatre routes d'envoi de mail — `cotisation-rappel`, `cotisation-send`, `devis-send`,
-`facture-send` — qui font toutes la même chose).
+**Vérifié, pas supposé** : une preview portant une 13ᵉ fonction a été construite
+avec succès le 06/11. Sur le plan gratuit, ce déploiement échouait.
+
+La fusion des quatre routes d'envoi de mail (`cotisation-rappel`,
+`cotisation-send`, `devis-send`, `facture-send`) n'est donc plus nécessaire.
+Elle reste souhaitable par propreté — elles font toutes la même chose — mais
+ce n'est plus un sujet de stabilité.
 
 ## Trois pièges mesurés le 06/11/2026
 
