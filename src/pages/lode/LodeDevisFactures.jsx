@@ -51,8 +51,12 @@ const fmtDate = iso => iso ? new Date(iso).toLocaleDateString('fr-BE') : '—'
 
 // ── Calcul des totaux d'un document ─────────────────────────────
 function calcTotaux(lignesToutes, remiseGlobalePct) {
-  // les lignes marquées "optionnelle" (option au choix) ne sont pas additionnées au total
-  const lignes = (lignesToutes || []).filter(l => !l.optionnelle)
+  // Deux familles de lignes sont AFFICHEES mais pas additionnees :
+  //  - « optionnelle » : une option au choix du client ;
+  //  - bloc 'projet'  : un article convenu, rappele sur une facture
+  //    d'acompte. L'additionner ferait payer le projet entier au lieu de
+  //    l'acompte — c'est l'erreur qui coute le plus cher ici.
+  const lignes = (lignesToutes || []).filter(l => !l.optionnelle && l.bloc !== 'projet')
   let ht = 0, tva = 0
   const parTaux = {}
   lignes.forEach(l => {
@@ -389,23 +393,38 @@ function Editeur({ type, doc, onClose, onSaved }) {
       .map(([k, ht]) => {
         const [taux, cat] = k.split('|')
         return {
-          titre: 'Acompte de ' + pct + ' % sur le projet',
-          // On garde la trace de ce qui a ete convenu : le client doit
-          // reconnaitre sa commande sur la facture d'acompte.
-          descriptif: articles.length ? ('Articles initialement convenus : ' + articles.join(', ')) : '',
-          description: 'Acompte de ' + pct + ' % sur le projet',
+          titre: 'Paiement échelonné',
+          descriptif: 'Acompte de ' + pct + ' % sur le projet',
+          description: 'Paiement échelonné',
           quantite: 1, prix_unitaire: Math.round(ht * pct) / 100,
-          remise_pct: 0, tva_pct: Number(taux), tva_categorie: cat, photos: [], optionnelle: false,
+          remise_pct: 0, tva_pct: Number(taux), tva_categorie: cat, photos: [],
+          optionnelle: false, bloc: 'facture',
         }
       })
     if (!nouvelles.length) { alert('Ajoute d\'abord les lignes du projet : le pourcentage se calcule dessus.'); return }
-    setLignes(nouvelles)
+    // ON NE REMPLACE PAS : les articles convenus restent, marques 'projet',
+    // et la ligne d'acompte s'ajoute en 'facture'. Le client voit ce qu'il a
+    // commande ET ce qu'on lui reclame maintenant.
+    setLignes([
+      ...lignes.filter(l => !l._deduction && l.bloc !== 'facture').map(l => ({ ...l, bloc: 'projet' })),
+      ...nouvelles,
+    ])
     if (!f.objet) set('objet', 'Acompte de ' + pct + ' % sur le projet')
   }
 
   // « Il reste X a facturer sur ce projet ». On ne l'affiche que si on peut
   // le calculer : sans total de projet, on ne devine pas.
-  const projetTTC = Number(f.total_projet_ttc) || 0
+  // Les deux blocs d'une facture d'acompte.
+  const lignesProjet  = lignes.filter(l => l.bloc === 'projet')
+  const lignesFacture = lignes.filter(l => l.bloc !== 'projet')
+  const estAcompte    = lignesProjet.length > 0
+  // Totaux du projet entier : calcules sur les lignes 'projet', qui sont
+  // justement celles que calcTotaux ecarte du total facture.
+  const totProjet = estAcompte
+    ? calcTotaux(lignesProjet.map(l => ({ ...l, bloc: null })), f.remise_pct)
+    : null
+
+  const projetTTC = estAcompte ? (totProjet?.ttc || 0) : (Number(f.total_projet_ttc) || 0)
   const resteAFacturer = projetTTC > 0
     ? Math.round((projetTTC - dejaFacture - tot.ttc) * 100) / 100
     : null
@@ -500,6 +519,8 @@ function Editeur({ type, doc, onClose, onSaved }) {
         quantite: Number(l.quantite) || 0, prix_unitaire: Number(l.prix_unitaire) || 0,
         remise_pct: Number(l.remise_pct) || 0, tva_pct: Number(l.tva_pct) || 0,
         ...(isDevis ? {} : { tva_categorie: (Number(l.tva_pct) || 0) > 0 ? 'S' : (l.tva_categorie || 'AE') }),
+        // Un devis n'a pas de blocs : la colonne n'existe que sur les factures.
+        ...(isDevis ? {} : { bloc: l.bloc || null }),
         total_ht: (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * (1 - (Number(l.remise_pct) || 0) / 100),
       }))
       if (lignesPayload.length) {
@@ -927,7 +948,12 @@ async function exportPDF(type, doc, lignes, opts = {}) {
 
   // ---- Tableau lignes (en-tête orange plein) ----
   // Lignes normales (non optionnelles) dans le total ; les optionnelles iront dans un encadré séparé
-  const lignesNormales = lignes.filter(l => !l.optionnelle)
+  //
+  // Sur une facture d'acompte, les articles du projet sont RAPPELES au-dessus
+  // mais ne figurent pas dans le tableau facture : les additionner ferait
+  // payer le projet entier.
+  const lignesProjetPdf = lignes.filter(l => l.bloc === 'projet')
+  const lignesNormales = lignes.filter(l => !l.optionnelle && l.bloc !== 'projet')
   const lignesOptions = lignes.filter(l => l.optionnelle)
   const hasRemiseLigne = lignes.some(x => Number(x.remise_pct) > 0)
 
@@ -1003,7 +1029,40 @@ async function exportPDF(type, doc, lignes, opts = {}) {
     return yy + 8
   }
 
-  let y = dessinerEnteteColonnes(startY)
+  // ── RAPPEL DU PROJET (facture d'acompte) ───────────────────────────────
+  // Le client doit reconnaitre sa commande sur la facture d'acompte, sinon il
+  // recoit un montant sans objet. On rappelle ce qui a ete convenu et le total
+  // du projet AVANT de montrer ce qu'on lui reclame aujourd'hui.
+  let startYReel = startY
+  if (lignesProjetPdf.length) {
+    const totProjetPdf = calcTotaux(lignesProjetPdf.map(l => ({ ...l, bloc: null })), doc.remise_pct)
+    let yr = startY
+    d.setFontSize(10); d.setFont(undefined, 'bold'); d.setTextColor(...O)
+    d.text('Répartition du projet', M_L, yr); yr += 4.6
+    d.setFontSize(8); d.setFont(undefined, 'normal'); d.setTextColor(...GREY)
+    d.text('Articles initialement convenus', M_L, yr); yr += 5
+    d.setFontSize(8.5); d.setTextColor(...DARK)
+    for (const l of lignesProjetPdf) {
+      if (yr > BOTTOM - 24) { d.addPage(); yr = 20 }
+      const htL = (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * (1 - (Number(l.remise_pct) || 0) / 100)
+      d.text(String(l.titre || l.description || '').slice(0, 70), M_L + 2, yr)
+      d.text(eurPDF(htL), PW - M_R - 2, yr, { align: 'right' })
+      yr += 4.4
+    }
+    yr += 1.5
+    d.setDrawColor(235, 235, 235); d.setLineWidth(0.2); d.line(M_L, yr, PW - M_R, yr); yr += 4.5
+    d.setFontSize(8.5); d.setTextColor(...GREY)
+    d.text('Total du projet (hors TVA)', PW - 70, yr)
+    d.setTextColor(...DARK); d.text(eurPDF(totProjetPdf.ht), PW - M_R - 2, yr, { align: 'right' }); yr += 4.6
+    d.setTextColor(...GREY); d.text('Total du projet (TVA incl.)', PW - 70, yr)
+    d.setTextColor(...DARK); d.text(eurPDF(totProjetPdf.ttc), PW - M_R - 2, yr, { align: 'right' }); yr += 8
+    d.setFontSize(10); d.setFont(undefined, 'bold'); d.setTextColor(...O)
+    d.text('À payer avec cette facture', M_L, yr); yr += 4.5
+    d.setFont(undefined, 'normal'); d.setTextColor(...DARK)
+    startYReel = yr
+  }
+
+  let y = dessinerEnteteColonnes(startYReel)
   let rowAlt = false
 
   for (let idx = 0; idx < lignesNormales.length; idx++) {
@@ -1110,6 +1169,19 @@ async function exportPDF(type, doc, lignes, opts = {}) {
   d.setFont(undefined, 'bold'); d.setFontSize(13); d.setTextColor(...O)
   d.text(isDevis ? L.totalTTC : (L.montantDu || L.totalTTC), labelX, y)
   d.setTextColor(...DARK); d.text(eurPDF(tot.ttc - dejaPaye), valX, y, { align: 'right' })
+
+  // Ce qui restera a facturer une fois cet acompte paye. Sans cette ligne, le
+  // client croit que la facture solde le projet.
+  if (lignesProjetPdf.length) {
+    const projetTtcPdf = calcTotaux(lignesProjetPdf.map(l => ({ ...l, bloc: null })), doc.remise_pct).ttc
+    const solde = Math.round((projetTtcPdf - (tot.ttc - dejaPaye)) * 100) / 100
+    if (solde > 0.004) {
+      y += 7
+      d.setFontSize(9); d.setFont(undefined, 'normal'); d.setTextColor(...O)
+      d.text('Solde restant sur le projet, à payer plus tard', labelX - 28, y)
+      d.setTextColor(...DARK); d.text(eurPDF(solde), valX, y, { align: 'right' })
+    }
+  }
 
   // ---- Options au choix (non comptées dans le total) ----
   if (lignesOptions.length) {
@@ -1255,7 +1327,8 @@ async function exportWord(type, doc, lignes) {
   const eurW = n => (Number(n) || 0).toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
   const O = 'EA580C', DARK = '1E293B', GREY = '64748B'
 
-  const lignesNormales = lignes.filter(l => !l.optionnelle)
+  const lignesProjetW = lignes.filter(l => l.bloc === 'projet')
+  const lignesNormales = lignes.filter(l => !l.optionnelle && l.bloc !== 'projet')
   const lignesOptions = lignes.filter(l => l.optionnelle)
   const hasRem = lignes.some(x => Number(x.remise_pct) > 0)
 
@@ -1537,13 +1610,7 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
               <div style={{ minWidth: 220 }}>
                 <Row2 l="Sous-total HTVA" v={eur(doc.total_ht)} />
                 <Row2 l="TVA" v={eur(doc.total_tva)} />
-                {/* L'acompte deja recu doit figurer sur le document ENVOYE AU
-                    CLIENT, pas seulement dans l'editeur : sinon on lui reclame
-                    une somme qu'il a deja versee. */}
-                {Number(doc.montant_paye) > 0 && (
-                  <Row2 l="Acompte déjà payé" v={'− ' + eur(Number(doc.montant_paye))} />
-                )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: `2px solid ${color}`, paddingTop: 6, marginTop: 4, fontWeight: 800, color }}><span>{Number(doc.montant_paye) > 0 ? 'Montant dû' : 'Montant'}</span><span>{eur(Number(doc.total_ttc) - (Number(doc.montant_paye) || 0))}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: `2px solid ${color}`, paddingTop: 6, marginTop: 4, fontWeight: 800, color }}><span>Montant</span><span>{eur(doc.total_ttc)}</span></div>
               </div>
             </div>
             {doc.notes && <><div style={{ fontSize: 9, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', marginTop: 18 }}>Notes &amp; commentaires</div><div style={{ color: COUL.texteMoyen }}>{doc.notes}</div></>}
