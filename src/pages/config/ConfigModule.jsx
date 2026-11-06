@@ -476,23 +476,45 @@ export default function ConfigModule() {
     notify('✓ Compte supprimé')
   }
 
+  // Le mail part du serveur (api/acces-hub-send → Microsoft Graph), plus par
+  // un `mailto:`. Un mailto ne peut pas porter de HTML — donc pas la charte
+  // Dynassur — et surtout il n'envoyait rien : il ouvrait un brouillon. La
+  // fiche enregistrait pourtant « accès envoyés » dès le clic, que
+  // l'administrateur envoie le brouillon ou le ferme.
+  // Maintenant la date n'est posée QU'APRÈS la confirmation du serveur.
   async function renvoyerAcces() {
     if (!selUser) return
+    const email = (selUser.email || '').trim()
+    if (!email) { notify('❌ Ce collaborateur n’a pas d’adresse e-mail'); return }
+    if (!window.confirm(`Envoyer le mail d'accès au Hub à ${selUser.nom_complet || email} (${email}) ?`)) return
+
     setSaving(true)
-    const now = new Date().toISOString()
-    const email = selUser.email
-    const nom = selUser.nom_complet || email
-    // La tâche de suivi « 1ère connexion » n'est plus créée : l'écran Tâches a été
-    // retiré, elle n'aurait été visible nulle part. La date d'envoi reste enregistrée
-    // sur la fiche, et la 1ère connexion s'y affiche aussi.
-    await supabase.from('collaborateurs').update({ date_envoi_acces: now }).eq('id', selUser.id)
-    setSelUser(u => ({ ...u, date_envoi_acces: now }))
-    setUsers(prev => prev.map(u => u.id === selUser.id ? { ...u, date_envoi_acces: now } : u))
-    setSaving(false)
-    notify('✓ Accès envoyés — tâche de suivi créée')
-    const sujet = encodeURIComponent('Vos accès au Hub DTX')
-    const corps = encodeURIComponent(`Bonjour ${selUser.nom_complet || ''},\n\nVotre accès au Hub DTX est activé.\nConnectez-vous ici : ${HUB_URL}\n\nUtilisez le bouton « Se connecter avec Microsoft » avec votre compte professionnel (${email}).\n\nÀ bientôt.`)
-    window.open(`mailto:${email}?subject=${sujet}&body=${corps}`)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) throw new Error('Session expirée — reconnecte-toi.')
+      const r = await fetch('/api/acces-hub-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          email,
+          prenom: selUser.prenom || (selUser.nom_complet || '').trim().split(/\s+/)[0] || '',
+          hub_url: HUB_URL,
+        }),
+      })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok || !j.ok) throw new Error(j.error || j.detail || ('HTTP ' + r.status))
+
+      const now = new Date().toISOString()
+      await supabase.from('collaborateurs').update({ date_envoi_acces: now }).eq('id', selUser.id)
+      setSelUser(u => ({ ...u, date_envoi_acces: now }))
+      setUsers(prev => prev.map(u => u.id === selUser.id ? { ...u, date_envoi_acces: now } : u))
+      notify('✓ Mail d’accès envoyé à ' + email)
+    } catch (e) {
+      notify('❌ Envoi impossible : ' + e.message)
+    } finally {
+      setSaving(false)
+    }
   }
 
   if (!isAdmin) return (
