@@ -56,7 +56,7 @@ export default function LodeDevisAccept() {
   const cfg = ent?.cfg
   const ORANGE = cfg?.couleur || '#475569'
   const wrap = { minHeight: '100vh', background: COUL.fondDoux, fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif", padding: '24px 14px', display: 'flex', justifyContent: 'center' }
-  const card = { width: '100%', maxWidth: 720, background: COUL.blanc, borderRadius: 16, boxShadow: '0 10px 40px rgba(0,0,0,.10)', overflow: 'hidden' }
+  const card = { width: '100%', maxWidth: 720, background: COUL.surface, borderRadius: 16, boxShadow: '0 10px 40px rgba(0,0,0,.10)', overflow: 'hidden' }
 
   if (loading) return <div style={wrap}><div style={{ ...card, padding: 40, textAlign: 'center', color: COUL.texteFaible }}>Chargement…</div></div>
 
@@ -73,7 +73,7 @@ export default function LodeDevisAccept() {
       <div style={card}>
         <div style={{ background: `linear-gradient(135deg, ${ORANGE}, #1e293b)`, color: COUL.blanc, padding: '22px 26px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            {cfg?.logo_url && <img src={cfg.logo_url} alt={cfg.raison_sociale} style={{ height: 40, background: COUL.blanc, borderRadius: 8, padding: 4 }} />}
+            {cfg?.logo_url && <img src={cfg.logo_url} alt={cfg.raison_sociale} style={{ height: 40, background: COUL.surface, borderRadius: 8, padding: 4 }} />}
             <div>
               <div style={{ fontSize: 13, opacity: .9 }}>Devis</div>
               <div style={{ fontSize: 24, fontWeight: 800 }}>{devis.numero}</div>
@@ -147,7 +147,7 @@ export default function LodeDevisAccept() {
                 {busy ? '…' : '✓ Accepter le devis'}
               </button>
               <button onClick={() => decision('refuse')} disabled={busy}
-                style={{ flex: 1, minWidth: 200, padding: '15px 20px', border: '1px solid #e2e8f0', borderRadius: 12, background: COUL.blanc, color: COUL.texteDoux, fontSize: 15, fontWeight: 700, cursor: busy ? 'wait' : 'pointer' }}>
+                style={{ flex: 1, minWidth: 200, padding: '15px 20px', border: '1px solid #e2e8f0', borderRadius: 12, background: COUL.surface, color: COUL.texteDoux, fontSize: 15, fontWeight: 700, cursor: busy ? 'wait' : 'pointer' }}>
                 Refuser
               </button>
             </div>

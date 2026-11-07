@@ -597,7 +597,7 @@ export default function ConfigModule() {
             </div>
 
             {selSoc && (
-              <div style={{ background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 14, padding: 20 }}>
+              <div style={{ background: COUL.surface, border: '1px solid #e2e8f0', borderRadius: 14, padding: 20 }}>
                 {tab === 'societes' ? (
                   <>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 12 }}>
@@ -609,7 +609,7 @@ export default function ConfigModule() {
                       <div>
                         <Lbl>Couleur</Lbl>
                         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                          <input type="color" value={selSoc.couleur || '#1e293b'} onChange={e => setSelSoc(s => ({ ...s, couleur: e.target.value }))} style={{ width: 44, height: 38, border: '1px solid #e2e8f0', borderRadius: 8, background: COUL.blanc }} />
+                          <input type="color" value={selSoc.couleur || '#1e293b'} onChange={e => setSelSoc(s => ({ ...s, couleur: e.target.value }))} style={{ width: 44, height: 38, border: '1px solid #e2e8f0', borderRadius: 8, background: COUL.surface }} />
                           <input value={selSoc.couleur || ''} onChange={e => setSelSoc(s => ({ ...s, couleur: e.target.value }))} style={inp} />
                         </div>
                       </div>
@@ -683,7 +683,7 @@ export default function ConfigModule() {
             </div>
 
             {showBureaux && (
-              <div style={{ background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 12, padding: 16, marginBottom: 14 }}>
+              <div style={{ background: COUL.surface, border: '1px solid #e2e8f0', borderRadius: 12, padding: 16, marginBottom: 14 }}>
                 <div style={{ fontSize: 11, fontWeight: 800, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 10 }}>
                   Bureaux — adresse complète (devoirs d'information, courriers clients)
                 </div>
@@ -798,7 +798,7 @@ export default function ConfigModule() {
             {selUser ? (() => {
               const roleMetier = !!(selUser.est_commercial || selUser.est_gestionnaire || selUser.est_sous_agent)
               return (
-              <div style={{ background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 14, padding: 20 }}>
+              <div style={{ background: COUL.surface, border: '1px solid #e2e8f0', borderRadius: 14, padding: 20 }}>
 
                 {/* CE QUE CETTE PERSONNE PORTE. C'est ce qui decide si on
                     peut la supprimer : effacee sans reattribution, ses
@@ -821,7 +821,7 @@ export default function ConfigModule() {
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
                   <span style={{ flex: 1 }} />
-                  <button onClick={deleteUser} disabled={saving} style={{ padding: '6px 12px', fontSize: 12, fontWeight: 700, borderRadius: 8, cursor: 'pointer', border: '1px solid #fecaca', background: COUL.blanc, color: COUL.danger }}>
+                  <button onClick={deleteUser} disabled={saving} style={{ padding: '6px 12px', fontSize: 12, fontWeight: 700, borderRadius: 8, cursor: 'pointer', border: '1px solid #fecaca', background: COUL.surface, color: COUL.danger }}>
                     {selUser.id ? (selUser.code || selUser.est_commercial || selUser.est_gestionnaire || selUser.est_sous_agent || selUser.est_apporteur ? '🗑 Retirer l\'accès Hub' : '🗑 Supprimer le compte') : '✕ Annuler'}
                   </button>
                 </div>
@@ -1038,7 +1038,7 @@ export default function ConfigModule() {
 
 // ─────────── petits composants ───────────
 const inp = { padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 14, color: COUL.texte, width: '100%', boxSizing: 'border-box' }
-const btnGhost = { padding: '8px 14px', border: '1px solid #e2e8f0', borderRadius: 8, background: COUL.blanc, fontSize: 13, fontWeight: 600, color: COUL.texteMoyen, cursor: 'pointer' }
+const btnGhost = { padding: '8px 14px', border: '1px solid #e2e8f0', borderRadius: 8, background: COUL.surface, fontSize: 13, fontWeight: 600, color: COUL.texteMoyen, cursor: 'pointer' }
 const btn = c => ({ padding: '11px 22px', border: 'none', borderRadius: 10, background: c || '#1e293b', color: COUL.blanc, fontSize: 15, fontWeight: 700, cursor: 'pointer' })
 
 function Section({ titre, children }) {
@@ -1060,7 +1060,7 @@ function Chk({ label, on, onClick }) {
   return (
     <button onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
       <span style={{ width: 34, height: 20, borderRadius: 999, background: on ? '#16a34a' : COUL.bordFort, position: 'relative', flexShrink: 0 }}>
-        <span style={{ position: 'absolute', top: 2, left: on ? 16 : 2, width: 16, height: 16, borderRadius: '50%', background: COUL.blanc, transition: 'left .15s' }} />
+        <span style={{ position: 'absolute', top: 2, left: on ? 16 : 2, width: 16, height: 16, borderRadius: '50%', background: COUL.surface, transition: 'left .15s' }} />
       </span>
       <span style={{ fontSize: 14, fontWeight: 600, color: COUL.texteMoyen }}>{label}</span>
     </button>

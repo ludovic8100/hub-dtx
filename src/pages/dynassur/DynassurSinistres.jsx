@@ -131,7 +131,7 @@ function WorkflowPanel({ sinistre, onClose }) {
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.35)', zIndex: 1100 }} />
       <div style={{
         position: 'fixed', top: 0, right: 0, bottom: 0, width: '100%', maxWidth: 520,
-        background: COUL.blanc, zIndex: 1101, display: 'flex', flexDirection: 'column',
+        background: COUL.surface, zIndex: 1101, display: 'flex', flexDirection: 'column',
         boxShadow: '-8px 0 30px rgba(0,0,0,0.15)',
         animation: 'slideIn .25s ease-out',
       }}>
@@ -155,7 +155,7 @@ function WorkflowPanel({ sinistre, onClose }) {
               <span style={{ fontWeight: 700 }}>{pct}%</span>
             </div>
             <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.2)' }}>
-              <div style={{ height: '100%', borderRadius: 3, background: COUL.blanc, width: `${pct}%`, transition: 'width .3s ease' }} />
+              <div style={{ height: '100%', borderRadius: 3, background: COUL.surface, width: `${pct}%`, transition: 'width .3s ease' }} />
             </div>
           </div>
 
@@ -268,7 +268,7 @@ const SORT_GET = {
 
 function Kpi({ label, value, col, sub }) {
   return (
-    <div style={{ background: COUL.blanc, borderRadius: 10, border: '1px solid #e2e8f0', borderTop: `3px solid ${col}`, padding: '14px 18px' }}>
+    <div style={{ background: COUL.surface, borderRadius: 10, border: '1px solid #e2e8f0', borderTop: `3px solid ${col}`, padding: '14px 18px' }}>
       <div style={{ fontSize: 10, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 6 }}>{label}</div>
       <div style={{ fontSize: 24, fontWeight: 800, color: COUL.texteFort, lineHeight: 1 }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: COUL.texteDoux, marginTop: 4 }}>{sub}</div>}
@@ -299,7 +299,7 @@ function SinistreDetail({ s, onClose, onWorkflow }) {
   const es = etatStyle(s.etat)
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '6vh 16px' }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: COUL.blanc, borderRadius: 14, width: '100%', maxWidth: 680, maxHeight: '84vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 14, width: '100%', maxWidth: 680, maxHeight: '84vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
         <div style={{ padding: '18px 22px', borderBottom: '1px solid #f1f5f9', background: `linear-gradient(135deg, ${E.color}, ${E.colorDark})`, color: COUL.blanc }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
@@ -412,7 +412,7 @@ export default function DynassurSinistres() {
     }
   }, [data, CUR])
 
-  const sel = { padding: '7px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, color: NAVY, background: COUL.blanc, fontFamily: "'Source Sans Pro', sans-serif" }
+  const sel = { padding: '7px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, color: NAVY, background: COUL.surface, fontFamily: "'Source Sans Pro', sans-serif" }
 
   return (
     <Layout currentPage="Sinistres">
@@ -473,7 +473,7 @@ export default function DynassurSinistres() {
           <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
         </div>
       ) : (
-        <div style={{ background: COUL.blanc, borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+        <div style={{ background: COUL.surface, borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>

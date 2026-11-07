@@ -12,7 +12,7 @@ const num = v => new Intl.NumberFormat('fr-BE').format(v)
 
 function Kpi({ label, value, col, sub, onClick }) {
   return (
-    <div onClick={onClick} style={{ background:COUL.blanc, borderRadius:10, border:'1px solid #e2e8f0', borderTop:`3px solid ${col}`, padding:'14px 18px',
+    <div onClick={onClick} style={{ background:COUL.surface, borderRadius:10, border:'1px solid #e2e8f0', borderTop:`3px solid ${col}`, padding:'14px 18px',
       cursor:onClick?'pointer':'default', transition:'box-shadow .15s' }}
       onMouseEnter={e=>{ if(onClick) e.currentTarget.style.boxShadow=`0 4px 14px ${col}25` }}
       onMouseLeave={e=>{ e.currentTarget.style.boxShadow='none' }}>
@@ -27,7 +27,7 @@ function Kpi({ label, value, col, sub, onClick }) {
 
 function Bloc({ titre, children }) {
   return (
-    <div style={{ background:COUL.blanc, borderRadius:12, border:'1px solid #e2e8f0', marginBottom:18, overflow:'hidden' }}>
+    <div style={{ background:COUL.surface, borderRadius:12, border:'1px solid #e2e8f0', marginBottom:18, overflow:'hidden' }}>
       <div style={{ background:NAVY, padding:'10px 16px' }}>
         <span style={{ color:COUL.blanc, fontSize:12, fontWeight:700, textTransform:'uppercase', letterSpacing:'.05em' }}>{titre}</span>
       </div>
@@ -87,7 +87,7 @@ function DetailModal({ titre, rows, onClose }) {
   const click = k => setSort(s => s.key===k ? { key:k, dir:s.dir==='asc'?'desc':'asc' } : { key:k, dir:'asc' })
   return (
     <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(15,23,42,.55)', zIndex:1000, display:'flex', justifyContent:'flex-end' }}>
-      <div onClick={e=>e.stopPropagation()} style={{ width:'min(900px,96vw)', height:'100%', background:COUL.blanc, display:'flex', flexDirection:'column', boxShadow:'-8px 0 30px rgba(0,0,0,.2)' }}>
+      <div onClick={e=>e.stopPropagation()} style={{ width:'min(900px,96vw)', height:'100%', background:COUL.surface, display:'flex', flexDirection:'column', boxShadow:'-8px 0 30px rgba(0,0,0,.2)' }}>
         <div style={{ background:NAVY, padding:'14px 20px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
           <div>
             <div style={{ color:COUL.blanc, fontSize:15, fontWeight:800 }}>{titre}</div>

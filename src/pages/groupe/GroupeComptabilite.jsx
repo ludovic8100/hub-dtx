@@ -145,7 +145,7 @@ export default function GroupeComptabilite() {
 
   const styleChamp = {
     padding: '7px 10px', borderRadius: 8, border: '1px solid #e2e8f0',
-    fontSize: 13, fontFamily: 'inherit', color: NAVY, background: COUL.blanc,
+    fontSize: 13, fontFamily: 'inherit', color: NAVY, background: COUL.surface,
   }
   const enTete = (col, label, aligne = 'left') => (
     <th onClick={() => trierPar(col)}
@@ -165,7 +165,7 @@ export default function GroupeComptabilite() {
         </p>
 
         {/* ── Filtres ── */}
-        <div style={{ background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: COUL.surface, border: '1px solid #e2e8f0', borderRadius: 12, padding: 16, marginBottom: 16 }}>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
             <input
               value={recherche} onChange={e => setRecherche(e.target.value)}
@@ -218,7 +218,7 @@ export default function GroupeComptabilite() {
             {[['12 mois', 12], ['24 mois', 24], ['Tout', 0]].map(([label, n]) => (
               <button key={label} onClick={() => { setDu(n ? moisEnArriere(n) : ''); setAu('') }}
                 style={{ fontSize: 11.5, padding: '5px 10px', borderRadius: 7, border: '1px solid #e2e8f0',
-                  background: COUL.blanc, color: COUL.texteDoux, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
+                  background: COUL.surface, color: COUL.texteDoux, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
                 {label}
               </button>
             ))}
@@ -238,7 +238,7 @@ export default function GroupeComptabilite() {
             { l: 'Dépenses',   v: fmt(totaux.sorties), c: COUL.danger },
             { l: 'Solde',      v: fmt(totaux.solde),   c: totaux.solde < 0 ? '#dc2626' : COUL.succes },
           ].map(k => (
-            <div key={k.l} style={{ background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 18px', minWidth: 150 }}>
+            <div key={k.l} style={{ background: COUL.surface, border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 18px', minWidth: 150 }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.05em' }}>{k.l}</div>
               <div style={{ fontSize: 19, fontWeight: 800, color: k.c, marginTop: 2 }}>{k.v}</div>
             </div>
@@ -256,11 +256,11 @@ export default function GroupeComptabilite() {
         {chargement ? (
           <p style={{ color: COUL.texteFaible, fontSize: 13 }}>Recherche…</p>
         ) : !lignes.length ? (
-          <div style={{ background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 10, padding: 36, textAlign: 'center', color: COUL.texteFaible, fontSize: 13 }}>
+          <div style={{ background: COUL.surface, border: '1px solid #e2e8f0', borderRadius: 10, padding: 36, textAlign: 'center', color: COUL.texteFaible, fontSize: 13 }}>
             Aucune opération ne correspond. Élargis la période ou retire un filtre.
           </div>
         ) : (
-          <div style={{ background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden' }}>
+          <div style={{ background: COUL.surface, border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden' }}>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
                 <thead>

@@ -59,10 +59,10 @@ export default function SignaturePad({ width = 460, height = 160, penColor = COU
       <canvas ref={cvRef}
         onMouseDown={start} onMouseMove={move} onMouseUp={end} onMouseLeave={end}
         onTouchStart={start} onTouchMove={move} onTouchEnd={end}
-        style={{ border: '1px dashed #cbd5e1', borderRadius: 10, background: COUL.blanc, touchAction: 'none', cursor: 'crosshair', display: 'block', maxWidth: '100%' }} />
+        style={{ border: '1px dashed #cbd5e1', borderRadius: 10, background: COUL.surface, touchAction: 'none', cursor: 'crosshair', display: 'block', maxWidth: '100%' }} />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
         <span style={{ fontSize: 11.5, color: vide ? '#94a3b8' : COUL.succes, fontWeight: vide ? 400 : 700 }}>{vide ? 'Signez dans le cadre' : '✓ Signé'}</span>
-        <button type="button" onClick={clear} style={{ border: '1px solid #e2e8f0', background: COUL.blanc, borderRadius: 8, padding: '4px 12px', fontSize: 12.5, cursor: 'pointer', color: COUL.texteMoyen }}>Effacer</button>
+        <button type="button" onClick={clear} style={{ border: '1px solid #e2e8f0', background: COUL.surface, borderRadius: 8, padding: '4px 12px', fontSize: 12.5, cursor: 'pointer', color: COUL.texteMoyen }}>Effacer</button>
       </div>
     </div>
   )

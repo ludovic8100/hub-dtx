@@ -102,7 +102,7 @@ export function BoutonSyncQlik({ style, onDark, compact }) {
         )}
       </button>
       {erreur && (
-        <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 50, minWidth: 240, maxWidth: 340, background: COUL.blanc, border: '1px solid #fecaca', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.15)', padding: '10px 12px' }}>
+        <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 50, minWidth: 240, maxWidth: 340, background: COUL.surface, border: '1px solid #fecaca', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.15)', padding: '10px 12px' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
             <i className="ti ti-alert-triangle" style={{ color: COUL.danger, fontSize: 16, marginTop: 1 }} />
             <div style={{ flex: 1, fontSize: 12, color: COUL.texteSombre, lineHeight: 1.45 }}>{erreur}</div>

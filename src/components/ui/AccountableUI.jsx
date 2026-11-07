@@ -157,7 +157,7 @@ export function ActionButton({ onClick, disabled, children, tone = 'grey', color
  * ------------------------------------------------------------------------- */
 export function DataCard({ children, style }) {
   return (
-    <div style={{ background: COUL.blanc, borderRadius: 14, border: '1px solid #eef2f6', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', fontFamily: FONT, ...style }}>
+    <div style={{ background: COUL.surface, borderRadius: 14, border: '1px solid #eef2f6', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', fontFamily: FONT, ...style }}>
       {children}
     </div>
   )
@@ -167,7 +167,7 @@ export function DataCard({ children, style }) {
 export function PrimaryButton({ onClick, children, color }) {
   return (
     <button onClick={onClick} style={{
-      background: COUL.blanc, color: color || '#ea580c', border: 'none', borderRadius: 10,
+      background: COUL.surface, color: color || '#ea580c', border: 'none', borderRadius: 10,
       padding: '10px 18px', cursor: 'pointer', fontSize: 13.5, fontWeight: 700, fontFamily: FONT,
       display: 'flex', alignItems: 'center', gap: 7, boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
     }}>{children}</button>

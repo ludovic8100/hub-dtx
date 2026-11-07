@@ -79,7 +79,7 @@ function VueConsolidee({ comptes }) {
           { label:'Comptes synchronisés', value: `${comptes.filter(c=>c.ponto_account_id).length} / ${comptes.length}`, color:COUL.bleu },
           { label:'Entités', value: Object.keys(parSociete).length, color:COUL.succes },
         ].map(k => (
-          <div key={k.label} style={{ background:COUL.blanc, borderRadius:'10px', border:'1px solid #e2e8f0', borderTop:`3px solid ${k.color}`, padding:'16px 20px' }}>
+          <div key={k.label} style={{ background:COUL.surface, borderRadius:'10px', border:'1px solid #e2e8f0', borderTop:`3px solid ${k.color}`, padding:'16px 20px' }}>
             <div style={{ fontSize:'11px', fontWeight:'700', color:COUL.texteFaible, textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'6px' }}>{k.label}</div>
             <div style={{ fontSize:'24px', fontWeight:'800', color:COUL.texteFort }}>{k.value}</div>
           </div>
@@ -90,7 +90,7 @@ function VueConsolidee({ comptes }) {
           const col = COLORS[code] || '#64748b'
           const logo = LOGOS[code]
           return (
-            <div key={code} style={{ background:COUL.blanc, borderRadius:'12px', border:'1px solid #e2e8f0', overflow:'hidden' }}>
+            <div key={code} style={{ background:COUL.surface, borderRadius:'12px', border:'1px solid #e2e8f0', overflow:'hidden' }}>
               <div style={{ background:col, padding:'12px 16px', display:'flex', alignItems:'center', gap:'10px' }}>
                 {logo && <img src={logo} alt={code} style={{ width:26, height:26, objectFit:'contain' }} />}
                 <div style={{ flex:1, color:COUL.blanc, fontWeight:'700', fontSize:'13px' }}>{data.nom || code}</div>
@@ -768,7 +768,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       </div>
 
       {/* Barre de filtres */}
-      <div style={{ background:COUL.blanc, borderRadius:'12px', border:'1px solid #e2e8f0', padding:'14px 16px', marginBottom:'14px', display:'flex', gap:'10px', flexWrap:'nowrap', alignItems:'flex-end', overflowX:'auto' }}>
+      <div style={{ background:COUL.surface, borderRadius:'12px', border:'1px solid #e2e8f0', padding:'14px 16px', marginBottom:'14px', display:'flex', gap:'10px', flexWrap:'nowrap', alignItems:'flex-end', overflowX:'auto' }}>
 
         {/* Filtre compte */}
         <div style={{ display:'flex', flexDirection:'column', gap:'3px' }}>
@@ -814,7 +814,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
             setPeriodeOuverte(o=>!o)
           }} style={{
             padding:'7px 10px', border:'1px solid #e2e8f0', borderRadius:'6px', fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif",
-            cursor:'pointer', background:COUL.blanc, color: filtre.periodes.length ? '#0f172a' : COUL.texteFaible, minWidth:'180px', maxWidth:'240px',
+            cursor:'pointer', background:COUL.surface, color: filtre.periodes.length ? '#0f172a' : COUL.texteFaible, minWidth:'180px', maxWidth:'240px',
             display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px', whiteSpace:'nowrap', overflow:'hidden'
           }}>
             <span style={{ overflow:'hidden', textOverflow:'ellipsis' }}>{periodeLabel()}</span>
@@ -824,7 +824,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
             <>
               <div onClick={()=>setPeriodeOuverte(false)} style={{ position:'fixed', inset:0, zIndex:1000 }} />
               <div ref={periodePanelRef} style={{
-                position:'fixed', top: periodePos.top, left: periodePos.left, zIndex:1001, background:COUL.blanc,
+                position:'fixed', top: periodePos.top, left: periodePos.left, zIndex:1001, background:COUL.surface,
                 border:'1px solid #e2e8f0', borderRadius:'10px', boxShadow:'0 12px 32px rgba(0,0,0,0.15)',
                 padding:'8px', width:'280px', maxHeight:'380px', overflowY:'auto'
               }}>
@@ -945,7 +945,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
         {(filtre.compte!=='tous'||filtre.type!=='tous'||filtre.libelle||filtre.periodes.length>0||filtre.categorie!=='toutes'||filtre.facture!=='toutes'||filtre.employe!=='tous'||filtre.activite!=='toutes') && (
           <div style={{ display:'flex', flexDirection:'column', gap:'3px' }}>
             <label style={{ fontSize:'10px', color:'transparent' }}>.</label>
-            <button onClick={()=>setFiltre({compte:'tous',type:'tous',libelle:'',periodes:[],categorie:'toutes',facture:'toutes',employe:'tous',activite:'toutes'})} style={{ padding:'7px 12px', borderRadius:'6px', fontSize:'12px', fontWeight:'600', cursor:'pointer', border:'1px solid #e2e8f0', background:COUL.blanc, color:COUL.texteDoux }}>
+            <button onClick={()=>setFiltre({compte:'tous',type:'tous',libelle:'',periodes:[],categorie:'toutes',facture:'toutes',employe:'tous',activite:'toutes'})} style={{ padding:'7px 12px', borderRadius:'6px', fontSize:'12px', fontWeight:'600', cursor:'pointer', border:'1px solid #e2e8f0', background:COUL.surface, color:COUL.texteDoux }}>
               ✕ Reset
             </button>
           </div>
@@ -971,7 +971,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       )}
 
       {/* Tableau transactions pleine largeur */}
-      <div style={{ background:COUL.blanc, borderRadius:'12px', border:'1px solid #e2e8f0', overflow:'hidden' }}>
+      <div style={{ background:COUL.surface, borderRadius:'12px', border:'1px solid #e2e8f0', overflow:'hidden' }}>
         {/* En-tête (desktop) */}
         {!isMobile && (
         <div style={{ display:'grid', gridTemplateColumns:'95px 100px 110px 220px 1fr 140px 110px', padding:'9px 16px', background:COUL.fond, borderBottom:'1px solid #e2e8f0', fontSize:'10px', fontWeight:'700', color:COUL.texteFaible, textTransform:'uppercase', letterSpacing:'0.06em' }}>
@@ -1178,7 +1178,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
         <>
           <div onClick={()=>setMenuCroix(null)} style={{ position:'fixed', inset:0, zIndex:1000 }} />
           <div style={{
-            position:'fixed', top: menuCroix.top, left: menuCroix.left, zIndex:1001, background:COUL.blanc,
+            position:'fixed', top: menuCroix.top, left: menuCroix.left, zIndex:1001, background:COUL.surface,
             border:'1px solid #e2e8f0', borderRadius:'10px', boxShadow:'0 12px 32px rgba(0,0,0,0.18)',
             padding:'6px', minWidth:'220px', fontFamily:"'Source Sans Pro', sans-serif"
           }}>
@@ -1266,7 +1266,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
       {apercuFacture && !isMobile && (
         <div style={{
           position:'fixed', top:'50%', right:'32px', transform:'translateY(-50%)', zIndex:250,
-          width:'440px', maxWidth:'40vw', maxHeight:'86vh', background:COUL.blanc, borderRadius:'14px',
+          width:'440px', maxWidth:'40vw', maxHeight:'86vh', background:COUL.surface, borderRadius:'14px',
           boxShadow:'0 20px 60px rgba(0,0,0,0.35)', border:'1px solid #e2e8f0', overflow:'hidden',
           display:'flex', flexDirection:'column', pointerEvents:'none'
         }}>
@@ -1277,7 +1277,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
           {apercuFacture.thumb ? (
             <img src={apercuFacture.thumb} alt="Aperçu facture" style={{ width:'100%', height:'auto', display:'block', objectFit:'contain' }} />
           ) : apercuFacture.lien ? (
-            <iframe src={apercuFacture.lien} title="Aperçu facture" style={{ width:'100%', height:'70vh', border:'none', display:'block', background:COUL.blanc }} />
+            <iframe src={apercuFacture.lien} title="Aperçu facture" style={{ width:'100%', height:'70vh', border:'none', display:'block', background:COUL.surface }} />
           ) : (
             <div style={{ padding:'30px 20px', textAlign:'center', color:COUL.texteFaible, fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif" }}>
               Aucun aperçu disponible<br/><span style={{ fontSize:'11px' }}>Cliquez sur le ✓ pour ouvrir la facture</span>
@@ -1303,7 +1303,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
         return (
           <div style={{
             position:'fixed', left, top, zIndex:1500, width:'320px',
-            background:COUL.blanc, border:'1px solid #e2e8f0', borderRadius:'12px',
+            background:COUL.surface, border:'1px solid #e2e8f0', borderRadius:'12px',
             boxShadow:'0 12px 40px rgba(15,23,42,0.22)', padding:'14px 16px', pointerEvents:'none'
           }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'8px', paddingBottom:'8px', borderBottom:'1px solid #f1f5f9' }}>
@@ -1335,7 +1335,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
         )
         return (
           <div onClick={()=>setTxSelection(null)} style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:'20px' }}>
-            <div onClick={e=>e.stopPropagation()} style={{ background:COUL.blanc, borderRadius:'16px', maxWidth:'560px', width:'100%', maxHeight:'85vh', overflow:'auto', boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }}>
+            <div onClick={e=>e.stopPropagation()} style={{ background:COUL.surface, borderRadius:'16px', maxWidth:'560px', width:'100%', maxHeight:'85vh', overflow:'auto', boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }}>
               <div style={{ padding:'20px 24px', background:`linear-gradient(135deg, ${color}, ${colorDark||color})`, borderRadius:'16px 16px 0 0', display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
                 <div>
                   <div style={{ fontSize:'12px', color:'rgba(255,255,255,0.7)', fontWeight:'600' }}>{fmtDate(t._date)}</div>
@@ -1357,10 +1357,10 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                         <button onClick={()=>ouvrirFactureLiee(t)} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', borderRadius:'8px', border:'none', background:COUL.succes, color:COUL.blanc, cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
                           📄 Ouvrir la facture
                         </button>
-                        <button onClick={()=>lierFactureManuelle(t)} style={{ padding:'8px 14px', borderRadius:'8px', border:'1px solid #cbd5e1', background:COUL.blanc, color:COUL.texteMoyen, cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                        <button onClick={()=>lierFactureManuelle(t)} style={{ padding:'8px 14px', borderRadius:'8px', border:'1px solid #cbd5e1', background:COUL.surface, color:COUL.texteMoyen, cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
                           Changer le lien
                         </button>
-                        <button onClick={()=>retirerLienFacture(t)} style={{ padding:'8px 14px', borderRadius:'8px', border:'1px solid #fecaca', background:COUL.blanc, color:COUL.danger, cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                        <button onClick={()=>retirerLienFacture(t)} style={{ padding:'8px 14px', borderRadius:'8px', border:'1px solid #fecaca', background:COUL.surface, color:COUL.danger, cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
                           Retirer
                         </button>
                       </div>
@@ -1375,7 +1375,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                         <button onClick={()=>lierFactureManuelle(t)} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', borderRadius:'8px', border:'none', background:color, color:COUL.blanc, cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
                           🔗 Lier une facture finalement
                         </button>
-                        <button onClick={()=>marquerSansFacture(t, false)} style={{ padding:'8px 14px', borderRadius:'8px', border:'1px solid #cbd5e1', background:COUL.blanc, color:COUL.texteMoyen, cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                        <button onClick={()=>marquerSansFacture(t, false)} style={{ padding:'8px 14px', borderRadius:'8px', border:'1px solid #cbd5e1', background:COUL.surface, color:COUL.texteMoyen, cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
                           Annuler « sans facture »
                         </button>
                       </div>
@@ -1390,7 +1390,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                         <button onClick={()=>lierFactureManuelle(t)} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', borderRadius:'8px', border:'none', background:color, color:COUL.blanc, cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
                           🔗 La facture est arrivée — la lier
                         </button>
-                        <button onClick={()=>marquerEnAttente(t, false)} style={{ padding:'8px 14px', borderRadius:'8px', border:'1px solid #cbd5e1', background:COUL.blanc, color:COUL.texteMoyen, cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                        <button onClick={()=>marquerEnAttente(t, false)} style={{ padding:'8px 14px', borderRadius:'8px', border:'1px solid #cbd5e1', background:COUL.surface, color:COUL.texteMoyen, cursor:'pointer', fontSize:'13px', fontWeight:'600', fontFamily:"'Source Sans Pro', sans-serif" }}>
                           Repasser à justifier
                         </button>
                       </div>
@@ -1484,7 +1484,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                         <button onClick={()=>creerCategorie(t.id)} style={{ flex:1, padding:'9px 12px', borderRadius:'7px', fontSize:'13px', fontWeight:'600', border:'none', background:COUL.bleu, color:COUL.blanc, cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>
                           Créer et assigner
                         </button>
-                        <button onClick={()=>setNouvelleCat({ ouvert:false, nom:'', type:'depense', couleur:COUL.bleu })} style={{ padding:'9px 12px', borderRadius:'7px', fontSize:'13px', fontWeight:'600', border:'1px solid #e2e8f0', background:COUL.blanc, color:COUL.texteDoux, cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>
+                        <button onClick={()=>setNouvelleCat({ ouvert:false, nom:'', type:'depense', couleur:COUL.bleu })} style={{ padding:'9px 12px', borderRadius:'7px', fontSize:'13px', fontWeight:'600', border:'1px solid #e2e8f0', background:COUL.surface, color:COUL.texteDoux, cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>
                           Annuler
                         </button>
                       </div>
@@ -1511,18 +1511,18 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                                 {employes.map(em => <option key={em.id} value={em.id}>{em.nom_complet || em.code}</option>)}
                               </select>
                               <input type="number" step="0.01" value={l.montant} onChange={e => { const v = e.target.value; setVentilDraft(d => ({ ...d, lignes: d.lignes.map((x, j) => j === i ? { ...x, montant: v } : x) })) }} placeholder="Montant €" style={{ width:'110px', padding:'8px 10px', border:'1px solid #e2e8f0', borderRadius:'6px', fontSize:'13px', fontFamily:"'Source Sans Pro', sans-serif", boxSizing:'border-box' }} />
-                              <button onClick={() => setVentilDraft(d => ({ ...d, lignes: d.lignes.filter((_, j) => j !== i) }))} title="Retirer" style={{ width:'34px', border:'1px solid #fecaca', borderRadius:'6px', background:COUL.blanc, color:COUL.danger, cursor:'pointer', flexShrink:0 }}>✕</button>
+                              <button onClick={() => setVentilDraft(d => ({ ...d, lignes: d.lignes.filter((_, j) => j !== i) }))} title="Retirer" style={{ width:'34px', border:'1px solid #fecaca', borderRadius:'6px', background:COUL.surface, color:COUL.danger, cursor:'pointer', flexShrink:0 }}>✕</button>
                             </div>
                           ))}
                           <div style={{ display:'flex', gap:'8px', marginBottom:'10px' }}>
-                            <button onClick={() => setVentilDraft(d => ({ ...d, lignes: [...d.lignes, { employe_id:'', montant:'' }] }))} style={{ flex:1, padding:'8px', borderRadius:'6px', fontSize:'12.5px', fontWeight:'600', border:'1px dashed #cbd5e1', background:COUL.blanc, color:COUL.texteMoyen, cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>+ Ajouter un employé</button>
-                            <button onClick={() => { const n = ventilDraft.lignes.length || 1; const part = (abs / n); setVentilDraft(d => ({ ...d, lignes: d.lignes.map(x => ({ ...x, montant: part.toFixed(2) })) })) }} style={{ flex:1, padding:'8px', borderRadius:'6px', fontSize:'12.5px', fontWeight:'600', border:'1px solid #e2e8f0', background:COUL.blanc, color:COUL.texteMoyen, cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>Répartir également</button>
+                            <button onClick={() => setVentilDraft(d => ({ ...d, lignes: [...d.lignes, { employe_id:'', montant:'' }] }))} style={{ flex:1, padding:'8px', borderRadius:'6px', fontSize:'12.5px', fontWeight:'600', border:'1px dashed #cbd5e1', background:COUL.surface, color:COUL.texteMoyen, cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>+ Ajouter un employé</button>
+                            <button onClick={() => { const n = ventilDraft.lignes.length || 1; const part = (abs / n); setVentilDraft(d => ({ ...d, lignes: d.lignes.map(x => ({ ...x, montant: part.toFixed(2) })) })) }} style={{ flex:1, padding:'8px', borderRadius:'6px', fontSize:'12.5px', fontWeight:'600', border:'1px solid #e2e8f0', background:COUL.surface, color:COUL.texteMoyen, cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>Répartir également</button>
                           </div>
                           <div style={{ fontSize:'13px', marginBottom:'10px', color:COUL.texteMoyen }}>Réparti : <b>{fmt(total)}</b> / {fmt(abs)} — reste : <b style={{ color: Math.abs(reste) < 0.01 ? '#16a34a' : COUL.danger }}>{fmt(reste)}</b></div>
                           <div style={{ display:'flex', gap:'8px' }}>
                             <button onClick={enregistrerVentilation} style={{ flex:1, padding:'9px 12px', borderRadius:'7px', fontSize:'13px', fontWeight:'700', border:'none', background:COUL.succes, color:COUL.blanc, cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>Enregistrer la répartition</button>
-                            <button onClick={() => setVentilDraft(null)} style={{ padding:'9px 12px', borderRadius:'7px', fontSize:'13px', fontWeight:'600', border:'1px solid #e2e8f0', background:COUL.blanc, color:COUL.texteDoux, cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>Annuler</button>
-                            {ventil.length > 0 && <button onClick={() => supprimerVentilation(t.id)} title="Supprimer la répartition" style={{ padding:'9px 12px', borderRadius:'7px', fontSize:'13px', fontWeight:'600', border:'1px solid #fecaca', background:COUL.blanc, color:COUL.danger, cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>Supprimer</button>}
+                            <button onClick={() => setVentilDraft(null)} style={{ padding:'9px 12px', borderRadius:'7px', fontSize:'13px', fontWeight:'600', border:'1px solid #e2e8f0', background:COUL.surface, color:COUL.texteDoux, cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>Annuler</button>
+                            {ventil.length > 0 && <button onClick={() => supprimerVentilation(t.id)} title="Supprimer la répartition" style={{ padding:'9px 12px', borderRadius:'7px', fontSize:'13px', fontWeight:'600', border:'1px solid #fecaca', background:COUL.surface, color:COUL.danger, cursor:'pointer', fontFamily:"'Source Sans Pro', sans-serif" }}>Supprimer</button>}
                           </div>
                         </div>
                       )
@@ -1530,7 +1530,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
                     if (ventil.length > 0) {
                       return (
                         <div>
-                          <div style={{ border:'1px solid #e2e8f0', borderRadius:'8px', padding:'10px 12px', marginBottom:'8px', background:COUL.blanc }}>
+                          <div style={{ border:'1px solid #e2e8f0', borderRadius:'8px', padding:'10px 12px', marginBottom:'8px', background:COUL.surface }}>
                             <div style={{ fontSize:'12px', color:COUL.texteDoux, marginBottom:'6px' }}>⚖️ Réparti entre {ventil.length} employé(s) :</div>
                             {ventil.map(v => { const em = employes.find(e => String(e.id) === String(v.employe_id)); return <div key={v.id} style={{ display:'flex', justifyContent:'space-between', fontSize:'13px', padding:'2px 0' }}><span>{em?.nom_complet || em?.code || ('#' + v.employe_id)}</span><b>{fmt(v.montant)}</b></div> })}
                           </div>

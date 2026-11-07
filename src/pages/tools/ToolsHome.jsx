@@ -12,7 +12,7 @@ import { COUL } from '../../lib/theme'
 const cardBase = {
   border: '1px solid #e2e8f0',
   borderRadius: 14,
-  background: COUL.blanc,
+  background: COUL.surface,
   overflow: 'hidden',
   display: 'flex',
   flexDirection: 'row',

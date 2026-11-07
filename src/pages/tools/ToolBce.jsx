@@ -29,7 +29,7 @@ export default function ToolBce() {
         <BceSearch onSelect={setC} />
 
         {c && (
-          <div style={{ marginTop: 14, border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 18px', background: COUL.blanc }}>
+          <div style={{ marginTop: 14, border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 18px', background: COUL.surface }}>
             <div style={{ fontSize: 16, fontWeight: 700, color: COUL.texte, marginBottom: 10 }}>{nom}</div>
             <Row label="N° BCE" value={bce} />
             <Row label="Forme juridique" value={forme} />

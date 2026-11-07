@@ -214,7 +214,7 @@ export default function GestionFournisseurs() {
             style={{ padding: '7px 13px', borderRadius: 8, border: '1px solid #1A3A6B', background: COUL.marineClair, color: COUL.blanc, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
             Accepter les propositions affichées
           </button>
-          <button onClick={charger} style={{ padding: '7px 13px', borderRadius: 8, border: '1px solid #e2e8f0', background: COUL.blanc, color: COUL.texteDoux, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Rafraîchir</button>
+          <button onClick={charger} style={{ padding: '7px 13px', borderRadius: 8, border: '1px solid #e2e8f0', background: COUL.surface, color: COUL.texteDoux, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Rafraîchir</button>
         </div>
       </div>
 
@@ -247,7 +247,7 @@ export default function GestionFournisseurs() {
         const valeur  = enCours ? edition[l.id] : (l.nom_court || '')
         const etat    = sauve[l.id]
         return (
-          <div key={l.id} style={{ borderBottom: '1px solid #f1f5f9', background: COUL.blanc }}>
+          <div key={l.id} style={{ borderBottom: '1px solid #f1f5f9', background: COUL.surface }}>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '10px 13px' }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13.5, color: COUL.texte, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

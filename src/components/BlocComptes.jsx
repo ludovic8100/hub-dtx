@@ -78,7 +78,7 @@ export default function BlocComptes({ societeCode, color }) {
 
       {comptes.length === 0 ? (
         <div style={{ padding:'30px', textAlign:'center', color:COUL.texteFaible, fontSize:13,
-          background:COUL.blanc, borderRadius:10, border:'1px solid #e2e8f0' }}>
+          background:COUL.surface, borderRadius:10, border:'1px solid #e2e8f0' }}>
           <i className="ti ti-plug-off" style={{ fontSize:28, display:'block', marginBottom:8 }} />
           Aucun compte connecté — synchronisation Ponto requise
         </div>
@@ -94,7 +94,7 @@ export default function BlocComptes({ societeCode, color }) {
 
               return (
                 <div key={c.id} style={{
-                  background:COUL.blanc, borderRadius:10,
+                  background:COUL.surface, borderRadius:10,
                   border:'1px solid #e2e8f0',
                   borderTop:`3px solid ${bcolor}`,
                   padding:'16px',

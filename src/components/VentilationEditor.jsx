@@ -119,13 +119,13 @@ export default function VentilationEditor({ tx, categories = [], activitesSoc = 
       <div style={{ fontSize: '12px', fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>Ventilation du paiement — {eur(absTx)}</div>
 
       {lignes.map((l, i) => (
-        <div key={i} style={{ border: '1px solid #eef2f7', borderRadius: '8px', padding: '8px', marginBottom: '8px', background: COUL.blanc }}>
+        <div key={i} style={{ border: '1px solid #eef2f7', borderRadius: '8px', padding: '8px', marginBottom: '8px', background: COUL.surface }}>
           <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '6px' }}>
             <input type="number" step="0.01" value={l.pct} onChange={e => setPct(i, e.target.value)} placeholder="%" style={{ ...inp, width: '68px' }} />
             <span style={{ fontSize: '12px', color: COUL.texteFaible }}>%</span>
             <input type="number" step="0.01" value={l.montant} onChange={e => setMontant(i, e.target.value)} placeholder="Montant" style={{ ...inp, width: '108px' }} />
             <span style={{ fontSize: '12px', color: COUL.texteFaible }}>€</span>
-            <button onClick={() => retirer(i)} title="Retirer" style={{ marginLeft: 'auto', width: '28px', height: '28px', border: '1px solid #fecaca', borderRadius: '7px', background: COUL.blanc, color: COUL.danger, cursor: 'pointer' }}>×</button>
+            <button onClick={() => retirer(i)} title="Retirer" style={{ marginLeft: 'auto', width: '28px', height: '28px', border: '1px solid #fecaca', borderRadius: '7px', background: COUL.surface, color: COUL.danger, cursor: 'pointer' }}>×</button>
           </div>
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
             <select value={l.categorie_id} onChange={e => setField(i, 'categorie_id', e.target.value)} style={{ ...inp, flex: '1 1 150px' }}>
@@ -149,9 +149,9 @@ export default function VentilationEditor({ tx, categories = [], activitesSoc = 
       ))}
 
       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
-        <button onClick={ajouter} style={{ padding: '7px 12px', borderRadius: '7px', fontSize: '12.5px', fontWeight: 600, border: '1px dashed #cbd5e1', background: COUL.blanc, color: COUL.texteMoyen, cursor: 'pointer', fontFamily: FONT }}>+ Ligne</button>
-        {lignes.length > 1 && <button onClick={repartirEgal} style={{ padding: '7px 12px', borderRadius: '7px', fontSize: '12.5px', fontWeight: 600, border: '1px solid #e2e8f0', background: COUL.blanc, color: COUL.texteMoyen, cursor: 'pointer', fontFamily: FONT }}>Répartir également ({lignes.length})</button>}
-        {factures.length > 1 && <button onClick={repartirParFacture} style={{ padding: '7px 12px', borderRadius: '7px', fontSize: '12.5px', fontWeight: 600, border: '1px solid #e2e8f0', background: COUL.blanc, color: COUL.texteMoyen, cursor: 'pointer', fontFamily: FONT }}>Répartir par facture ({factures.length})</button>}
+        <button onClick={ajouter} style={{ padding: '7px 12px', borderRadius: '7px', fontSize: '12.5px', fontWeight: 600, border: '1px dashed #cbd5e1', background: COUL.surface, color: COUL.texteMoyen, cursor: 'pointer', fontFamily: FONT }}>+ Ligne</button>
+        {lignes.length > 1 && <button onClick={repartirEgal} style={{ padding: '7px 12px', borderRadius: '7px', fontSize: '12.5px', fontWeight: 600, border: '1px solid #e2e8f0', background: COUL.surface, color: COUL.texteMoyen, cursor: 'pointer', fontFamily: FONT }}>Répartir également ({lignes.length})</button>}
+        {factures.length > 1 && <button onClick={repartirParFacture} style={{ padding: '7px 12px', borderRadius: '7px', fontSize: '12.5px', fontWeight: 600, border: '1px solid #e2e8f0', background: COUL.surface, color: COUL.texteMoyen, cursor: 'pointer', fontFamily: FONT }}>Répartir par facture ({factures.length})</button>}
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px', padding: '8px 4px', borderTop: '1px solid #eef2f7' }}>
@@ -163,9 +163,9 @@ export default function VentilationEditor({ tx, categories = [], activitesSoc = 
 
       <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
         <button onClick={enregistrer} disabled={busy || !equilibre} style={{ flex: 1, padding: '9px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, border: 'none', background: (busy || !equilibre) ? '#94a3b8' : COUL.succes, color: COUL.blanc, cursor: (busy || !equilibre) ? 'not-allowed' : 'pointer', fontFamily: FONT }}>Enregistrer la ventilation</button>
-        <button onClick={() => setOuvert(false)} style={{ padding: '9px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, border: '1px solid #e2e8f0', background: COUL.blanc, color: COUL.texteMoyen, cursor: 'pointer', fontFamily: FONT }}>Fermer</button>
+        <button onClick={() => setOuvert(false)} style={{ padding: '9px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, border: '1px solid #e2e8f0', background: COUL.surface, color: COUL.texteMoyen, cursor: 'pointer', fontFamily: FONT }}>Fermer</button>
       </div>
-      {nbExistant > 0 && <button onClick={annulerVentilation} style={{ marginTop: '8px', width: '100%', padding: '7px', borderRadius: '7px', fontSize: '12px', fontWeight: 600, border: '1px solid #fecaca', background: COUL.blanc, color: COUL.danger, cursor: 'pointer', fontFamily: FONT }}>Supprimer la ventilation (repasser en catégorie unique)</button>}
+      {nbExistant > 0 && <button onClick={annulerVentilation} style={{ marginTop: '8px', width: '100%', padding: '7px', borderRadius: '7px', fontSize: '12px', fontWeight: 600, border: '1px solid #fecaca', background: COUL.surface, color: COUL.danger, cursor: 'pointer', fontFamily: FONT }}>Supprimer la ventilation (repasser en catégorie unique)</button>}
     </div>
   )
 }

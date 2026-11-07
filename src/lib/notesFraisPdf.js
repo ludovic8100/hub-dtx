@@ -4,7 +4,7 @@
 import { fmtIban, ibanEspace, epcPayload } from './epc'
 import { ENTITES } from './entites'
 import { supabase } from './supabase'
-import { COUL } from './theme'
+import { COUL, COUL_BRUT } from './theme'
 // Libs lourdes (jspdf, pdf-lib, qrcode ≈ 800 kB) chargées dynamiquement au moment
 // de la génération, pour ne pas alourdir le chunk de la page qui importe ce module.
 
@@ -90,7 +90,7 @@ export async function genererPdfNote({ entiteKey = 'dynassur', note = {}, lignes
   let qr = null
   if (hasIban) {
     const payload = epcPayload({ benefNom, iban: ibanRaw, montant: tTTC, communication: note.numero })
-    try { qr = await QRCode.toDataURL(payload, { errorCorrectionLevel: 'M', margin: 1, width: 240, color: { dark: COUL.texteFort, light: COUL.blanc } }) } catch { qr = null }
+    try { qr = await QRCode.toDataURL(payload, { errorCorrectionLevel: 'M', margin: 1, width: 240, color: { dark: COUL_BRUT.texteFort, light: COUL_BRUT.blanc } }) } catch { qr = null }
   }
 
   // ───────── EN-TÊTE ─────────

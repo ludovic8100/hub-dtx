@@ -599,7 +599,7 @@ function Cie({ nom, cies, size=18 }) {
   const r=resolveCie(nom,cies); const pad=Math.round(size*0.3)
   if(r.logoUrl && !err)
     return <img src={r.logoUrl} alt={nom} title={nom} onError={()=>setErr(true)}
-      style={{height:size,maxWidth:size*3.4,objectFit:'contain',verticalAlign:'middle',background:COUL.blanc,borderRadius:4,padding:'1px 2px'}}/>
+      style={{height:size,maxWidth:size*3.4,objectFit:'contain',verticalAlign:'middle',background:COUL.surface,borderRadius:4,padding:'1px 2px'}}/>
   return <span title={nom} style={{display:'inline-block',fontSize:Math.max(10,Math.round(size*0.6)),fontWeight:800,padding:`1px ${pad}px`,borderRadius:6,background:r.couleur+'22',color:r.couleur,lineHeight:`${size}px`,whiteSpace:'nowrap'}}>{r.court}</span>
 }
 
@@ -756,7 +756,7 @@ function VueContrats({ client, objets, contratsClient, garantiesParPolice, cies,
           <span style={{fontSize:12,color:COUL.texte}}>
             Filtré sur <strong>{typeSel.icon} {typeSel.label}</strong> — {typeC.length} contrat{typeC.length>1?'s':''} et {objetsList.length} objet{objetsList.length>1?'s':''} de risque.
           </span>
-          <button onClick={()=>onType&&onType(null)} style={{marginLeft:'auto',fontSize:11,fontWeight:700,padding:'4px 10px',borderRadius:6,cursor:'pointer',border:'1px solid #c4b5fd',background:COUL.blanc,color:COUL.violet}}>
+          <button onClick={()=>onType&&onType(null)} style={{marginLeft:'auto',fontSize:11,fontWeight:700,padding:'4px 10px',borderRadius:6,cursor:'pointer',border:'1px solid #c4b5fd',background:COUL.surface,color:COUL.violet}}>
             <i className="ti ti-x" style={{marginRight:4}}/>Tout afficher
           </button>
         </div>
@@ -813,7 +813,7 @@ function VueContrats({ client, objets, contratsClient, garantiesParPolice, cies,
                 <span style={{fontSize:12,fontWeight:700,color:COUL.texte}}>{`${qSel.nom||''} ${qSel.prenom||''}`.trim()} <span style={{color:COUL.texteFaible,fontWeight:400}}>· {qSel.dossier}</span></span>
                 <select value={qType} onChange={e=>setQType(e.target.value)} style={{fontSize:12,padding:'4px 8px',borderRadius:6,border:'1px solid #cbd5e1'}}>{TYPES.map(t=><option key={t} value={t}>{t}</option>)}</select>
                 <button disabled={saving} onClick={ajouterLien} style={{fontSize:11,fontWeight:700,padding:'5px 11px',borderRadius:6,cursor:'pointer',border:'none',background:COUL.teal,color:COUL.blanc}}>{saving?'…':'Ajouter'}</button>
-                <button onClick={()=>{setQSel(null);setQ('')}} style={{fontSize:11,fontWeight:700,padding:'5px 9px',borderRadius:6,cursor:'pointer',border:'1px solid #cbd5e1',background:COUL.blanc,color:COUL.texteDoux}}>Annuler</button>
+                <button onClick={()=>{setQSel(null);setQ('')}} style={{fontSize:11,fontWeight:700,padding:'5px 9px',borderRadius:6,cursor:'pointer',border:'1px solid #cbd5e1',background:COUL.surface,color:COUL.texteDoux}}>Annuler</button>
               </div>
             ):(
               <div>
@@ -821,7 +821,7 @@ function VueContrats({ client, objets, contratsClient, garantiesParPolice, cies,
                 {qres.length>0&&(
                   <div style={{marginTop:6,display:'flex',flexDirection:'column',gap:3,maxHeight:180,overflowY:'auto'}}>
                     {qres.map((c,i)=>(
-                      <div key={i} onClick={()=>setQSel(c)} style={{fontSize:12,padding:'5px 9px',borderRadius:6,background:COUL.blanc,border:'1px solid #e2e8f0',cursor:'pointer',display:'flex',gap:8,alignItems:'center'}}>
+                      <div key={i} onClick={()=>setQSel(c)} style={{fontSize:12,padding:'5px 9px',borderRadius:6,background:COUL.surface,border:'1px solid #e2e8f0',cursor:'pointer',display:'flex',gap:8,alignItems:'center'}}>
                         <span style={{fontWeight:700,color:COUL.texte}}>{`${c.nom||''} ${c.prenom||''}`.trim()}</span>
                         <span style={{color:COUL.texteFaible,fontFamily:'monospace',fontSize:11}}>{c.dossier}</span>
                       </div>
@@ -960,7 +960,7 @@ function ContratModal({ contrat, dossier, objets, onClose, preview, cies }) {
   )
   return (
     <div onClick={preview?undefined:onClose} style={{position:'fixed',inset:0,background:preview?'transparent':'rgba(15,23,42,0.55)',zIndex:1000,display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'40px 16px',overflowY:'auto',pointerEvents:preview?'none':'auto'}}>
-      <div onClick={e=>e.stopPropagation()} style={{background:COUL.blanc,borderRadius:14,maxWidth:720,width:'100%',boxShadow:preview?'0 24px 70px rgba(15,23,42,0.28)':'0 20px 60px rgba(0,0,0,0.35)',overflow:'hidden',border:preview?`1px solid ${BLUE}55`:'none'}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:COUL.surface,borderRadius:14,maxWidth:720,width:'100%',boxShadow:preview?'0 24px 70px rgba(15,23,42,0.28)':'0 20px 60px rgba(0,0,0,0.35)',overflow:'hidden',border:preview?`1px solid ${BLUE}55`:'none'}}>
         <div style={{background:`linear-gradient(135deg, ${BLUE} 0%, ${NAVY} 140%)`,padding:'16px 20px',display:'flex',alignItems:'flex-start',gap:12}}>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:10,color:'rgba(255,255,255,0.75)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.05em'}}>Contrat</div>
@@ -1328,7 +1328,7 @@ function Fiche({ client, onClose, onOpenDossier }) {
   ].filter(Boolean) : []
 
   return(
-    <div ref={ref} style={{background:COUL.blanc,borderRadius:14,border:`2px solid ${BLUE}25`,overflow:'hidden',boxShadow:'0 4px 24px rgba(0,128,189,0.1)'}}>
+    <div ref={ref} style={{background:COUL.surface,borderRadius:14,border:`2px solid ${BLUE}25`,overflow:'hidden',boxShadow:'0 4px 24px rgba(0,128,189,0.1)'}}>
 
       <div style={{background:`linear-gradient(135deg, ${ENTITES.dynassur.color} 0%, ${ENTITES.dynassur.colorDark} 140%)`,padding:'14px 20px'}}>
         <div style={{display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
@@ -1718,7 +1718,7 @@ export default function DynassurClients() {
               ]}
             />
 
-            <div style={{background:COUL.blanc,borderRadius:12,border:'1px solid #e2e8f0',overflow:'hidden'}}>
+            <div style={{background:COUL.surface,borderRadius:12,border:'1px solid #e2e8f0',overflow:'hidden'}}>
               <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',padding:'12px 16px',borderBottom:'1px solid #f1f5f9'}}>
                 <div style={{display:'flex',alignItems:'center',gap:8}}>
                   <i className={modeRecents?"ti ti-history":"ti ti-calendar-heart"} style={{fontSize:18,color:COUL.teal}}/>
@@ -1726,12 +1726,12 @@ export default function DynassurClients() {
                   <span style={{fontSize:12,color:COUL.texteFaible}}>{modeRecents?'· vos dernières fiches et celles de votre bureau':'· trie les clients par ancienneté du dernier contact'}</span>
                 </div>
                 <div style={{display:'flex',gap:8,marginLeft:'auto',flexWrap:'wrap'}}>
-                  <select value={scope} onChange={e=>setScope(e.target.value)} style={{padding:'7px 10px',borderRadius:8,border:'1px solid #e2e8f0',fontSize:13,fontFamily:'inherit',color:NAVY,background:COUL.blanc}}>
+                  <select value={scope} onChange={e=>setScope(e.target.value)} style={{padding:'7px 10px',borderRadius:8,border:'1px solid #e2e8f0',fontSize:13,fontFamily:'inherit',color:NAVY,background:COUL.surface}}>
                     <option value="all">Tous Dynassur ({counts.total.toLocaleString('fr-BE')})</option>
                     <option value="mine">Mes clients ({counts.mine.toLocaleString('fr-BE')})</option>
                     <option value="bureau">Mon bureau ({counts.bureau.toLocaleString('fr-BE')})</option>
                   </select>
-                  <select value={contactFilter} onChange={e=>setContactFilter(e.target.value)} style={{padding:'7px 10px',borderRadius:8,border:`1px solid ${relanceActif?'#0d9488':COUL.bord}`,fontSize:13,fontFamily:'inherit',color:NAVY,background:COUL.blanc,fontWeight:relanceActif?700:400}}>
+                  <select value={contactFilter} onChange={e=>setContactFilter(e.target.value)} style={{padding:'7px 10px',borderRadius:8,border:`1px solid ${relanceActif?'#0d9488':COUL.bord}`,fontSize:13,fontFamily:'inherit',color:NAVY,background:COUL.surface,fontWeight:relanceActif?700:400}}>
                     <option value="tous">Toutes les tranches</option>
                     {TRANCHES.map(t=><option key={t.val} value={t.val}>{t.label} ({relanceCounts[t.val]||0})</option>)}
                   </select>
@@ -1781,7 +1781,7 @@ export default function DynassurClients() {
 
         {kpiModal&&(
           <div onClick={()=>setKpiModal(null)} style={{position:'fixed',inset:0,background:'rgba(15,23,42,.55)',zIndex:1000,display:'flex',justifyContent:'flex-end'}}>
-            <div onClick={e=>e.stopPropagation()} style={{width:'min(820px,96vw)',height:'100%',background:COUL.blanc,display:'flex',flexDirection:'column',boxShadow:'-8px 0 30px rgba(0,0,0,.2)'}}>
+            <div onClick={e=>e.stopPropagation()} style={{width:'min(820px,96vw)',height:'100%',background:COUL.surface,display:'flex',flexDirection:'column',boxShadow:'-8px 0 30px rgba(0,0,0,.2)'}}>
               <div style={{background:NAVY,padding:'14px 20px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
                 <div style={{color:COUL.blanc,fontSize:15,fontWeight:800}}>{kpiModal==='loading'?'Calcul en cours…':kpiModal.titre}</div>
                 <button onClick={()=>setKpiModal(null)} style={{background:'transparent',border:'none',color:COUL.blanc,fontSize:22,cursor:'pointer'}}>✕</button>

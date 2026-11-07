@@ -19,7 +19,7 @@ export default function Login() {
       fontFamily: "'Source Sans Pro', sans-serif"
     }}>
       <div style={{
-        background: COUL.blanc,
+        background: COUL.surface,
         borderRadius: '16px',
         padding: '48px 40px',
         textAlign: 'center',

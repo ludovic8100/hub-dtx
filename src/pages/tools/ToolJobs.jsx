@@ -77,7 +77,7 @@ export default function ToolJobs() {
 
   const boutonRafraichir = (
     <button onClick={charger}
-      style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid #e2e8f0', background: COUL.blanc, borderRadius: 8, padding: '7px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: COUL.texteSombre, fontFamily: 'inherit' }}>
+      style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid #e2e8f0', background: COUL.surface, borderRadius: 8, padding: '7px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: COUL.texteSombre, fontFamily: 'inherit' }}>
       <i className="ti ti-reload" style={{ fontSize: 14 }} /> Rafraîchir
     </button>
   )
@@ -115,7 +115,7 @@ export default function ToolJobs() {
               return (
                 <div key={j.job}
                   onClick={() => setSelection(actif ? null : j.job)}
-                  style={{ background: COUL.blanc, border: `1px solid ${actif ? NAVY : COUL.bord}`, borderTop: `3px solid ${e.couleur}`, borderRadius: 12, padding: '14px 16px', cursor: 'pointer', boxShadow: actif ? '0 2px 10px rgba(13,47,94,0.12)' : '0 1px 3px rgba(0,0,0,0.04)' }}>
+                  style={{ background: COUL.surface, border: `1px solid ${actif ? NAVY : COUL.bord}`, borderTop: `3px solid ${e.couleur}`, borderRadius: 12, padding: '14px 16px', cursor: 'pointer', boxShadow: actif ? '0 2px 10px rgba(13,47,94,0.12)' : '0 1px 3px rgba(0,0,0,0.04)' }}>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                     <span style={{ fontSize: 14, fontWeight: 800, color: NAVY, flex: 1 }}>{j.libelle}</span>
@@ -170,7 +170,7 @@ export default function ToolJobs() {
             Aucune exécution enregistrée. Le journal se remplit au prochain passage de chaque job.
           </p>
         ) : (
-          <div style={{ background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden' }}>
+          <div style={{ background: COUL.surface, border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
                 <tr style={{ textAlign: 'left', color: COUL.texteDoux, background: COUL.fond, borderBottom: '1px solid #e2e8f0' }}>

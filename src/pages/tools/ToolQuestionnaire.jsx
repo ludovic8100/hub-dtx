@@ -10,7 +10,7 @@ import { formaterDateSaisie } from '../../components/FicheVieFormulaire'
 import { FICHES, versionPourDate, SEUIL_VERSION } from '../../lib/fichesVie'
 import { construireFichePDF } from '../../lib/fichesViePdf'
 import { proposerReponses, profilDepuisReponses, profilDepuisScoreRisque } from '../../lib/fichesVieReponses'
-import { COUL } from '../../lib/theme'
+import { COUL, COUL_BRUT } from '../../lib/theme'
 import { risqueFonds, lectureComposition, profilDepuisScore, chargerFonds,
          chargerCompagniesSansFonds, compagnieSansFonds, enregistrerFonds } from '../../lib/fondsRisque'
 
@@ -48,7 +48,7 @@ async function ocrPdfPages(pdf, onProgress) {
     canvas.height = viewport.height
     const ctx = canvas.getContext('2d')
     // White background (improves OCR on transparent PDFs)
-    ctx.fillStyle = COUL.blanc
+    ctx.fillStyle = COUL_BRUT.blanc
     ctx.fillRect(0, 0, canvas.width, canvas.height)
     await page.render({ canvasContext: ctx, viewport }).promise
 
@@ -903,7 +903,7 @@ export default function ToolQuestionnaire() {
   // ─── Styles ───
   const cardStyle = {
     border: '1px solid #e2e8f0', borderRadius: 12, padding: '18px 20px',
-    background: COUL.blanc, marginBottom: 14,
+    background: COUL.surface, marginBottom: 14,
   }
   const btnPrimary = {
     background: COUL.marineClair, color: COUL.blanc, border: 'none', borderRadius: 8,
@@ -921,7 +921,7 @@ export default function ToolQuestionnaire() {
   // ─── Right panel style ───
   const panelCardStyle = {
     border: '1px solid #e2e8f0', borderRadius: 10, padding: '14px 16px',
-    background: COUL.blanc, marginBottom: 12,
+    background: COUL.surface, marginBottom: 12,
   }
   const profileColors = {
     'Défensif': COUL.succes, 'Conservateur': '#22c55e',
@@ -1052,7 +1052,7 @@ export default function ToolQuestionnaire() {
                     <div key={d.id}
                       onClick={() => { setClientLibre(null); setDoublons([]); selectClient(d) }}
                       style={{
-                        padding: '7px 10px', borderRadius: 6, cursor: 'pointer', background: COUL.blanc,
+                        padding: '7px 10px', borderRadius: 6, cursor: 'pointer', background: COUL.surface,
                         border: d.pts >= 10 ? '1px solid #f0c478' : '1px solid #e2e8f0', marginBottom: 5,
                       }}>
                       <div style={{ fontSize: 12.5, fontWeight: 700, color: COUL.texte }}>
@@ -1319,7 +1319,7 @@ export default function ToolQuestionnaire() {
                   {ajoutFonds && (
                     <div style={{
                       marginTop: 10, padding: '12px 14px', borderRadius: 8,
-                      background: COUL.blanc, border: '1px solid #f0c478',
+                      background: COUL.surface, border: '1px solid #f0c478',
                     }}>
                       <div style={{ fontSize: 12.5, fontWeight: 700, color: COUL.alerte, marginBottom: 6 }}>
                         Enregistrer « {ajoutFonds.nom} »
@@ -1366,7 +1366,7 @@ export default function ToolQuestionnaire() {
                         </button>
                         <button onClick={() => setAjoutFonds(null)}
                           style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #dce4ec',
-                                   background: COUL.blanc, color: COUL.texteDoux, fontSize: 12,
+                                   background: COUL.surface, color: COUL.texteDoux, fontSize: 12,
                                    fontFamily: 'inherit', cursor: 'pointer' }}>
                           Annuler
                         </button>
@@ -1722,7 +1722,7 @@ export default function ToolQuestionnaire() {
               {desaccordVersion && (
                 <div style={{
                   marginTop: 12, padding: '11px 13px', borderRadius: 8,
-                  background: COUL.blanc, border: '2px solid #b91c1c',
+                  background: COUL.surface, border: '2px solid #b91c1c',
                 }}>
                   <div style={{ fontSize: 13.5, fontWeight: 800, color: COUL.dangerFonce, marginBottom: 4 }}>
                     ⚠ Attention — vous ne serez pas en ordre

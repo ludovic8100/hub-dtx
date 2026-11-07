@@ -6,7 +6,7 @@ import { traduitGarantie } from '../../lib/garantieFr'
 import { buildDevoirInfoPdf, genererMotivation } from '../../lib/devoirInfoPdf'
 import * as pdfjsLib from 'pdfjs-dist'
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.js?url'
-import { COUL } from '../../lib/theme'
+import { COUL, COUL_BRUT } from '../../lib/theme'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
@@ -14,7 +14,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 // particulières → document pré-rempli, vérifié, signé sur tablette, archivé (bucket devoir-info).
 
 const NAVY = COUL.marineClair
-const card = { border: '1px solid #e2e8f0', borderRadius: 12, padding: '18px 20px', background: COUL.blanc, marginBottom: 14 }
+const card = { border: '1px solid #e2e8f0', borderRadius: 12, padding: '18px 20px', background: COUL.surface, marginBottom: 14 }
 const h2 = { fontSize: 15, fontWeight: 700, color: COUL.texte, marginBottom: 10 }
 const lab = { fontSize: 12, color: COUL.texteDoux, margin: '10px 0 4px', display: 'block' }
 const inp = { width: '100%', padding: '9px 12px', fontSize: 14, border: '1px solid #cbd5e1', borderRadius: 8, boxSizing: 'border-box', fontFamily: 'inherit' }
@@ -61,7 +61,7 @@ function SignaturePad({ label, onChange }) {
   useEffect(() => {
     const cv = ref.current, r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1
     cv.width = r.width * dpr; cv.height = r.height * dpr
-    const ctx = cv.getContext('2d'); ctx.scale(dpr, dpr); ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.strokeStyle = COUL.texteFort
+    const ctx = cv.getContext('2d'); ctx.scale(dpr, dpr); ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.strokeStyle = COUL_BRUT.texteFort
   }, [])
   const pos = e => { const r = ref.current.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top] }
   const down = e => { e.preventDefault(); ref.current.setPointerCapture(e.pointerId); drawing.current = true; const ctx = ref.current.getContext('2d'); ctx.beginPath(); ctx.moveTo(...pos(e)) }

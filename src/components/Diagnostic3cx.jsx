@@ -51,7 +51,7 @@ export default function Diagnostic3cx() {
   const copier = () => navigator.clipboard?.writeText(JSON.stringify(rapport, null, 2))
 
   return (
-    <section style={{ background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 18px', marginBottom: 20 }}>
+    <section style={{ background: COUL.surface, border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 18px', marginBottom: 20 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 240 }}>
           <h2 style={{ fontSize: 14.5, fontWeight: 800, color: NAVY, margin: 0 }}>Téléphonie 3CX</h2>

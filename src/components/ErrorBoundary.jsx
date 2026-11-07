@@ -88,7 +88,7 @@ export default class ErrorBoundary extends Component {
             <div style={{ fontSize: 14, marginBottom: 12 }}>
               Le reste de l'application reste utilisable — le menu n'est pas affecté. Détail de l'erreur :
             </div>
-            <pre style={{ background: COUL.blanc, border: '1px solid #F5C6CB', borderRadius: 6, padding: 12, fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: COUL.dangerFonce, maxHeight: 280, overflow: 'auto' }}>{msg}{stack ? '\n\n' + stack : ''}</pre>
+            <pre style={{ background: COUL.surface, border: '1px solid #F5C6CB', borderRadius: 6, padding: 12, fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: COUL.dangerFonce, maxHeight: 280, overflow: 'auto' }}>{msg}{stack ? '\n\n' + stack : ''}</pre>
             <button
               onClick={() => window.location.reload()}
               style={{ marginTop: 12, padding: '8px 16px', borderRadius: 7, border: 'none', background: '#1E5799', color: COUL.blanc, fontWeight: 600, cursor: 'pointer', fontSize: 13 }}

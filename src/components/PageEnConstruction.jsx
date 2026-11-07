@@ -8,7 +8,7 @@ export default function PageEnConstruction({ titre, icon, color = COUL.bleu, col
       <div style={{ fontFamily: "'Source Sans Pro', sans-serif", width: '100%' }}>
         <StatBanner color={color} colorDark={colorDark || color} logoUrl={logoUrl} title={titre} subtitle={sousTitre} />
         <div style={{
-          background: COUL.blanc, borderRadius: 14, border: '1px solid #eef2f6',
+          background: COUL.surface, borderRadius: 14, border: '1px solid #eef2f6',
           padding: '64px 32px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
         }}>
           <div style={{

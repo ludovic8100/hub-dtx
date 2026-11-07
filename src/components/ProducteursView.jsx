@@ -70,7 +70,7 @@ export default function ProducteursView() {
         <span style={{ marginLeft: 'auto', fontSize: 12, color: COUL.texteDoux }}>{rows.length} producteur(s)</span>
       </div>
 
-      <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden', background: COUL.blanc }}>
+      <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden', background: COUL.surface }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead><tr>
             <th style={th}>N° producteur</th><th style={th}>FSMA</th><th style={th}>Compagnie</th><th style={th}>Statut</th><th style={{ ...th, textAlign: 'right' }}>Actions</th>
@@ -94,9 +94,9 @@ export default function ProducteursView() {
                   <td style={td}>
                     <select value={p.statut || 'actif'} onChange={e => setStatut(p.id, e.target.value)}
                       style={{ border: 'none', borderRadius: 5, padding: '3px 8px', fontSize: 12, fontWeight: 600, color: COUL.blanc, background: st.couleur, cursor: 'pointer' }}>
-                      <option value="actif" style={{ color: '#000', background: COUL.blanc }}>Actif</option>
-                      <option value="runoff" style={{ color: '#000', background: COUL.blanc }}>Run-off</option>
-                      <option value="cloture" style={{ color: '#000', background: COUL.blanc }}>Clôturé</option>
+                      <option value="actif" style={{ color: '#000', background: COUL.surface }}>Actif</option>
+                      <option value="runoff" style={{ color: '#000', background: COUL.surface }}>Run-off</option>
+                      <option value="cloture" style={{ color: '#000', background: COUL.surface }}>Clôturé</option>
                     </select>
                   </td>
                   <td style={{ ...td, textAlign: 'right' }}>

@@ -42,13 +42,13 @@ const AVATARS = [
 ]
 const initiales = nom => (nom || '?').split(/[\s-]+/).filter(Boolean).slice(0, 2).map(m => m[0]).join('').toUpperCase()
 
-const panneau = { background: COUL.blanc, border: `1px solid ${T.ligne}`, borderRadius: T.rayon, boxShadow: T.ombre }
+const panneau = { background: COUL.surface, border: `1px solid ${T.ligne}`, borderRadius: T.rayon, boxShadow: T.ombre }
 
 /* ── Carte de chiffre : bandeau coloré de 4 px, icône à l'accent ── */
 function CarteKpi({ icone, label, valeur, accent, aide }) {
   return (
     <article title={aide} style={{
-      position: 'relative', background: COUL.blanc, border: `1px solid ${T.ligne}`, borderRadius: 9,
+      position: 'relative', background: COUL.surface, border: `1px solid ${T.ligne}`, borderRadius: 9,
       boxShadow: T.ombre, display: 'flex', alignItems: 'center', gap: 15,
       minHeight: 103, padding: '20px 17px 15px', overflow: 'hidden',
     }}>
@@ -231,7 +231,7 @@ export function VueEquipe({ stats, heures, rappels, selection, onCollaborateur, 
             alerte={(stats.hors?.menuFiles ?? 0) > 0} />
           <button onClick={onVoirRappels}
             style={{ width: '100%', marginTop: 13, minHeight: 34, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9,
-              border: `1px solid ${T.bleu}`, borderRadius: 7, background: COUL.blanc, color: '#0086d9', fontWeight: 650, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', padding: 4 }}>
+              border: `1px solid ${T.bleu}`, borderRadius: 7, background: COUL.surface, color: '#0086d9', fontWeight: 650, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', padding: 4 }}>
             <i className="ti ti-calendar" style={{ fontSize: 17 }} />Voir les rappels
           </button>
         </section>

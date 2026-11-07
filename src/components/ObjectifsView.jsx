@@ -85,7 +85,7 @@ class DetailBoundary extends Component {
   render() {
     if (this.state.err) return (
       <div onClick={this.props.onClose} style={{ position:'fixed', inset:0, background:'rgba(15,23,42,.55)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
-        <div onClick={e=>e.stopPropagation()} style={{ background:COUL.blanc, padding:24, borderRadius:12, maxWidth:600, width:'100%' }}>
+        <div onClick={e=>e.stopPropagation()} style={{ background:COUL.surface, padding:24, borderRadius:12, maxWidth:600, width:'100%' }}>
           <div style={{ fontWeight:800, color:COUL.danger, marginBottom:8, fontSize:15 }}>Erreur d'affichage du détail</div>
           <pre style={{ fontSize:12, whiteSpace:'pre-wrap', wordBreak:'break-word', color:COUL.texteMoyen, background:COUL.fond, padding:12, borderRadius:8, maxHeight:300, overflow:'auto' }}>{String(this.state.err?.stack || this.state.err?.message || this.state.err)}</pre>
           <button onClick={this.props.onClose} style={{ marginTop:14, padding:'8px 18px', border:'none', borderRadius:8, background:COUL.bleu, color:COUL.blanc, fontWeight:700, cursor:'pointer' }}>Fermer</button>
@@ -127,7 +127,7 @@ function DetailModal({ titre, kind, rows, onClose }) {
   const click = k => setSort(s => s.key === k ? { key:k, dir:s.dir === 'asc' ? 'desc' : 'asc' } : { key:k, dir:'asc' })
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.55)', zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: 'min(880px,96vw)', height: '100%', background: COUL.blanc, display: 'flex', flexDirection: 'column', boxShadow: '-8px 0 30px rgba(0,0,0,.2)' }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: 'min(880px,96vw)', height: '100%', background: COUL.surface, display: 'flex', flexDirection: 'column', boxShadow: '-8px 0 30px rgba(0,0,0,.2)' }}>
         <div style={{ background: C.blueDark, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <div style={{ color: COUL.blanc, fontSize: 15, fontWeight: 800 }}>{titre}</div>

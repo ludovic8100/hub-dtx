@@ -56,7 +56,7 @@ const infoLbl = { fontSize: 10, fontWeight: 800, color: COUL.texteFaible, textTr
 const infoVal = { fontSize: 14, fontWeight: 700, color: COUL.texte }
 function Card({ titre, sous, right, children }) {
   return (
-    <div style={{ background: COUL.blanc, borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden', marginBottom: 20 }}>
+    <div style={{ background: COUL.surface, borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden', marginBottom: 20 }}>
       {titre && <div style={{ padding: '11px 15px', background: COUL.fond, borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <div><div style={{ fontSize: 14, fontWeight: 800, color: NAVY }}>{titre}</div>{sous && <div style={{ fontSize: 11.5, color: COUL.texteDoux, marginTop: 2 }}>{sous}</div>}</div>
         {right}
@@ -66,7 +66,7 @@ function Card({ titre, sous, right, children }) {
   )
 }
 function Kpi({ label, value, col }) {
-  return <div style={{ background: COUL.blanc, borderRadius: 10, border: '1px solid #e2e8f0', borderTop: `3px solid ${col}`, padding: '12px 16px' }}>
+  return <div style={{ background: COUL.surface, borderRadius: 10, border: '1px solid #e2e8f0', borderTop: `3px solid ${col}`, padding: '12px 16px' }}>
     <div style={{ fontSize: 10, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 5 }}>{label}</div>
     <div style={{ fontSize: 22, fontWeight: 800, color: COUL.texteFort, lineHeight: 1 }}>{value}</div>
   </div>
@@ -391,11 +391,11 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
               <b>Note renvoyée</b>{sel.refus_at ? ` le ${fmtD(sel.refus_at)}` : ''} : {sel.refus_motif}<br />Corrigez puis soumettez à nouveau.
             </div>}
 
-            <div style={{ background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 3px rgba(15,23,42,.07)' }}>
+            <div style={{ background: COUL.surface, border: '1px solid #e2e8f0', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 3px rgba(15,23,42,.07)' }}>
 
               {(() => { const NE = ENTITES[sel.societe] || ENT; return (
               <div style={{ background: NE.color, padding: '18px 24px', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-                <div style={{ width: 54, height: 54, borderRadius: 12, background: COUL.blanc, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+                <div style={{ width: 54, height: 54, borderRadius: 12, background: COUL.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
                   {NE.logo ? <img src={NE.logo} alt="" style={{ maxWidth: '78%', maxHeight: '78%', objectFit: 'contain' }} />
                     : <span style={{ fontSize: 26, fontWeight: 800, color: NE.color }}>{(NE.label || '?').trim()[0]}</span>}
                 </div>
@@ -527,10 +527,10 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
                   </div>
                   {qrUrl
                     ? <div style={{ textAlign: 'center' }}>
-                        <img src={qrUrl} alt="QR paiement SEPA" style={{ width: 154, height: 154, border: '1px solid #e2e8f0', borderRadius: 12, background: COUL.blanc, padding: 6, boxSizing: 'border-box' }} />
+                        <img src={qrUrl} alt="QR paiement SEPA" style={{ width: 154, height: 154, border: '1px solid #e2e8f0', borderRadius: 12, background: COUL.surface, padding: 6, boxSizing: 'border-box' }} />
                         <div style={{ fontSize: 11, color: COUL.texteFaible, marginTop: 5 }}>Scannez avec votre appli bancaire</div>
                       </div>
-                    : <div style={{ maxWidth: 230, fontSize: 12.5, color: COUL.danger, background: COUL.blanc, border: '1px solid #fecaca', borderRadius: 12, padding: 14, lineHeight: 1.5 }}>
+                    : <div style={{ maxWidth: 230, fontSize: 12.5, color: COUL.danger, background: COUL.surface, border: '1px solid #fecaca', borderRadius: 12, padding: 14, lineHeight: 1.5 }}>
                         Pas de QR : renseignez l'IBAN du bénéficiaire dans <b>Administration › Utilisateurs</b>, puis rouvrez cette note (le QR s'affiche ici). Pour que le PDF téléchargeable contienne aussi le QR, repassez ensuite la note en brouillon et re-validez.
                       </div>}
                 </div>
@@ -547,7 +547,7 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
 
             {showSig && (
               <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 1000 }}>
-                <div style={{ background: COUL.blanc, borderRadius: 14, padding: 22, width: 'min(520px,100%)', boxShadow: '0 10px 40px rgba(0,0,0,.25)' }}>
+                <div style={{ background: COUL.surface, borderRadius: 14, padding: 22, width: 'min(520px,100%)', boxShadow: '0 10px 40px rgba(0,0,0,.25)' }}>
                   <div style={{ fontSize: 16, fontWeight: 800, color: NAVY, marginBottom: 6 }}>Signature — soumission de la note</div>
                   <div style={{ fontSize: 13, color: COUL.texteMoyen, marginBottom: 14, lineHeight: 1.5 }}>En signant, vous certifiez que les frais déclarés sont exacts et réellement engagés. Cette signature sera apposée sur la pièce justificative.</div>
                   <SignaturePad width={472} height={170} onChange={setSigImage} />

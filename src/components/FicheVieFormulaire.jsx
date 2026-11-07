@@ -293,7 +293,7 @@ const Badge = () => (
   }}>proposé</span>
 )
 
-const carte = { background: COUL.blanc, border: `1px solid ${C.bord}`, borderRadius: 10, padding: 14, marginBottom: 12 }
+const carte = { background: COUL.surface, border: `1px solid ${C.bord}`, borderRadius: 10, padding: 14, marginBottom: 12 }
 const titreSection = { fontSize: 14, fontWeight: 700, color: C.bleu, margin: '0 0 10px' }
 const titreSousSection = { fontSize: 13, fontWeight: 700, color: C.bleu, margin: '12px 0 6px' }
 const intro = { fontSize: 11.5, color: C.gris, lineHeight: 1.5, margin: '0 0 8px' }

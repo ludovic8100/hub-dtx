@@ -48,7 +48,7 @@ export default function BceSearch({ onSelect, placeholder = 'Rechercher une entr
       {loading && <div style={{ fontSize: 11, color: '#0369a1', marginTop: 4 }}>Recherche…</div>}
       {error && !loading && <div style={{ fontSize: 11, color: COUL.danger, marginTop: 4 }}>{error}</div>}
       {results && results.length > 0 && (
-        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 30, marginTop: 4, background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', maxHeight: 280, overflowY: 'auto' }}>
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 30, marginTop: 4, background: COUL.surface, border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', maxHeight: 280, overflowY: 'auto' }}>
           {results.map((e, i) => {
             const nom = e.denomination_with_legal_form || e.denomination || '(sans dénomination)'
             const bce = e.cbe_number_formatted || e.cbe_number || ''

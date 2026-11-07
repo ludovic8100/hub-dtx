@@ -388,7 +388,7 @@ export default function HexagroupCotisations() {
   }
 
   // ── UI ──
-  const card = { background: COUL.blanc, border: '0.5px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }
+  const card = { background: COUL.surface, border: '0.5px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }
   const metric = (label, val, col) => (
     <div style={{ background: COUL.fond, borderRadius: 10, padding: '14px 16px' }}>
       <div style={{ fontSize: 13, color: COUL.texteDoux, marginBottom: 6 }}>{label}</div>
@@ -397,7 +397,7 @@ export default function HexagroupCotisations() {
   )
   const ibtn = (icon, label, onClick, col) => (
     <button onClick={onClick} title={label} aria-label={label}
-      style={{ width: 30, height: 30, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '0.5px solid #e2e8f0', background: COUL.blanc, borderRadius: 6, cursor: 'pointer', color: col || '#475569' }}>
+      style={{ width: 30, height: 30, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '0.5px solid #e2e8f0', background: COUL.surface, borderRadius: 6, cursor: 'pointer', color: col || '#475569' }}>
       <i className={`ti ${icon}`} style={{ fontSize: 16 }} />
     </button>
   )
@@ -414,7 +414,7 @@ export default function HexagroupCotisations() {
               <select value={annee} onChange={e => setAnnee(Number(e.target.value))} style={{ padding: '7px 10px', borderRadius: 8, border: 'none' }}>
                 {[annee + 1, annee, annee - 1, annee - 2].filter((v, i, a) => a.indexOf(v) === i).sort((a, b) => b - a).map(a => <option key={a} value={a}>{a}</option>)}
               </select>
-              <button onClick={nouvelleCampagne} disabled={busy} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: COUL.blanc, color: cVIOLET, fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
+              <button onClick={nouvelleCampagne} disabled={busy} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: COUL.surface, color: cVIOLET, fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
                 <i className="ti ti-plus" style={{ fontSize: 15, verticalAlign: -2, marginRight: 4 }} />Nouvelle campagne
               </button>
               <button onClick={() => setPick(true)} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: 'rgba(255,255,255,.18)', color: COUL.blanc, fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
@@ -529,7 +529,7 @@ export default function HexagroupCotisations() {
       {/* ── Panneau d'édition ── */}
       {edit && form && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 60, overflowY: 'auto', padding: '40px 16px' }}>
-          <div style={{ background: COUL.blanc, borderRadius: 14, width: 'min(680px,100%)', padding: 24 }}>
+          <div style={{ background: COUL.surface, borderRadius: 14, width: 'min(680px,100%)', padding: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div style={{ fontSize: 18, fontWeight: 700 }}>Cotisation {edit.numero} — {edit.membre?.societe || edit.membre?.contact}</div>
               <button onClick={() => { setEdit(null); setForm(null) }} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 20, color: COUL.texteDoux }}><i className="ti ti-x" /></button>
@@ -569,7 +569,7 @@ export default function HexagroupCotisations() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 18, borderTop: '0.5px solid #eef2f7', paddingTop: 14 }}>
               <div style={{ fontSize: 15, fontWeight: 700 }}>Total : <span style={{ color: cVIOLET }}>{eur(totalForm())}</span></div>
               <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => { setEdit(null); setForm(null) }} style={{ padding: '9px 16px', borderRadius: 8, border: '0.5px solid #e2e8f0', background: COUL.blanc, cursor: 'pointer', fontWeight: 600 }}>Annuler</button>
+                <button onClick={() => { setEdit(null); setForm(null) }} style={{ padding: '9px 16px', borderRadius: 8, border: '0.5px solid #e2e8f0', background: COUL.surface, cursor: 'pointer', fontWeight: 600 }}>Annuler</button>
                 <button onClick={sauverEdition} disabled={busy} style={{ padding: '9px 18px', borderRadius: 8, border: 'none', background: cVIOLET, color: COUL.blanc, cursor: 'pointer', fontWeight: 700 }}>{busy ? 'Enregistrement…' : 'Enregistrer'}</button>
               </div>
             </div>
@@ -617,7 +617,7 @@ export default function HexagroupCotisations() {
               <div style={{ fontSize: 11, color: COUL.texteFaible, marginTop: 4 }}>Crée une ligne « intitulé » à ce montant. Laisse vide pour saisir les lignes toi-même ensuite.</div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <button onClick={() => setExc(null)} style={{ padding: '9px 16px', borderRadius: 8, border: '0.5px solid #cbd5e1', background: COUL.blanc, cursor: 'pointer', fontWeight: 600 }}>Annuler</button>
+              <button onClick={() => setExc(null)} style={{ padding: '9px 16px', borderRadius: 8, border: '0.5px solid #cbd5e1', background: COUL.surface, cursor: 'pointer', fontWeight: 600 }}>Annuler</button>
               <button onClick={creerExceptionnelle} disabled={busy || !exc.membre_ids.length} style={{ padding: '9px 18px', borderRadius: 8, border: 'none', background: cVIOLET, color: COUL.blanc, cursor: 'pointer', fontWeight: 700, opacity: exc.membre_ids.length ? 1 : .5 }}>{busy ? 'Création…' : `Créer (${exc.membre_ids.length})`}</button>
             </div>
           </div>
@@ -636,7 +636,7 @@ export default function HexagroupCotisations() {
                 const nb = rows.filter(r => r.membre_id === m.id).length
                 return (
                   <button key={m.id} onClick={() => creerCotisation(m)}
-                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', textAlign: 'left', padding: '10px 12px', border: '0.5px solid #eef2f7', borderRadius: 8, marginBottom: 6, background: COUL.blanc, cursor: 'pointer' }}>
+                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', textAlign: 'left', padding: '10px 12px', border: '0.5px solid #eef2f7', borderRadius: 8, marginBottom: 6, background: COUL.surface, cursor: 'pointer' }}>
                     <span style={{ fontWeight: 600 }}>{m.societe || m.contact}{nb > 0 && <span style={{ fontSize: 11, color: COUL.texteFaible, fontWeight: 400, marginLeft: 6 }}>· déjà {nb}</span>}</span>
                     <span style={{ fontSize: 12, color: COUL.texteFaible }}>facturer →</span>
                   </button>
@@ -654,7 +654,7 @@ export default function HexagroupCotisations() {
         const echu = f.joursRetard > 0
         return (
           <div style={modalBg} onClick={() => setRappel(null)}>
-            <div onClick={e => e.stopPropagation()} style={{ background: COUL.blanc, borderRadius: 14, width: 'min(520px,100%)', padding: 22, boxShadow: '0 20px 50px rgba(0,0,0,.25)' }}>
+            <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 14, width: 'min(520px,100%)', padding: 22, boxShadow: '0 20px 50px rgba(0,0,0,.25)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                 <div style={{ fontSize: 18, fontWeight: 800 }}>Rappel — {rappel.numero}</div>
                 <button onClick={() => setRappel(null)} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 20, color: COUL.texteFaible }}><i className="ti ti-x" /></button>
@@ -664,7 +664,7 @@ export default function HexagroupCotisations() {
                 Échéance {fmtD(f.echeance)} · {echu ? `${f.joursRetard} jours de retard` : 'pas encore échu'}
               </div>
               <button onClick={() => envoyerRappel(rappel, 'simple')} disabled={busy}
-                style={{ width: '100%', textAlign: 'left', padding: '12px 14px', border: '0.5px solid #e2e8f0', borderRadius: 10, background: COUL.blanc, cursor: 'pointer', marginBottom: 10 }}>
+                style={{ width: '100%', textAlign: 'left', padding: '12px 14px', border: '0.5px solid #e2e8f0', borderRadius: 10, background: COUL.surface, cursor: 'pointer', marginBottom: 10 }}>
                 <div style={{ fontWeight: 700, fontSize: 14 }}><i className="ti ti-bell" style={{ verticalAlign: -2, marginRight: 6 }} />Rappel simple</div>
                 <div style={{ fontSize: 12, color: COUL.texteDoux, marginTop: 2 }}>Mail courtois, montant inchangé ({eur(rappel.total)}).</div>
               </button>
@@ -686,10 +686,10 @@ export default function HexagroupCotisations() {
 }
 
 const modalBg = { position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 60, overflowY: 'auto', padding: '40px 16px' }
-const modalCard = { background: COUL.blanc, borderRadius: 14, padding: 24 }
+const modalCard = { background: COUL.surface, borderRadius: 14, padding: 24 }
 const modalHead = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }
 const closeBtn = { border: 'none', background: 'none', cursor: 'pointer', fontSize: 20, color: COUL.texteDoux }
-const btnGhost = { padding: '9px 16px', borderRadius: 8, border: '0.5px solid #e2e8f0', background: COUL.blanc, cursor: 'pointer', fontWeight: 600 }
+const btnGhost = { padding: '9px 16px', borderRadius: 8, border: '0.5px solid #e2e8f0', background: COUL.surface, cursor: 'pointer', fontWeight: 600 }
 const btnPrim = { padding: '9px 18px', borderRadius: 8, border: 'none', background: '#6E2C91', color: COUL.blanc, cursor: 'pointer', fontWeight: 700 }
 
 const lbl = { display: 'block', fontSize: 12, color: COUL.texteDoux, marginBottom: 4, fontWeight: 600 }

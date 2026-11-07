@@ -133,7 +133,7 @@ export default function AdminNotesFrais() {
               : rows.length === 0 ? <div style={{ color: COUL.texteDoux, fontSize: 14, padding: '30px 0', textAlign: 'center' }}>Aucune note en attente de validation.</div>
                 : <div style={{ display: 'grid', gap: 10 }}>
                   {rows.map(n => { const e = ENT(n.societe); return (
-                    <div key={n.id} style={{ display: 'flex', alignItems: 'center', gap: 14, background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 12, padding: '12px 16px' }}>
+                    <div key={n.id} style={{ display: 'flex', alignItems: 'center', gap: 14, background: COUL.surface, border: '1px solid #e2e8f0', borderRadius: 12, padding: '12px 16px' }}>
                       <span style={{ width: 10, height: 10, borderRadius: '50%', background: e.color, flexShrink: 0 }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 700, color: NAVY, fontSize: 14 }}>{n.titre || 'Note de frais'} <span style={{ color: COUL.texteFaible, fontWeight: 500 }}>· {e.label}</span></div>
@@ -153,7 +153,7 @@ export default function AdminNotesFrais() {
               <button onClick={() => { setSel(null); setLignes([]) }} style={btn('#fff', '#475569', '1px solid #e2e8f0')}>← Retour à la liste</button>
               <button onClick={voirPdf} style={btn('#fff', NAVY, '1px solid #cbd5e1')}>📄 Voir le PDF (note + justificatifs)</button>
             </div>
-            <div style={{ background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 14, padding: 22 }}>
+            <div style={{ background: COUL.surface, border: '1px solid #e2e8f0', borderRadius: 14, padding: 22 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
                 <div>
                   <div style={{ fontSize: 17, fontWeight: 800, color: NAVY }}>{sel.titre || 'Note de frais'}</div>
@@ -186,7 +186,7 @@ export default function AdminNotesFrais() {
 
               <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 16 }}>
                 <div style={{ fontSize: 11, color: COUL.texteFaible, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6 }}>Signature du collaborateur</div>
-                {sel.sig_image ? <img src={sel.sig_image} alt="Signature" style={{ maxWidth: 240, maxHeight: 90, border: '1px solid #e2e8f0', borderRadius: 8, background: COUL.blanc }} />
+                {sel.sig_image ? <img src={sel.sig_image} alt="Signature" style={{ maxWidth: 240, maxHeight: 90, border: '1px solid #e2e8f0', borderRadius: 8, background: COUL.surface }} />
                   : <div style={{ fontSize: 13, color: COUL.alerte }}>Aucune signature enregistrée.</div>}
                 <div style={{ fontSize: 12, color: COUL.texteDoux, marginTop: 4 }}>{sel.sig_nom || sel.auteur_nom} · signé le {fmtD(sel.sig_at)}</div>
               </div>

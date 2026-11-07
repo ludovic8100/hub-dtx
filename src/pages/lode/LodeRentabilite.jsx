@@ -14,16 +14,16 @@ const RESP = ['LDE', 'JCL', 'LLO']
 const achHT = (a) => (Number(a.montant) || 0) / (1 + (a.tva_taux == null ? 21 : Number(a.tva_taux)) / 100)
 const MOIS = ['', 'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc']
 
-const card = { background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 12, padding: 16, marginTop: 16 }
+const card = { background: COUL.surface, border: '1px solid #e2e8f0', borderRadius: 12, padding: 16, marginTop: 16 }
 const th = { padding: '9px 12px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.04em', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }
 const thR = { ...th, textAlign: 'right' }
 const td = { padding: '9px 12px', borderBottom: '1px solid #f1f5f9', fontSize: 13, color: COUL.texteSombre }
 const tdR = { ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
-const inp = { padding: '8px 10px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, fontFamily: FONT, background: COUL.blanc }
+const inp = { padding: '8px 10px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, fontFamily: FONT, background: COUL.surface }
 
 function Kpi({ label, value, c, sub }) {
   return (
-    <div style={{ flex: '1 1 160px', background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 12, padding: '12px 14px' }}>
+    <div style={{ flex: '1 1 160px', background: COUL.surface, border: '1px solid #e2e8f0', borderRadius: 12, padding: '12px 14px' }}>
       <div style={{ fontSize: 10.5, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.04em' }}>{label}</div>
       <div style={{ fontSize: 22, fontWeight: 800, color: c }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: COUL.texteFaible, marginTop: 2 }}>{sub}</div>}
@@ -38,7 +38,7 @@ function ApercuFacture({ fid, nom, pin, onClose }) {
   useEffect(() => { setEtat('load') }, [fid])
   const src = `/api/apercu-facture?fid=${encodeURIComponent(fid)}`
   return (
-    <div style={{ position: 'fixed', top: '50%', right: 24, transform: 'translateY(-50%)', zIndex: 2100, width: 520, maxWidth: '48vw', maxHeight: '88vh', background: COUL.blanc, borderRadius: 14, boxShadow: '0 20px 60px rgba(0,0,0,0.35)', border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', pointerEvents: pin ? 'auto' : 'none' }}>
+    <div style={{ position: 'fixed', top: '50%', right: 24, transform: 'translateY(-50%)', zIndex: 2100, width: 520, maxWidth: '48vw', maxHeight: '88vh', background: COUL.surface, borderRadius: 14, boxShadow: '0 20px 60px rgba(0,0,0,0.35)', border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', pointerEvents: pin ? 'auto' : 'none' }}>
       <div style={{ padding: '10px 14px', background: COUL.texteFort, color: COUL.blanc, fontSize: 12, fontWeight: 600, fontFamily: FONT, display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>📄 {nom}</span>{pin && <button onClick={onClose} style={{ border: 'none', background: 'rgba(255,255,255,0.15)', color: COUL.blanc, borderRadius: 6, padding: '2px 9px', cursor: 'pointer', fontSize: 14, lineHeight: 1.3 }}>✕</button>}</div>
       <div style={{ overflowY: 'auto', background: COUL.fond }}>
         <img src={src} alt="Apercu facture" onLoad={() => setEtat('ok')} onError={() => setEtat('err')} style={{ width: '100%', height: 'auto', display: etat === 'ok' ? 'block' : 'none' }} />
@@ -285,7 +285,7 @@ export default function LodeRentabilite() {
                     {achatsListe.slice(0, 80).map(a => (
                       <tr key={a.id} style={a.lode_devis_id ? { background: COUL.succesFondDoux } : null}>
                         <td style={{ ...td, textAlign: 'center', width: 44 }}>
-                          {a.fichier_id ? <button title="Aperçu facture" onClick={() => setApercu(c => c && c.pin && c.fid === a.fichier_id ? null : { fid: a.fichier_id, nom: (a.nom || '').replace(/\.pdf$/i, ''), pin: true })} onMouseEnter={() => { if (CAN_HOVER) setApercu(c => c && c.pin ? c : { fid: a.fichier_id, nom: (a.nom || '').replace(/\.pdf$/i, ''), pin: false }) }} onMouseLeave={() => setApercu(c => c && c.pin ? c : null)} style={{ border: '1px solid #e2e8f0', background: COUL.blanc, borderRadius: 8, padding: '4px 8px', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>📄</button> : <span style={{ color: COUL.bordFort }}>—</span>}
+                          {a.fichier_id ? <button title="Aperçu facture" onClick={() => setApercu(c => c && c.pin && c.fid === a.fichier_id ? null : { fid: a.fichier_id, nom: (a.nom || '').replace(/\.pdf$/i, ''), pin: true })} onMouseEnter={() => { if (CAN_HOVER) setApercu(c => c && c.pin ? c : { fid: a.fichier_id, nom: (a.nom || '').replace(/\.pdf$/i, ''), pin: false }) }} onMouseLeave={() => setApercu(c => c && c.pin ? c : null)} style={{ border: '1px solid #e2e8f0', background: COUL.surface, borderRadius: 8, padding: '4px 8px', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>📄</button> : <span style={{ color: COUL.bordFort }}>—</span>}
                         </td>
                         <td style={td}>{(a.date_facture || '').slice(0, 10)}</td>
                         <td style={td}>{a.nom || '—'}</td>
