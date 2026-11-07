@@ -38,7 +38,8 @@ from io import BytesIO
 
 from pypdf import PdfReader
 
-from _env import DRY_RUN, SUPABASE_SERVICE_KEY, SUPABASE_URL, banniere
+from _env import (DRY_RUN, SUPABASE_SERVICE_KEY, SUPABASE_URL, banniere,
+                  refuser_ecriture_sharepoint)
 
 GRAPH = "https://graph.microsoft.com/v1.0"
 SITE = "dynassur.sharepoint.com:/sites/ADMINISTRATION"
@@ -388,7 +389,8 @@ def main():
             print(f"\nLot de {LOT} atteint, arret.")
             break
         print(f"  {chemin}/\n      {it['name']}\n   →  {nouveau}")
-        if not DRY_RUN:
+        if not DRY_RUN and not refuser_ecriture_sharepoint(
+                f"{it['name']} -> {nouveau}"):
             graph(jeton, "PATCH", f"/sites/{sid}/drive/items/{it['id']}",
                   {"name": nouveau})
         faits += 1
