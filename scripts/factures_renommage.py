@@ -51,7 +51,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from _env import APP_ENV, DRY_RUN, SUPABASE_SERVICE_KEY, SUPABASE_URL, banniere
+from _env import (APP_ENV, DRY_RUN, SUPABASE_SERVICE_KEY, SUPABASE_URL, banniere,
+                  refuser_ecriture_sharepoint)
 
 GRAPH = "https://graph.microsoft.com/v1.0"
 SITE = "dynassur.sharepoint.com:/sites/ADMINISTRATION"
@@ -98,7 +99,12 @@ def site_id(jeton: str) -> str:
 
 def renommer_fichier(jeton: str, sid: str, item_id: str, nouveau: str):
     """PATCH Graph. C'est la SEULE ecriture que ce script fait dans SharePoint :
-    un changement de nom. Jamais de deplacement, jamais de suppression."""
+    un changement de nom. Jamais de deplacement, jamais de suppression.
+
+    En TEST, elle ne part pas : la base de test n'a pas a renommer de vrais
+    documents."""
+    if refuser_ecriture_sharepoint(f"{item_id} -> {nouveau}"):
+        return {"name": nouveau, "ignore_en_test": True}
     corps = json.dumps({"name": nouveau}).encode()
     req = urllib.request.Request(
         f"{GRAPH}/sites/{sid}/drive/items/{item_id}",

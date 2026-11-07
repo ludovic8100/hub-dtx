@@ -41,3 +41,26 @@ def banniere(nom: str) -> None:
     """Affiche l'environnement visé en tête de log (utile dans les Actions)."""
     mode = "DRY_RUN" if DRY_RUN else "ÉCRITURE RÉELLE"
     print(f"[{nom}] env={APP_ENV} supabase={SUPABASE_URL} mode={mode}", flush=True)
+
+
+def refuser_ecriture_sharepoint(quoi: str) -> bool:
+    """En TEST, aucune ecriture ne doit partir vers le VRAI SharePoint.
+
+    APP_ENV=test isole la base Supabase, et c'est tout : les scripts parlent au
+    meme site SharePoint dans les deux cas. Un renommage lance en test prendrait
+    donc ses ordres dans la base de TEST et modifierait de VRAIS documents.
+
+    Mesure du 07/11/2026 : deux scripts ecrivent dans SharePoint
+    (factures_renommage, fdp_renommage). Les autres n'ecrivent que dans Supabase.
+
+    Refuser est le bon defaut : un dossier _TEST a part se perime et donne une
+    fausse assurance, alors qu'un refus se voit dans le journal. Le jour ou un
+    renommage doit etre repete en test, c'est la lecture qu'on verifie, pas
+    l'ecriture.
+
+    Renvoie True quand l'ecriture doit etre SAUTEE.
+    """
+    if IS_TEST:
+        print(f"[TEST] ecriture SharePoint refusee : {quoi}", flush=True)
+        return True
+    return False

@@ -535,6 +535,33 @@ métier) :
   prix de revient — rien de confidentiel — mais si `notes` sert à des
   remarques internes, le client les lit.
 
+### `APP_ENV=test` n'isole que Supabase, pas SharePoint (07/11/2026)
+
+Trouvé en mettant l'environnement de test en service. `scripts/_env.py` fait
+basculer la base de données selon `APP_ENV` — et **rien d'autre**. Les scripts
+parlent au même site SharePoint dans les deux cas : `FACTURES_RACINE` vaut
+`COMPTA/FACTURES`, quel que soit l'environnement. Le `_TEST` annoncé plus bas
+dans ce fichier **n'a jamais existé dans le code**.
+
+Conséquence mesurée : un renommage lancé avec `target=test` prendrait ses ordres
+dans la base de **test** et modifierait de **vrais documents**.
+
+Périmètre exact, vérifié et plus étroit qu'il n'y paraît : sur les quatre scripts
+qui contiennent un `PATCH`, **deux seulement écrivent dans SharePoint** —
+`factures_renommage.py` et `fdp_renommage.py`. `factures_lecture_pdf.py` et
+`office_users_sync.py` écrivent dans Supabase.
+
+Corrigé par `refuser_ecriture_sharepoint()` dans `scripts/_env.py`, appelée aux
+deux points d'écriture. En test, l'écriture est **sautée et journalisée**.
+
+**Refuser plutôt que rediriger vers `_TEST`**, et c'est délibéré : un dossier de
+test à part se périme et donne une fausse assurance, alors qu'un refus se voit
+dans le journal. Ce qu'on vérifie en test, c'est la lecture et les décisions —
+pas que Graph sait renommer.
+
+⚠️ **Tout nouveau script qui écrit dans SharePoint doit appeler ce garde-fou.**
+Rien ne l'impose automatiquement.
+
 ## Environnements & configuration (depuis le 29/10/2026)
 
 - **Aucune URL/clé en dur** dans le code : tout passe par `src/config/env.js` (front, variables `VITE_*`),
