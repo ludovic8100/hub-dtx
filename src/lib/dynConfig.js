@@ -10,9 +10,13 @@ export const DYN = {
   ville: 'Juprelle',
   pays: 'Belgique',
   tva: 'BE 0677.519.858',
-  iban: '',                   // À compléter
-  bic: '',                    // À compléter
-  banque: '',
+  // Relevés sur une facture Dynassur réelle (2026-329 du 01/10/2026, émise via
+  // Accountable) : l'adresse, le n° de TVA et le compte y figurent et
+  // correspondent à ce qui était déjà ici. Sans l'IBAN, une facture Dynassur
+  // sortie du Hub n'aurait porté aucune coordonnée de paiement.
+  iban: 'BE83 3631 7492 7315',
+  bic: 'BBRUBEBB',            // ING
+  banque: 'ING',
   email: 'info@dynassur.be',
   telephone: '',              // Aucun pour l'instant
   couleur: COUL.bleu,         // bleu Dynassur
