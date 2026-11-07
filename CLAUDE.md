@@ -9,8 +9,15 @@ Application interne de gestion pour un groupe de 6 entités belges :
 - **Backend** : Supabase (projet `tndwonqdbeszkcztkzqe`, Postgres 17, EU) — appelé directement depuis le front avec la clé anon + RLS.
 - **Déploiement** : Vercel, déploie automatiquement la branche `main`.
   Prod : **https://hub.dtx-group.be** (depuis le 07/11/2026).
-  ⚠️ `hub-dtx.vercel.app` **reste actif et ne doit pas être retiré** : les liens de devis déjà
-  envoyés pointent dessus, et ils n'expirent jamais.
+  `hub-dtx.vercel.app` a été **retiré le 07/11/2026**, sur décision de Ludovic.
+  J'avais écrit ici qu'il ne devait jamais l'être, à cause des liens de devis. **C'était un
+  avertissement écrit sans mesure.** Mesuré ensuite : 4 devis envoyés sur 15, dont **3 déjà
+  acceptés** et 1 dont la validité avait expiré le 26/09 ; et surtout **aucun des 15 liens n'a
+  jamais été ouvert** (`opened_at` est null partout). La page publique `/devis/:token` n'a donc
+  jamais servi une seule fois.
+  Deux alias Vercel subsistent et ne sont pas supprimables — `hub-dtx-dynassur-s-projects.vercel.app`
+  et `hub-dtx-git-main-dynassur-s-projects.vercel.app`. Ils font toujours porte de secours si le
+  DNS de `dtx-group.be` tombe.
 - **ETL / automatisations** : instance n8n `https://n8n.srv1082740.hstgr.cloud` (voir § n8n).
 - **Documents** : SharePoint (`dynassur.sharepoint.com/sites/ADMINISTRATION`) est la source de vérité des fichiers (factures, bordereaux…). Supabase ne stocke que métadonnées + URL.
 
@@ -330,7 +337,7 @@ dans `main` pendant que **tous les déploiements de production échouaient** (13
 serverless pour une limite de 12). Elles ont été annoncées comme faites. Elles ne l'étaient
 pas. « Fusionné » et « en ligne » sont deux choses différentes, et c'est la seconde qui
 intéresse l'utilisateur. Contrôler l'état du déploiement Vercel **et son alias**
-(`hub-dtx.vercel.app`, `aliasError: null`) avant d'annoncer quoi que ce soit.
+(`hub.dtx-group.be`, `aliasError: null`) avant d'annoncer quoi que ce soit.
 
 Ce qui continue d'exiger un accord explicite, parce que ce n'est pas réversible d'un
 `git revert` : les écritures massives en base de production, les suppressions, et tout
@@ -573,7 +580,7 @@ Rien ne l'impose automatiquement.
   clé Supabase sont obligatoires (le démarrage échoue plutôt que de retomber sur la prod) et le
   bandeau `BandeauEnv` s'affiche.
 - Helpers à utiliser : `n8nWebhook('iban-sync')`, `sharepointUrl('COMPTA/FACTURES/_LODE')`, `LOGOS_URL`, `HUB_URL`.
-- Branches : `main` = production (`hub-dtx.vercel.app`), `staging` = test (projet Vercel `hub-dtx-test`,
+- Branches : `main` = production (`hub.dtx-group.be`), `staging` = test (projet Vercel `hub-dtx-test`,
   à créer en phase 2). Feature → PR → `staging` → `main`.
 - Plan complet (test/prod, couche applicative, migrations, CI) : `docs/ARCHITECTURE-ENVIRONNEMENTS.md`.
 - Sécurité phase 0 appliquée : `execute_raw_sql` et `tickets_rappels_echeance` ne sont plus exécutables
