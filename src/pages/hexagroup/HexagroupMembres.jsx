@@ -32,7 +32,7 @@ export default function HexagroupMembres() {
 
   const ibtn = (icon, label, onClick, col) => (
     <button onClick={onClick} title={label} aria-label={label}
-      style={{ width: 30, height: 30, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '0.5px solid #e2e8f0', background: COUL.blanc, borderRadius: 6, cursor: 'pointer', color: col || '#475569' }}>
+      style={{ width: 30, height: 30, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '0.5px solid #e2e8f0', background: COUL.surface, borderRadius: 6, cursor: 'pointer', color: col || '#475569' }}>
       <i className={`ti ${icon}`} style={{ fontSize: 16 }} />
     </button>
   )
@@ -42,7 +42,7 @@ export default function HexagroupMembres() {
       <div style={{ fontFamily: "'Source Sans Pro', sans-serif", width: '100%' }}>
         <StatBanner color={E.color} colorDark={E.colorDark} logoUrl={E.logo} title="Membres" subtitle="Hexagroup ASBL"
           action={
-            <button onClick={() => setEdit('new')} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: COUL.blanc, color: '#6E2C91', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
+            <button onClick={() => setEdit('new')} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: COUL.surface, color: '#6E2C91', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
               <i className="ti ti-plus" style={{ fontSize: 15, verticalAlign: -2, marginRight: 4 }} />Nouveau membre
             </button>
           } />
@@ -61,7 +61,7 @@ export default function HexagroupMembres() {
             {loading && <div style={{ padding: 24, textAlign: 'center', color: COUL.texteFaible }}>Chargement…</div>}
             {!loading && filtre.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: COUL.texteFaible }}>Aucun membre.</div>}
             {filtre.map(m => (
-              <div key={m.id} style={{ background: COUL.blanc, border: '0.5px solid #e2e8f0', borderRadius: 12, padding: 14, opacity: m.actif ? 1 : 0.55 }}>
+              <div key={m.id} style={{ background: COUL.surface, border: '0.5px solid #e2e8f0', borderRadius: 12, padding: 14, opacity: m.actif ? 1 : 0.55 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: 15 }}>{m.societe || m.contact || '—'}</div>
@@ -82,7 +82,7 @@ export default function HexagroupMembres() {
             ))}
           </div>
         ) : (
-        <div style={{ background: COUL.blanc, border: '0.5px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ background: COUL.surface, border: '0.5px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead><tr style={{ background: COUL.fond, color: COUL.texteDoux, textAlign: 'left' }}>
               <th style={{ padding: '11px 12px', fontWeight: 700 }}>Membre</th>

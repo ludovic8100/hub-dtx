@@ -261,7 +261,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: mobE ? 8 : 20, overflowY: 'auto' }}>
-      <div style={{ background: COUL.blanc, borderRadius: 14, maxWidth: 880, width: '100%', padding: mobE ? 16 : 24, fontFamily: "'Source Sans Pro', sans-serif" }}>
+      <div style={{ background: COUL.surface, borderRadius: 14, maxWidth: 880, width: '100%', padding: mobE ? 16 : 24, fontFamily: "'Source Sans Pro', sans-serif" }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
           <h2 style={{ fontSize: 18, fontWeight: 800, color: NAVY, margin: 0 }}>
             {doc?.id ? 'Modifier' : 'Nouveau'} {isDevis ? 'devis' : 'facture'} {doc?.numero ? `· ${doc.numero}` : ''}
@@ -275,7 +275,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
           <label style={lbl}>Rechercher un client encodé (nom, prénom, dossier, ville, email, TVA…)</label>
           <input style={inp} value={clientQuery} placeholder="Tapez au moins 2 caractères — ou saisie manuelle ci-dessous" onChange={e => setClientQuery(e.target.value)} />
           {clientQuery.trim().length >= 2 && (
-            <div style={{ position: 'absolute', zIndex: 20, left: 0, right: 0, background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 8, marginTop: 4, maxHeight: 280, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,.12)' }}>
+            <div style={{ position: 'absolute', zIndex: 20, left: 0, right: 0, background: COUL.surface, border: '1px solid #e2e8f0', borderRadius: 8, marginTop: 4, maxHeight: 280, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,.12)' }}>
               {searching && <div style={{ padding: 10, fontSize: 13, color: COUL.texteDoux }}>Recherche…</div>}
               {!searching && clientResults.length === 0 && <div style={{ padding: 10, fontSize: 13, color: COUL.texteDoux }}>Aucun client trouvé</div>}
               {clientResults.map(c => {
@@ -691,11 +691,11 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: mob ? 0 : 20 }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: mob ? '100vw' : 'min(1080px,96vw)', height: mob ? '100vh' : 'min(92vh,900px)', background: COUL.blanc, borderRadius: mob ? 0 : 16, overflow: 'hidden', display: 'flex', flexDirection: mob ? 'column' : 'row', boxShadow: '0 20px 60px rgba(0,0,0,.3)' }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: mob ? '100vw' : 'min(1080px,96vw)', height: mob ? '100vh' : 'min(92vh,900px)', background: COUL.surface, borderRadius: mob ? 0 : 16, overflow: 'hidden', display: 'flex', flexDirection: mob ? 'column' : 'row', boxShadow: '0 20px 60px rgba(0,0,0,.3)' }}>
 
         {/* ── Colonne gauche : aperçu du document ── */}
         <div style={{ flex: 1, background: COUL.fondDoux, overflow: 'auto', padding: mob ? 14 : 28, order: mob ? 2 : 1 }}>
-          <div style={{ background: COUL.blanc, maxWidth: 620, margin: '0 auto', borderRadius: 10, boxShadow: '0 2px 12px rgba(0,0,0,.08)', padding: mob ? '22px 18px' : '30px 34px', fontSize: 12, color: COUL.texte }}>
+          <div style={{ background: COUL.surface, maxWidth: 620, margin: '0 auto', borderRadius: 10, boxShadow: '0 2px 12px rgba(0,0,0,.08)', padding: mob ? '22px 18px' : '30px 34px', fontSize: 12, color: COUL.texte }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 22 }}>
               {DTX.logo_url ? <img src={DTX.logo_url} alt="DTX" style={{ height: 46 }} /> : <div style={{ fontWeight: 800, fontSize: 18, color }}>{DTX.raison_sociale}</div>}
               <div style={{ textAlign: 'right' }}>
@@ -785,7 +785,7 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
           {/* Actions d'envoi */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 22 }}>
             <button onClick={envoyerEmail} disabled={sending} style={{ flex: 1, minWidth: 180, padding: '11px 16px', border: 'none', borderRadius: 10, background: COUL.succes, color: COUL.blanc, fontWeight: 700, fontSize: 14, cursor: sending ? 'wait' : 'pointer' }}>{sending ? '…' : '📧 Envoyer par email'}</button>
-            <button onClick={() => marquerEnvoye(false)} style={{ padding: '11px 16px', border: '1px solid #e2e8f0', borderRadius: 10, background: COUL.blanc, color: COUL.texteDoux, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Marquer envoyé</button>
+            <button onClick={() => marquerEnvoye(false)} style={{ padding: '11px 16px', border: '1px solid #e2e8f0', borderRadius: 10, background: COUL.surface, color: COUL.texteDoux, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Marquer envoyé</button>
           </div>
 
           {/* Timeline */}
@@ -797,7 +797,7 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
                 const cfg = EVT[ev.type] || { icon: '•', label: ev.type, col: COUL.texteDoux }
                 return (
                   <div key={ev.id || i} style={{ position: 'relative', marginBottom: 18 }}>
-                    <div style={{ position: 'absolute', left: -26, width: 20, height: 20, borderRadius: '50%', background: COUL.blanc, border: `2px solid ${cfg.col}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>{cfg.icon}</div>
+                    <div style={{ position: 'absolute', left: -26, width: 20, height: 20, borderRadius: '50%', background: COUL.surface, border: `2px solid ${cfg.col}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>{cfg.icon}</div>
                     <div style={{ fontWeight: 700, color: COUL.texte, fontSize: 14 }}>{cfg.label}</div>
                     <div style={{ fontSize: 12, color: COUL.texteFaible }}>{ev.created_at ? new Date(ev.created_at).toLocaleString('fr-BE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}{ev.detail ? ` · ${ev.detail}` : ''}</div>
                   </div>

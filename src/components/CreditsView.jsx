@@ -78,8 +78,8 @@ function CreditForm({ contrat, existingFin, onClose, onSave }) {
   }
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-      <div style={{background:COUL.blanc,borderRadius:16,width:"100%",maxWidth:560,maxHeight:"90vh",overflowY:"auto"}}>
-        <div style={{padding:"20px 24px 16px",borderBottom:`1px solid ${C.border}`,position:"sticky",top:0,background:COUL.blanc}}>
+      <div style={{background:COUL.surface,borderRadius:16,width:"100%",maxWidth:560,maxHeight:"90vh",overflowY:"auto"}}>
+        <div style={{padding:"20px 24px 16px",borderBottom:`1px solid ${C.border}`,position:"sticky",top:0,background:COUL.surface}}>
           <div style={{fontSize:16,fontWeight:700,color:C.navy}}>Données financières du crédit</div>
           <div style={{fontSize:13,color:C.textL,marginTop:4}}>{contrat.prenom_client} {contrat.nom_client} — {contrat.compagnie} — {contrat.police}</div>
         </div>
@@ -95,7 +95,7 @@ function CreditForm({ contrat, existingFin, onClose, onSave }) {
             <div style={{gridColumn:"1/3"}}><label style={D.label}>Mensualité actuelle (€) — optionnel</label><input style={D.input} type="number" step="0.01" value={form.mensualite_actuelle} onChange={e=>set("mensualite_actuelle",e.target.value)} placeholder="calculée si vide" /></div>
           </div>
         </div>
-        <div style={{padding:"16px 24px",borderTop:`1px solid ${C.border}`,display:"flex",justifyContent:"flex-end",gap:10,position:"sticky",bottom:0,background:COUL.blanc}}>
+        <div style={{padding:"16px 24px",borderTop:`1px solid ${C.border}`,display:"flex",justifyContent:"flex-end",gap:10,position:"sticky",bottom:0,background:COUL.surface}}>
           <button style={D.btn("ghost")} onClick={onClose}>Annuler</button>
           <button style={D.btn("primary")} onClick={save} disabled={saving}>{saving?"...":"Enregistrer"}</button>
         </div>

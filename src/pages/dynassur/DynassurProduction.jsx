@@ -46,7 +46,7 @@ function Badge({ label, col, bg }) {
 
 function KpiCard({ label, value, col, sub, onClick }) {
   return (
-    <div onClick={onClick} style={{ background:COUL.blanc, borderRadius:10, border:'1px solid #e2e8f0',
+    <div onClick={onClick} style={{ background:COUL.surface, borderRadius:10, border:'1px solid #e2e8f0',
       borderTop:`3px solid ${col}`, padding:'14px 18px', cursor:onClick?'pointer':'default', transition:'box-shadow .15s' }}
       onMouseEnter={e=>{ if(onClick) e.currentTarget.style.boxShadow=`0 4px 14px ${col}25` }}
       onMouseLeave={e=>{ e.currentTarget.style.boxShadow='none' }}>
@@ -77,7 +77,7 @@ function ContratModal({ police, onClose }) {
   const main = rows && rows[0]
   return (
     <div onClick={e => { e.stopPropagation(); onClose() }} style={{ position:'fixed', inset:0, background:'rgba(15,23,42,.6)', zIndex:1100, display:'flex', alignItems:'flex-start', justifyContent:'center', padding:'8vh 16px' }}>
-      <div onClick={e => e.stopPropagation()} style={{ background:COUL.blanc, borderRadius:14, width:'100%', maxWidth:560, maxHeight:'80vh', overflow:'auto', boxShadow:'0 20px 60px rgba(0,0,0,.3)' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background:COUL.surface, borderRadius:14, width:'100%', maxWidth:560, maxHeight:'80vh', overflow:'auto', boxShadow:'0 20px 60px rgba(0,0,0,.3)' }}>
         <div style={{ background:`linear-gradient(135deg,${NAVY},${BLUE})`, color:COUL.blanc, padding:'16px 20px', display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
           <div>
             <div style={{ fontSize:12, opacity:.85 }}>Contrat</div>
@@ -140,7 +140,7 @@ function ActsModal({ titre, rows, onClose }) {
   const click = k => setSort(s => s.key === k ? { key:k, dir:s.dir === 'asc' ? 'desc' : 'asc' } : { key:k, dir:'asc' })
   return (
     <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(15,23,42,.55)', zIndex:1000, display:'flex', justifyContent:'flex-end' }}>
-      <div onClick={e=>e.stopPropagation()} style={{ width:'min(880px,96vw)', height:'100%', background:COUL.blanc, display:'flex', flexDirection:'column', boxShadow:'-8px 0 30px rgba(0,0,0,.2)' }}>
+      <div onClick={e=>e.stopPropagation()} style={{ width:'min(880px,96vw)', height:'100%', background:COUL.surface, display:'flex', flexDirection:'column', boxShadow:'-8px 0 30px rgba(0,0,0,.2)' }}>
         <div style={{ background:NAVY, padding:'14px 20px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
           <div>
             <div style={{ color:COUL.blanc, fontSize:15, fontWeight:800 }}>{titre}</div>
@@ -236,7 +236,7 @@ function ChartAnnee({ annee, rows, cats, mode, onDetail, myCode, myBase }) {
   }
 
   return (
-    <div style={{ background:COUL.blanc, borderRadius:14, border:'1px solid #e8edf3', padding:'16px 18px', marginBottom:16, boxShadow:'0 1px 3px rgba(15,23,42,.04)' }}>
+    <div style={{ background:COUL.surface, borderRadius:14, border:'1px solid #e8edf3', padding:'16px 18px', marginBottom:16, boxShadow:'0 1px 3px rgba(15,23,42,.04)' }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8, gap:12, flexWrap:'wrap' }}>
         <button onClick={() => onDetail(`Production ${annee} — toute la production`, rows)}
           style={{ fontSize:20, fontWeight:800, color:NAVY, background:'none', border:'none', cursor:'pointer', padding:0, display:'flex', alignItems:'center', gap:6 }}>
@@ -418,7 +418,7 @@ function OngletCollaborateurs({ data, annee, onDetail }) {
 
       <div style={{ display:'grid', gridTemplateColumns: selected?'1fr 1fr':'1fr', gap:16 }}>
         {/* Tableau agents */}
-        <div style={{ background:COUL.blanc, borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
+        <div style={{ background:COUL.surface, borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
           <div style={{ overflowX:'auto' }}>
             <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
               <thead>
@@ -485,7 +485,7 @@ function OngletCollaborateurs({ data, annee, onDetail }) {
 
         {/* Détail agent sélectionné */}
         {selected && (
-          <div style={{ background:COUL.blanc, borderRadius:12, border:`2px solid ${BLUE}`, overflow:'hidden' }}>
+          <div style={{ background:COUL.surface, borderRadius:12, border:`2px solid ${BLUE}`, overflow:'hidden' }}>
             <div style={{ padding:'12px 16px', borderBottom:'1px solid #e2e8f0', display:'flex', alignItems:'center', justifyContent:'space-between', background:BLUE+'08' }}>
               <div>
                 <div style={{ fontSize:14, fontWeight:700, color:NAVY }}>{AGENT_NOMS[selected]||selected}</div>
@@ -545,7 +545,7 @@ function OngletDetail({ data }) {
   const paginated = filtered.slice(page*PER_PAGE, (page+1)*PER_PAGE)
   const nbPages = Math.ceil(filtered.length/PER_PAGE)
 
-  const selStyle = { padding:'6px 10px', borderRadius:6, border:'1px solid #e2e8f0', fontSize:12, color:'#374151', background:COUL.blanc, cursor:'pointer' }
+  const selStyle = { padding:'6px 10px', borderRadius:6, border:'1px solid #e2e8f0', fontSize:12, color:'#374151', background:COUL.surface, cursor:'pointer' }
 
   return (
     <div>
@@ -571,7 +571,7 @@ function OngletDetail({ data }) {
       </div>
 
       {/* Tableau */}
-      <div style={{ background:COUL.blanc, borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
+      <div style={{ background:COUL.surface, borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
         <div style={{ overflowX:'auto' }}>
           <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
             <thead>
@@ -690,7 +690,7 @@ export function ProductionContent() {
         />
 
         {/* Onglets */}
-        <div style={{ display:'flex', borderBottom:'1px solid #e2e8f0', marginBottom:24, background:COUL.blanc, borderRadius:'10px 10px 0 0', padding:'0 16px' }}>
+        <div style={{ display:'flex', borderBottom:'1px solid #e2e8f0', marginBottom:24, background:COUL.surface, borderRadius:'10px 10px 0 0', padding:'0 16px' }}>
           {ONGLETS.map(o => (
             <button key={o.key} onClick={()=>setOnglet(o.key)} style={{
               padding:'10px 18px', border:'none', cursor:'pointer', fontSize:13,
@@ -726,7 +726,7 @@ export function ProductionContent() {
                 <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
               </div>
             ) : data.length === 0 ? (
-              <div style={{ padding:60, textAlign:'center', background:COUL.blanc, borderRadius:12, border:'1px solid #e2e8f0', color:COUL.texteFaible }}>
+              <div style={{ padding:60, textAlign:'center', background:COUL.surface, borderRadius:12, border:'1px solid #e2e8f0', color:COUL.texteFaible }}>
                 <i className="ti ti-database-off" style={{ fontSize:40, display:'block', marginBottom:12 }} />
                 Aucune donnée de production pour {annee}.<br/>
                 <span style={{ fontSize:12 }}>Importez les données depuis Brio via n8n.</span>

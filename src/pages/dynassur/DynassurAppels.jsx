@@ -434,7 +434,7 @@ export default function DynassurAppels() {
           options={[{ v: 'tous', l: 'Entrants + sortants' }, { v: 'entrant', l: 'Entrants uniquement' }, { v: 'sortant', l: 'Sortants uniquement' }, { v: 'manque', l: 'Manqués uniquement' }]} />
         <button onClick={exporter} disabled={chargement}
           style={{ height: 43, minWidth: 140, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9,
-            border: '1px solid #008fe8', borderRadius: 7, background: COUL.blanc, color: '#0086d9',
+            border: '1px solid #008fe8', borderRadius: 7, background: COUL.surface, color: '#0086d9',
             fontWeight: 650, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', padding: '8px 16px' }}>
           <i className="ti ti-download" style={{ fontSize: 17 }} />Exporter CSV
         </button>
@@ -476,7 +476,7 @@ function Filtre({ libelle, valeur, onChange, options }) {
     <div style={{ minWidth: 0 }}>
       <label style={{ display: 'block', color: '#637899', fontSize: 11, fontWeight: 600, margin: '0 0 5px 2px' }}>{libelle}</label>
       <select value={valeur} onChange={e => onChange(e.target.value)}
-        style={{ height: 43, width: '100%', border: '1px solid #cadbed', borderRadius: 7, background: COUL.blanc,
+        style={{ height: 43, width: '100%', border: '1px solid #cadbed', borderRadius: 7, background: COUL.surface,
           color: '#102344', padding: '0 13px', fontWeight: 550, fontSize: 14, fontFamily: 'inherit',
           boxShadow: '0 3px 13px #18396a07', cursor: 'pointer' }}>
         {options.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
@@ -573,7 +573,7 @@ function ChiffresCles({ stats, compact = false }) {
       {/* Les quatre satellites */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gridTemplateRows: 'repeat(2,minmax(0,1fr))', gap: 14 }}>
         {tuiles.map(t => (
-          <div key={t.cle} style={{ background: COUL.blanc, border: '1px solid #e8edf4', borderRadius: 14, padding: '14px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: 77 }}>
+          <div key={t.cle} style={{ background: COUL.surface, border: '1px solid #e8edf4', borderRadius: 14, padding: '14px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: 77 }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: COUL.texteFaible }}>{t.label}</div>
               {t.delta}
@@ -594,7 +594,7 @@ function ChiffresCles({ stats, compact = false }) {
 
 function Tuile({ label, valeur, sous, couleur }) {
   return (
-    <div style={{ background: COUL.blanc, borderRadius: 12, border: '1px solid #e8edf4', borderTop: `3px solid ${couleur}`, padding: '13px 16px' }}>
+    <div style={{ background: COUL.surface, borderRadius: 12, border: '1px solid #e8edf4', borderTop: `3px solid ${couleur}`, padding: '13px 16px' }}>
       <div style={{ fontSize: 10, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 6 }}>{label}</div>
       <div style={{ fontSize: 22, fontWeight: 800, color: COUL.texteFort, lineHeight: 1 }}>{valeur}</div>
       {sous && <div style={{ fontSize: 10.5, color: COUL.texteDoux, marginTop: 4 }}>{sous}</div>}
@@ -604,7 +604,7 @@ function Tuile({ label, valeur, sous, couleur }) {
 
 /* ── Carte de section ── */
 const Carte = ({ titre, aide, extra, children }) => (
-  <section style={{ background: COUL.blanc, borderRadius: 16, border: '1px solid #e8edf4', padding: '18px 20px 20px', marginBottom: 16 }}>
+  <section style={{ background: COUL.surface, borderRadius: 16, border: '1px solid #e8edf4', padding: '18px 20px 20px', marginBottom: 16 }}>
     <header style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 14 }}>
       <span style={{ width: 3, alignSelf: 'stretch', minHeight: 26, borderRadius: 2, background: COULEURS.entrant, flexShrink: 0 }} />
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -700,7 +700,7 @@ function CartePoste({ p, maxPoste, postes, edition, setEdition, renommer }) {
   ].filter(x => x.v > 0)
 
   return (
-    <div style={{ border: '1px solid #e8edf4', borderRadius: 13, padding: '13px 15px', background: COUL.blanc }}>
+    <div style={{ border: '1px solid #e8edf4', borderRadius: 13, padding: '13px 15px', background: COUL.surface }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 11 }}>
         <span style={{
           width: 33, height: 33, borderRadius: 9, flexShrink: 0,
@@ -789,7 +789,7 @@ function Journal({ lignes, total, relances = 0, sens, setSens, q, setQ, ouvrirFi
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher (numéro, contact, poste)…" style={{ flex: 1, minWidth: 200, padding: '8px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13 }} />
       </div>
 
-      <div style={{ background: COUL.blanc, borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+      <div style={{ background: COUL.surface, borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>

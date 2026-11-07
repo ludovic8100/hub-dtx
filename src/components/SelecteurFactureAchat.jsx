@@ -53,7 +53,7 @@ function ApercuFacture({ fid, nom }) {
   useEffect(() => { setEtat('load') }, [fid])
   const src = `/api/apercu-facture?fid=${encodeURIComponent(fid)}`
   return (
-    <div style={{ position: 'fixed', top: '50%', right: '24px', transform: 'translateY(-50%)', zIndex: 2100, width: '570px', maxWidth: '50vw', maxHeight: '90vh', background: COUL.blanc, borderRadius: '14px', boxShadow: '0 20px 60px rgba(0,0,0,0.35)', border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', pointerEvents: 'none' }}>
+    <div style={{ position: 'fixed', top: '50%', right: '24px', transform: 'translateY(-50%)', zIndex: 2100, width: '570px', maxWidth: '50vw', maxHeight: '90vh', background: COUL.surface, borderRadius: '14px', boxShadow: '0 20px 60px rgba(0,0,0,0.35)', border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', pointerEvents: 'none' }}>
       <div style={{ padding: '10px 14px', background: COUL.texteFort, color: COUL.blanc, fontSize: '12px', fontWeight: '600', fontFamily: FONT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>📄 {nom}</div>
       <div style={{ overflowY: 'auto', background: COUL.fond }}>
         <img src={src} alt="Apercu facture" onLoad={() => setEtat('ok')} onError={() => setEtat('err')} style={{ width: '100%', height: 'auto', display: etat === 'ok' ? 'block' : 'none' }} />
@@ -107,7 +107,7 @@ export default function SelecteurFactureAchat({ societeCode, montantCible, dateC
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT }} onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} style={{ background: COUL.blanc, borderRadius: '14px', width: 'min(620px, 94vw)', maxHeight: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: '14px', width: 'min(620px, 94vw)', maxHeight: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
           <div style={{ fontSize: '15px', fontWeight: '800', color: COUL.texteFort }}>{multi ? 'Lier une ou plusieurs factures' : 'Lier une facture'}</div>
           <div style={{ fontSize: '12.5px', color: COUL.texteDoux, marginTop: '3px' }}>{sousTitre ? sousTitre : (<>Mouvement de <strong>{fmt(montantCible)}</strong>{societeCode ? ` · ${societeCode}` : ''}</>)}</div>
@@ -150,7 +150,7 @@ export default function SelecteurFactureAchat({ societeCode, montantCible, dateC
             })()}
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #e2e8f0', background: COUL.blanc, color: COUL.texteDoux, cursor: 'pointer', fontSize: '13px', fontWeight: '600', fontFamily: FONT }}>Annuler</button>
+            <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #e2e8f0', background: COUL.surface, color: COUL.texteDoux, cursor: 'pointer', fontSize: '13px', fontWeight: '600', fontFamily: FONT }}>Annuler</button>
             {multi && <button onClick={() => selList.length && onChoisir(selList)} disabled={selList.length === 0} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: selList.length ? '#2563eb' : COUL.bordFort, color: COUL.blanc, cursor: selList.length ? 'pointer' : 'default', fontSize: '13px', fontWeight: '700', fontFamily: FONT }}>Lier {selList.length || ''} facture{selList.length > 1 ? 's' : ''}</button>}
           </div>
         </div>

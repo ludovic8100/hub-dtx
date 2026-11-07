@@ -145,7 +145,7 @@ export default function GestionCategories() {
         {estModifie(cat)
           ? <button onClick={() => enregistrer(cat)} style={{ padding: '7px 12px', border: 'none', borderRadius: 7, background: COUL.succes, color: COUL.blanc, fontWeight: 700, fontSize: 12.5, cursor: 'pointer', fontFamily: FONT }}>Enregistrer</button>
           : <span style={{ width: 84 }} />}
-        <button onClick={() => supprimer(cat)} title="Supprimer" style={{ width: 32, height: 32, border: '1px solid #fecaca', borderRadius: 7, background: COUL.blanc, color: COUL.danger, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <button onClick={() => supprimer(cat)} title="Supprimer" style={{ width: 32, height: 32, border: '1px solid #fecaca', borderRadius: 7, background: COUL.surface, color: COUL.danger, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <i className="ti ti-trash" style={{ fontSize: 15 }} />
         </button>
       </div>
@@ -169,7 +169,7 @@ export default function GestionCategories() {
 
       {reaff && (
         <div onClick={() => setReaff(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: COUL.blanc, borderRadius: 14, padding: 22, width: 460, maxWidth: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.25)' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 14, padding: 22, width: 460, maxWidth: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.25)' }}>
             <div style={{ fontSize: 16, fontWeight: 800, color: COUL.texteFort, marginBottom: 8 }}>Réaffecter avant suppression</div>
             <div style={{ fontSize: 13, color: COUL.texteMoyen, marginBottom: 16, lineHeight: 1.5 }}>
               <b>{reaff.count}</b> transaction(s) utilisent « <b>{reaff.cat.nom}</b> ». Choisis la catégorie vers laquelle les déplacer&nbsp;; « {reaff.cat.nom} » sera ensuite supprimée.
@@ -179,7 +179,7 @@ export default function GestionCategories() {
               {cats.filter(c => c.type === reaff.cat.type && c.id !== reaff.cat.id).map(c => <option key={c.id} value={c.id}>{c.parent_id ? '↳ ' : ''}{c.nom}</option>)}
             </select>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <button onClick={() => setReaff(null)} style={{ padding: '9px 16px', border: '1px solid #e2e8f0', borderRadius: 8, background: COUL.blanc, color: COUL.texteMoyen, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: FONT }}>Annuler</button>
+              <button onClick={() => setReaff(null)} style={{ padding: '9px 16px', border: '1px solid #e2e8f0', borderRadius: 8, background: COUL.surface, color: COUL.texteMoyen, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: FONT }}>Annuler</button>
               <button onClick={confirmerReaff} disabled={!reaff.cible} style={{ padding: '9px 16px', border: 'none', borderRadius: 8, background: reaff.cible ? '#dc2626' : '#fca5a5', color: COUL.blanc, fontWeight: 700, fontSize: 13, cursor: reaff.cible ? 'pointer' : 'not-allowed', fontFamily: FONT }}>Réaffecter et supprimer</button>
             </div>
           </div>
@@ -202,7 +202,7 @@ export default function GestionCategories() {
       </div>
 
       {loading ? <div style={{ color: COUL.texteFaible, padding: 20 }}>Chargement…</div> : (
-        <div style={{ background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 14, padding: 20 }}>
+        <div style={{ background: COUL.surface, border: '1px solid #e2e8f0', borderRadius: 14, padding: 20 }}>
           {liste.length === 0 && <div style={{ color: COUL.texteFaible, fontSize: 13, marginBottom: 14 }}>Aucune catégorie{filtre ? ` pour ${filtre}` : ''}. Ajoute-en une ci-dessous.</div>}
 
           {depenses.length > 0 && <>

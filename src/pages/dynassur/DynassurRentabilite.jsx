@@ -36,7 +36,7 @@ function useIsMobile() {
 
 function Kpi({ label, value, col, sub }) {
   return (
-    <div style={{ flex: '1 1 150px', background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 12, padding: '12px 14px' }}>
+    <div style={{ flex: '1 1 150px', background: COUL.surface, border: '1px solid #e2e8f0', borderRadius: 12, padding: '12px 14px' }}>
       <div style={{ fontSize: 10.5, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.04em' }}>{label}</div>
       <div style={{ fontSize: 22, fontWeight: 800, color: col }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: COUL.texteFaible, marginTop: 2 }}>{sub}</div>}
@@ -46,7 +46,7 @@ function Kpi({ label, value, col, sub }) {
 
 function Section({ titre, children, note }) {
   return (
-    <div style={{ background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 12, padding: 16, marginTop: 16 }}>
+    <div style={{ background: COUL.surface, border: '1px solid #e2e8f0', borderRadius: 12, padding: 16, marginTop: 16 }}>
       <div style={{ fontSize: 14, fontWeight: 800, color: NAVY }}>{titre}</div>
       {note && <div style={{ fontSize: 12, color: COUL.texteFaible, margin: '4px 0 10px' }}>{note}</div>}
       {children}

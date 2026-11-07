@@ -68,8 +68,8 @@ function CieFormModal({ cie, comptes = [], logos = [], onClose, onSave, onDelete
 
   return (
     <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.55)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:16, fontFamily:"'Source Sans Pro', sans-serif" }}>
-      <div style={{ background:COUL.blanc, borderRadius:16, width:"100%", maxWidth:520, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,0.3)" }}>
-        <div style={{ padding:"20px 24px 16px", borderBottom:`1px solid ${C.border}`, display:"flex", alignItems:"center", justifyContent:"space-between", position:"sticky", top:0, background:COUL.blanc, borderRadius:"16px 16px 0 0" }}>
+      <div style={{ background:COUL.surface, borderRadius:16, width:"100%", maxWidth:520, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,0.3)" }}>
+        <div style={{ padding:"20px 24px 16px", borderBottom:`1px solid ${C.border}`, display:"flex", alignItems:"center", justifyContent:"space-between", position:"sticky", top:0, background:COUL.surface, borderRadius:"16px 16px 0 0" }}>
           <div style={{ fontSize:16, fontWeight:700, color:C.navy }}>{isNew ? "➕ Nouvelle compagnie" : `✏️ ${cie.nom}`}</div>
           <button onClick={onClose} style={{ border:"none", background:C.bg, borderRadius:8, padding:"6px 10px", cursor:"pointer", fontSize:16 }}>✕</button>
         </div>
@@ -110,7 +110,7 @@ function CieFormModal({ cie, comptes = [], logos = [], onClose, onSave, onDelete
                   {comptes.map(p => {
                     const st = STATUT_PROD[p.statut] || STATUT_PROD.actif
                     return (
-                    <div key={p.id} style={{ display:"flex", alignItems:"center", gap:8, background:COUL.blanc, border:`1px solid ${C.border}`, borderRadius:6, padding:"6px 8px" }}>
+                    <div key={p.id} style={{ display:"flex", alignItems:"center", gap:8, background:COUL.surface, border:`1px solid ${C.border}`, borderRadius:6, padding:"6px 8px" }}>
                       <span style={{ fontSize:12, fontWeight:700, color:C.navy, fontFamily:"monospace" }}>{p.numero_producteur}</span>
                       {p.fsma && <span style={{ fontSize:10, color:C.textL }}>FSMA {p.fsma}</span>}
                       {/* À quoi sert ce compte : AG en a cinq, Record un PAT et un PH. */}
@@ -119,9 +119,9 @@ function CieFormModal({ cie, comptes = [], logos = [], onClose, onSave, onDelete
                         style={{ ...D.input, flex:1, minWidth:120, fontSize:12, padding:"4px 8px" }} />
                       <select value={p.statut||"actif"} onChange={e => onSetStatut(p.id, e.target.value)}
                         style={{ border:"none", borderRadius:5, padding:"2px 6px", fontSize:11, fontWeight:600, cursor:"pointer", color:COUL.blanc, background:st.couleur }}>
-                        <option value="actif" style={{ color:"#000", background:COUL.blanc }}>Actif</option>
-                        <option value="runoff" style={{ color:"#000", background:COUL.blanc }}>Run-off</option>
-                        <option value="cloture" style={{ color:"#000", background:COUL.blanc }}>Clôturé</option>
+                        <option value="actif" style={{ color:"#000", background:COUL.surface }}>Actif</option>
+                        <option value="runoff" style={{ color:"#000", background:COUL.surface }}>Run-off</option>
+                        <option value="cloture" style={{ color:"#000", background:COUL.surface }}>Clôturé</option>
                       </select>
                       <button onClick={() => window.confirm(`Supprimer le n° ${p.numero_producteur} ?`) && onDelProd(p.id)}
                         style={{ border:"none", background:"none", color:C.danger, cursor:"pointer", fontSize:14, padding:0 }} title="Supprimer">🗑</button>
@@ -453,7 +453,7 @@ export default function CompagniesView() {
           <div style={{ fontSize:13, fontWeight:700, color:"#856404", marginBottom:10 }}>⚠ {nonRattaches.length} numéro{nonRattaches.length>1?"s":""} de producteur non rattaché{nonRattaches.length>1?"s":""}</div>
           <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
             {nonRattaches.map(p => (
-              <div key={p.id} style={{ display:"flex", alignItems:"center", gap:8, background:COUL.blanc, border:`1px solid ${C.border}`, borderRadius:6, padding:"6px 8px", flexWrap:"wrap" }}>
+              <div key={p.id} style={{ display:"flex", alignItems:"center", gap:8, background:COUL.surface, border:`1px solid ${C.border}`, borderRadius:6, padding:"6px 8px", flexWrap:"wrap" }}>
                 <span style={{ fontSize:12, fontWeight:700, color:C.navy, fontFamily:"monospace" }}>{p.numero_producteur}</span>
                 <span style={{ fontSize:11, color:C.textM }}>{p.compagnie_nom}</span>
                 {p.fsma && <span style={{ fontSize:10, color:C.textL }}>FSMA {p.fsma}</span>}

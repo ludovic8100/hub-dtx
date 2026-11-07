@@ -16,7 +16,7 @@ const fmtDate = v => v ? new Date(v).toLocaleDateString('fr-BE',{day:'2-digit',m
 
 function KpiCard({ label, value, icon, color, sub }) {
   return (
-    <div style={{ background:COUL.blanc, borderRadius:12, padding:20, border:`1px solid ${C.border}`, borderTop:`3px solid ${color}` }}>
+    <div style={{ background:COUL.surface, borderRadius:12, padding:20, border:`1px solid ${C.border}`, borderTop:`3px solid ${color}` }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
         <div>
           <div style={{ fontSize:11, color:C.muted, fontWeight:700, textTransform:'uppercase', letterSpacing:'.05em', marginBottom:8 }}>{label}</div>
@@ -118,7 +118,7 @@ export default function DashboardDynassur() {
 
         {/* Derniers clients consultés */}
         {recents.length > 0 && (
-          <div style={{ background:COUL.blanc, borderRadius:12, border:'1px solid #e2e8f0', padding:'14px 18px', marginBottom:24 }}>
+          <div style={{ background:COUL.surface, borderRadius:12, border:'1px solid #e2e8f0', padding:'14px 18px', marginBottom:24 }}>
             <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
               <i className="ti ti-history" style={{ fontSize:15, color:C.blue }} />
               <span style={{ fontSize:13, fontWeight:700, color:C.navy }}>Derniers clients consultés</span>
@@ -150,7 +150,7 @@ export default function DashboardDynassur() {
 
             {/* Objectifs progression */}
             {obj && (
-              <div style={{ background:COUL.blanc, borderRadius:12, border:`1px solid ${C.border}`, padding:18 }}>
+              <div style={{ background:COUL.surface, borderRadius:12, border:`1px solid ${C.border}`, padding:18 }}>
                 <div style={{ fontSize:12, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'.05em', marginBottom:14 }}>Objectifs {annee}</div>
                 {obj.target_na > 0 && (
                   <div style={{ marginBottom:10 }}>
@@ -183,7 +183,7 @@ export default function DashboardDynassur() {
             )}
 
             {/* Top agents NA ce mois */}
-            <div style={{ background:COUL.blanc, borderRadius:12, border:`1px solid ${C.border}`, padding:18 }}>
+            <div style={{ background:COUL.surface, borderRadius:12, border:`1px solid ${C.border}`, padding:18 }}>
               <div style={{ fontSize:12, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'.05em', marginBottom:12 }}>Top NA — mois {mois}</div>
               {loading ? <div style={{ color:C.muted, fontSize:13 }}>Chargement…</div>
               : prodMois.length === 0 ? <div style={{ color:C.muted, fontSize:13 }}>Aucune NA ce mois</div>
@@ -200,7 +200,7 @@ export default function DashboardDynassur() {
           </div>
 
           {/* COL 2 — Bordereaux */}
-          <div style={{ background:COUL.blanc, borderRadius:12, border:`1px solid ${C.border}`, overflow:'hidden' }}>
+          <div style={{ background:COUL.surface, borderRadius:12, border:`1px solid ${C.border}`, overflow:'hidden' }}>
             <div style={{ padding:'14px 18px', borderBottom:`1px solid ${C.border}`, display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
               <i className="ti ti-file-alert" style={{ fontSize:15, color:C.danger }} />
               <span style={{ fontSize:13, fontWeight:700, color:COUL.texteFort }}>Bordereaux {annee}</span>

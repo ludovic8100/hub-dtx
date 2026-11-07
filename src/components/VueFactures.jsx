@@ -224,7 +224,7 @@ function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, s
     <>
       <KpiRow kpis={kpis} actif={filtre.statut} onClic={(v) => setFiltre(f => ({ ...f, statut: f.statut === v ? 'toutes' : v }))} />
       <FiltreBar filtre={filtre} setFiltre={setFiltre} anneesDispo={anneesDispo} societesDispo={multiSociete ? societesDispo : null} placeholder="Nom de facture…" reset={() => setFiltre({ statut: 'toutes', recherche: '', annee: '', societe: '' })} />
-      <div style={{ background: COUL.blanc, borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+      <div style={{ background: COUL.surface, borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
         <Ligne header cols={cols} items={entetes} />
         {facturesPage.length === 0 && <div style={{ padding: '50px', textAlign: 'center', color: COUL.texteFaible }}>Aucune facture</div>}
         {facturesPage.map((f, i) => {
@@ -247,7 +247,7 @@ function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, s
             <span style={{ fontSize: '12.5px', color: COUL.texteDoux, fontWeight: '600' }}>{fmtDate(f.date_facture)}</span>,
             <span style={{ fontSize: '13px', color: COUL.texteFort, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '10px' }}>{(f.nom || '').replace(/\.pdf$/i, '')}</span>,
             ...(masquerMontant ? [] : [<span style={{ textAlign: 'right', display: 'block', fontSize: '13.5px', fontWeight: '700', color: f.montant == null ? '#cbd5e1' : (vente ? '#16a34a' : COUL.danger) }}>{f.montant == null ? '—' : (vente ? '+ ' : '- ') + fmt(Math.abs(f.montant))}</span>]),
-            <button onClick={(e) => { e.stopPropagation(); basculerSens(f) }} title={vente ? 'Reclasser dans les Dépenses' : 'Reclasser dans les Rentrées'} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '30px', height: '30px', margin: '0 auto', borderRadius: '7px', border: '1px solid #e2e8f0', background: COUL.blanc, color: COUL.texteDoux, cursor: 'pointer' }}><i className="ti ti-transfer" style={{ fontSize: '16px' }} /></button>,
+            <button onClick={(e) => { e.stopPropagation(); basculerSens(f) }} title={vente ? 'Reclasser dans les Dépenses' : 'Reclasser dans les Rentrées'} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '30px', height: '30px', margin: '0 auto', borderRadius: '7px', border: '1px solid #e2e8f0', background: COUL.surface, color: COUL.texteDoux, cursor: 'pointer' }}><i className="ti ti-transfer" style={{ fontSize: '16px' }} /></button>,
           ]
           return <Ligne key={f.fichier_id} cols={cols} items={cells} onClick={() => ouvrir(f)} clickable={!!f.url} alt={i % 2 === 1} title={f.nom} />
         })}
@@ -300,7 +300,7 @@ function VueVentes({ tables, color }) {
   const facturesPage = filtrees.slice((page - 1) * PAR_PAGE, page * PAR_PAGE)
 
   if (loading) return <div style={{ padding: '50px', textAlign: 'center', color: COUL.texteFaible }}>Chargement des rentrées…</div>
-  if (tables.length === 0) return <div style={{ padding: '50px', textAlign: 'center', color: COUL.texteFaible, background: COUL.blanc, borderRadius: '12px', border: '1px solid #e2e8f0' }}>Pas de module de facturation pour cette entité.</div>
+  if (tables.length === 0) return <div style={{ padding: '50px', textAlign: 'center', color: COUL.texteFaible, background: COUL.surface, borderRadius: '12px', border: '1px solid #e2e8f0' }}>Pas de module de facturation pour cette entité.</div>
 
   const kpis = [
     { label: 'Total rentrées', value: factures.length, c: color, sub: `${nbPayees} encaissées • ${nbNonPayees} en attente` },
@@ -313,7 +313,7 @@ function VueVentes({ tables, color }) {
     <>
       <KpiRow kpis={kpis} actif={filtre.statut} onClic={(v) => setFiltre(f => ({ ...f, statut: f.statut === v ? 'toutes' : v }))} />
       <FiltreBar filtre={filtre} setFiltre={setFiltre} anneesDispo={anneesDispo} placeholder="Client, n° ou objet…" reset={() => setFiltre({ statut: 'toutes', recherche: '', annee: '' })} />
-      <div style={{ background: COUL.blanc, borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+      <div style={{ background: COUL.surface, borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
         <Ligne header cols={['100px', '110px', '110px', '1fr', '130px']} items={['Statut', 'Date', 'N°', 'Client', 'Montant TTC']} />
         {facturesPage.length === 0 && <div style={{ padding: '50px', textAlign: 'center', color: COUL.texteFaible }}>Aucune rentrée</div>}
         {facturesPage.map((f, i) => {
@@ -351,7 +351,7 @@ function KpiRow({ kpis, actif, onClic }) {
 
 function FiltreBar({ filtre, setFiltre, anneesDispo, placeholder, reset, societesDispo }) {
   return (
-    <div style={{ background: COUL.blanc, borderRadius: '12px', border: '1px solid #e2e8f0', padding: '14px 16px', marginBottom: '14px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+    <div style={{ background: COUL.surface, borderRadius: '12px', border: '1px solid #e2e8f0', padding: '14px 16px', marginBottom: '14px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
         <label style={{ fontSize: '10px', fontWeight: '700', color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Statut</label>
         <div style={{ display: 'flex', gap: '4px' }}>
@@ -385,7 +385,7 @@ function FiltreBar({ filtre, setFiltre, anneesDispo, placeholder, reset, societe
         </div>
       )}
       {(filtre.statut !== 'toutes' || filtre.recherche || filtre.annee || filtre.societe) && (
-        <button onClick={reset} style={{ padding: '7px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', border: '1px solid #e2e8f0', background: COUL.blanc, color: COUL.texteDoux, fontFamily: FONT }}>Réinitialiser</button>
+        <button onClick={reset} style={{ padding: '7px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', border: '1px solid #e2e8f0', background: COUL.surface, color: COUL.texteDoux, fontFamily: FONT }}>Réinitialiser</button>
       )}
     </div>
   )
@@ -518,7 +518,7 @@ function PanneauLierPaiement({ facture, color, onClose, onLier, tousComptes = fa
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT }} onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} style={{ background: COUL.blanc, borderRadius: '14px', width: 'min(620px, 94vw)', maxHeight: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: '14px', width: 'min(620px, 94vw)', maxHeight: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: '12px' }}>
           {facture.fichier_id && (
             <img src={`/api/apercu-facture?fid=${facture.fichier_id}`} alt=""
@@ -569,7 +569,7 @@ function PanneauLierPaiement({ facture, color, onClose, onLier, tousComptes = fa
               : <span style={{ color: COUL.texteFaible }}>Cochez un ou plusieurs mouvements</span>}
           </div>
           <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-            <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #e2e8f0', background: COUL.blanc, color: COUL.texteDoux, cursor: 'pointer', fontSize: '13px', fontWeight: '600', fontFamily: FONT }}>Annuler</button>
+            <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #e2e8f0', background: COUL.surface, color: COUL.texteDoux, cursor: 'pointer', fontSize: '13px', fontWeight: '600', fontFamily: FONT }}>Annuler</button>
             <button onClick={() => sel.length && onLier(selMouvements)} disabled={sel.length === 0} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: sel.length ? color : COUL.bord, color: sel.length ? '#fff' : COUL.texteFaible, cursor: sel.length ? 'pointer' : 'default', fontSize: '13px', fontWeight: '700', fontFamily: FONT }}>{sel.length > 1 ? `Lier ${sel.length} mouvements` : 'Lier ce paiement'}</button>
           </div>
         </div>

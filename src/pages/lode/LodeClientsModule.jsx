@@ -143,7 +143,7 @@ function EditeurClient({ client, onClose, onSaved }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: 20, overflowY: 'auto' }}>
-      <div style={{ background: COUL.blanc, borderRadius: 14, maxWidth: 720, width: '100%', padding: mobE ? 16 : 24, fontFamily: "'Source Sans Pro', sans-serif" }}>
+      <div style={{ background: COUL.surface, borderRadius: 14, maxWidth: 720, width: '100%', padding: mobE ? 16 : 24, fontFamily: "'Source Sans Pro', sans-serif" }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
           <h2 style={{ fontSize: 18, fontWeight: 800, color: NAVY, margin: 0 }}>{client?.id ? 'Modifier le client' : 'Nouveau client'}</h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: COUL.texteFaible }}>×</button>
@@ -183,7 +183,7 @@ function EditeurClient({ client, onClose, onSaved }) {
             </div>
             {bceError && !bceLoading && <div style={{ fontSize: 11, color: COUL.texteFaible, marginTop: 6 }}>{bceError}</div>}
             {bceResults && bceResults.length > 0 && (
-              <div style={{ position: 'absolute', left: 14, right: 14, top: 70, zIndex: 10, background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 9, boxShadow: '0 6px 20px rgba(0,0,0,0.12)', maxHeight: 260, overflowY: 'auto' }}>
+              <div style={{ position: 'absolute', left: 14, right: 14, top: 70, zIndex: 10, background: COUL.surface, border: '1px solid #e2e8f0', borderRadius: 9, boxShadow: '0 6px 20px rgba(0,0,0,0.12)', maxHeight: 260, overflowY: 'auto' }}>
                 {bceResults.map((e, i) => (
                   <div key={i} onClick={() => appliquerBCE(e)} style={{
                     padding: '9px 12px', cursor: 'pointer', fontSize: 12,
@@ -226,7 +226,7 @@ function EditeurClient({ client, onClose, onSaved }) {
             <label style={lbl}>Adresse {addrLoading && <span style={{ color: ORANGE }}>⏳</span>}</label>
             <input style={inp} value={f.adresse} onChange={e => set('adresse', e.target.value)} autoComplete="off" placeholder="Commencez à taper la rue…" />
             {addrResults && addrResults.length > 0 && (
-              <div style={{ position: 'absolute', left: 0, right: 0, top: 60, zIndex: 20, background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 9, boxShadow: '0 6px 20px rgba(0,0,0,0.12)', maxHeight: 220, overflowY: 'auto' }}>
+              <div style={{ position: 'absolute', left: 0, right: 0, top: 60, zIndex: 20, background: COUL.surface, border: '1px solid #e2e8f0', borderRadius: 9, boxShadow: '0 6px 20px rgba(0,0,0,0.12)', maxHeight: 220, overflowY: 'auto' }}>
                 {addrResults.map((a, i) => (
                   <div key={i} onClick={() => appliquerAdresse(a)} style={{
                     padding: '8px 11px', cursor: 'pointer', fontSize: 12,

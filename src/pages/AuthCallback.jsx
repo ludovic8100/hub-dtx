@@ -61,7 +61,7 @@ export default function AuthCallback() {
           onClick={() => navigate('/login', { replace: true })}
           style={{
             padding: '10px 20px', borderRadius: 8, border: 'none',
-            background: COUL.blanc, color: COUL.marine, fontWeight: 700, cursor: 'pointer',
+            background: COUL.surface, color: COUL.marine, fontWeight: 700, cursor: 'pointer',
           }}
         >
           Retour

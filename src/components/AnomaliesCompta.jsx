@@ -40,7 +40,7 @@ function Apercu({ f }) {
   return (
     <div style={{
       position: 'absolute', zIndex: 60, right: 0, top: 'calc(100% + 6px)',
-      minWidth: 260, maxWidth: 360, background: COUL.blanc, border: '1px solid #cbd5e1',
+      minWidth: 260, maxWidth: 360, background: COUL.surface, border: '1px solid #cbd5e1',
       borderRadius: 9, boxShadow: '0 10px 30px rgba(15,24,38,.18)', padding: '10px 12px',
       textAlign: 'left', fontWeight: 400, cursor: 'default',
     }}>
@@ -98,7 +98,7 @@ function Montant({ f, valeur, couleur }) {
 function Section({ titre, compte, total, explication, prudence, children }) {
   const [ouvert, setOuvert] = useState(true)
   return (
-    <section style={{ border: '1px solid #dce4ec', borderRadius: 12, background: COUL.blanc,
+    <section style={{ border: '1px solid #dce4ec', borderRadius: 12, background: COUL.surface,
                       overflow: 'hidden', marginBottom: 14 }}>
       <button onClick={() => setOuvert(!ouvert)} style={{
         width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 15px',

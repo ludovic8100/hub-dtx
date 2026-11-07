@@ -129,7 +129,7 @@ export default function RentabiliteView({ transactions = [], categories = [], ac
   const maxCat = Math.max(1, ...parCategorie.map(c => c.total))
   const maxMois = Math.max(1, ...parMois.map(m => Math.max(m.e, m.s)))
 
-  const card = { background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px 18px' }
+  const card = { background: COUL.surface, border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px 18px' }
   const kpi = { background: COUL.fond, borderRadius: '10px', padding: '14px 16px' }
 
   return (
@@ -140,7 +140,7 @@ export default function RentabiliteView({ transactions = [], categories = [], ac
           const on = anSel.has(a)
           return <button key={a} onClick={() => toggleAnnee(a)} style={{ padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 700, fontFamily: FONT, border: on ? `2px solid ${color}` : '1px solid #e2e8f0', background: on ? `${color}14` : COUL.blanc, color: on ? '#0f172a' : COUL.texteFaible }}>{a}</button>
         })}
-        {annees.length > 1 && <button onClick={() => setAnneesSel(new Set(annees))} style={{ padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, fontFamily: FONT, border: '1px solid #e2e8f0', background: COUL.blanc, color: COUL.texteDoux }}>Tous</button>}
+        {annees.length > 1 && <button onClick={() => setAnneesSel(new Set(annees))} style={{ padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, fontFamily: FONT, border: '1px solid #e2e8f0', background: COUL.surface, color: COUL.texteDoux }}>Tous</button>}
       </div>
 
       {activitesSoc.length > 0 && (

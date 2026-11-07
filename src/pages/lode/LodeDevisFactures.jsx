@@ -684,7 +684,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
     <div style={{ position: 'fixed', inset: 0, background: COUL.fond, zIndex: 1000, display: 'flex', flexDirection: 'column', fontFamily: "'Source Sans Pro', sans-serif" }}>
 
       {/* ── Barre du haut : identite du document, bascule, actions ── */}
-      <div style={{ background: COUL.blanc, borderBottom: `1px solid ${COUL.bord}`, padding: mobE ? '10px 12px' : '11px 20px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+      <div style={{ background: COUL.surface, borderBottom: `1px solid ${COUL.bord}`, padding: mobE ? '10px 12px' : '11px 20px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
         <button onClick={onClose} title="Fermer" style={{ background: 'none', border: 'none', fontSize: 19, cursor: 'pointer', color: COUL.texteDoux, padding: 0, lineHeight: 1 }}>←</button>
         <div style={{ fontSize: mobE ? 14 : 15, fontWeight: 800, color: NAVY, minWidth: 0 }}>
           {mobE
@@ -694,7 +694,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
-          <button onClick={onClose} style={{ background: COUL.blanc, border: `1px solid ${COUL.bord}`, borderRadius: 9, padding: mobE ? '7px 12px' : '8px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: COUL.texteMoyen }}>Annuler</button>
+          <button onClick={onClose} style={{ background: COUL.surface, border: `1px solid ${COUL.bord}`, borderRadius: 9, padding: mobE ? '7px 12px' : '8px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: COUL.texteMoyen }}>Annuler</button>
           <button onClick={save} disabled={saving || verrouille} style={{ background: verrouille ? COUL.bordFort : ORANGE, border: 'none', borderRadius: 9, padding: mobE ? '7px 14px' : '8px 20px', cursor: (saving || verrouille) ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700, color: COUL.blanc }}>
             {verrouille ? '🔒' : (saving ? 'Enregistrement…' : 'Enregistrer')}
           </button>
@@ -726,7 +726,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
           {vue === 'pdf' ? (
             <div style={{ maxWidth: 860, margin: '0 auto' }}>
               {pdfUrl ? <>
-                <iframe title="Aperçu PDF" src={pdfUrl} style={{ width: '100%', height: '78vh', border: `1px solid ${COUL.bord}`, borderRadius: 10, background: COUL.blanc }} />
+                <iframe title="Aperçu PDF" src={pdfUrl} style={{ width: '100%', height: '78vh', border: `1px solid ${COUL.bord}`, borderRadius: 10, background: COUL.surface }} />
                 {/* Repli : certains navigateurs refusent d'afficher un PDF dans
                     un cadre. L'apercu serait alors blanc, sans rien pour s'en sortir. */}
                 <div style={{ textAlign: 'center', marginTop: 8 }}>
@@ -737,7 +737,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
               </> : <div style={{ padding: 40, textAlign: 'center', color: COUL.texteDoux, fontSize: 14 }}>{pdfErr || 'Génération de l’aperçu…'}</div>}
             </div>
           ) : (
-          <div style={{ maxWidth: 860, margin: '0 auto', background: COUL.blanc, borderRadius: 12, boxShadow: '0 1px 3px rgba(15,23,42,.08), 0 8px 28px rgba(15,23,42,.06)', padding: mobE ? 18 : 38 }}>
+          <div style={{ maxWidth: 860, margin: '0 auto', background: COUL.surface, borderRadius: 12, boxShadow: '0 1px 3px rgba(15,23,42,.08), 0 8px 28px rgba(15,23,42,.06)', padding: mobE ? 18 : 38 }}>
 
             {/* Titre + dates */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 20, flexWrap: 'wrap', marginBottom: 26 }}>
@@ -833,7 +833,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
 
             {!verrouille && (
               <button onClick={() => { addLigne(); setArticleOuvert(lignes.length) }}
-                style={{ width: '100%', marginTop: 10, background: COUL.blanc, border: `1px dashed ${COUL.bordFort}`, borderRadius: 9, padding: '11px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: ORANGE }}>
+                style={{ width: '100%', marginTop: 10, background: COUL.surface, border: `1px dashed ${COUL.bordFort}`, borderRadius: 9, padding: '11px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: ORANGE }}>
                 ＋ Ajouter un article
               </button>
             )}
@@ -869,7 +869,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
         </div>
 
         {/* ══════════ PANNEAU DÉTAILS ══════════ */}
-        <div style={{ width: mobE ? '100%' : 340, flex: mobE ? 1 : 'none', flexShrink: 0, background: COUL.blanc, borderLeft: mobE ? 'none' : `1px solid ${COUL.bord}`, overflowY: 'auto', display: (mobE && vue !== 'details') ? 'none' : 'block' }}>
+        <div style={{ width: mobE ? '100%' : 340, flex: mobE ? 1 : 'none', flexShrink: 0, background: COUL.surface, borderLeft: mobE ? 'none' : `1px solid ${COUL.bord}`, overflowY: 'auto', display: (mobE && vue !== 'details') ? 'none' : 'block' }}>
           {!mobE && <div style={{ padding: '13px 18px', borderBottom: `1px solid ${COUL.bord}`, fontSize: 13.5, fontWeight: 800, color: NAVY }}>Détails</div>}
 
           {/* Type / responsable / langue / statut */}
@@ -1001,7 +1001,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
               onDrop={e => { e.preventDefault(); const fs = [...e.dataTransfer.files].filter(x => x.type === 'application/pdf'); if (fs.length) importerPDFs(fs) }}
               style={{ border: `2px dashed ${importPDF.drag ? ORANGE : COUL.bordFort}`, background: importPDF.drag ? COUL.orangeFond : COUL.fond, borderRadius: 9, padding: '14px 12px', textAlign: 'center' }}>
               <div style={{ fontSize: 11.5, color: COUL.texteDoux, marginBottom: 8, lineHeight: 1.5 }}>SDA / Marquise — glissez le PDF ici, les articles seront pré-remplis</div>
-              <label style={{ display: 'inline-block', background: COUL.blanc, border: `1px solid ${ORANGE}`, color: ORANGE, borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+              <label style={{ display: 'inline-block', background: COUL.surface, border: `1px solid ${ORANGE}`, color: ORANGE, borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
                 {importPDF.loading ? 'Lecture…' : 'Parcourir…'}
                 <input type="file" accept="application/pdf" multiple style={{ display: 'none' }} onChange={e => { const fs = [...e.target.files]; if (fs.length) importerPDFs(fs); e.target.value = '' }} />
               </label>
@@ -1076,7 +1076,7 @@ function ModalArticle({ l, i, setLigne, delLigne, ajouterPhotos, onClose, mobE, 
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', zIndex: 9500, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '5vh 14px', overflowY: 'auto' }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: COUL.blanc, borderRadius: 14, width: '100%', maxWidth: 520, boxShadow: '0 20px 60px rgba(0,0,0,.25)', overflow: 'hidden' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 14, width: '100%', maxWidth: 520, boxShadow: '0 20px 60px rgba(0,0,0,.25)', overflow: 'hidden' }}>
         <div style={{ padding: '15px 20px', borderBottom: `1px solid ${COUL.bord}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: 16, fontWeight: 800, color: NAVY }}>Éditer l’article</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 21, cursor: 'pointer', color: COUL.texteFaible }}>×</button>
@@ -1206,7 +1206,7 @@ function ModalClient({ f, set, clientQuery, setClientQuery, clientResults, searc
   const lbl2 = { fontSize: 11.5, fontWeight: 700, color: COUL.texteDoux, marginBottom: 4, display: 'block' }
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', zIndex: 9500, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '5vh 14px', overflowY: 'auto' }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: COUL.blanc, borderRadius: 14, width: '100%', maxWidth: 620, boxShadow: '0 20px 60px rgba(0,0,0,.25)', overflow: 'hidden' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 14, width: '100%', maxWidth: 620, boxShadow: '0 20px 60px rgba(0,0,0,.25)', overflow: 'hidden' }}>
         <div style={{ padding: '15px 20px', borderBottom: `1px solid ${COUL.bord}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: 16, fontWeight: 800, color: NAVY }}>Client</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 21, cursor: 'pointer', color: COUL.texteFaible }}>×</button>
@@ -1216,7 +1216,7 @@ function ModalClient({ f, set, clientQuery, setClientQuery, clientResults, searc
             <label style={lbl2}>Rechercher dans la base (nom, dossier, ville, email, TVA…)</label>
             <input autoFocus style={inp2} value={clientQuery} placeholder="Tapez au moins 2 caractères" onChange={e => setClientQuery(e.target.value)} />
             {clientQuery.trim().length >= 2 && (
-              <div style={{ position: 'absolute', zIndex: 20, left: 0, right: 0, background: COUL.blanc, border: `1px solid ${COUL.bord}`, borderRadius: 9, marginTop: 4, maxHeight: 260, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,.12)' }}>
+              <div style={{ position: 'absolute', zIndex: 20, left: 0, right: 0, background: COUL.surface, border: `1px solid ${COUL.bord}`, borderRadius: 9, marginTop: 4, maxHeight: 260, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,.12)' }}>
                 {searching && <div style={{ padding: 10, fontSize: 13, color: COUL.texteDoux }}>Recherche…</div>}
                 {!searching && clientResults.length === 0 && <div style={{ padding: 10, fontSize: 13, color: COUL.texteDoux }}>Aucun client trouvé</div>}
                 {clientResults.map(c => {
@@ -2126,11 +2126,11 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: mob ? 0 : 20 }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: mob ? '100vw' : 'min(1080px,96vw)', height: mob ? '100vh' : 'min(92vh,900px)', background: COUL.blanc, borderRadius: mob ? 0 : 16, overflow: 'hidden', display: 'flex', flexDirection: mob ? 'column' : 'row', boxShadow: '0 20px 60px rgba(0,0,0,.3)' }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: mob ? '100vw' : 'min(1080px,96vw)', height: mob ? '100vh' : 'min(92vh,900px)', background: COUL.surface, borderRadius: mob ? 0 : 16, overflow: 'hidden', display: 'flex', flexDirection: mob ? 'column' : 'row', boxShadow: '0 20px 60px rgba(0,0,0,.3)' }}>
 
         {/* ── Colonne gauche : aperçu du document ── */}
         <div style={{ flex: 1, background: COUL.fondDoux, overflow: 'auto', padding: mob ? 14 : 28, order: mob ? 2 : 1 }}>
-          <div style={{ background: COUL.blanc, maxWidth: 620, margin: '0 auto', borderRadius: 10, boxShadow: '0 2px 12px rgba(0,0,0,.08)', padding: mob ? '22px 18px' : '30px 34px', fontSize: 12, color: COUL.texte }}>
+          <div style={{ background: COUL.surface, maxWidth: 620, margin: '0 auto', borderRadius: 10, boxShadow: '0 2px 12px rgba(0,0,0,.08)', padding: mob ? '22px 18px' : '30px 34px', fontSize: 12, color: COUL.texte }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 22 }}>
               {LODE.logo_url ? <img src={LODE.logo_url} alt="LODE" style={{ height: 46 }} /> : <div style={{ fontWeight: 800, fontSize: 18, color }}>{LODE.raison_sociale}</div>}
               <div style={{ textAlign: 'right' }}>
@@ -2220,7 +2220,7 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
           {/* Actions d'envoi */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 22 }}>
             <button onClick={envoyerEmail} disabled={sending} style={{ flex: 1, minWidth: 180, padding: '11px 16px', border: 'none', borderRadius: 10, background: COUL.succes, color: COUL.blanc, fontWeight: 700, fontSize: 14, cursor: sending ? 'wait' : 'pointer' }}>{sending ? '…' : '📧 Envoyer par email'}</button>
-            <button onClick={() => marquerEnvoye(false)} style={{ padding: '11px 16px', border: '1px solid #e2e8f0', borderRadius: 10, background: COUL.blanc, color: COUL.texteDoux, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Marquer envoyé</button>
+            <button onClick={() => marquerEnvoye(false)} style={{ padding: '11px 16px', border: '1px solid #e2e8f0', borderRadius: 10, background: COUL.surface, color: COUL.texteDoux, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Marquer envoyé</button>
           </div>
 
           {/* Timeline */}
@@ -2232,7 +2232,7 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
                 const cfg = EVT[ev.type] || { icon: '•', label: ev.type, col: COUL.texteDoux }
                 return (
                   <div key={ev.id || i} style={{ position: 'relative', marginBottom: 18 }}>
-                    <div style={{ position: 'absolute', left: -26, width: 20, height: 20, borderRadius: '50%', background: COUL.blanc, border: `2px solid ${cfg.col}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>{cfg.icon}</div>
+                    <div style={{ position: 'absolute', left: -26, width: 20, height: 20, borderRadius: '50%', background: COUL.surface, border: `2px solid ${cfg.col}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>{cfg.icon}</div>
                     <div style={{ fontWeight: 700, color: COUL.texte, fontSize: 14 }}>{cfg.label}</div>
                     <div style={{ fontSize: 12, color: COUL.texteFaible }}>{ev.created_at ? new Date(ev.created_at).toLocaleString('fr-BE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}{ev.detail ? ` · ${ev.detail}` : ''}</div>
                   </div>
@@ -2252,7 +2252,7 @@ function ApercuFacture({ fid, nom }) {
   useEffect(() => { setEtat('load') }, [fid])
   const src = `/api/apercu-facture?fid=${encodeURIComponent(fid)}`
   return (
-    <div style={{ position: 'fixed', top: '50%', right: 24, transform: 'translateY(-50%)', zIndex: 2100, width: 520, maxWidth: '48vw', maxHeight: '88vh', background: COUL.blanc, borderRadius: 14, boxShadow: '0 20px 60px rgba(0,0,0,0.35)', border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', pointerEvents: 'none' }}>
+    <div style={{ position: 'fixed', top: '50%', right: 24, transform: 'translateY(-50%)', zIndex: 2100, width: 520, maxWidth: '48vw', maxHeight: '88vh', background: COUL.surface, borderRadius: 14, boxShadow: '0 20px 60px rgba(0,0,0,0.35)', border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', pointerEvents: 'none' }}>
       <div style={{ padding: '10px 14px', background: COUL.texteFort, color: COUL.blanc, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>📄 {nom}</div>
       <div style={{ overflowY: 'auto', background: COUL.fond }}>
         <img src={src} alt="Apercu facture" onLoad={() => setEtat('ok')} onError={() => setEtat('err')} style={{ width: '100%', height: 'auto', display: etat === 'ok' ? 'block' : 'none' }} />
@@ -2318,7 +2318,7 @@ function EnvoiFactureModal({ doc, b64, fileName, onClose, onSent }) {
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.5)', zIndex: 9000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '5vh 16px', overflowY: 'auto' }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: COUL.blanc, borderRadius: 16, width: '100%', maxWidth: 560, boxShadow: '0 20px 60px rgba(0,0,0,.25)', overflow: 'hidden' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 16, width: '100%', maxWidth: 560, boxShadow: '0 20px 60px rgba(0,0,0,.25)', overflow: 'hidden' }}>
         <div style={{ background: C, color: COUL.blanc, padding: '16px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: 17, fontWeight: 800 }}>Envoyer la facture {doc.numero}</div>
           <button onClick={onClose} style={{ background: 'rgba(255,255,255,.2)', border: 'none', color: COUL.blanc, width: 30, height: 30, borderRadius: 15, cursor: 'pointer', fontSize: 16 }}>{'\u00d7'}</button>
@@ -2334,7 +2334,7 @@ function EnvoiFactureModal({ doc, b64, fileName, onClose, onSent }) {
           </div>
           {err && <div style={{ color: COUL.danger, fontSize: 13, fontWeight: 600 }}>{err}</div>}
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
-            <button onClick={onClose} disabled={sending} style={{ padding: '10px 18px', border: '1px solid #e2e8f0', background: COUL.blanc, color: COUL.texteMoyen, borderRadius: 10, fontWeight: 700, fontSize: 13.5, cursor: 'pointer' }}>Annuler</button>
+            <button onClick={onClose} disabled={sending} style={{ padding: '10px 18px', border: '1px solid #e2e8f0', background: COUL.surface, color: COUL.texteMoyen, borderRadius: 10, fontWeight: 700, fontSize: 13.5, cursor: 'pointer' }}>Annuler</button>
             <button onClick={envoyer} disabled={sending} style={{ padding: '10px 22px', border: 'none', background: COUL.succes, color: COUL.blanc, borderRadius: 10, fontWeight: 700, fontSize: 13.5, cursor: sending ? 'wait' : 'pointer' }}>{sending ? 'Envoi\u2026' : '\u2709 Envoyer la facture'}</button>
           </div>
         </div>
@@ -2437,7 +2437,7 @@ function ModalPaiement({ facture, factures, onClose, onLie }) {
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', zIndex: 9500, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '5vh 14px', overflowY: 'auto' }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: COUL.blanc, borderRadius: 14, width: '100%', maxWidth: 680, boxShadow: '0 20px 60px rgba(0,0,0,.25)', overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '86vh' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 14, width: '100%', maxWidth: 680, boxShadow: '0 20px 60px rgba(0,0,0,.25)', overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '86vh' }}>
         <div style={{ padding: '15px 20px', borderBottom: `1px solid ${COUL.bord}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 16, fontWeight: 800, color: NAVY }}>Rapprocher un paiement</div>
@@ -2451,7 +2451,7 @@ function ModalPaiement({ facture, factures, onClose, onLie }) {
         {facture.transaction_id && (
           <div style={{ padding: '11px 20px', background: COUL.succesFondDoux, borderBottom: `1px solid ${COUL.succesBord}`, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 13, fontWeight: 700, color: COUL.succesFonce }}>✓ Un paiement est déjà rapproché</span>
-            <button onClick={delier} disabled={busy} style={{ marginLeft: 'auto', background: COUL.blanc, border: `1px solid ${COUL.dangerBord}`, color: COUL.danger, borderRadius: 8, padding: '6px 12px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>Le retirer</button>
+            <button onClick={delier} disabled={busy} style={{ marginLeft: 'auto', background: COUL.surface, border: `1px solid ${COUL.dangerBord}`, color: COUL.danger, borderRadius: 8, padding: '6px 12px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>Le retirer</button>
           </div>
         )}
 
@@ -2524,7 +2524,7 @@ function MenuLigne({ anchor, items, onClose }) {
   return (
     <>
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1200 }} />
-      <div ref={ref} style={{ position: 'fixed', top: pos.top, right: Math.max(8, window.innerWidth - anchor.right), zIndex: 1201, visibility: pos.pret ? 'visible' : 'hidden', background: COUL.blanc, border: `1px solid ${COUL.bord}`, borderRadius: 10, boxShadow: '0 10px 30px rgba(15,23,42,.18)', minWidth: 206, overflow: 'hidden', textAlign: 'left' }}>
+      <div ref={ref} style={{ position: 'fixed', top: pos.top, right: Math.max(8, window.innerWidth - anchor.right), zIndex: 1201, visibility: pos.pret ? 'visible' : 'hidden', background: COUL.surface, border: `1px solid ${COUL.bord}`, borderRadius: 10, boxShadow: '0 10px 30px rgba(15,23,42,.18)', minWidth: 206, overflow: 'hidden', textAlign: 'left' }}>
         {items.filter(Boolean).map((it, k) => it.sep ? (
           <div key={k} style={{ height: 1, background: COUL.bord }} />
         ) : (

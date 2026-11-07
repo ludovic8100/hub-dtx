@@ -43,7 +43,7 @@ export default function InternalClientSearch({ sources = [], onSelect, placehold
       {loading && <div style={{ fontSize: 11, color: COUL.violet, marginTop: 4 }}>Recherche…</div>}
       {results && results.length === 0 && !loading && <div style={{ fontSize: 11, color: COUL.texteFaible, marginTop: 4 }}>Aucun client existant trouvé.</div>}
       {results && results.length > 0 && (
-        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 30, marginTop: 4, background: COUL.blanc, border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', maxHeight: 280, overflowY: 'auto' }}>
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 30, marginTop: 4, background: COUL.surface, border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', maxHeight: 280, overflowY: 'auto' }}>
           {results.map((r, i) => {
             const nom = r.denomination || [r.nom, r.prenom].filter(Boolean).join(' ') || '(sans nom)'
             const meta = [r.numero_bce, r.ville].filter(Boolean).join(' · ')

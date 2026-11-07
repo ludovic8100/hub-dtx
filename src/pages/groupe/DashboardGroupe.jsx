@@ -49,7 +49,7 @@ function KpiCard({ label, value, sub, col, icon, onClick }) {
       onMouseEnter={() => onClick && setHov(true)}
       onMouseLeave={() => setHov(false)}
       style={{
-        background:COUL.blanc, borderRadius:10,
+        background:COUL.surface, borderRadius:10,
         border: hov ? `1px solid ${col||'#0080BD'}50` : '1px solid #e2e8f0',
         borderTop:`3px solid ${col||'#0080BD'}`, padding:'16px 20px',
         cursor: onClick ? 'pointer' : 'default',
@@ -136,7 +136,7 @@ function BlocBanque({ comptes, loading, onRafraichir }) {
     && !!revealed['__total__']
 
   return (
-    <div style={{ background:COUL.blanc, borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
+    <div style={{ background:COUL.surface, borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
       <BlocHeader icon="ti-credit-card" title="Comptes bancaires"
         right={(
           <div style={{ display:'flex', alignItems:'center', gap:8 }}>
@@ -173,7 +173,7 @@ function BlocBanque({ comptes, loading, onRafraichir }) {
               return (
                 <div key={code} style={{ border:`1px solid #e2e8f0`, borderTop:`3px solid ${soc.color}`, borderRadius:10, overflow:'hidden', background:COUL.fond }}>
                   {/* En-tête société */}
-                  <div style={{ padding:'9px 14px', display:'flex', alignItems:'center', gap:8, background:COUL.blanc, borderBottom:`1px solid ${soc.color}15` }}>
+                  <div style={{ padding:'9px 14px', display:'flex', alignItems:'center', gap:8, background:COUL.surface, borderBottom:`1px solid ${soc.color}15` }}>
                     <div style={{ width:9, height:9, borderRadius:'50%', background:soc.color, flexShrink:0 }} />
                     <span onClick={() => route && navigate(route)}
                       style={{ fontSize:13, fontWeight:700, color:COUL.texte, flex:1, cursor:route?'pointer':'default' }}>
@@ -273,7 +273,7 @@ function BlocTresorerie({ comptes, transactions, loading }) {
   const maxFlow = Math.max(...flowData.map(f=>Math.max(f.entrees,f.sorties)), 1)
 
   return (
-    <div style={{ background:COUL.blanc, borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
+    <div style={{ background:COUL.surface, borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
       <div style={{ padding:'14px 18px', borderBottom:'1px solid #f1f5f9', display:'flex', alignItems:'center', gap:8 }}>
         <i className="ti ti-chart-line" style={{ fontSize:16, color:COUL.teal }} />
         <span style={{ fontSize:13, fontWeight:700, color:COUL.texteFort }}>Trésorerie consolidée</span>
@@ -411,7 +411,7 @@ function BlocProduction({ loading: loadingExt }) {
 
   return (
     <div
-      style={{ background:COUL.blanc, borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}
+      style={{ background:COUL.surface, borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}
     >
       {/* Header */}
       <BlocHeader icon="ti-chart-line" title="Production 2026"
@@ -584,7 +584,7 @@ export default function DashboardGroupe() {
         </div>
 
         {/* 3b — Factures à pointer (toutes sociétés, tous comptes) */}
-        <div style={{ marginBottom:24, background:COUL.blanc, borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
+        <div style={{ marginBottom:24, background:COUL.surface, borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden' }}>
           <BlocHeader icon="ti-file-invoice" title="Factures à pointer" />
           <div style={{ padding:16 }}>
             <VueFactures societeCodes={['DYNASSUR','DTX','LODE','HEXAGROUP','PRIVE']} color={ENTITES.groupe.color} tousComptes statutDefaut="nonpayees" masquerMontant />
