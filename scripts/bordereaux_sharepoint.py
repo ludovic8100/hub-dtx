@@ -230,8 +230,10 @@ def documents_en_base():
     while True:
         page = supabase(
             "GET",
+            # Voir factures_sharepoint.py : une pagination sans `order` saute
+            # des lignes, et c'est le meme garde-fou de purge qui en depend.
             f"bordereaux?select=sharepoint_item_id,montant,transaction_id"
-            f"&offset={debut}&limit={pas}",
+            f"&order=id&offset={debut}&limit={pas}",
         ) or []
         for ligne in page:
             ident = ligne.get("sharepoint_item_id")

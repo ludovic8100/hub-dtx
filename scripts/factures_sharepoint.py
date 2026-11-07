@@ -222,8 +222,12 @@ def ids_en_base():
     while True:
         page = supabase(
             "GET",
+            # `order=id` n'est PAS cosmetique : sans tri, PostgREST ne garantit
+            # aucun ordre stable entre deux pages, donc cette lecture peut sauter
+            # des lignes. Ici ca fausse `connus`, et donc le garde-fou qui annule
+            # la purge quand le scan voit moins de 80 % de ce que porte la base.
             f"factures_achat?select=fichier_id,transaction_id,lode_devis_id"
-            f"&offset={debut}&limit={pas}",
+            f"&order=id&offset={debut}&limit={pas}",
         ) or []
         for ligne in page:
             fid = ligne["fichier_id"]
