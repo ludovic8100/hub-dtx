@@ -133,11 +133,36 @@ export function AuthProvider({ children }) {
   // Important : on remet d'abord à false toutes les colonnes connues du
   // catalogue, sinon retirer un droit dans Paramètres ne le retirerait pas —
   // la valeur de l'ancienne colonne resterait vraie.
+  // Microsoft ne renvoie pas toujours l'adresse telle qu'elle est dans la fiche.
+  // Deux ecarts rencontres :
+  //  - un INVITE porte une forme UPN : « machin_gmail.com#EXT#@tenant.onmicrosoft.com »
+  //    alors que sa fiche porte « machin@gmail.com » ;
+  //  - la casse varie (« Lorange.Ludivine@... » contre « lorange.ludivine@... »).
+  // Une egalite exacte et sensible a la casse rate donc la fiche dans les deux cas,
+  // et la personne se voit refuser l'acces alors qu'elle l'a.
+  function adressesPossibles(email) {
+    const brut = String(email || '').trim()
+    if (!brut) return []
+    const liste = [brut]
+    const ext = brut.match(/^(.+)#EXT#@/i)
+    if (ext) {
+      const i = ext[1].lastIndexOf('_')          // le dernier _ separe le nom du domaine
+      if (i > 0) liste.push(ext[1].slice(0, i) + '@' + ext[1].slice(i + 1))
+    }
+    return [...new Set(liste.map(a => a.toLowerCase()))]
+  }
+
   async function loadPerms(email) {
-    const { data, error } = await supabase
+    const candidats = adressesPossibles(email)
+    if (!candidats.length) return null
+    // ilike sans joker = egalite insensible a la casse.
+    const { data: lignes, error } = await supabase
       .from('collaborateurs').select('*')
-      .eq('email', email).eq('compte_hub_actif', true).single()
-    if (error || !data) return null
+      .or(candidats.map(a => `email.ilike.${a}`).join(','))
+      .eq('compte_hub_actif', true).limit(2)
+    if (error) return null
+    const data = (lignes || [])[0]
+    if (!data) return null
 
     const [{ data: acces }, { data: catalogue }] = await Promise.all([
       supabase.from('collaborateur_acces').select('societe,module_code').eq('collaborateur_id', data.id),
@@ -228,7 +253,7 @@ export function AuthProvider({ children }) {
         if (cancelled) return
         setPerms(p)
         setActiveSociete(getDefaultSociete(p, p?.est_admin === true))
-        if (track) trackConnexion(session.user.email)
+        if (track) trackConnexion(p?.email || session.user.email)
       } else {
         setUser(null); setPerms(null); setActiveSociete(null)
       }
@@ -290,7 +315,7 @@ export function AuthProvider({ children }) {
       if (document.hidden) return
       const { data, error } = await supabase
         .from('collaborateurs').select('compte_hub_actif')
-        .eq('email', user.email).maybeSingle()
+        .eq('email', perms?.email || user.email).maybeSingle()
       if (error) return
       if (data?.compte_hub_actif) return
       await supabase.auth.signOut()
@@ -305,7 +330,9 @@ export function AuthProvider({ children }) {
       clearInterval(minuteur)
       clearInterval(minuteurCompte)
     }
-  }, [user])
+    // perms?.email et non perms : une chaine, donc le minuteur ne redemarre
+    // que si l'adresse change vraiment, pas a chaque nouvel objet.
+  }, [user, perms?.email])
 
   // ── Connexion Microsoft ──────────────────────────────────────────────────
   //
