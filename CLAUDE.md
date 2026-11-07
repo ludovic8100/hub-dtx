@@ -437,6 +437,54 @@ Au passage, `tmp_manquant` portait `FOR INSERT TO anon WITH CHECK (true)` : la
 dedans. Politique supprimée et `anon` révoqué. La table est morte (aucun usage
 dans le code) mais **pas supprimée** — une suppression ne se défait pas.
 
+### Une vue sans `security_invoker` ne protège rien non plus (07/11/2026)
+
+Même règle que les partitions, autre forme : **Postgres applique la sécurité par
+relation**. Une vue lit ses tables avec les droits de **son propriétaire** tant
+qu'elle n'est pas `security_invoker` — fermer les tables ne ferme donc rien tant
+que les vues restent ouvertes.
+
+Trois vues d'anomalies comptables portaient en plus le droit de lecture d'`anon`.
+Mesuré en se faisant passer pour `anon`, pas déduit :
+
+| Vue | Lisible par Internet |
+|---|---|
+| `v_factures_impayees` | **1 457 lignes** — fournisseurs, montants, six sociétés |
+| `v_factures_doublons` | 62 lignes |
+| `v_paiements_doubles` | 27 lignes |
+
+Fermé le 07/11 (`20261107100000_fermer_vues_a_anon.sql`), vérifié rôle par rôle :
+`anon` refusé sur les six vues, l'administrateur garde 1 457 / 62 / 27.
+
+**Le piège de la lecture des policies.** J'avais d'abord conclu que `credits`
+acceptait une insertion publique, en lisant `pg_policies`. Faux : pour une policy
+`INSERT`, `qual` est `NULL` et la condition vit dans `with_check`. Le test en se
+faisant passer pour `anon` a dit l'inverse en une seconde. **Lire une policy ne
+vaut pas la tester.**
+
+**Et `security_invoker` n'est pas gratuit.** Posé sur `v_factures_impayees`, il
+fait dépasser 25 s (RLS évaluée par ligne sur 7 388 factures croisées à 6 644
+transactions — les fonctions sont pourtant déjà `STABLE`) et l'onglet Anomalies
+ne répond plus. Essayé, mesuré, retiré. Le correctif est une réécriture de la
+vue, pas un drapeau.
+
+### Le cloisonnement par bureau marche — mesuré le 07/11/2026
+
+En se faisant passer pour deux collaborateurs non-administrateurs :
+
+| | JFS (Spa) | RCA (Tinlot) |
+|---|---|---|
+| `clients` | 1 144 | 234 |
+| `contrats` | 4 453 | 703 |
+| `objets_risque` | 17 911 | 2 267 |
+| `transactions`, `factures_achat`, `comptes_bancaires` | 0 | 0 |
+
+**Ce qui n'est pas cloisonné, et c'est le reste du bloc 2** : `sinistres` **8 014
+pour tout le monde** (alors que RCA ne voit que 234 clients — les sinistres
+portent le numéro de dossier des 10 000 autres), `bordereaux` **6 867 en
+lecture ET écriture**, `appels` 6 873, `collaborateurs` 54 avec IBAN, BIC et
+date de naissance.
+
 ### Deux comptes nommés d'après leur société, et c'est voulu (07/11/2026)
 
 | Compte | Personne | Société |
