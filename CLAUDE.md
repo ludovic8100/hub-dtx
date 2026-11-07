@@ -264,6 +264,93 @@ parallèles, ou un seul par société ? » de la feuille de route.
 par mois via Accountable (facture 2026-329 au 01/10/2026), contre 23 factures au
 total pour LODE. C'est le vrai volume du groupe.
 
+## Les cinq ambiances (07/11/2026)
+
+Standard, Noël, Nouvel An, Halloween, Vacances. Sélecteur dans l'en-tête
+(`src/components/SelecteurAmbiance.jsx`), **Standard par défaut**, calendrier
+**décoché**. Valeurs et mécanisme : `src/lib/themes.js`.
+
+**Décision de Ludovic : pas de mode sombre.** Le mécanisme existe (dix couples
+ambiance × mode), mais la bascule est retirée du sélecteur — un mode sombre à
+moitié fini vaut moins que pas de mode sombre. Cinq lignes à remettre le jour où
+les lots 2 et 3 sont faits ; le commentaire dans le fichier dit lesquelles.
+
+### `COUL` ne porte plus de valeurs, mais des variables CSS
+
+`COUL.texte` vaut désormais `var(--hub-texte)`, pas `#1e293b`. Un style inline lit
+`var()` comme il lisait `#fff`, donc **les 2 628 usages à travers 73 fichiers sont
+devenus thématisables sans qu'aucun de ces fichiers ne change**.
+
+Ce n'était possible qu'à une condition, vérifiée avant d'y toucher : `COUL` n'est
+**jamais** manipulé comme une chaîne. Pas une concaténation, pas un `.slice()`, pas
+un suffixe d'opacité. ⚠️ **Écrire `COUL.bord + '80'` casserait tout en silence** —
+pour une couleur translucide, poser une valeur `rgba()` en dur ou ajouter un jeton.
+
+### ⚠️ Trois endroits ne savent pas lire `var()`, et échouent SANS RIEN DIRE
+
+| Où | Ce qui se passe |
+|---|---|
+| `<canvas>` (`ctx.fillStyle`, `ctx.strokeStyle`) | la valeur est ignorée, la couleur précédente reste |
+| génération de QR | la bibliothèque attend du hexadécimal |
+| jsPDF | idem |
+
+Ceux-là importent **`COUL_BRUT`**, qui porte les vraies valeurs de l'ambiance
+Standard claire. Un QR de note de frais reste noir sur blanc même en Halloween, et
+c'est voulu : un QR doit être lisible par un lecteur.
+
+**Tout nouveau code qui dessine dans un canvas ou génère un PDF doit employer
+`COUL_BRUT`.** Rien ne l'impose automatiquement, et l'erreur ne se voit pas.
+
+### `COUL.blanc` et `COUL.surface` ne sont pas la même chose
+
+`COUL.blanc` jouait deux rôles incompatibles : **239 fois un fond de carte** (qui
+doit s'assombrir) et **160 fois du texte sur fond coloré** (qui doit rester blanc).
+Les 239 fonds sont passés à `COUL.surface`.
+
+**La règle pour tout nouveau code** : un fond prend `COUL.surface`, du texte sur un
+aplat coloré prend `COUL.blanc`. Écrire `background: COUL.blanc` réintroduit le
+défaut.
+
+### Ce qui ne suit PAS l'ambiance, et c'est mesuré
+
+**1 654 couleurs restent écrites en dur dans 71 fichiers**, dont 42 % dans six
+fichiers (Succession, Clients, Comptabilité, Appels, Tickets, Questionnaire). En
+clair elles ne se voient pas ; en sombre elles feraient des taches. Sans mode
+sombre, c'est de la dette rangée — à traiter quand on touche déjà à ces fichiers.
+
+Les **couleurs d'identité des sociétés** (`src/lib/entites.js`) ne bougent jamais :
+une ambiance ne repeint pas une société. Le brief du package dit la même chose.
+
+### La page de garde porte les cinq couvertures
+
+`public/ambiances/*.webp`, 1672 × 941, choisies par `--hub-couverture`. Le logo DTX
+et la signature sont **incrustés dans les images** : la carte de connexion ne doit
+répéter ni l'un ni l'autre. L'image est montrée **entière**, en haut, la carte
+dessous — un recadrage couperait le logo, qui est au centre.
+
+Deux points ouverts, signalés et non tranchés :
+
+- la signature incrustée est **en anglais** dans une application en français ;
+- la page de garde affiche **Standard pour qui n'a jamais choisi**, même le
+  24 décembre — personne n'est connecté, il n'y a pas d'autre préférence
+  disponible. C'est la conséquence de « pas d'ambiance automatique sans
+  validation ».
+
+**Halloween a été recomposé** : ses trois photos étaient collées en rectangles à
+bords francs. Refondues sur `standard.webp`, qui est la même image sans décorations.
+La leçon vaut au-delà : fondre ne suffit pas, **le masque doit atteindre zéro AVANT
+la limite de la photo** — à 27 % d'opacité, un bord reste une cassure de 27 %.
+
+### Le package de design arrive par une GitHub Action
+
+Le connecteur Microsoft 365 refuse les archives (« application/zip can't be read »),
+et l'hôte des artefacts GitHub est refusé par le proxy des sessions. Le workflow
+`recuperer-package-design.yml` télécharge le ZIP de SharePoint `DOWNLOAD`, imprime
+les textes dans son journal et dépose les images sur une branche.
+
+⚠️ Il porte `contents: write` et il est **temporaire** — à supprimer une fois le
+design intégré, comme `diagnostic-secret-graph.yml`.
+
 ## Outils (`/tools`)
 
 Les six outils partagent depuis le 02/11/2026 un cadre commun : le registre `src/lib/outils.js`
