@@ -575,13 +575,75 @@ Rien ne l'impose automatiquement.
 - Plan complet (test/prod, couche applicative, migrations, CI) : `docs/ARCHITECTURE-ENVIRONNEMENTS.md`.
 - Sécurité phase 0 appliquée : `execute_raw_sql` et `tickets_rappels_echeance` ne sont plus exécutables
   par `anon` (`sql/security_phase0_revoke_rpc_anon.sql`).
-- **Environnement TEST : PAS ENCORE EN SERVICE** (vérifié le 05/11/2026). Le projet Supabase
-  `lvdnzbhplnzuwdqtitdb` existe (schéma = `supabase/migrations/20261029120000_baseline_prod.sql`,
-  données anonymisées via `scripts/seed_test.py`) — mais **le projet Vercel `hub-dtx-test` n'a
-  jamais été créé** : le jeton du connecteur Vercel ne peut pas créer de projet (403, constaté le
-  30/10 et reconfirmé le 05/11). La branche `staging` est alignée sur `main` et prête.
-  Ne pas dire au Hub qu'il a un environnement de test tant que `hub-dtx-test.vercel.app` ne répond pas.
-  Méthode de travail et différence test / preview / production : `docs/COMMENT-TRAVAILLER.md`.
-  Checklist et variables : `docs/ENVIRONNEMENT-TEST.md`.
-  En test : mails redirigés (`api/_lib/mail.js`), webhooks n8n suffixés `-test`, SharePoint sous `_TEST`.
+### Environnement TEST — état au 07/11/2026
+
+⚠️ **L'ancien projet Supabase `lvdnzbhplnzuwdqtitdb` N'EXISTE PLUS.** L'organisation DYNASSUR
+ne contient que la production. Supprimé, ou créé sur un autre compte — on ne sait pas.
+
+**Nouveau projet : `wsuawmtwlvcyppgfvqzj`** (`hub-dtx-test`, région Paris comme la production,
+plan gratuit, 0 €). Schéma monté à **100 tables + 31 des 43 migrations**.
+
+**Et c'est le plan A qui est retenu, pas le second projet Vercel** : on garde UN seul projet
+Vercel et on fait pointer la cible **Preview** sur la base de test. Une page de réglages, et
+d'un coup toute branche et toute PR deviennent inoffensives — au lieu de la seule branche
+`staging`. Ça bouche en plus le trou actuel, qui est que les préversions écrivent dans les
+vraies données.
+
+Les cinq variables à poser sur la cible **Preview** :
+
+| Variable | Valeur |
+|---|---|
+| `VITE_APP_ENV` | `test` |
+| `APP_ENV` | `test` |
+| `VITE_SUPABASE_URL` | `https://wsuawmtwlvcyppgfvqzj.supabase.co` |
+| `VITE_SUPABASE_ANON_KEY` | la clé publishable du projet de test |
+| `MAIL_REDIRECT_TO` | une adresse réelle |
+
+**Les deux premières suffisent à armer quatre garde-fous** (vérifié dans le code, pas supposé) :
+mails redirigés ou refusés (`api/_lib/mail.js`), envoi Peppol refusé (`PEPPOL_AUTORISE`),
+webhooks n8n suffixés `-test`, et **démarrage bloqué** si l'URL Supabase manque plutôt qu'un
+repli silencieux sur la production.
+
+⚠️ **Le connecteur Vercel ne peut NI lire NI écrire les variables d'environnement** (403 sur
+`/projects/{id}/env`, en lecture comme en écriture, et Vercel précise qu'une reconnexion n'y
+changera rien). Tout le reste passe — déploiements, projet, domaines. **Ne pas confondre avec
+un connecteur cassé** : le 07/11 j'ai cru qu'il l'était pendant deux heures parce que
+j'utilisais un identifiant d'équipe faux. Le bon est `team_ullhaGKqy8NSZIrW8WRu4Vho`.
+
+La **Deployment Protection est déjà activée** (`ssoProtection`, `all_except_custom_domains`) :
+les préversions ne sont pas ouvertes à qui connaît l'adresse.
+
+**Ce qui reste, et c'est le vrai sujet** : les 12 migrations qui échouent révèlent que **le
+dépôt ne reproduit pas la production** — une trentaine d'objets n'existent qu'en base, dont
+`collaborateur_acces`, `ref_modules`, `a_module()` et `acces_compta()`, c'est-à-dire le cœur
+des droits d'accès. Voir la section suivante.
+
+Méthode de travail et différence test / preview / production : `docs/COMMENT-TRAVAILLER.md`.
+Checklist et variables : `docs/ENVIRONNEMENT-TEST.md`.
+
+### Le dépôt ne reproduit pas la production (mesuré le 07/11/2026)
+
+Trouvé en montant le projet de test : 12 des 43 migrations échouent parce qu'elles modifient
+des objets qu'**aucune migration du dépôt ne crée**. Ils ont été appliqués directement en base.
+
+| | Absents du dépôt |
+|---|---|
+| **Tables** | `collaborateur_acces`, `ref_modules`, `ref_modules_societes` (tout le modèle de droits), `personnes`, `fournisseurs`, `fournisseurs_alias`, `compagnies_alias`, `clients_attribution`, `releves_producteur` + 18 partitions |
+| **Vues** | `v_factures_impayees`, `v_factures_doublons`, `v_paiements_doubles`, `v_fournisseurs_usage`, `v_lacunes_bordereaux`, `v_rp_qualite`, `mv_rp_mensuel` |
+| **Fonctions** | `a_module`, `acces_compta`, `acces_compta_compte`, `rapprocher_factures_sures`, `rapprocher_factures_paiements`, `noms_concordent`, `mouvement_interne`, `job_tickets_rappels` |
+
+Et l'inverse : le projet de test porte `user_permissions`, `bordereaux_brio` et
+`v_matrice_rcp_2026`, que la production **n'a plus** — les migrations qui les suppriment ont
+échoué en chaîne.
+
+**Conséquence** : « rejouer les migrations » ne reconstruit pas la base. Ça pèse sur la
+restauration d'une sauvegarde, sur l'utilité du test, et sur la sécurité — les règles de
+cloisonnement ne sont pas versionnées, donc ni relisibles en diff, ni réappliquables, ni
+opposables.
+
+**À faire** : une migration de rattrapage générée depuis la production, qui écrit la
+définition réelle de chaque objet manquant dans un fichier du dépôt.
+
+En test : mails redirigés (`api/_lib/mail.js`), webhooks n8n suffixés `-test`, et **SharePoint
+NON isolé** — voir la section « `APP_ENV=test` n'isole que Supabase ».
 - Workflows Qlik : entrée `target` (test/production) = environnement GitHub ; le cron vise la prod.
