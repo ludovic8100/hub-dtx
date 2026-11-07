@@ -668,8 +668,36 @@ restauration d'une sauvegarde, sur l'utilité du test, et sur la sécurité — 
 cloisonnement ne sont pas versionnées, donc ni relisibles en diff, ni réappliquables, ni
 opposables.
 
-**À faire** : une migration de rattrapage générée depuis la production, qui écrit la
-définition réelle de chaque objet manquant dans un fichier du dépôt.
+**Premier morceau fait le 07/11** (`20261107160000_rattrapage_modele_de_droits.sql`) :
+`compte_hub_actif` et les trois tables du modèle de droits — `ref_modules`,
+`ref_modules_societes`, `collaborateur_acces` — avec leur catalogue. Migration **idempotente** :
+sans effet en production (vérifié : 18 modules, 35 déclinaisons, 184 attributions, 19 comptes
+actifs, tous inchangés), elle comble le test. Gain au passage : `anon` perd le droit de lecture
+sur `collaborateur_acces`.
+
+**Ce qui l'a révélé est instructif** : l'environnement de test ne laissait pas se connecter.
+L'authentification Microsoft réussissait, puis le Hub cherchait la fiche du collaborateur et
+tombait sur « Accès non autorisé », faute de ces objets. Le défaut le plus abstrait du projet
+s'est manifesté de la façon la plus concrète qui soit.
+
+**Reste à rattraper** : `fournisseurs`, `fournisseurs_alias`, `compagnies_alias`, `personnes`,
+`clients_attribution`, `releves_producteur` + partitions, les sept vues, et les fonctions
+`a_module`, `acces_compta`, `acces_compta_compte`, `rapprocher_factures_sures`,
+`rapprocher_factures_paiements`, `noms_concordent`, `mouvement_interne`, `job_tickets_rappels`.
+
+### L'environnement de test fonctionne — 07/11/2026
+
+Connexion Microsoft vérifiée de bout en bout sur une préversion, avec le bandeau
+« ENVIRONNEMENT DE TEST — BASE WSUAWMTWLVCYPPGFVQZJ — AUCUNE DONNÉE RÉELLE ».
+
+Côté Azure, l'application **Hub DTX** porte désormais les **deux** URI de retour (production et
+test) et un second secret `Supabase-Test`. Côté Supabase de test : fournisseur Azure activé avec
+le même Client ID `5065b920-f43b-489d-8c68-1576803f020f`, et `Redirect URLs` =
+`https://hub-*-dynassur-s-projects.vercel.app/**` — **le joker est indispensable**, chaque
+préversion ayant une adresse différente.
+
+⚠️ Le `Site URL` du projet de test est resté sur `http://localhost:3000`. Sans effet tant que le
+joker couvre les préversions, mais c'est l'adresse de repli.
 
 En test : mails redirigés (`api/_lib/mail.js`), webhooks n8n suffixés `-test`, et **SharePoint
 NON isolé** — voir la section « `APP_ENV=test` n'isole que Supabase ».
