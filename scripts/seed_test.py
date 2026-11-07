@@ -17,7 +17,7 @@ Garde-fous : refuse d'écrire si TARGET_SUPABASE_URL est l'URL de production ou 
 Ce qui est copié :
   • Référentiel complet : compagnies, categories(+regles), activites, ticket_categories, parametres_frais,
     taux_reference, hex_cotisations_config, sinistre_workflow_definitions, comptes_bancaires, collaborateurs(+taux),
-    producteurs, user_permissions (actifs), ref_*.
+    producteurs, ref_*.
   • Facturation LODE / Hexagroup : clients, devis, factures, lignes, cotisations (coordonnées anonymisées).
   • Échantillon Dynassur : SAMPLE_CLIENTS dossiers clients + leurs contrats, quittances, objets_risque,
     sinistres, segmentation, parentes, famille — noms/coordonnées anonymisés de façon stable (même dossier
@@ -65,11 +65,28 @@ def api(base, key, method, path, body=None, prefer=None):
         return json.loads(raw) if raw else None
 
 
+# Deux tables n'ont pas de colonne `id` : leur cle primaire porte un autre nom.
+# Une table d'exceptions plutot qu'un parametre, parce qu'un parametre s'oublie
+# et que l'oubli ne se voit pas — la copie serait juste incomplete, en silence.
+CLE_DE_TRI = {
+    "sinistres": "pointeur_sinistre",
+    "client_donnees_plus": "dossier",
+}
+
+
 def lire(table, filtre="", page=1000):
-    """Lit toute une table (ou un filtre PostgREST) par pages."""
+    """Lit toute une table (ou un filtre PostgREST) par pages.
+
+    `order` est indispensable : sans tri, PostgREST ne garantit AUCUN ordre
+    stable entre deux pages. Une lecture paginee peut alors sauter des lignes
+    et en rendre d'autres deux fois — ici, la base de test serait incomplete
+    sans que rien ne le signale.
+    """
     out, off = [], 0
+    tri = CLE_DE_TRI.get(table, "id")
     while True:
-        q = f"{table}?select=*&limit={page}&offset={off}" + (("&" + filtre) if filtre else "")
+        q = (f"{table}?select=*&order={tri}&limit={page}&offset={off}"
+             + (("&" + filtre) if filtre else ""))
         rows = api(SRC_URL, SRC_KEY, "GET", q) or []
         out += rows
         if len(rows) < page: break
@@ -156,8 +173,8 @@ def main():
     ecrire("collaborateurs", [dict(r, iban=None, bic=None, telephone=None, adresse=None) for r in lire("collaborateurs")])
     ecrire("collaborateur_taux", lire("collaborateur_taux"))
     ecrire("producteurs", [dict(r, telephone=None) for r in lire("producteurs")])
-    ecrire("user_permissions", [dict(r, iban=None, premiere_connexion=None, derniere_connexion=None, last_login_at=None)
-                                for r in lire("user_permissions", "actif=eq.true")])
+    # `user_permissions` a ete fusionnee dans `collaborateurs` le 30/10/2026 puis
+    # supprimee. Les comptes du Hub sont deja copies juste au-dessus, sans IBAN.
 
     # 2) LODE / Hexagroup
     ecrire("lode_clients", [anonymiser_lode_client(r) for r in lire("lode_clients")])

@@ -101,7 +101,9 @@ def fetch_clients_index():
     """ dossier -> infos client (nom, prénom, naissance, cp, localité) """
     idx, start = {}, 0
     while True:
-        url = f"{SUPA_URL}/rest/v1/clients?select=dossier,nom,prenom,date_naissance,cp,localite&limit=1000&offset={start}"
+        # `order=id` : sans tri, une lecture paginee saute des lignes et cet
+        # index des clients serait incomplet, en silence.
+        url = f"{SUPA_URL}/rest/v1/clients?select=dossier,nom,prenom,date_naissance,cp,localite&order=id&limit=1000&offset={start}"
         req = urllib.request.Request(url, headers={"apikey": SUPA_KEY, "Authorization": f"Bearer {SUPA_KEY}"})
         page = json.load(urllib.request.urlopen(req))
         for c in page:
