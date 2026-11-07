@@ -402,6 +402,52 @@ pourquoi.
 **Règle générale** : un indicateur calculé sur une source vide doit renvoyer
 `null`, jamais un total — et surtout jamais zéro, qui se lit comme une mesure.
 
+### Une RLS sur une table partitionnée ne protège pas ses partitions (07/11/2026)
+
+Postgres applique la sécurité **par relation**. `releves_producteur` avait bien
+RLS activée, mais ses **15 partitions** (`releves_producteur_2017` … `_2030`,
+`_hors_plage`) ne l'avaient pas — et PostgREST expose **chaque partition sous son
+propre nom**. Interroger `releves_producteur_2026` directement contournait donc
+entièrement la politique du parent.
+
+`anon` y avait **SELECT et INSERT**. N'importe qui sur Internet pouvait lire, et
+surtout **écrire**, des lignes de commission. La table était vide, donc rien n'a
+fui — mais c'était de la chance : les chantiers `prod-p3-*` consistent justement
+à la remplir.
+
+Corrigé le 07/11 (`20261107090000_rls_partitions_releves_et_tmp_manquant.sql`) :
+RLS activée sur chaque partition, `anon` révoqué sur le parent, les partitions et
+les deux séquences.
+
+**Vérifié en se faisant passer pour chaque rôle**, parce qu'activer la RLS sur une
+partition aurait pu casser la lecture par le parent :
+
+| | |
+|---|---|
+| connecté → lecture par le **parent** | **OK** — l'application marche toujours |
+| `anon` → partition en direct | **refusé** |
+| `anon` → parent | **refusé** |
+
+⚠️ **Toute nouvelle partition créée plus tard repartira sans RLS** : Postgres n'en
+hérite pas. Le `do $$` de la migration est écrit pour être rejouable — le relancer
+après avoir ajouté une partition.
+
+Au passage, `tmp_manquant` portait `FOR INSERT TO anon WITH CHECK (true)` : la
+**seule écriture publique de la base**, sans aucune condition, 1 700 lignes déjà
+dedans. Politique supprimée et `anon` révoqué. La table est morte (aucun usage
+dans le code) mais **pas supprimée** — une suppression ne se défait pas.
+
+### Deux comptes nommés d'après leur société, et c'est voulu (07/11/2026)
+
+| Compte | Personne | Société |
+|---|---|---|
+| `rde@dynassur.be` | Renaud Desclez | R'Assur |
+| `ice@dynassur.be` | Ingrid CEZAR | cezassur |
+
+Ils ont été créés **sous le nom de leur société dans Qlik**. On les garde tels
+quels **tant que Qlik est là** ; la standardisation se fera à l'arrêt de Qlik,
+pas avant — renommer maintenant casserait la correspondance avec la source.
+
 ## Le Hub est derrière le login Microsoft — vérifié le 06/11/2026
 
 Question de Ludovic : *« l'entièreté du Hub doit passer par l'authentificateur
