@@ -208,6 +208,52 @@ règles d'accès de leur société, mais un collaborateur DTX voit que Dynassur 
 tel fournisseur. Acceptable pour un groupe sous un même toit, mais à décider explicitement
 avec le chantier des droits (`docs/DROITS-ACCES.md`), pas à subir.
 
+## Devis & factures : un seul design, décliné par société (07/11/2026)
+
+Règle donnée par Ludovic : **« garde bien en mémoire le design qu'on a construit
+style LODE, mais avec les couleurs de Dynassur. Tu devras faire ça pour DTX. »**
+
+L'éditeur refait le 06/11 (PR #144, #147) est **le modèle**, pas une page LODE :
+
+- le document à gauche tel qu'il sera imprimé, les réglages dans un panneau à
+  droite, bascule **Éditeur / PDF** en haut ;
+- numéro, dates, objet et client édités **sur le document lui-même** — les champs
+  ne se révèlent qu'au survol ;
+- un clic sur un article ouvre sa fiche : quantité avec pas −/＋, prix HTVA **ou
+  TVA comprise**, remise repliée tant qu'elle vaut zéro, photos, option ;
+- sur téléphone : trois onglets **Document / Détails / PDF**, et les articles en
+  cartes — un tableau à six colonnes sur 390 px est illisible ;
+- facture d'acompte : **deux tableaux aux mêmes colonnes**, PDF et Word ;
+- communication structurée (modulo 97) et QR de paiement EPC sur la facture.
+
+**Ce qui change d'une société à l'autre, et rien d'autre** : la couleur, le logo,
+les coordonnées. Tout est déjà paramétré dans `src/lib/lodeConfig.js`,
+`dynConfig.js` et `dtxConfig.js`, qui ont la même forme (`couleur`, `logo_url`,
+`iban`, `bic`, `tva`…), et dans `src/lib/entites.js` pour les couleurs d'identité :
+
+| | Couleur | Foncé |
+|---|---|---|
+| LODE | `#ea580c` orange | `#7c2d12` |
+| Dynassur | `#0080BD` bleu | `#0D2F5E` |
+| DTX | `#94a3b8` gris | `#334155` |
+
+Ces couleurs **ne sont pas des jetons de thème** : elles sont volontairement hors
+de `src/lib/theme.js`. Le orange de LODE n'est pas « la couleur d'accent », c'est
+LODE.
+
+**Le piège, et il est déjà là** : l'éditeur LODE fait 2 923 lignes, celui de DTX
+1 023. L'écart était de 900 lignes le 03/11, il est de 1 900 depuis le 06/11 —
+parce que tout ce qui précède n'existe que pour LODE. Décliner le design sur
+Dynassur et DTX en recopiant la page une troisième fois revient à payer trois
+fois chaque correction. **Trancher d'abord la question des trois jeux de tables
+jumelles (`lode_*`, `dtx_*`, `dyn_*`) — un seul écran avec une colonne
+`societe` — puis décliner.** C'est le point « Trancher : trois modules
+parallèles, ou un seul par société ? » de la feuille de route.
+
+**Dynassur d'abord, et pour une raison chiffrée** : Dynassur émet ~33 factures
+par mois via Accountable (facture 2026-329 au 01/10/2026), contre 23 factures au
+total pour LODE. C'est le vrai volume du groupe.
+
 ## Outils (`/tools`)
 
 Les six outils partagent depuis le 02/11/2026 un cadre commun : le registre `src/lib/outils.js`
