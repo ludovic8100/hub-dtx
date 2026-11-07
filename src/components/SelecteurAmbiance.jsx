@@ -106,11 +106,15 @@ export default function SelecteurAmbiance({ compact = false }) {
 
           <div style={{ height: 1, background: 'var(--hub-bord)', margin: '6px 4px' }} />
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', fontSize: 12.5, cursor: 'pointer' }}>
-            <input type="checkbox" checked={pref.mode === 'sombre'}
-              onChange={e => changer({ mode: e.target.checked ? 'sombre' : 'clair' })} />
-            Mode sombre
-          </label>
+          {/* PAS DE BASCULE « MODE SOMBRE » ICI, ET C'EST UN CHOIX.
+              Le mécanisme existe (themes.js porte les dix couples ambiance ×
+              mode), mais 1 654 couleurs restent écrites en dur dans 71
+              fichiers : en clair elles ne se voient pas, en sombre elles font
+              des taches claires. Offrir le bouton, ce serait offrir un mode
+              à moitié fini.
+              Décision de Ludovic le 07/11 : « pas de mode sombre
+              spécialement ». Le jour où les lots 2 et 3 sont faits, il suffit
+              de remettre ces cinq lignes. */}
 
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', fontSize: 12.5, cursor: 'pointer' }}>
             <input type="checkbox" checked={pref.auto}
