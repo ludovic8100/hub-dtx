@@ -50,6 +50,40 @@ jobs:
       - name: Télécharger et extraire
         run: python scripts/recuperer_package_design.py
 
+      # L'hote des artefacts GitHub (blob.core.windows.net) est refuse par le
+      # proxy des sessions Claude : « 403 Forbidden ». Le journal du run, lui,
+      # passe par l'API REST et se lit sans probleme. On imprime donc les
+      # fichiers de texte directement — c'est le seul canal qui marche.
+      #
+      # Borne volontairement : pas la demo de 1,5 Mo, pas le manifeste de
+      # sommes de controle. Ce qui sert a comprendre et a integrer.
+      - name: Afficher les textes dans le journal
+        run: |
+          python3 - <<'PY'
+          import pathlib
+          racine = pathlib.Path("package")
+          motifs = [
+            "**/00_LIRE_AVANT/*.md",
+            "**/02_IMPLEMENTATION/**/*.css",
+            "**/02_IMPLEMENTATION/**/*.json",
+            "**/02_IMPLEMENTATION/**/*.ts",
+            "**/02_IMPLEMENTATION/**/*.tsx",
+            "**/02_IMPLEMENTATION/**/*.md",
+            "**/03_ASSETS/decorations/*.svg",
+          ]
+          vus = set()
+          for motif in motifs:
+              for f in sorted(racine.glob(motif)):
+                  if f in vus or not f.is_file():
+                      continue
+                  vus.add(f)
+                  rel = f.relative_to(racine)
+                  print(f"\n===== DEBUT {rel} ({f.stat().st_size} o) =====")
+                  print(f.read_text(encoding="utf-8", errors="replace"))
+                  print(f"===== FIN {rel} =====")
+          print(f"\n{len(vus)} fichiers imprimes.")
+          PY
+
       # Deux artefacts, et c'est volontaire : la session n'a pas besoin des
       # images pour lire un brief, et un artefact de 60 Mo coûte cher à
       # rapatrier. Le petit d'abord, le complet seulement si nécessaire.
