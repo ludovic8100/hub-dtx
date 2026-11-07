@@ -7,7 +7,10 @@ Application interne de gestion pour un groupe de 6 entités belges :
 
 - **Frontend** : React 18 + Vite + react-router, styles inline (pas de framework CSS). Langue : français.
 - **Backend** : Supabase (projet `tndwonqdbeszkcztkzqe`, Postgres 17, EU) — appelé directement depuis le front avec la clé anon + RLS.
-- **Déploiement** : Vercel, déploie automatiquement la branche `main`. Prod : https://hub-dtx.vercel.app
+- **Déploiement** : Vercel, déploie automatiquement la branche `main`.
+  Prod : **https://hub.dtx-group.be** (depuis le 07/11/2026).
+  ⚠️ `hub-dtx.vercel.app` **reste actif et ne doit pas être retiré** : les liens de devis déjà
+  envoyés pointent dessus, et ils n'expirent jamais.
 - **ETL / automatisations** : instance n8n `https://n8n.srv1082740.hstgr.cloud` (voir § n8n).
 - **Documents** : SharePoint (`dynassur.sharepoint.com/sites/ADMINISTRATION`) est la source de vérité des fichiers (factures, bordereaux…). Supabase ne stocke que métadonnées + URL.
 
