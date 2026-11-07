@@ -101,11 +101,13 @@ const SOMBRE = {
  *  reconnaissables comme le même Noël. */
 export const AMBIANCES = {
   standard: {
+    couverture: '/ambiances/standard.webp',
     label: 'Standard', symbole: '✦',
     clair: { saison: '#5dafff', saisonDoux: 'rgba(74,153,237,.13)', saisonLueur: 'rgba(30,128,236,.10)' },
     sombre: { saison: '#5daffF', saisonDoux: 'rgba(74,153,237,.15)', saisonLueur: 'rgba(30,128,236,.22)' },
   },
   noel: {
+    couverture: '/ambiances/noel.webp',
     label: 'Noël', symbole: '❄',
     clair: {
       fond: '#f2f7f5', fondDoux: '#e9f2ee', fondAlterne: '#f7fbf9',
@@ -117,6 +119,7 @@ export const AMBIANCES = {
     },
   },
   'nouvel-an': {
+    couverture: '/ambiances/nouvel-an.webp',
     label: 'Nouvel An', symbole: '✧',
     clair: {
       fond: '#f8f7fb', fondDoux: '#efedf7', fondAlterne: '#fbfaff',
@@ -128,6 +131,7 @@ export const AMBIANCES = {
     },
   },
   halloween: {
+    couverture: '/ambiances/halloween.webp',
     label: 'Halloween', symbole: '☾',
     clair: {
       fond: '#f8f5fa', fondDoux: '#efe9f3', fondAlterne: '#fcf9fd',
@@ -139,6 +143,7 @@ export const AMBIANCES = {
     },
   },
   vacances: {
+    couverture: '/ambiances/vacances.webp',
     label: 'Vacances', symbole: '☀',
     clair: {
       fond: '#f0f9fa', fondDoux: '#e2f2f3', fondAlterne: '#f7fdfd',
@@ -184,6 +189,14 @@ export function cssDesAmbiances() {
       regles.push(bloc(`html[data-ambiance="${amb}"][data-mode="${mode}"]`, jetons(amb, mode)))
     }
   }
+  // La couverture de la page de garde ne dépend pas du mode : la même image
+  // sert en clair et en sombre. Elle sort donc dans sa propre règle, une par
+  // ambiance, au lieu d'être dupliquée dans les dix blocs.
+  for (const amb of CLES_AMBIANCE) {
+    regles.push(`html[data-ambiance="${amb}"]{--hub-couverture:url('${AMBIANCES[amb].couverture}')}`)
+  }
+  regles.push(`:root{--hub-couverture:url('${AMBIANCES.standard.couverture}')}`)
+
   // `color-scheme` fait suivre les éléments natifs — ascenseurs, cases à
   // cocher, sélecteurs de date. Sans lui, un thème sombre garde des
   // ascenseurs blancs, et ça se voit immédiatement.
