@@ -1,0 +1,77 @@
+# Récupère un package de design déposé dans SharePoint DOWNLOAD et le publie
+# comme artefact, pour qu'une session Claude puisse le lire.
+#
+# POURQUOI : le connecteur Microsoft 365 d'une session lit le texte, les PDF
+# et les images, mais refuse les archives (« application/zip can't be read »).
+# Les GitHub Actions, elles, ont déjà les accès Graph. Ce workflow fait le pont.
+#
+# NE MODIFIE RIEN : il télécharge, extrait, et publie. Aucune écriture
+# SharePoint, aucune écriture en base.
+#
+# TEMPORAIRE : à supprimer une fois le design intégré.
+name: Récupérer un package de design
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      fichier:
+        description: "Nom exact du fichier dans SharePoint DOWNLOAD"
+        type: string
+        required: true
+        default: "DTX_Hub_Environnement_Complet_Claude_2026 (3).zip"
+
+jobs:
+  recuperer:
+    runs-on: ubuntu-latest
+    # Les secrets Graph vivent dans l'environnement production, lui-même
+    # limité à la branche main. Voir verifier-acces-sharepoint.yml.
+    environment: production
+    env:
+      GRAPH_TENANT_ID: ${{ secrets.GRAPH_TENANT_ID }}
+      GRAPH_CLIENT_ID: ${{ secrets.GRAPH_CLIENT_ID }}
+      GRAPH_CLIENT_SECRET: ${{ secrets.GRAPH_CLIENT_SECRET }}
+      FICHIER: ${{ inputs.fichier }}
+      SORTIE: package
+    steps:
+      - name: Refuser la production depuis une branche
+        if: ${{ github.ref != 'refs/heads/main' }}
+        run: |
+          echo "::error::Ce workflow utilise les secrets de PRODUCTION mais tourne sur ${{ github.ref }}."
+          exit 1
+
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Télécharger et extraire
+        run: python scripts/recuperer_package_design.py
+
+      # Deux artefacts, et c'est volontaire : la session n'a pas besoin des
+      # images pour lire un brief, et un artefact de 60 Mo coûte cher à
+      # rapatrier. Le petit d'abord, le complet seulement si nécessaire.
+      - name: Publier les textes seuls
+        uses: actions/upload-artifact@v4
+        with:
+          name: design-textes
+          path: |
+            package/**/*.txt
+            package/**/*.md
+            package/**/*.json
+            package/**/*.css
+            package/**/*.js
+            package/**/*.cjs
+            package/**/*.html
+            package/**/*.svg
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Publier le package complet
+        uses: actions/upload-artifact@v4
+        with:
+          name: design-complet
+          path: package/
+          retention-days: 7
