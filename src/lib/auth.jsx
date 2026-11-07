@@ -155,13 +155,27 @@ export function AuthProvider({ children }) {
   async function loadPerms(email) {
     const candidats = adressesPossibles(email)
     if (!candidats.length) return null
+
     // ilike sans joker = egalite insensible a la casse.
+    //
+    // REPLI VOLONTAIRE : cette requete garde la porte d'entree du Hub. Si le
+    // filtre `or` etait refuse pour une raison que je n'ai pas prevue, PERSONNE
+    // ne pourrait plus se connecter — un correctif ne doit jamais pouvoir faire
+    // pire que ce qu'il remplace. On retombe donc sur l'egalite exacte d'avant,
+    // qui marche pour les 16 comptes internes.
+    let data = null
     const { data: lignes, error } = await supabase
       .from('collaborateurs').select('*')
       .or(candidats.map(a => `email.ilike.${a}`).join(','))
       .eq('compte_hub_actif', true).limit(2)
-    if (error) return null
-    const data = (lignes || [])[0]
+    if (error) {
+      const secours = await supabase
+        .from('collaborateurs').select('*')
+        .eq('email', email).eq('compte_hub_actif', true).maybeSingle()
+      data = secours.data || null
+    } else {
+      data = (lignes || [])[0] || null
+    }
     if (!data) return null
 
     const [{ data: acces }, { data: catalogue }] = await Promise.all([
