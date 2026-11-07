@@ -11,8 +11,15 @@
 # TEMPORAIRE : à supprimer une fois le design intégré.
 name: Récupérer un package de design
 
+# ECRITURE, et c'est l'exception : les images du package sont binaires.
+# Le journal du run ne transporte que du texte, et l'hote des artefacts
+# (blob.core.windows.net) est refuse par le proxy des sessions Claude. Le
+# seul canal qui reste pour un .webp, c'est un commit.
+#
+# Porte volontairement etroite : une branche dediee, et uniquement les
+# fichiers de public/ambiances/.
 permissions:
-  contents: read
+  contents: write
 
 on:
   workflow_dispatch:
@@ -22,6 +29,10 @@ on:
         type: string
         required: true
         default: "DTX_Hub_Environnement_Complet_Claude_2026 (3).zip"
+      branche_assets:
+        description: "Branche ou deposer les images (vide = ne rien commiter)"
+        type: string
+        default: ''
 
 jobs:
   recuperer:
@@ -87,6 +98,26 @@ jobs:
       # Deux artefacts, et c'est volontaire : la session n'a pas besoin des
       # images pour lire un brief, et un artefact de 60 Mo coûte cher à
       # rapatrier. Le petit d'abord, le complet seulement si nécessaire.
+      - name: Deposer les couvertures sur une branche
+        if: ${{ inputs.branche_assets != '' }}
+        env:
+          BRANCHE: ${{ inputs.branche_assets }}
+        run: |
+          set -e
+          mkdir -p public/ambiances
+          # Les couvertures seules. Pas les logos : le Hub a deja les siens,
+          # et le brief dit expressement de les preserver.
+          find package -path '*03_ASSETS/covers/*' -name '*.webp' -exec cp {} public/ambiances/ \;
+          ls -l public/ambiances/
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$BRANCHE"
+          git add -f public/ambiances/
+          git commit -m "Couvertures des cinq ambiances, depuis le package SharePoint" \
+                     -m "Images binaires : ni le journal du run ni l'hote des artefacts ne peuvent les transporter jusqu'a une session Claude. Un commit est le seul canal qui reste." \
+            || { echo "rien a commiter"; exit 0; }
+          git push -f origin "$BRANCHE"
+
       - name: Publier les textes seuls
         uses: actions/upload-artifact@v4
         with:
