@@ -589,26 +589,53 @@ d'un coup toute branche et toute PR deviennent inoffensives — au lieu de la se
 `staging`. Ça bouche en plus le trou actuel, qui est que les préversions écrivent dans les
 vraies données.
 
-Les cinq variables à poser sur la cible **Preview** :
+✅ **Les cinq variables sont posées sur la cible Preview** (07/11, production intacte) :
+`VITE_APP_ENV=test`, `APP_ENV=test`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`,
+`MAIL_REDIRECT_TO`.
 
-| Variable | Valeur |
-|---|---|
-| `VITE_APP_ENV` | `test` |
-| `APP_ENV` | `test` |
-| `VITE_SUPABASE_URL` | `https://wsuawmtwlvcyppgfvqzj.supabase.co` |
-| `VITE_SUPABASE_ANON_KEY` | la clé publishable du projet de test |
-| `MAIL_REDIRECT_TO` | une adresse réelle |
+### Ce qu'un seul interrupteur arme — mesuré, pas supposé
 
-**Les deux premières suffisent à armer quatre garde-fous** (vérifié dans le code, pas supposé) :
-mails redirigés ou refusés (`api/_lib/mail.js`), envoi Peppol refusé (`PEPPOL_AUTORISE`),
-webhooks n8n suffixés `-test`, et **démarrage bloqué** si l'URL Supabase manque plutôt qu'un
-repli silencieux sur la production.
+En lisant enfin les variables, le trou s'est révélé plus large qu'annoncé : il n'y avait
+**aucune variable Supabase nulle part**, ni en production ni en preview. Les deux retombaient
+sur les constantes de production écrites dans `src/config/env.js`. Et Preview portait déjà
+`AZURE_CLIENT_SECRET`, `GITHUB_DISPATCH_TOKEN`, `CBEAPI` et les `THREECX_*` — sans `APP_ENV`,
+le code **se croyait en production** : les garde-fous existaient, aucun n'était armé.
 
-⚠️ **Le connecteur Vercel ne peut NI lire NI écrire les variables d'environnement** (403 sur
-`/projects/{id}/env`, en lecture comme en écriture, et Vercel précise qu'une reconnexion n'y
-changera rien). Tout le reste passe — déploiements, projet, domaines. **Ne pas confondre avec
-un connecteur cassé** : le 07/11 j'ai cru qu'il l'était pendant deux heures parce que
-j'utilisais un identifiant d'équipe faux. Le bon est `team_ullhaGKqy8NSZIrW8WRu4Vho`.
+| | Avant | Après |
+|---|---|---|
+| Base de données | **PRODUCTION** | projet de test |
+| Mails | **envoi réel** | redirigés (`MAIL_REDIRECT_TO`) ou refusés |
+| GitHub Actions | `target=production` | `target=test` |
+| Branche déclenchée | `main` | `staging` |
+| Envoi Peppol | autorisé | refusé (`PEPPOL_AUTORISE`) |
+| Webhooks n8n | les vrais | suffixés `-test` |
+
+**Le plus sérieux était `GITHUB_DISPATCH_TOKEN`** : une préversion pouvait lancer une GitHub
+Action **sur `main` avec les secrets de production**. `api/declencher.js` lisait déjà `IS_TEST`
+pour choisir sa cible et sa branche — il faisait bien son travail, mais personne ne lui avait
+dit qu'il était en test.
+
+⚠️ **Reste non cadré** : les `THREECX_*` sont sur Preview et `api/3cx/` ne contient **aucun**
+garde-fou de test. Le sens Hub → 3CX est documenté comme ouvert mais inutilisé — à mesurer
+avant de conclure.
+
+### Accéder à Vercel depuis une session cloud
+
+**Le connecteur MCP ne peut NI lire NI écrire les variables d'environnement** (403 sur
+`/projects/{id}/env`, et Vercel précise qu'une reconnexion n'y changera rien). Tout le reste
+passe : déploiements, projet, domaines.
+
+**Le contournement qui marche**, mis en service le 07/11 : un **secret réseau de type Bearer**
+dans les réglages de l'environnement cloud — hôte `api.vercel.com`, en-tête `Authorization`,
+préfixe `Bearer`, valeur = un jeton Vercel d'équipe. Le proxy injecte l'en-tête ; Claude ne voit
+jamais le jeton. Il faut **aussi** ajouter `api.vercel.com` aux domaines autorisés du réseau,
+sinon l'hôte est injoignable (`curl` renvoie `000`). Les deux ont pris effet **sans redémarrer
+la session**. ⚠️ Laisser les préfixes de chemin vides : l'API Vercel éparpille ses routes sur
+`/v5/`, `/v6/`, `/v10/`, `/v13/`.
+
+⚠️ **Ne pas confondre avec un connecteur cassé** : le 07/11 j'ai cru qu'il l'était pendant deux
+heures parce que j'utilisais un identifiant d'équipe faux, et j'ai envoyé Ludovic reconnecter
+pour rien. Le bon est `team_ullhaGKqy8NSZIrW8WRu4Vho`.
 
 La **Deployment Protection est déjà activée** (`ssoProtection`, `all_except_custom_domains`) :
 les préversions ne sont pas ouvertes à qui connaît l'adresse.
