@@ -1,5 +1,5 @@
 import { n8nWebhook } from '../../config/env'
-import { useState, useEffect, useRef, useLayoutEffect } from 'react'
+import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
 import { PEPPOL_ACTIF } from '../../lib/peppol'
 import Layout from '../../components/Layout'
@@ -8,7 +8,27 @@ import { I18N, CGV_I18N, LANGUES } from '../../lib/lodeI18n'
 import { StatBanner, TabsBar, StatusBadge, ActionButton, DataCard, PrimaryButton, useMobile } from '../../components/ui/AccountableUI'
 import { extraireDevis } from '../../lib/devisExtraction'
 import { COUL } from '../../lib/theme'
+import { useLocation, useNavigate } from 'react-router-dom'
 import QRCode from 'qrcode'
+
+// Comment un client s'affiche dans une liste de résultats.
+//
+// ⚠️ CETTE FONCTION DOIT RESTER AU NIVEAU DU FICHIER.
+//
+// Elle était définie À L'INTÉRIEUR d'un composant, et ModalClient — qui est
+// un AUTRE composant — l'appelait. Le code se lisait bien, la page se
+// chargeait bien, et elle plantait sur « labelClient is not defined » au
+// moment précis où la recherche de client renvoyait un résultat. Autrement
+// dit : elle ne marchait que tant qu'on ne trouvait personne.
+//
+// Elle ne dépend que de son argument : aucune raison qu'elle vive dans la
+// portée d'un composant.
+function labelClient(c) {
+  const nom = c.denomination || (((c.prenom || '') + ' ' + (c.nom || '')).trim()) || '(sans nom)'
+  const icon = c.type === 'entreprise' ? '\u{1F3E2}' : '\u{1F464}'
+  const sub = [c.dossier ? '#' + c.dossier : '', c.ville || c.localite || '', c.email || ''].filter(Boolean).join(' \u00B7 ')
+  return { icon, nom, sub }
+}
 
 const ORANGE = LODE.couleur
 const NAVY = COUL.texte
@@ -131,6 +151,85 @@ function Editeur({ type, doc, onClose, onSaved }) {
   const [saving, setSaving] = useState(false)
   const [importPDF, setImportPDF] = useState({ loading: false, msg: '', drag: false })
 
+  // ⚠️ UN DEVIS SANS CHANTIER NE DOIT PAS POUVOIR ÊTRE ENREGISTRÉ.
+  //
+  // Ludovic : « en clair, chaque devis doit être rattaché à un chantier, ici
+  // ce n'est pas le cas ».
+  //
+  // Un devis orphelin casse toute la chaîne : il n'apparaît pas dans les
+  // chiffres du chantier, la marge l'ignore, et la facture qui en sortira
+  // sera elle aussi hors dossier. C'est exactement par là que les 2 000 €
+  // non réclamés sont passés.
+  //
+  // On BLOQUE donc l'enregistrement — mais sans jamais laisser dans une
+  // impasse : si aucun chantier n'existe, un bouton le crée depuis ce que le
+  // devis sait déjà (le client et l'objet).
+  // Une seule source pour les commerciaux, partagée avec l'écran Dossiers.
+  const [responsables, setResponsables] = useState([])
+  useEffect(() => {
+    let annule = false
+    supabase.from('collaborateurs').select('code,nom_complet')
+      .eq('actif', true).not('code', 'is', null).order('nom_complet')
+      .then(({ data }) => { if (!annule) setResponsables(data || []) })
+    return () => { annule = true }
+  }, [])
+
+  const [dossiersDispo, setDossiersDispo] = useState([])
+  const [creationDossier, setCreationDossier] = useState(false)
+  useEffect(() => {
+    if (!isDevis) return
+    let annule = false
+    supabase.from('dossiers').select('id,numero,titre,client_nom,client_id,statut')
+      .eq('societe', 'LODE').neq('statut', 'clos').order('created_at', { ascending: false })
+      .then(({ data }) => { if (!annule) setDossiersDispo(data || []) })
+    return () => { annule = true }
+  }, [isDevis])
+
+  // ⚠️ LA LISTE DES CHANTIERS DOIT ÊTRE FILTRÉE PAR CLIENT.
+  //
+  // Ludovic : « je peux ajouter ce que je veux... ici j'ai attribué Dewez au
+  // chantier Detilloux ». Un chantier appartient à un client : proposer tous
+  // les chantiers ouverts, c'est rendre l'erreur non seulement possible mais
+  // probable — et une fois faite, elle est invisible, puisque les deux noms
+  // s'affichent chacun à leur place.
+  //
+  // Sans client choisi, la liste est VIDE plutôt que complète : mieux vaut
+  // une liste qui oblige à choisir le client qu'une liste qui laisse se
+  // tromper.
+  const dossiersDuClient = useMemo(
+    () => f.client_id ? dossiersDispo.filter(d => String(d.client_id) === String(f.client_id)) : [],
+    [dossiersDispo, f.client_id])
+
+  // Changer de client invalide le chantier déjà choisi : il appartenait à
+  // quelqu'un d'autre.
+  useEffect(() => {
+    if (!isDevis || !f.dossier_id) return
+    if (!dossiersDuClient.some(d => d.id === f.dossier_id)) set('dossier_id', null)
+  }, [f.client_id, dossiersDispo])
+
+  // Créer le chantier depuis le devis : tout est déjà là.
+  const creerDossierDepuisDevis = async () => {
+    setCreationDossier(true)
+    const { data: numero, error: e1 } = await supabase.rpc('prochain_numero', {
+      p_type: 'dossier', p_societe: 'LODE', p_prefixe: 'DOS',
+    })
+    if (e1) { alert(`Numérotation refusée — ${e1.message}`); setCreationDossier(false); return }
+    const { data, error } = await supabase.from('dossiers').insert({
+      societe: 'LODE', numero,
+      titre: (f.objet || '').trim() || 'Chantier sans titre',
+      type: 'intervention',
+      client_type: f.client_id ? 'lode_client' : null,
+      client_id: f.client_id || null,
+      client_nom: f.client_nom || null,
+      adresse: f.client_adresse || null, cp: f.client_cp || null, ville: f.client_ville || null,
+      date_debut: todayISO(),
+    }).select('id,numero,titre,client_nom,client_id,statut').single()
+    setCreationDossier(false)
+    if (error) { alert(`Création du chantier refusée — ${error.message}`); return }
+    setDossiersDispo(p => [data, ...p])
+    set('dossier_id', data.id)
+  }
+
   // Import de devis fournisseur (SDA / Marquise) -> pré-remplit les lignes
   const importerPDFs = async (files) => {
     setImportPDF({ loading: true, msg: '', drag: false })
@@ -207,12 +306,6 @@ function Editeur({ type, doc, onClose, onSaved }) {
     return () => clearTimeout(t)
   }, [clientQuery, searchCols, hasActif])
 
-  const labelClient = (c) => {
-    const nom = c.denomination || (((c.prenom || '') + ' ' + (c.nom || '')).trim()) || '(sans nom)'
-    const icon = c.type === 'entreprise' ? '\u{1F3E2}' : '\u{1F464}'
-    const sub = [c.dossier ? '#' + c.dossier : '', c.ville || c.localite || '', c.email || ''].filter(Boolean).join(' \u00B7 ')
-    return { icon, nom, sub }
-  }
 
   const choisirClient = (c) => {
     if (!c) return
@@ -484,6 +577,13 @@ function Editeur({ type, doc, onClose, onSaved }) {
   const save = async () => {
     if (verrouille) { alert('Cette facture a déjà été émise/envoyée : elle ne peut plus être modifiée. Pour la corriger, créez une note de crédit.'); return }
     if (!f.client_nom.trim()) { alert('Le nom du client est obligatoire'); return }
+    // Un devis sans chantier casse toute la chaîne en aval : il n'apparaît
+    // dans les chiffres d'aucun dossier, la marge l'ignore, et la facture qui
+    // en sortira héritera du vide. On refuse plutôt que de le laisser passer.
+    if (isDevis && !f.dossier_id) {
+      alert("Ce devis doit être rattaché à un chantier.\n\nChoisis-le dans le panneau Détails, ou clique « Créer le chantier » juste en dessous — tout y est déjà pré-rempli.")
+      return
+    }
     setSaving(true)
     try {
       let docId = doc?.id
@@ -496,6 +596,10 @@ function Editeur({ type, doc, onClose, onSaved }) {
         total_ht: tot.ht, total_tva: tot.tva, total_ttc: tot.ttc,
         responsable: f.responsable || null,
       }
+      // Le dossier suit le document. Sans ça, un devis créé DEPUIS un dossier
+      // de chantier perdrait son rattachement à l'enregistrement, et l'écran
+      // Dossiers afficherait « rien de facturé » sur un chantier devisé.
+      if (f.dossier_id) payload.dossier_id = f.dossier_id
       if (isDevis) { payload.date_devis = f.date_devis; payload.date_validite = f.date_validite }
       else { payload.date_facture = f.date_facture; payload.date_echeance = f.date_echeance; if (f.devis_id) payload.devis_id = f.devis_id }
       // L'acompte DEJA PAYE se deduit APRES la TVA : ce n'est pas une ligne de
@@ -886,12 +990,41 @@ function Editeur({ type, doc, onClose, onSaved }) {
               </div>
             )}
             <div style={{ display: 'grid', gap: 10 }}>
+              {isDevis && (
+                <div>
+                  <label style={lbl}>Chantier <span style={{ color: COUL.danger }}>*</span></label>
+                  <select style={{ ...inp, borderColor: f.dossier_id ? COUL.bord : COUL.danger }}
+                    value={f.dossier_id || ''} onChange={e => set('dossier_id', e.target.value || null)}>
+                    <option value="">— aucun (obligatoire)</option>
+                    {dossiersDuClient.map(d => (
+                      <option key={d.id} value={d.id}>
+                        {d.numero} · {d.titre}
+                      </option>
+                    ))}
+                  </select>
+                  <div style={{ fontSize: 11, color: COUL.texteFaible, marginTop: 4 }}>
+                    {!f.client_id
+                      ? 'Choisis d’abord le client : la liste s’y limitera.'
+                      : dossiersDuClient.length === 0
+                        ? `Aucun chantier ouvert pour ${f.client_nom || 'ce client'}.`
+                        : `Chantiers de ${f.client_nom || 'ce client'} uniquement.`}
+                  </div>
+                  {!f.dossier_id && f.client_id && (
+                    <button type="button" onClick={creerDossierDepuisDevis} disabled={creationDossier}
+                      style={{ marginTop: 6, width: '100%', padding: '8px', borderRadius: 8, border: `1px solid ${ORANGE}`, background: COUL.blanc, color: ORANGE, fontSize: 12.5, fontWeight: 700, cursor: creationDossier ? 'wait' : 'pointer', fontFamily: 'inherit' }}>
+                      {creationDossier ? 'Création…' : `+ Créer le chantier${f.client_nom ? ' pour ' + f.client_nom : ''}`}
+                    </button>
+                  )}
+                </div>
+              )}
               <div><label style={lbl}>Responsable</label>
+                {/* La liste vient de `collaborateurs`, plus de trois noms écrits
+                    en dur ici. Deux écrans avec deux listes différentes, c'est
+                    exactement ce que Ludovic a vu : « je ne comprends pas
+                    pourquoi un seul, et dans devis j'ai les trois ». */}
                 <select style={inp} value={f.responsable || ''} onChange={e => set('responsable', e.target.value)}>
                   <option value="">—</option>
-                  <option value="LDE">LDE — Ludovic Detilloux</option>
-                  <option value="JCL">JCL — Jean-Charles Lorange</option>
-                  <option value="LLO">LLO — Ludivine Lorange</option>
+                  {responsables.map(r => <option key={r.code} value={r.code}>{r.code} — {r.nom_complet}</option>)}
                 </select>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -1056,8 +1189,30 @@ function ModalArticle({ l, i, setLigne, delLigne, ajouterPhotos, onClose, mobE, 
   // HTVA qui est stocke, imprime et multiplie par la quantite. Garder plus de
   // decimales ferait un total qui ne colle pas au prix unitaire affiche.
   const prixAffiche = tvac ? Math.round(pu * (1 + taux / 100) * 100) / 100 : pu
+
+  // ⚠️ LE CHAMP PRIX NE PEUT PAS ÊTRE DÉRIVÉ À CHAQUE FRAPPE.
+  //
+  // Ludovic : « je clique sur TVA comprise, et là je ne sais plus modifier le
+  // montant ». Deux causes, toutes deux réelles :
+  //
+  //  1. `type="number"` rend une valeur VIDE dès qu'on tape une virgule — et
+  //     `Number('')` vaut 0. Le montant s'effaçait à la frappe. En Belgique on
+  //     tape une virgule : c'est le champ qui doit s'adapter, pas la personne.
+  //
+  //  2. En mode TVA comprise, la valeur affichée était recalculée à chaque
+  //     frappe (TVAC → HTVA arrondi → TVAC arrondi). Le texte en cours de
+  //     saisie était donc réécrit sous les doigts, curseur compris.
+  //
+  // On garde donc le texte TEL QUE TAPÉ pendant la saisie, et on ne le
+  // resynchronise sur le modèle qu'à la sortie du champ ou quand la bascule
+  // TVA / le taux change — c'est-à-dire quand la valeur affichée doit
+  // légitimement changer.
+  const [prixTexte, setPrixTexte] = useState(null)   // null = suit le modèle
+  useEffect(() => { setPrixTexte(null) }, [tvac, taux])
   const majPrix = (v) => {
-    const n = Number(String(v).replace(',', '.')) || 0
+    setPrixTexte(v)
+    const n = Number(String(v).replace(',', '.').replace(/\s/g, ''))
+    if (!Number.isFinite(n)) return      // saisie intermédiaire (« 2500, ») : on attend
     setLigne(i, 'prix_unitaire', tvac ? Math.round((n / (1 + taux / 100)) * 100) / 100 : n)
   }
   const ht = (Number(l.quantite) || 0) * pu * (1 - (Number(l.remise_pct) || 0) / 100)
@@ -1074,8 +1229,23 @@ function ModalArticle({ l, i, setLigne, delLigne, ajouterPhotos, onClose, mobE, 
   const lbl2 = { fontSize: 11.5, fontWeight: 700, color: COUL.texteDoux, marginBottom: 4, display: 'block' }
   const pas = (d) => setLigne(i, 'quantite', Math.max(0, (Number(l.quantite) || 0) + d))
 
+  // ⚠️ FERMER SUR `onClick` SEUL FERME LA FENÊTRE QUAND ON SÉLECTIONNE DU TEXTE.
+  //
+  // Ludovic : « lorsque je veux sélectionner le montant, la fenêtre se ferme ».
+  //
+  // On appuie dans le champ, on glisse, on relâche hors de la carte : le
+  // navigateur attribue alors le `click` à l'ancêtre commun, donc à
+  // l'arrière-plan. Un geste de sélection parfaitement normal était lu comme
+  // un clic dehors — et la saisie en cours était perdue.
+  //
+  // On ne ferme donc que si le bouton a été ENFONCÉ sur l'arrière-plan.
+  const departDehors = useRef(false)
+
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', zIndex: 9500, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '5vh 14px', overflowY: 'auto' }}>
+    <div
+      onMouseDown={e => { departDehors.current = e.target === e.currentTarget }}
+      onClick={e => { if (e.target === e.currentTarget && departDehors.current) onClose() }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', zIndex: 9500, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '5vh 14px', overflowY: 'auto' }}>
       <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 14, width: '100%', maxWidth: 520, boxShadow: '0 20px 60px rgba(0,0,0,.25)', overflow: 'hidden' }}>
         <div style={{ padding: '15px 20px', borderBottom: `1px solid ${COUL.bord}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: 16, fontWeight: 800, color: NAVY }}>Éditer l’article</div>
@@ -1126,7 +1296,10 @@ function ModalArticle({ l, i, setLigne, delLigne, ajouterPhotos, onClose, mobE, 
                 TVA comprise
               </label>
             </div>
-            <input type="number" step="0.01" style={inp2} value={prixAffiche} onChange={e => majPrix(e.target.value)} />
+            <input type="text" inputMode="decimal" style={inp2}
+              value={prixTexte ?? String(prixAffiche)}
+              onChange={e => majPrix(e.target.value)}
+              onBlur={() => setPrixTexte(null)} />
             <div style={{ fontSize: 11, color: COUL.texteFaible, marginTop: 4 }}>
               {tvac ? `Soit ${eur(pu)} hors TVA` : `Soit ${eur(pu * (1 + taux / 100))} TVA comprise`}
             </div>
@@ -2054,7 +2227,7 @@ function Row2({ l, v }) {
   return <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', color: COUL.texteDoux }}><span>{l}</span><span>{v}</span></div>
 }
 
-function SuiviModal({ doc, color, onClose, onChanged }) {
+function SuiviModal({ doc, color, onClose, onChanged, onConvertir, factureLiee }) {
   const mob = useMobile()
   const [events, setEvents] = useState(null)
   const [lignes, setLignes] = useState([])
@@ -2217,11 +2390,36 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
             <button onClick={copier} style={{ padding: '9px 14px', border: 'none', borderRadius: 8, background: color, color: COUL.blanc, fontWeight: 700, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>{copied ? '✓ Copié' : 'Copier'}</button>
           </div>
 
-          {/* Actions d'envoi */}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 22 }}>
-            <button onClick={envoyerEmail} disabled={sending} style={{ flex: 1, minWidth: 180, padding: '11px 16px', border: 'none', borderRadius: 10, background: COUL.succes, color: COUL.blanc, fontWeight: 700, fontSize: 14, cursor: sending ? 'wait' : 'pointer' }}>{sending ? '…' : '📧 Envoyer par email'}</button>
-            <button onClick={() => marquerEnvoye(false)} style={{ padding: '11px 16px', border: '1px solid #e2e8f0', borderRadius: 10, background: COUL.surface, color: COUL.texteDoux, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Marquer envoyé</button>
-          </div>
+          {/* L'ACTION QUI SUIT DEPEND DU STATUT.
+              Ludovic : « des que le devis est accepte, le bouton transformer
+              en facture doit apparaitre, ce bouton ne doit pas rester dans le
+              menu ». Un devis accepte n'a plus a etre envoye : la seule suite
+              logique est de le facturer. Enterrer ce geste dans un menu
+              deroulant, c'est le rendre invisible au moment ou il compte. */}
+          {statut === 'accepté' ? (
+            <div style={{ marginBottom: 22 }}>
+              {factureLiee ? (
+                <div style={{ padding: '12px 14px', borderRadius: 10, background: COUL.fond, border: `1px solid ${COUL.bord}`, fontSize: 13.5, color: COUL.texteDoux }}>
+                  🔒 Déjà facturé — facture <strong style={{ color: COUL.texte }}>{factureLiee.numero}</strong>.
+                </div>
+              ) : (
+                <>
+                  <button onClick={() => onConvertir?.(doc)}
+                    style={{ width: '100%', padding: '13px 16px', border: 'none', borderRadius: 10, background: COUL.succes, color: COUL.blanc, fontWeight: 800, fontSize: 15, cursor: 'pointer' }}>
+                    → Convertir en facture
+                  </button>
+                  <div style={{ fontSize: 11.5, color: COUL.texteFaible, marginTop: 6, textAlign: 'center' }}>
+                    Le devis reste consultable ; la facture reprend ses articles et son client.
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 22 }}>
+              <button onClick={envoyerEmail} disabled={sending} style={{ flex: 1, minWidth: 180, padding: '11px 16px', border: 'none', borderRadius: 10, background: COUL.succes, color: COUL.blanc, fontWeight: 700, fontSize: 14, cursor: sending ? 'wait' : 'pointer' }}>{sending ? '…' : '📧 Envoyer par email'}</button>
+              <button onClick={() => marquerEnvoye(false)} style={{ padding: '11px 16px', border: '1px solid #e2e8f0', borderRadius: 10, background: COUL.surface, color: COUL.texteDoux, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Marquer envoyé</button>
+            </div>
+          )}
 
           {/* Timeline */}
           <div style={{ fontSize: 11, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', marginBottom: 12 }}>Historique</div>
@@ -2542,11 +2740,22 @@ function MenuLigne({ anchor, items, onClose }) {
 }
 
 export default function LodeDevisFactures() {
+  // Arrivée depuis l'écran Dossiers : « créer un devis » y pousse le client
+  // et le dossier, et l'éditeur s'ouvre déjà rempli. On efface l'état de
+  // navigation aussitôt, sinon un simple rechargement rouvrirait l'éditeur.
+  const navLocation = useLocation()
+  const navigateVers = useNavigate()
   const [tab, setTab] = useState('devis')
   const [devis, setDevis] = useState([])
   const [factures, setFactures] = useState([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(null) // {type, doc}
+  useEffect(() => {
+    const d = navLocation.state?.nouveauDevis
+    if (!d) return
+    setEditing({ type: 'devis', doc: d })
+    navigateVers(navLocation.pathname, { replace: true, state: null })
+  }, [navLocation.state])
   const [busy, setBusy] = useState(null)
   const [suivi, setSuivi] = useState(null)      // devis dont on affiche le suivi
   const [apercu, setApercu] = useState(null)      // {fid,nom} apercu PDF au survol
@@ -2769,6 +2978,20 @@ export default function LodeDevisFactures() {
   })
 
   // Suivi acomptes : dossiers (par devis) avec un acompte facture mais un reste a facturer > 0.
+  // Les devis acceptés qui attendent leur facture.
+  //
+  // Ludovic : « dès que le devis est accepté, le bouton transformer en
+  // facture doit apparaître, ce bouton ne doit pas rester dans le menu ».
+  //
+  // Un geste qui n'a de valeur qu'à un moment précis ne doit pas être rangé
+  // dans un menu déroulant : au mieux on le cherche, au pire on l'oublie —
+  // et un devis accepté jamais facturé est exactement l'oubli qui coûte de
+  // l'argent. Il monte donc en bandeau, comme « À solder » pour les factures.
+  // ⚠️ Pas de `COUL.x || '#fallback'` dans ce bandeau : depuis le passage aux
+  // variables CSS, COUL.succesBord vaut la CHAÎNE « var(--hub-succesBord) »,
+  // donc toujours vraie. Un repli par `||` sur un jeton COUL est du code mort.
+  const aFacturer = devis.filter(d => d.statut === 'accepté' && !factureDuDevis(d.id))
+
   const aSolder = (() => {
     const acs = factures.filter(x => x.type === 'acompte')
     if (!acs.length) return []
@@ -2803,9 +3026,6 @@ export default function LodeDevisFactures() {
   // pas « changer le statut » mais « facturer » : elle passe en tete.
   const itemsStatut = (doc) => {
     const suite = []
-    if (tab === 'devis' && doc.statut === 'accepté') {
-      suite.push({ icon: '→', label: 'Convertir en facture', onClick: () => convertir(doc) }, { sep: true })
-    }
     if (tab === 'devis' && doc.statut === 'envoyé') {
       suite.push({ icon: '📊', label: 'Voir si le client a ouvert', onClick: () => setSuivi(doc) }, { sep: true })
     }
@@ -2839,8 +3059,6 @@ export default function LodeDevisFactures() {
       tab !== 'devis' && { icon: '✉', label: 'Envoyer par mail', disabled: busy === doc.id + 'mail', onClick: () => ouvrirEnvoiFacture(doc) },
       PEPPOL_ACTIF && tab === 'factures' && doc.client_tva && doc.statut !== 'payée' && doc.statut !== 'annulée'
         && { icon: '📨', label: 'Envoyer via Peppol', disabled: busy === doc.id + 'peppol', onClick: () => envoyerPeppol(doc) },
-      tab === 'devis' && doc.statut === 'accepté' && { sep: true },
-      tab === 'devis' && doc.statut === 'accepté' && { icon: '→', label: 'Convertir en facture', onClick: () => convertir(doc) },
       tab === 'devis' && { sep: true },
       tab === 'devis' && (factureDuDevis(doc.id)
         ? { icon: '🔒', label: `Facturé (${factureDuDevis(doc.id).numero})`, disabled: true, onClick: () => {} }
@@ -2901,6 +3119,34 @@ export default function LodeDevisFactures() {
 
         <TabsBar color={C} active={tab} onChange={setTab}
           tabs={[{ key: 'devis', label: 'Devis', count: devis.length }, { key: 'factures', label: 'Factures', count: factures.length }]} />
+
+        {tab === 'devis' && aFacturer.length > 0 && (
+          <DataCard style={{ padding: 0, marginBottom: 14, border: `1px solid ${COUL.succesBord}`, overflow: 'hidden' }}>
+            <div style={{ background: COUL.succesFond, color: COUL.succesFonce, fontWeight: 800, fontSize: 13.5, padding: '10px 16px', borderBottom: `1px solid ${COUL.succesBord}` }}>
+              ✅ Accepté, pas encore facturé — {aFacturer.length} devis
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {aFacturer.map(d => (
+                <div key={d.id} style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', justifyContent: 'space-between', padding: '11px 16px', borderTop: '1px solid #f8fafc' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, color: COUL.texte, fontSize: 14 }}>{d.client_nom}</div>
+                    <div style={{ color: COUL.texteFaible, fontSize: 12 }}>
+                      Devis {d.numero}{d.objet ? ' · ' + d.objet : ''}
+                      {d.accepted_at ? ' · accepté le ' + new Date(d.accepted_at).toLocaleDateString('fr-BE') : ''}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 10.5, color: COUL.succesFonce, fontWeight: 700, textTransform: 'uppercase', letterSpacing: .3 }}>Montant</div>
+                      <div style={{ fontWeight: 800, color: COUL.succesFonce, fontSize: 16 }}>{eur(d.total_ttc)}</div>
+                    </div>
+                    <button onClick={() => convertir(d)} style={{ background: COUL.succes, color: COUL.blanc, border: 'none', borderRadius: 9, padding: '9px 15px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>Convertir en facture</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </DataCard>
+        )}
 
         {tab === 'factures' && aSolder.length > 0 && (
           <DataCard style={{ padding: 0, marginBottom: 14, border: '1px solid #fed7aa', overflow: 'hidden' }}>
@@ -3067,7 +3313,12 @@ export default function LodeDevisFactures() {
       </div>
 
       {editing && <Editeur type={editing.type} doc={editing.doc} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load() }} />}
-      {suivi && <SuiviModal doc={suivi} color={C} onClose={() => setSuivi(null)} onChanged={() => { load() }} />}
+      {suivi && (
+        <SuiviModal doc={suivi} color={C}
+          factureLiee={factureDuDevis(suivi.id)}
+          onConvertir={(d) => { setSuivi(null); convertir(d) }}
+          onClose={() => setSuivi(null)} onChanged={() => { load() }} />
+      )}
       {apercu && <ApercuFacture fid={apercu.fid} nom={apercu.nom} />}
       {paiement && (
         <ModalPaiement
