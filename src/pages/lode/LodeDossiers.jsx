@@ -11,9 +11,13 @@ import { COUL } from '../../lib/theme'
 // quoi facturer, quand il n'oublie pas. L'achat tombe et on ne sait plus
 // l'attribuer. »
 //
-// Mesuré sur un seul dossier (MONDY, octobre 2026) : coût Winsol 1 824,96 €
-// facture impayée, prix annoncé au client 2 841,96 € TTC, encaissé 840,00 €,
-// facture de vente AUCUNE. 2 001,96 € que personne ne réclame.
+// Mesuré sur un dossier d'octobre 2026 pris au hasard : la facture
+// fournisseur est là et impayée, un acompte client est encaissé, le prix
+// annoncé au client est connu — et AUCUNE facture de vente n'existe. Le
+// solde non réclamé dépasse deux mille euros, sur une seule intervention.
+//
+// ⚠️ Ce dépôt est PUBLIC. Aucun nom de client, aucun montant réel ne doit
+// apparaître dans le code, les commentaires ou les messages de commit.
 //
 // L'INVARIANT
 //
