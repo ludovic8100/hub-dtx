@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
 import { COUL } from '../../lib/theme'
+import { analyserTelephone, telephonePourBase, telephoneEnFrappe } from '../../lib/telephone'
 
 // Les dossiers LODE — un par intervention.
 //
@@ -108,6 +109,7 @@ export default function LodeDossiers() {
   const [nouveau, setNouveau] = useState(null)   // dossier fraîchement créé, à montrer en grand
   const [aAttribuer, setAAttribuer] = useState(null) // facture d'achat en cours d'attribution
   const [erreur, setErreur] = useState('')
+  const [creation, setCreation] = useState(false)
   const [tri, setTri]   = useState({ col: 'numero', sens: 'desc' })
   const [triA, setTriA] = useState({ col: 'date_facture', sens: 'desc' })
 
@@ -182,21 +184,47 @@ export default function LodeDossiers() {
     return s + Math.max(0, (Number(d.montant_a_facturer) || 0) - (c.facture || 0))
   }, 0), [dossiers, parDossier])
 
-  async function creerDossier(titre, client, montant) {
+  // Rien ici ne doit échouer en silence. La première version sortait sans
+  // rien dire quand les champs étaient vides, et n'affichait aucune trace
+  // quand la base refusait : vu de l'écran, le bouton « ne marchait pas ».
+  // Un échec muet est pire qu'un message laid.
+  async function creerDossier(titre, client, montant) {   // client = { id, nom } | null
     setErreur('')
-    const { data: numero, error: e1 } = await supabase.rpc('prochain_numero', {
-      p_type: 'dossier', p_societe: 'LODE', p_prefixe: 'DOS',
-    })
-    if (e1) { setErreur(e1.message); return }
-    const { data, error } = await supabase.from('dossiers').insert({
-      societe: 'LODE', numero, titre: titre || 'Sans titre',
-      client_nom: client || null, type: 'intervention',
-      montant_a_facturer: montant === '' || montant == null ? null : Number(montant),
-      date_debut: new Date().toISOString().slice(0, 10),
-    }).select('id,numero,titre,client_nom,statut,montant_a_facturer,date_debut,created_at').single()
-    if (error) { setErreur(error.message); return }
-    setDossiers(p => [data, ...p])
-    setNouveau(data)
+    try {
+      const { data: numero, error: e1 } = await supabase.rpc('prochain_numero', {
+        p_type: 'dossier', p_societe: 'LODE', p_prefixe: 'DOS',
+      })
+      if (e1) { setErreur(`Numérotation refusée — ${e1.message}`); return false }
+      if (!numero) { setErreur('Numérotation : aucun numéro rendu.'); return false }
+
+      const montantNum = montant === '' || montant == null ? null : Number(String(montant).replace(',', '.'))
+      if (montantNum != null && Number.isNaN(montantNum)) {
+        setErreur('Le prix annoncé doit être un nombre (ex. 2841.96).'); return false
+      }
+
+      const { data, error } = await supabase.from('dossiers').insert({
+        societe: 'LODE', numero, titre: titre || 'Sans titre',
+        // Le client est désormais une VRAIE fiche, pas un nom tapé à la main :
+        // sans elle, on ne peut lui envoyer ni devis ni facture, et deux
+        // orthographes du même nom font deux clients.
+        client_type: client?.id ? 'lode_client' : null,
+        client_id:   client?.id || null,
+        client_nom:  client?.nom || null,
+        type: 'intervention',
+        montant_a_facturer: montantNum,
+        date_debut: new Date().toISOString().slice(0, 10),
+      }).select('id,numero,titre,client_nom,statut,montant_a_facturer,date_debut,created_at').single()
+
+      if (error) { setErreur(`Création refusée — ${error.message}`); return false }
+      setDossiers(p => [data, ...p])
+      setNouveau(data)
+      return true
+    } catch (e) {
+      // Une exception inattendue (réseau coupé, session expirée) ne doit pas
+      // laisser le bouton tourner dans le vide.
+      setErreur(`Erreur inattendue — ${e?.message || e}`)
+      return false
+    }
   }
 
   async function affecter(facture, dossier) {
@@ -247,7 +275,14 @@ export default function LodeDossiers() {
 
         {!loading && onglet === 'dossiers' && (
           <>
-            <FormNouveau onCreer={creerDossier} />
+            <div style={{ ...card, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <button onClick={() => setCreation(true)} style={btn}>
+                <i className="ti ti-plus" style={{ marginRight: 6 }} />Nouveau dossier
+              </button>
+              <span style={{ fontSize: 12.5, color: COUL.texteFaible }}>
+                Le dossier commence par le client : on le retrouve s&apos;il existe, on le crée sinon.
+              </span>
+            </div>
             <div style={{ ...card, padding: 0, overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 760 }}>
                 <thead><tr>
@@ -326,6 +361,15 @@ export default function LodeDossiers() {
         )}
       </div>
 
+      {creation && (
+        <PanneauNouveauDossier
+          onClose={() => setCreation(false)}
+          onCreer={async (titre, client, montant) => {
+            const ok = await creerDossier(titre, client, montant)
+            if (ok) setCreation(false)
+            return ok
+          }} />
+      )}
       {nouveau && <PanneauNumero dossier={nouveau} onClose={() => setNouveau(null)} />}
       {aAttribuer && (
         <PanneauAttribuer facture={aAttribuer} dossiers={dossiers}
@@ -335,34 +379,237 @@ export default function LodeDossiers() {
   )
 }
 
-function FormNouveau({ onCreer }) {
+// La fenêtre de création d'un dossier. Elle commence par le CLIENT.
+//
+// POURQUOI LE CLIENT D'ABORD
+//
+// Ludovic : « lorsque je tape Detilloux et nouveau dossier, il crée le
+// dossier mais il ne propose pas de créer le client. Or on a dit qu'on devait
+// impérativement avoir le client créé, ce qui est logique si on veut pouvoir
+// envoyer un devis. »
+//
+// Un dossier rattaché à un nom tapé à la main ne sert à rien : on ne peut lui
+// envoyer ni devis ni facture, et deux orthographes du même nom font deux
+// clients. La fenêtre cherche donc d'abord dans les clients existants — «
+// DUPLAND » existe, il doit être retrouvé, pas recréé — et n'ouvre le
+// formulaire de création que si personne ne correspond.
+//
+// LE CONSENTEMENT RGPD N'EST PAS ENCORE ENVOYÉ
+//
+// Décidé avec Ludovic : tout nouveau client doit recevoir un mail
+// l'informant de l'encodage de ses données. La case est posée ici et la date
+// sera stockée, mais l'ENVOI reste à brancher — un envoi de courrier est un
+// geste qui sort du Hub, il se construit et se teste à part.
+
+function PanneauNouveauDossier({ onClose, onCreer }) {
+  const [etape, setEtape] = useState('client')   // client | creerClient | dossier
+  const [q, setQ] = useState('')
+  const [clients, setClients] = useState([])
+  const [cherche, setCherche] = useState(false)
+  const [client, setClient] = useState(null)     // { id, nom }
   const [titre, setTitre] = useState('')
-  const [client, setClient] = useState('')
   const [montant, setMontant] = useState('')
   const [occupe, setOccupe] = useState(false)
-  async function go() {
-    if (!titre.trim() && !client.trim()) return
-    setOccupe(true)
-    await onCreer(titre.trim(), client.trim(), montant)
-    setTitre(''); setClient(''); setMontant(''); setOccupe(false)
+  const [erreur, setErreur] = useState('')
+  const [fiche, setFiche] = useState({ type: 'particulier', nom: '', prenom: '', denomination: '',
+                                       email: '', gsm: '', adresse: '', cp: '', ville: '', tva: '' })
+
+  const nomClient = (c) => c.denomination || [c.prenom, c.nom].filter(Boolean).join(' ') || '(sans nom)'
+
+  // Recherche à la frappe, sur le nom, le prénom, la dénomination et la ville.
+  useEffect(() => {
+    let annule = false
+    const t = setTimeout(async () => {
+      setCherche(true)
+      const terme = q.trim()
+      let req = supabase.from('lode_clients').select('id,nom,prenom,denomination,ville,email').limit(40)
+      if (terme) {
+        const m = `%${terme}%`
+        req = req.or(`nom.ilike.${m},prenom.ilike.${m},denomination.ilike.${m},ville.ilike.${m}`)
+      }
+      const { data } = await req.order('nom')
+      if (!annule) { setClients(data || []); setCherche(false) }
+    }, 220)
+    return () => { annule = true; clearTimeout(t) }
+  }, [q])
+
+  async function creerClient() {
+    const estSociete = fiche.type === 'entreprise'
+    if (estSociete ? !fiche.denomination.trim() : !fiche.nom.trim()) {
+      setErreur(estSociete ? 'La dénomination est obligatoire.' : 'Le nom est obligatoire.'); return
+    }
+    setOccupe(true); setErreur('')
+    const { data, error } = await supabase.from('lode_clients').insert({
+      type: fiche.type,
+      nom:          estSociete ? null : fiche.nom.trim().toUpperCase(),
+      prenom:       estSociete ? null : (fiche.prenom.trim() || null),
+      denomination: estSociete ? fiche.denomination.trim() : null,
+      email:   fiche.email.trim()   || null,
+      gsm:     telephonePourBase(fiche.gsm),
+      adresse: fiche.adresse.trim() || null,
+      cp:      fiche.cp.trim()      || null,
+      ville:   fiche.ville.trim()   || null,
+      tva:     estSociete ? (fiche.tva.trim() || null) : null,
+      actif: true,
+    }).select('id,nom,prenom,denomination').single()
+    setOccupe(false)
+    if (error) { setErreur(`Création du client refusée — ${error.message}`); return }
+    setClient({ id: data.id, nom: nomClient(data) })
+    setEtape('dossier')
   }
+
+  async function valider() {
+    if (!titre.trim()) { setErreur("Donne un intitulé à l'intervention."); return }
+    setOccupe(true); setErreur('')
+    const ok = await onCreer(titre.trim(), client, montant)
+    setOccupe(false)
+    if (!ok) setErreur("La création du dossier a échoué — voir le message sur l'écran.")
+  }
+
+  // Le téléphone a son propre champ : il se met en forme pendant la frappe
+  // et dit s'il n'a pas été reconnu, au lieu de l'accepter en silence.
+  const tel = analyserTelephone(fiche.gsm)
+  const champTelephone = () => (
+    <div style={{ flex: '1 1 150px' }}>
+      <label style={{ display: 'block', fontSize: 10.5, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Téléphone</label>
+      <input value={fiche.gsm}
+        onChange={e => setFiche(f => ({ ...f, gsm: telephoneEnFrappe(e.target.value) }))}
+        onBlur={() => setFiche(f => ({ ...f, gsm: tel.valide ? tel.affichage : f.gsm }))}
+        placeholder="0479 28 01 20" style={{
+          ...inp, width: '100%',
+          borderColor: fiche.gsm.trim() && !tel.valide ? COUL.danger : '#cbd5e1',
+        }} />
+      <div style={{ fontSize: 10.5, marginTop: 3, color: tel.valide ? COUL.succes : COUL.texteFaible, minHeight: 14 }}>
+        {tel.vide ? 'Belgique par défaut — tape l\u2019indicatif pour un autre pays'
+          : tel.valide ? `${tel.affichage}${tel.pays && tel.pays !== 'BE' ? ' · ' + tel.pays : ''}`
+          : 'Numéro non reconnu — il sera gardé tel quel'}
+      </div>
+    </div>
+  )
+
+  const champ = (libelle, cle, opts = {}) => (
+    <div style={{ flex: opts.large ? '1 1 100%' : '1 1 150px' }}>
+      <label style={{ display: 'block', fontSize: 10.5, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>{libelle}</label>
+      <input value={fiche[cle]} onChange={e => setFiche(f => ({ ...f, [cle]: e.target.value }))}
+        placeholder={opts.ph || ''} style={{ ...inp, width: '100%' }} />
+    </div>
+  )
+
   return (
-    <div style={{ ...card, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-      <div style={{ flex: '2 1 200px' }}>
-        <label style={{ display: 'block', fontSize: 10.5, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Intervention</label>
-        <input value={titre} onChange={e => setTitre(e.target.value)} placeholder="Remplacement moteur, pose porte…" style={{ ...inp, width: '100%' }} />
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, padding: 16 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 14, width: 'min(620px, 96vw)', maxHeight: '88vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
+          <div style={{ fontSize: 15, fontWeight: 800, color: COUL.texteFort }}>Nouveau dossier</div>
+          <div style={{ fontSize: 12.5, color: COUL.texteDoux, marginTop: 3 }}>
+            {etape === 'client'      && 'Pour qui ? Cherche le client, ou crée-le.'}
+            {etape === 'creerClient' && 'Nouveau client — ces données serviront au devis et à la facture.'}
+            {etape === 'dossier'     && <>Client : <strong>{client?.nom}</strong> · <button onClick={() => setEtape('client')} style={{ border: 'none', background: 'none', color: OR, cursor: 'pointer', fontSize: 12.5, fontFamily: FONT, padding: 0, textDecoration: 'underline' }}>changer</button></>}
+          </div>
+        </div>
+
+        {etape === 'client' && (
+          <>
+            <div style={{ padding: '12px 20px', borderBottom: '1px solid #f1f5f9' }}>
+              <input value={q} onChange={e => setQ(e.target.value)} autoFocus
+                placeholder="Nom, prénom, société, ville…" style={{ ...inp, width: '100%' }} />
+              <div style={{ fontSize: 11, color: COUL.texteFaible, marginTop: 6 }}>
+                {cherche ? 'Recherche…' : `${clients.length} client${clients.length > 1 ? 's' : ''} trouvé${clients.length > 1 ? 's' : ''}`}
+              </div>
+            </div>
+            <div style={{ overflowY: 'auto', flex: 1, minHeight: 120 }}>
+              {clients.map(c => (
+                <div key={c.id} onClick={() => { setClient({ id: c.id, nom: nomClient(c) }); setEtape('dossier') }}
+                  style={{ padding: '11px 20px', borderBottom: '1px solid #f8fafc', cursor: 'pointer' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = COUL.fond }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: COUL.texteFort }}>{nomClient(c)}</div>
+                  <div style={{ fontSize: 11.5, color: COUL.texteFaible }}>{[c.ville, c.email].filter(Boolean).join(' · ') || '—'}</div>
+                </div>
+              ))}
+              {!cherche && clients.length === 0 && (
+                <div style={{ padding: '24px 20px', textAlign: 'center', color: COUL.texteFaible, fontSize: 13 }}>
+                  Aucun client ne correspond.
+                </div>
+              )}
+            </div>
+            <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9' }}>
+              <button onClick={() => { setFiche(f => ({ ...f, nom: q.trim().toUpperCase() })); setEtape('creerClient') }}
+                style={{ ...btn, width: '100%' }}>
+                <i className="ti ti-user-plus" style={{ marginRight: 6 }} />
+                Créer le client{q.trim() ? ` « ${q.trim()} »` : ''}
+              </button>
+            </div>
+          </>
+        )}
+
+        {etape === 'creerClient' && (
+          <div style={{ padding: '14px 20px', overflowY: 'auto', flex: 1 }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              {[['particulier', 'Particulier'], ['entreprise', 'Société']].map(([v, l]) => (
+                <button key={v} onClick={() => setFiche(f => ({ ...f, type: v }))}
+                  style={{ flex: 1, padding: '8px', borderRadius: 8, fontFamily: FONT, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                           border: `1px solid ${fiche.type === v ? OR : '#e2e8f0'}`,
+                           background: fiche.type === v ? '#fff7ed' : COUL.surface,
+                           color: fiche.type === v ? OR : COUL.texteDoux }}>{l}</button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              {fiche.type === 'entreprise'
+                ? <>{champ('Dénomination', 'denomination', { large: true })}{champ('N° TVA', 'tva', { ph: 'BE0123.456.789' })}</>
+                : <>{champ('Nom', 'nom')}{champ('Prénom', 'prenom')}</>}
+              {champ('Courriel', 'email', { ph: 'nom@exemple.be' })}
+              {champTelephone()}
+              {champ('Adresse', 'adresse', { large: true })}
+              {champ('Code postal', 'cp')}
+              {champ('Ville', 'ville')}
+            </div>
+            <div style={{ fontSize: 11.5, color: COUL.texteFaible, marginTop: 12, lineHeight: 1.5, background: COUL.fondDoux, borderRadius: 8, padding: '9px 11px' }}>
+              <strong>RGPD</strong> — tout nouveau client doit être informé de l&apos;encodage de ses données.
+              L&apos;envoi automatique du courriel n&apos;est <strong>pas encore branché</strong> : à faire à la main
+              pour l&apos;instant.
+            </div>
+          </div>
+        )}
+
+        {etape === 'dossier' && (
+          <div style={{ padding: '14px 20px', overflowY: 'auto', flex: 1 }}>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: 'block', fontSize: 10.5, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Intervention</label>
+              <input value={titre} onChange={e => setTitre(e.target.value)} autoFocus
+                onKeyDown={e => e.key === 'Enter' && valider()}
+                placeholder="Remplacement moteur, pose pergola…" style={{ ...inp, width: '100%' }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 10.5, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Prix annoncé au client (TTC)</label>
+              <input value={montant} onChange={e => setMontant(e.target.value)} inputMode="decimal"
+                onKeyDown={e => e.key === 'Enter' && valider()}
+                placeholder="facultatif — sert à repérer un oubli de facturation" style={{ ...inp, width: '100%' }} />
+            </div>
+          </div>
+        )}
+
+        {erreur && (
+          <div style={{ padding: '10px 20px', fontSize: 12.5, color: COUL.dangerFonce, background: COUL.dangerFondDoux, borderTop: '1px solid #f1f5f9' }}>{erreur}</div>
+        )}
+
+        <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+          <button onClick={etape === 'client' ? onClose : () => { setErreur(''); setEtape('client') }}
+            style={{ padding: '9px 14px', borderRadius: 8, border: '1px solid #e2e8f0', background: COUL.surface, color: COUL.texteDoux, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: FONT }}>
+            {etape === 'client' ? 'Annuler' : 'Retour'}
+          </button>
+          {etape === 'creerClient' && (
+            <button onClick={creerClient} disabled={occupe} style={{ ...btn, opacity: occupe ? 0.6 : 1 }}>
+              {occupe ? 'Création…' : 'Créer le client et continuer'}
+            </button>
+          )}
+          {etape === 'dossier' && (
+            <button onClick={valider} disabled={occupe} style={{ ...btn, opacity: occupe ? 0.6 : 1 }}>
+              {occupe ? 'Création…' : 'Créer le dossier'}
+            </button>
+          )}
+        </div>
       </div>
-      <div style={{ flex: '2 1 180px' }}>
-        <label style={{ display: 'block', fontSize: 10.5, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Client</label>
-        <input value={client} onChange={e => setClient(e.target.value)} placeholder="Nom du client" style={{ ...inp, width: '100%' }} />
-      </div>
-      <div style={{ flex: '1 1 150px' }}>
-        <label style={{ display: 'block', fontSize: 10.5, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Prix annoncé (TTC)</label>
-        <input value={montant} onChange={e => setMontant(e.target.value)} inputMode="decimal" placeholder="facultatif" style={{ ...inp, width: '100%' }} />
-      </div>
-      <button onClick={go} disabled={occupe} style={{ ...btn, opacity: occupe ? 0.6 : 1 }}>
-        <i className="ti ti-plus" style={{ marginRight: 6 }} />Nouveau dossier
-      </button>
     </div>
   )
 }
