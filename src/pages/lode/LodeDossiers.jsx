@@ -780,6 +780,7 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
   const [rattacher, setRattacher] = useState(false)
   const [mo, setMo] = useState(false)
   const [heures, setHeures] = useState(dossier.mo_heures == null ? '' : String(dossier.mo_heures))
+  const [numero, setNumero] = useState(dossier.numero || '')
   const [commercial, setCommercial] = useState(dossier.responsable || '')
   const [qui, setQui] = useState(dossier.mo_collaborateur_id || '')
   const [taux, setTaux] = useState(dossier.mo_taux_horaire == null ? '' : String(dossier.mo_taux_horaire))
@@ -830,6 +831,7 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
     || statut !== (dossier.statut || 'ouvert')
     || heures !== (dossier.mo_heures == null ? '' : String(dossier.mo_heures))
     || visites !== (dossier.mo_visites == null ? '' : String(dossier.mo_visites))
+    || numero !== (dossier.numero || '')
     || commercial !== (dossier.responsable || '')
     || String(qui) !== String(dossier.mo_collaborateur_id || '')
     || taux !== (dossier.mo_taux_horaire == null ? '' : String(dossier.mo_taux_horaire))
@@ -844,6 +846,7 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
       setErreur('Les heures et les visites doivent être des nombres positifs.'); setOccupe(false); return
     }
     const patch = {
+      numero: numero.trim() || null,
       titre: titre.trim(),
       date_debut: date || null,
       montant_a_facturer: aFact,
@@ -857,7 +860,21 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
     }
     const { error } = await supabase.from('dossiers').update(patch).eq('id', dossier.id)
     setOccupe(false)
-    if (error) { setErreur(`Enregistrement refusé — ${error.message}`); return }
+    if (error) {
+      setErreur(error.code === '23505'
+        ? `Le numéro « ${patch.numero} » est déjà pris par un autre chantier.`
+        : `Enregistrement refusé — ${error.message}`)
+      return
+    }
+    // Le compteur automatique ignore les renumérotations manuelles : sans ce
+    // recalage, le prochain dossier créé reprendrait un numéro déjà attribué
+    // et l'index unique refuserait l'écriture — des semaines plus tard, chez
+    // quelqu'un qui n'aura rien fait de mal.
+    if (patch.numero && patch.numero !== dossier.numero) {
+      await supabase.rpc('caler_numero', {
+        p_type: 'dossier', p_societe: dossier.societe || 'LODE', p_numero: patch.numero,
+      })
+    }
     onEnregistre(patch)
     // Enregistrer ferme la fenêtre.
     //
@@ -878,7 +895,20 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
 
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontFamily: 'ui-monospace, Menlo, Consolas, monospace', fontSize: 12, fontWeight: 700, color: OR }}>{dossier.numero}</div>
+            {/* ⚠️ NUMÉRO ÉDITABLE — MESURE TEMPORAIRE.
+                Ludovic, à la mise en production : « place les noms des
+                dossiers en mode éditable, que je puisse réécrire correctement
+                et remettre dans l'ordre, puis tu enlèveras cette option
+                après ». Le temps de la reprise, donc — à retirer ensuite,
+                sinon deux dossiers finiront par porter le même numéro malgré
+                l'index unique, ou par trouer la séquence. */}
+            <input value={numero} onChange={e => setNumero(e.target.value)}
+              title="Numéro modifiable — mesure temporaire, le temps de la reprise"
+              style={{
+                fontFamily: 'ui-monospace, Menlo, Consolas, monospace', fontSize: 12, fontWeight: 700,
+                color: OR, border: `1px dashed ${OR}`, borderRadius: 6, padding: '2px 6px',
+                background: COUL.surface, width: 160,
+              }} />
             <div style={{ fontSize: 15, fontWeight: 800, color: COUL.texteFort, marginTop: 2 }}>{dossier.client_nom || 'Sans client'}</div>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, lineHeight: 1, cursor: 'pointer', color: COUL.texteFaible }}>×</button>
