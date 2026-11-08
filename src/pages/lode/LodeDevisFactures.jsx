@@ -8,7 +8,27 @@ import { I18N, CGV_I18N, LANGUES } from '../../lib/lodeI18n'
 import { StatBanner, TabsBar, StatusBadge, ActionButton, DataCard, PrimaryButton, useMobile } from '../../components/ui/AccountableUI'
 import { extraireDevis } from '../../lib/devisExtraction'
 import { COUL } from '../../lib/theme'
+import { useLocation, useNavigate } from 'react-router-dom'
 import QRCode from 'qrcode'
+
+// Comment un client s'affiche dans une liste de résultats.
+//
+// ⚠️ CETTE FONCTION DOIT RESTER AU NIVEAU DU FICHIER.
+//
+// Elle était définie À L'INTÉRIEUR d'un composant, et ModalClient — qui est
+// un AUTRE composant — l'appelait. Le code se lisait bien, la page se
+// chargeait bien, et elle plantait sur « labelClient is not defined » au
+// moment précis où la recherche de client renvoyait un résultat. Autrement
+// dit : elle ne marchait que tant qu'on ne trouvait personne.
+//
+// Elle ne dépend que de son argument : aucune raison qu'elle vive dans la
+// portée d'un composant.
+function labelClient(c) {
+  const nom = c.denomination || (((c.prenom || '') + ' ' + (c.nom || '')).trim()) || '(sans nom)'
+  const icon = c.type === 'entreprise' ? '\u{1F3E2}' : '\u{1F464}'
+  const sub = [c.dossier ? '#' + c.dossier : '', c.ville || c.localite || '', c.email || ''].filter(Boolean).join(' \u00B7 ')
+  return { icon, nom, sub }
+}
 
 const ORANGE = LODE.couleur
 const NAVY = COUL.texte
@@ -207,12 +227,6 @@ function Editeur({ type, doc, onClose, onSaved }) {
     return () => clearTimeout(t)
   }, [clientQuery, searchCols, hasActif])
 
-  const labelClient = (c) => {
-    const nom = c.denomination || (((c.prenom || '') + ' ' + (c.nom || '')).trim()) || '(sans nom)'
-    const icon = c.type === 'entreprise' ? '\u{1F3E2}' : '\u{1F464}'
-    const sub = [c.dossier ? '#' + c.dossier : '', c.ville || c.localite || '', c.email || ''].filter(Boolean).join(' \u00B7 ')
-    return { icon, nom, sub }
-  }
 
   const choisirClient = (c) => {
     if (!c) return
@@ -496,6 +510,10 @@ function Editeur({ type, doc, onClose, onSaved }) {
         total_ht: tot.ht, total_tva: tot.tva, total_ttc: tot.ttc,
         responsable: f.responsable || null,
       }
+      // Le dossier suit le document. Sans ça, un devis créé DEPUIS un dossier
+      // de chantier perdrait son rattachement à l'enregistrement, et l'écran
+      // Dossiers afficherait « rien de facturé » sur un chantier devisé.
+      if (f.dossier_id) payload.dossier_id = f.dossier_id
       if (isDevis) { payload.date_devis = f.date_devis; payload.date_validite = f.date_validite }
       else { payload.date_facture = f.date_facture; payload.date_echeance = f.date_echeance; if (f.devis_id) payload.devis_id = f.devis_id }
       // L'acompte DEJA PAYE se deduit APRES la TVA : ce n'est pas une ligne de
@@ -2542,11 +2560,22 @@ function MenuLigne({ anchor, items, onClose }) {
 }
 
 export default function LodeDevisFactures() {
+  // Arrivée depuis l'écran Dossiers : « créer un devis » y pousse le client
+  // et le dossier, et l'éditeur s'ouvre déjà rempli. On efface l'état de
+  // navigation aussitôt, sinon un simple rechargement rouvrirait l'éditeur.
+  const navLocation = useLocation()
+  const navigateVers = useNavigate()
   const [tab, setTab] = useState('devis')
   const [devis, setDevis] = useState([])
   const [factures, setFactures] = useState([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(null) // {type, doc}
+  useEffect(() => {
+    const d = navLocation.state?.nouveauDevis
+    if (!d) return
+    setEditing({ type: 'devis', doc: d })
+    navigateVers(navLocation.pathname, { replace: true, state: null })
+  }, [navLocation.state])
   const [busy, setBusy] = useState(null)
   const [suivi, setSuivi] = useState(null)      // devis dont on affiche le suivi
   const [apercu, setApercu] = useState(null)      // {fid,nom} apercu PDF au survol

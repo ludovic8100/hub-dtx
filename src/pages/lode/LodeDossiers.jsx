@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
 import { COUL } from '../../lib/theme'
@@ -128,6 +129,8 @@ export default function LodeDossiers() {
   const [aAttribuer, setAAttribuer] = useState(null) // facture d'achat en cours d'attribution
   const [erreur, setErreur] = useState('')
   const [creation, setCreation] = useState(false)
+  const [ouvert, setOuvert] = useState(null)      // dossier dont la fiche est ouverte
+  const navigate = useNavigate()
   const [tri, setTri]   = useState({ col: 'numero', sens: 'desc' })
   const [triA, setTriA] = useState({ col: 'date_facture', sens: 'desc' })
 
@@ -320,7 +323,10 @@ export default function LodeDossiers() {
                   {lignesTriees.map(d => {
                     const vide = <span style={{ color: '#cbd5e1' }}>—</span>
                     return (
-                      <tr key={d.id}>
+                      <tr key={d.id} onClick={() => setOuvert(d)}
+                        style={{ cursor: 'pointer' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = COUL.fond }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
                         <td style={{ ...td, fontWeight: 700, fontFamily: 'ui-monospace, Menlo, Consolas, monospace', fontSize: 12 }}>{d.numero || '—'}</td>
                         <td style={td}>{d.titre}{d.nbAchats > 0 && <span style={{ fontSize: 11, color: COUL.texteFaible, marginLeft: 6 }}>· {d.nbAchats} achat{d.nbAchats > 1 ? 's' : ''}</span>}</td>
                         <td style={{ ...td, color: COUL.texteDoux }}>{d.client_nom || '—'}</td>
@@ -387,6 +393,19 @@ export default function LodeDossiers() {
             if (ok) setCreation(false)
             return ok
           }} />
+      )}
+      {ouvert && (
+        <FicheDossier
+          dossier={ouvert}
+          achats={achats.filter(a => a.destination_type === 'dossier' && a.destination_id === ouvert.id)}
+          ventes={ventes.filter(v => v.dossier_id === ouvert.id)}
+          onClose={() => setOuvert(null)}
+          onEnregistre={(patch) => {
+            setDossiers(p => p.map(x => x.id === ouvert.id ? { ...x, ...patch } : x))
+            setOuvert(o => ({ ...o, ...patch }))
+          }}
+          onDevis={() => navigate('/lode/devis-factures', { state: { nouveauDevis: devisDepuisDossier(ouvert) } })}
+        />
       )}
       {nouveau && <PanneauNumero dossier={nouveau} onClose={() => setNouveau(null)} />}
       {aAttribuer && (
@@ -627,6 +646,190 @@ function PanneauNouveauDossier({ onClose, onCreer }) {
             </button>
           )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+// Le brouillon de devis qu'un dossier engendre : le client et le dossier,
+// rien d'autre. L'éditeur de devis fait le reste.
+//
+// On recopie aussi les coordonnées du client sur le document, comme le fait
+// l'éditeur : un devis doit rester lisible tel qu'il a été émis, même si le
+// client déménage ensuite.
+function devisDepuisDossier(d) {
+  return {
+    dossier_id: d.id,
+    client_id: d.client_type === 'lode_client' ? d.client_id : null,
+    client_nom: d.client_nom || '',
+    client_adresse: d.adresse || '',
+    client_cp: d.cp || '',
+    client_ville: d.ville || '',
+    objet: d.titre || '',
+  }
+}
+
+// La fiche d'un dossier.
+//
+// Ludovic : « il manque la date de création du dossier — attention, la date
+// doit être modifiable et l'intervention aussi », puis « tu cliques sur le
+// dossier et tu sais créer un devis ».
+//
+// Les deux vont ensemble : un dossier qu'on ne peut pas corriger est un
+// dossier qu'on recrée, et un dossier qui ne débouche sur rien n'a pas de
+// raison d'exister.
+function FicheDossier({ dossier, achats, ventes, onClose, onEnregistre, onDevis }) {
+  const [titre, setTitre] = useState(dossier.titre || '')
+  const [date, setDate] = useState((dossier.date_debut || '').slice(0, 10))
+  const [montant, setMontant] = useState(dossier.montant_a_facturer == null ? '' : String(dossier.montant_a_facturer))
+  const [statut, setStatut] = useState(dossier.statut || 'ouvert')
+  const [occupe, setOccupe] = useState(false)
+  const [erreur, setErreur] = useState('')
+  const [enregistre, setEnregistre] = useState(false)
+
+  const coute    = achats.reduce((s, a) => s + (Number(a.montant) || 0), 0)
+  const facture  = ventes.reduce((s, v) => s + (Number(v.total_ttc) || 0), 0)
+  const encaisse = ventes.reduce((s, v) => s + (Number(v.montant_paye) || 0), 0)
+  const aFact    = montant === '' ? null : Number(String(montant).replace(',', '.'))
+  const manque   = aFact == null || Number.isNaN(aFact) ? null : Math.max(0, aFact - facture)
+
+  const modifie = titre !== (dossier.titre || '')
+    || date !== (dossier.date_debut || '').slice(0, 10)
+    || montant !== (dossier.montant_a_facturer == null ? '' : String(dossier.montant_a_facturer))
+    || statut !== (dossier.statut || 'ouvert')
+
+  async function enregistrer() {
+    if (!titre.trim()) { setErreur("L'intervention ne peut pas être vide."); return }
+    if (aFact != null && Number.isNaN(aFact)) { setErreur('Le prix annoncé doit être un nombre.'); return }
+    setOccupe(true); setErreur('')
+    const patch = {
+      titre: titre.trim(),
+      date_debut: date || null,
+      montant_a_facturer: aFact,
+      statut,
+      updated_at: new Date().toISOString(),
+    }
+    const { error } = await supabase.from('dossiers').update(patch).eq('id', dossier.id)
+    setOccupe(false)
+    if (error) { setErreur(`Enregistrement refusé — ${error.message}`); return }
+    onEnregistre(patch)
+    setEnregistre(true); setTimeout(() => setEnregistre(false), 2000)
+  }
+
+  const lbl = { display: 'block', fontSize: 10.5, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, padding: 16 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 14, width: 'min(700px, 96vw)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontFamily: 'ui-monospace, Menlo, Consolas, monospace', fontSize: 12, fontWeight: 700, color: OR }}>{dossier.numero}</div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: COUL.texteFort, marginTop: 2 }}>{dossier.client_nom || 'Sans client'}</div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, lineHeight: 1, cursor: 'pointer', color: COUL.texteFaible }}>×</button>
+        </div>
+
+        <div style={{ overflowY: 'auto', flex: 1 }}>
+          <div style={{ padding: '14px 20px', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ flex: '2 1 240px' }}>
+              <label style={lbl}>Intervention</label>
+              <input value={titre} onChange={e => setTitre(e.target.value)} style={{ ...inp, width: '100%' }} />
+            </div>
+            <div style={{ flex: '1 1 140px' }}>
+              <label style={lbl}>Date du dossier</label>
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...inp, width: '100%' }} />
+            </div>
+            <div style={{ flex: '1 1 140px' }}>
+              <label style={lbl}>Prix annoncé (TTC)</label>
+              <input value={montant} onChange={e => setMontant(e.target.value)} inputMode="decimal" placeholder="—" style={{ ...inp, width: '100%' }} />
+            </div>
+            <div style={{ flex: '1 1 140px' }}>
+              <label style={lbl}>État</label>
+              <select value={statut} onChange={e => setStatut(e.target.value)} style={{ ...inp, width: '100%' }}>
+                <option value="ouvert">Ouvert</option>
+                <option value="clos">Clos</option>
+              </select>
+            </div>
+          </div>
+
+          <div style={{ padding: '0 20px 14px', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {[['Coûté', coute, COUL.texteSombre], ['À facturer', aFact, COUL.texteSombre],
+              ['Facturé', facture, COUL.texteSombre], ['Encaissé', encaisse, COUL.succes],
+              ['Manquant', manque, manque > 0 ? COUL.danger : COUL.texteFaible]].map(([l, v, c]) => (
+              <div key={l} style={{ flex: '1 1 110px', background: COUL.fond, borderRadius: 9, padding: '9px 11px' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.04em' }}>{l}</div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: c, fontVariantNumeric: 'tabular-nums' }}>
+                  {v == null ? '—' : eur(v)}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <Section titre={`Achats rattachés (${achats.length})`}>
+            {achats.length === 0 && <Vide texte="Aucun achat rattaché. Onglet « Achats à attribuer » pour en rattacher un." />}
+            {achats.map(a => (
+              <Ligne2 key={a.id}
+                gauche={a.fournisseur || 'fournisseur inconnu'}
+                sousGauche={`${fmtDate(a.date_facture)}${a.numero ? ' · n°' + a.numero : ''}`}
+                droite={eur(a.montant)}
+                sousDroite={a.transaction_id ? 'payée' : 'non payée'}
+                tonDroite={a.transaction_id ? COUL.succes : COUL.danger} />
+            ))}
+          </Section>
+
+          <Section titre={`Devis et factures (${ventes.length})`}>
+            {ventes.length === 0 && <Vide texte="Rien d'émis pour ce dossier." />}
+            {ventes.map(v => (
+              <Ligne2 key={v.id}
+                gauche={`${v.numero} — ${v.objet || ''}`}
+                sousGauche={v.statut || ''}
+                droite={eur(v.total_ttc)}
+                sousDroite={`encaissé ${eur(v.montant_paye || 0)}`}
+                tonDroite={COUL.texteFaible} />
+            ))}
+          </Section>
+        </div>
+
+        {erreur && <div style={{ padding: '10px 20px', fontSize: 12.5, color: COUL.dangerFonce, background: COUL.dangerFondDoux }}>{erreur}</div>}
+
+        <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button onClick={onDevis} style={{ ...btn, background: COUL.surface, color: OR, border: `1px solid ${OR}` }}>
+            <i className="ti ti-file-plus" style={{ marginRight: 6 }} />Créer un devis
+          </button>
+          <span style={{ flex: 1 }} />
+          {enregistre && <span style={{ fontSize: 12.5, color: COUL.succes, fontWeight: 600 }}>✓ Enregistré</span>}
+          <button onClick={enregistrer} disabled={occupe || !modifie}
+            style={{ ...btn, opacity: occupe || !modifie ? 0.5 : 1 }}>
+            {occupe ? 'Enregistrement…' : 'Enregistrer'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Section({ titre, children }) {
+  return (
+    <div style={{ borderTop: '1px solid #f1f5f9' }}>
+      <div style={{ padding: '10px 20px 4px', fontSize: 10.5, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.04em' }}>{titre}</div>
+      <div style={{ paddingBottom: 8 }}>{children}</div>
+    </div>
+  )
+}
+function Vide({ texte }) {
+  return <div style={{ padding: '10px 20px 14px', fontSize: 12.5, color: COUL.texteFaible }}>{texte}</div>
+}
+function Ligne2({ gauche, sousGauche, droite, sousDroite, tonDroite }) {
+  return (
+    <div style={{ padding: '8px 20px', display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline' }}>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: COUL.texteFort, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{gauche}</div>
+        <div style={{ fontSize: 11.5, color: COUL.texteFaible }}>{sousGauche}</div>
+      </div>
+      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{droite}</div>
+        <div style={{ fontSize: 11, color: tonDroite, fontWeight: 600 }}>{sousDroite}</div>
       </div>
     </div>
   )
