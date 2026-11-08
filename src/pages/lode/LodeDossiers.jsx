@@ -139,6 +139,10 @@ export default function LodeDossiers() {
   // ne montre que les erreurs futures et jamais les erreurs passées ne sert
   // qu'à moitié — on ne peut pas corriger ce qu'on ne voit plus.
   const [toutVoir, setToutVoir] = useState(false)
+  // Un dossier clos n'a plus rien à dire : il encombre une liste qui doit
+  // montrer ce qui reste à faire. Il reste consultable d'une case à cocher —
+  // masqué n'est pas supprimé.
+  const [voirClos, setVoirClos] = useState(false)
 
   async function charger() {
     setLoading(true)
@@ -196,7 +200,10 @@ export default function LodeDossiers() {
     }
   }), [dossiers, parDossier])
 
-  const lignesTriees = useMemo(() => trier(lignes, tri.col, tri.sens), [lignes, tri])
+  const lignesTriees = useMemo(
+    () => trier(voirClos ? lignes : lignes.filter(d => d.statut !== 'clos'), tri.col, tri.sens),
+    [lignes, tri, voirClos])
+  const nbClos = useMemo(() => dossiers.filter(d => d.statut === 'clos').length, [dossiers])
 
   const nonAffectes = useMemo(
     () => trier(achats.filter(a => !a.destination_type), triA.col, triA.sens),
@@ -312,9 +319,15 @@ export default function LodeDossiers() {
               <button onClick={() => setCreation(true)} style={btn}>
                 <i className="ti ti-plus" style={{ marginRight: 6 }} />Nouveau dossier
               </button>
-              <span style={{ fontSize: 12.5, color: COUL.texteFaible }}>
+              <span style={{ fontSize: 12.5, color: COUL.texteFaible, flex: 1 }}>
                 Le dossier commence par le client : on le retrouve s&apos;il existe, on le crée sinon.
               </span>
+              {nbClos > 0 && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: COUL.texteDoux, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                  <input type="checkbox" checked={voirClos} onChange={e => setVoirClos(e.target.checked)} />
+                  Voir les {nbClos} dossier{nbClos > 1 ? 's' : ''} clos
+                </label>
+              )}
             </div>
             <div style={{ ...card, padding: 0, overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 760 }}>
@@ -753,7 +766,6 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, onClose, onE
   const [statut, setStatut] = useState(dossier.statut || 'ouvert')
   const [occupe, setOccupe] = useState(false)
   const [erreur, setErreur] = useState('')
-  const [enregistre, setEnregistre] = useState(false)
   const [rattacher, setRattacher] = useState(false)
 
   const coute    = achats.reduce((s, a) => s + (Number(a.montant) || 0), 0)
@@ -782,7 +794,15 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, onClose, onE
     setOccupe(false)
     if (error) { setErreur(`Enregistrement refusé — ${error.message}`); return }
     onEnregistre(patch)
-    setEnregistre(true); setTimeout(() => setEnregistre(false), 2000)
+    // Enregistrer ferme la fenêtre.
+    //
+    // Ludovic : « quand on clique sur clos puis enregistrer, il doit fermer
+    // la fenêtre, pas la laisser ouverte ». C'est vrai de tout enregistrement,
+    // pas seulement de la clôture : laisser la fenêtre ouverte avec un « ✓ »
+    // qui s'efface au bout de deux secondes oblige à se demander si c'est
+    // parti. Fermer EST la confirmation — et la ligne mise à jour derrière la
+    // montre.
+    onClose()
   }
 
   const lbl = { display: 'block', fontSize: 10.5, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }
@@ -881,7 +901,6 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, onClose, onE
             <i className="ti ti-file-plus" style={{ marginRight: 6 }} />Créer un devis
           </button>
           <span style={{ flex: 1 }} />
-          {enregistre && <span style={{ fontSize: 12.5, color: COUL.succes, fontWeight: 600 }}>✓ Enregistré</span>}
           <button onClick={enregistrer} disabled={occupe || !modifie}
             style={{ ...btn, opacity: occupe || !modifie ? 0.5 : 1 }}>
             {occupe ? 'Enregistrement…' : 'Enregistrer'}
