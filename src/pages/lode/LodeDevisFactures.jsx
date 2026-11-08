@@ -1,5 +1,5 @@
 import { n8nWebhook } from '../../config/env'
-import { useState, useEffect, useRef, useLayoutEffect } from 'react'
+import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
 import { PEPPOL_ACTIF } from '../../lib/peppol'
 import Layout from '../../components/Layout'
@@ -174,6 +174,28 @@ function Editeur({ type, doc, onClose, onSaved }) {
       .then(({ data }) => { if (!annule) setDossiersDispo(data || []) })
     return () => { annule = true }
   }, [isDevis])
+
+  // ⚠️ LA LISTE DES CHANTIERS DOIT ÊTRE FILTRÉE PAR CLIENT.
+  //
+  // Ludovic : « je peux ajouter ce que je veux... ici j'ai attribué Dewez au
+  // chantier Detilloux ». Un chantier appartient à un client : proposer tous
+  // les chantiers ouverts, c'est rendre l'erreur non seulement possible mais
+  // probable — et une fois faite, elle est invisible, puisque les deux noms
+  // s'affichent chacun à leur place.
+  //
+  // Sans client choisi, la liste est VIDE plutôt que complète : mieux vaut
+  // une liste qui oblige à choisir le client qu'une liste qui laisse se
+  // tromper.
+  const dossiersDuClient = useMemo(
+    () => f.client_id ? dossiersDispo.filter(d => String(d.client_id) === String(f.client_id)) : [],
+    [dossiersDispo, f.client_id])
+
+  // Changer de client invalide le chantier déjà choisi : il appartenait à
+  // quelqu'un d'autre.
+  useEffect(() => {
+    if (!isDevis || !f.dossier_id) return
+    if (!dossiersDuClient.some(d => d.id === f.dossier_id)) set('dossier_id', null)
+  }, [f.client_id, dossiersDispo])
 
   // Créer le chantier depuis le devis : tout est déjà là.
   const creerDossierDepuisDevis = async () => {
@@ -964,13 +986,20 @@ function Editeur({ type, doc, onClose, onSaved }) {
                   <select style={{ ...inp, borderColor: f.dossier_id ? COUL.bord : COUL.danger }}
                     value={f.dossier_id || ''} onChange={e => set('dossier_id', e.target.value || null)}>
                     <option value="">— aucun (obligatoire)</option>
-                    {dossiersDispo.map(d => (
+                    {dossiersDuClient.map(d => (
                       <option key={d.id} value={d.id}>
-                        {d.numero} · {d.titre}{d.client_nom ? ' · ' + d.client_nom : ''}
+                        {d.numero} · {d.titre}
                       </option>
                     ))}
                   </select>
-                  {!f.dossier_id && (
+                  <div style={{ fontSize: 11, color: COUL.texteFaible, marginTop: 4 }}>
+                    {!f.client_id
+                      ? 'Choisis d’abord le client : la liste s’y limitera.'
+                      : dossiersDuClient.length === 0
+                        ? `Aucun chantier ouvert pour ${f.client_nom || 'ce client'}.`
+                        : `Chantiers de ${f.client_nom || 'ce client'} uniquement.`}
+                  </div>
+                  {!f.dossier_id && f.client_id && (
                     <button type="button" onClick={creerDossierDepuisDevis} disabled={creationDossier}
                       style={{ marginTop: 6, width: '100%', padding: '8px', borderRadius: 8, border: `1px solid ${ORANGE}`, background: COUL.blanc, color: ORANGE, fontSize: 12.5, fontWeight: 700, cursor: creationDossier ? 'wait' : 'pointer', fontFamily: 'inherit' }}>
                       {creationDossier ? 'Création…' : `+ Créer le chantier${f.client_nom ? ' pour ' + f.client_nom : ''}`}

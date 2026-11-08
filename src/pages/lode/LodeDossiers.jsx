@@ -125,6 +125,7 @@ export default function LodeDossiers() {
   const [dossiers, setDossiers] = useState([])
   const [achats, setAchats] = useState([])
   const [ventes, setVentes] = useState([])
+  const [devis, setDevis] = useState([])
   const [loading, setLoading] = useState(true)
   const [nouveau, setNouveau] = useState(null)   // dossier fraîchement créé, à montrer en grand
   const [aAttribuer, setAAttribuer] = useState(null) // facture d'achat en cours d'attribution
@@ -146,7 +147,7 @@ export default function LodeDossiers() {
 
   async function charger() {
     setLoading(true)
-    const [d, a, v] = await Promise.all([
+    const [d, a, v, dv] = await Promise.all([
       supabase.from('dossiers')
         .select('id,numero,titre,client_nom,client_type,client_id,statut,montant_a_facturer,date_debut,created_at,mo_heures,mo_visites,mo_collaborateur_id,mo_taux_horaire')
         .eq('societe', 'LODE').order('created_at', { ascending: false }),
@@ -155,8 +156,14 @@ export default function LodeDossiers() {
         .eq('societe', 'LODE').eq('sens', 'achat').order('date_facture', { ascending: false }),
       supabase.from('lode_factures')
         .select('id,numero,client_nom,total_ttc,montant_paye,dossier_id,statut'),
+      // La section s'appelle « Devis et factures » : sans ce chargement elle
+      // n'a jamais montré que des factures, et un devis rattaché au chantier
+      // restait invisible. Un écran qui annonce deux choses et n'en montre
+      // qu'une fait douter de la donnée, pas de l'écran.
+      supabase.from('lode_devis')
+        .select('id,numero,client_nom,objet,total_ttc,statut,date_devis,dossier_id'),
     ])
-    setDossiers(d.data || []); setAchats(a.data || []); setVentes(v.data || [])
+    setDossiers(d.data || []); setAchats(a.data || []); setVentes(v.data || []); setDevis(dv.data || [])
     setLoading(false)
   }
   useEffect(() => { charger() }, [])
@@ -452,6 +459,7 @@ export default function LodeDossiers() {
             destination_nom: `${ouvert.numero ? ouvert.numero + ' · ' : ''}${ouvert.titre}`,
           })}
           ventes={ventes.filter(v => v.dossier_id === ouvert.id)}
+          devis={devis.filter(v => v.dossier_id === ouvert.id)}
           onClose={() => setOuvert(null)}
           onEnregistre={(patch) => {
             setDossiers(p => p.map(x => x.id === ouvert.id ? { ...x, ...patch } : x))
@@ -759,7 +767,7 @@ async function devisDepuisDossier(d) {
 // Les deux vont ensemble : un dossier qu'on ne peut pas corriger est un
 // dossier qu'on recrée, et un dossier qui ne débouche sur rien n'a pas de
 // raison d'exister.
-function FicheDossier({ dossier, achats, achatsLibres = [], ventes, onClose, onEnregistre, onDevis, onRattacher }) {
+function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], onClose, onEnregistre, onDevis, onRattacher }) {
   const [titre, setTitre] = useState(dossier.titre || '')
   const [date, setDate] = useState((dossier.date_debut || '').slice(0, 10))
   const [montant, setMontant] = useState(dossier.montant_a_facturer == null ? '' : String(dossier.montant_a_facturer))
@@ -989,8 +997,16 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, onClose, onE
             ))}
           </Section>
 
-          <Section titre={`Devis et factures (${ventes.length})`}>
-            {ventes.length === 0 && <Vide texte="Rien d'émis pour ce dossier." />}
+          <Section titre={`Devis et factures (${devis.length + ventes.length})`}>
+            {devis.length === 0 && ventes.length === 0 && <Vide texte="Rien d'émis pour ce dossier." />}
+            {devis.map(d => (
+              <Ligne2 key={'d' + d.id}
+                gauche={`Devis ${d.numero}${d.objet ? ' — ' + d.objet : ''}`}
+                sousGauche={`${d.statut || ''}${d.date_devis ? ' · ' + fmtDate(d.date_devis) : ''}`}
+                droite={eur(d.total_ttc)}
+                sousDroite={d.statut === 'accepté' ? 'à facturer' : ''}
+                tonDroite={d.statut === 'accepté' ? COUL.danger : COUL.texteFaible} />
+            ))}
             {ventes.map(v => (
               <Ligne2 key={v.id}
                 gauche={`${v.numero} — ${v.objet || ''}`}
