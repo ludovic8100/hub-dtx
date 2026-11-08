@@ -13,6 +13,12 @@ import { HUB_URL } from '../config/env'
 //
 // Le domaine a donc été remis sur le projet, et il sert cette page-ci.
 //
+// LE TON EST CELUI D'UNE ANNONCE, PAS D'UNE ERREUR. Un visiteur qui lit
+// « cette adresse n'est plus la bonne » croit avoir fait une faute ; un
+// visiteur qui lit « notre plateforme a déménagé » comprend qu'on l'a
+// déplacée pour lui. La seconde formule dit la même chose et ne met personne
+// en défaut.
+//
 // POURQUOI PAS UNE REDIRECTION AUTOMATIQUE
 //
 // Parce qu'une redirection silencieuse ne corrige pas le favori : la personne
@@ -64,15 +70,16 @@ export default function AncienneAdresse() {
             fontSize: 21, fontWeight: 700, color: COUL.marine,
             margin: '0 0 10px', lineHeight: 1.3,
           }}>
-            Cette adresse n'est plus celle du Hub
+            Notre plateforme a déménagé
           </h1>
 
           <p style={{
             fontSize: 15, color: COUL.texteDoux, lineHeight: 1.55,
             margin: '0 0 22px',
           }}>
-            Le Hub a déménagé. Tout s'y trouve toujours — clients, comptabilité,
-            devis, factures — à sa nouvelle adresse.
+            Pour votre confort et votre sécurité, le Hub DTX est désormais
+            accessible à son adresse définitive. Vos identifiants et vos données
+            restent inchangés.
           </p>
 
           <a
@@ -86,14 +93,14 @@ export default function AncienneAdresse() {
               fontSize: 15.5, fontWeight: 700,
             }}
           >
-            Aller sur hub.dtx-group.be
+            Accéder au Hub DTX
             <span aria-hidden="true" style={{ fontSize: 17, lineHeight: 1 }}>→</span>
           </a>
 
           <p style={{
             fontSize: 13, color: COUL.texteFaible, margin: '18px 0 0', lineHeight: 1.5,
           }}>
-            Pensez à remplacer votre favori :<br />
+            Pensez à mettre à jour votre favori :<br />
             <span style={{
               display: 'inline-block', marginTop: 5,
               fontFamily: 'ui-monospace, Menlo, Consolas, monospace',
