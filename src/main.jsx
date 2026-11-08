@@ -1,13 +1,13 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
-import { injecterFeuille, appliquer, preferenceLue } from './lib/themes'
+import { injecterFeuille, appliquer } from './lib/themes'
 
 // L'ambiance est posée AVANT le premier rendu, pas dans un effet React.
 // Sinon la page s'affiche en clair puis bascule — un éclair blanc d'une
 // demi-seconde à chaque chargement, que l'on ne rattrape plus ensuite.
 injecterFeuille()
-appliquer(preferenceLue())
+appliquer()
 
 // Un déploiement renomme les fichiers de l'application. Un onglet laissé ouvert
 // garde l'ancienne page d'accueil, qui réclame des morceaux de code effacés

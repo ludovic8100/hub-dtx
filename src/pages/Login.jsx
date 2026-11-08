@@ -1,7 +1,7 @@
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { COUL } from '../lib/theme'
-import { AMBIANCES, preferenceLue } from '../lib/themes'
+import { AMBIANCES, ambianceEffective } from '../lib/themes'
 
 // La page de garde.
 //
@@ -24,13 +24,15 @@ import { AMBIANCES, preferenceLue } from '../lib/themes'
 // d'une colonne, la carte dessous. Aucun recadrage, à aucune largeur — ce qui
 // règle du même coup la demande de « variantes mobiles moins recadrées ».
 //
-// ⚠️ LA COUVERTURE AFFICHÉE EST CELLE DU NAVIGATEUR, PAS CELLE DU JOUR
+// ⚠️ LA COUVERTURE VIENT DU CACHE, PAS DE LA BASE
 //
-// Personne n'est connecté ici : la seule préférence disponible est celle
-// mémorisée dans ce navigateur. Quelqu'un qui n'a jamais choisi voit donc
-// Standard, même le 24 décembre. C'est la conséquence directe de la règle
-// « pas d'ambiance automatique sans validation » — à rouvrir si on veut que
-// la page de garde suive le calendrier pour tout le monde.
+// Personne n'est connecté ici : la page ne peut pas lire `ref_ambiances`,
+// qui n'est lisible que par un compte authentifié. Elle affiche donc le
+// dernier réglage que CE navigateur a vu — posé à la connexion précédente.
+//
+// Conséquence : un navigateur qui n'a jamais ouvert le Hub voit Standard,
+// même si l'administrateur a mis Noël. Dès la première connexion, le cache
+// est à jour et la page de garde suit.
 
 export default function Login() {
   const { user, loading, signInWithMicrosoft, erreurConnexion } = useAuth()
@@ -39,8 +41,7 @@ export default function Login() {
   // (sinon un simple retour sur /login masque une connexion pourtant réussie).
   if (!loading && user) return <Navigate to="/" replace />
 
-  const pref = preferenceLue()
-  const ambiance = AMBIANCES[pref.ambiance] || AMBIANCES.standard
+  const ambiance = AMBIANCES[ambianceEffective()] || AMBIANCES.standard
 
   return (
     <div style={{

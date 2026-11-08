@@ -5,6 +5,8 @@ import Sidebar from './Sidebar'
 import ErrorBoundary from './ErrorBoundary'
 import { useAuth } from '../lib/auth'
 import { bootstrapConfigs } from '../lib/bootstrapConfigs'
+import { supabase } from '../lib/supabase'
+import { reglesEcrites, appliquer } from '../lib/themes'
 import { COUL } from '../lib/theme'
 
 // Préfixe d'URL → code entité
@@ -25,6 +27,30 @@ export default function Layout({ children, currentPage }) {
 
   // Charge les coordonnées des sociétés depuis la base (une fois) pour les documents devis/factures
   useEffect(() => { bootstrapConfigs() }, [])
+
+  // L'ambiance est un réglage de GROUPE, posé par un administrateur dans
+  // Paramètres. On le relit à chaque entrée dans le Hub et on le met en cache.
+  //
+  // POURQUOI UN CACHE ET PAS UNE SIMPLE REQUÊTE : la feuille de style est
+  // posée AVANT le premier rendu (main.jsx), donc avant toute requête. Sans
+  // cache, chaque chargement montrerait Standard une demi-seconde puis
+  // basculerait. Le cache sert le prochain chargement ; celui-ci se corrige
+  // ici, une fois, sans que personne le voie.
+  useEffect(() => {
+    let annule = false
+    ;(async () => {
+      const { data, error } = await supabase
+        .from('ref_ambiances')
+        .select('code,actif,forcee,debut_mois,debut_jour,fin_mois,fin_jour')
+        .order('ordre')
+      // Table absente ou illisible : on garde le cache précédent plutôt que
+      // de repeindre le Hub en Standard sur une erreur réseau.
+      if (annule || error || !data) return
+      reglesEcrites(data)
+      appliquer(data)
+    })()
+    return () => { annule = true }
+  }, [])
 
   // Synchronise l'entité active du menu avec l'URL courante
   useEffect(() => {
@@ -67,7 +93,7 @@ export default function Layout({ children, currentPage }) {
 
         {/* Sidebar — modules uniquement, plus de SocieteSelector */}
         {sidebarVisible && (
-          <aside style={{
+          <aside className="hub-saison-volet" style={{
             width: '220px',
             minWidth: '220px',
             display: 'flex',
@@ -86,7 +112,7 @@ export default function Layout({ children, currentPage }) {
           </aside>
         )}
 
-        <main style={{
+        <main className="hub-saison-zone" style={{
           flex: 1,
           width: '100%',
           minWidth: 0,
