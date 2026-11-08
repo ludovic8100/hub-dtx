@@ -404,7 +404,7 @@ export default function LodeDossiers() {
             setDossiers(p => p.map(x => x.id === ouvert.id ? { ...x, ...patch } : x))
             setOuvert(o => ({ ...o, ...patch }))
           }}
-          onDevis={() => navigate('/lode/devis-factures', { state: { nouveauDevis: devisDepuisDossier(ouvert) } })}
+          onDevis={async () => navigate('/lode/devis-factures', { state: { nouveauDevis: await devisDepuisDossier(ouvert) } })}
         />
       )}
       {nouveau && <PanneauNumero dossier={nouveau} onClose={() => setNouveau(null)} />}
@@ -657,15 +657,43 @@ function PanneauNouveauDossier({ onClose, onCreer }) {
 // On recopie aussi les coordonnées du client sur le document, comme le fait
 // l'éditeur : un devis doit rester lisible tel qu'il a été émis, même si le
 // client déménage ensuite.
-function devisDepuisDossier(d) {
-  return {
+// ⚠️ LES COORDONNÉES VIENNENT DU CLIENT, PAS DU DOSSIER.
+//
+// Première version : je recopiais `d.adresse`, `d.cp`, `d.ville` — les
+// champs du DOSSIER, que la fenêtre de création ne demande même pas. Un
+// devis engendré depuis un dossier sortait donc avec « Ludovic DETILLOUX »
+// et rien d'autre : ni rue, ni code postal, ni TVA. Inutilisable.
+//
+// On va donc lire la fiche client. Si elle est introuvable, on retombe sur
+// ce que le dossier sait — un devis incomplet vaut mieux qu'un écran qui
+// refuse de s'ouvrir.
+async function devisDepuisDossier(d) {
+  const base = {
     dossier_id: d.id,
     client_id: d.client_type === 'lode_client' ? d.client_id : null,
     client_nom: d.client_nom || '',
-    client_adresse: d.adresse || '',
-    client_cp: d.cp || '',
-    client_ville: d.ville || '',
     objet: d.titre || '',
+  }
+  if (!base.client_id) return base
+
+  const { data: c } = await supabase.from('lode_clients')
+    .select('nom,prenom,denomination,type,adresse,cp,ville,pays,email,telephone,gsm,tva,langue')
+    .eq('id', base.client_id).maybeSingle()
+  if (!c) return base
+
+  return {
+    ...base,
+    client_nom: c.type === 'entreprise'
+      ? (c.denomination || base.client_nom)
+      : ([c.prenom, c.nom].filter(Boolean).join(' ') || base.client_nom),
+    client_adresse:   c.adresse || '',
+    client_cp:        c.cp || '',
+    client_ville:     c.ville || '',
+    client_pays:      c.pays || 'Belgique',
+    client_email:     c.email || '',
+    client_telephone: c.telephone || c.gsm || '',
+    client_tva:       c.tva || '',
+    langue:           c.langue || 'fr',
   }
 }
 
