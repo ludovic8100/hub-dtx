@@ -1,3 +1,4 @@
+import { voile } from '../../lib/voile'
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import Layout from '../../components/Layout'
@@ -128,7 +129,7 @@ function WorkflowPanel({ sinistre, onClose }) {
 
   return (
     <>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.35)', zIndex: 1100 }} />
+      <div {...voile(onClose)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.35)', zIndex: 1100 }} />
       <div style={{
         position: 'fixed', top: 0, right: 0, bottom: 0, width: '100%', maxWidth: 520,
         background: COUL.surface, zIndex: 1101, display: 'flex', flexDirection: 'column',
@@ -298,7 +299,7 @@ function MontantCard({ label, value, col }) {
 function SinistreDetail({ s, onClose, onWorkflow }) {
   const es = etatStyle(s.etat)
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '6vh 16px' }}>
+    <div {...voile(onClose)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '6vh 16px' }}>
       <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 14, width: '100%', maxWidth: 680, maxHeight: '84vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
         <div style={{ padding: '18px 22px', borderBottom: '1px solid #f1f5f9', background: `linear-gradient(135deg, ${E.color}, ${E.colorDark})`, color: COUL.blanc }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>

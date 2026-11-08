@@ -1,3 +1,4 @@
+import { voile } from '../../lib/voile'
 import { n8nWebhook } from '../../config/env'
 import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
@@ -632,6 +633,16 @@ function Editeur({ type, doc, onClose, onSaved }) {
         ...(isDevis ? {} : { bloc: l.bloc || null }),
         total_ht: (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * (1 - (Number(l.remise_pct) || 0) / 100),
       }))
+      // Le commercial choisi sur le devis remonte au CHANTIER, qui le
+      // redescend sur les autres documents. Ludovic : « si j'attribue un
+      // devis à LLO, le chantier doit être attribué aussi ». La propagation
+      // vit en base (synchroniser_commercial) et non ici : deux écrans
+      // peuvent changer le commercial, une seule règle doit décider.
+      if (f.dossier_id) {
+        await supabase.rpc('synchroniser_commercial', {
+          p_dossier_id: f.dossier_id, p_code: f.responsable || null,
+        })
+      }
       if (lignesPayload.length) {
         const { error: errLignes } = await supabase.from(tableLignes).insert(lignesPayload)
         if (errLignes) throw new Error('Enregistrement des lignes : ' + errLignes.message)
@@ -1239,12 +1250,9 @@ function ModalArticle({ l, i, setLigne, delLigne, ajouterPhotos, onClose, mobE, 
   // un clic dehors — et la saisie en cours était perdue.
   //
   // On ne ferme donc que si le bouton a été ENFONCÉ sur l'arrière-plan.
-  const departDehors = useRef(false)
-
   return (
     <div
-      onMouseDown={e => { departDehors.current = e.target === e.currentTarget }}
-      onClick={e => { if (e.target === e.currentTarget && departDehors.current) onClose() }}
+      {...voile(onClose)}
       style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', zIndex: 9500, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '5vh 14px', overflowY: 'auto' }}>
       <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 14, width: '100%', maxWidth: 520, boxShadow: '0 20px 60px rgba(0,0,0,.25)', overflow: 'hidden' }}>
         <div style={{ padding: '15px 20px', borderBottom: `1px solid ${COUL.bord}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1378,7 +1386,7 @@ function ModalClient({ f, set, clientQuery, setClientQuery, clientResults, searc
   const inp2 = { padding: '9px 11px', border: `1px solid ${COUL.bord}`, borderRadius: 9, fontSize: 13.5, fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' }
   const lbl2 = { fontSize: 11.5, fontWeight: 700, color: COUL.texteDoux, marginBottom: 4, display: 'block' }
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', zIndex: 9500, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '5vh 14px', overflowY: 'auto' }}>
+    <div {...voile(onClose)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', zIndex: 9500, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '5vh 14px', overflowY: 'auto' }}>
       <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 14, width: '100%', maxWidth: 620, boxShadow: '0 20px 60px rgba(0,0,0,.25)', overflow: 'hidden' }}>
         <div style={{ padding: '15px 20px', borderBottom: `1px solid ${COUL.bord}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: 16, fontWeight: 800, color: NAVY }}>Client</div>
@@ -2298,7 +2306,7 @@ function SuiviModal({ doc, color, onClose, onChanged, onConvertir, factureLiee }
     : [{ type: 'cree', detail: 'Devis créé', created_at: doc.created_at }]
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: mob ? 0 : 20 }}>
+    <div {...voile(onClose)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: mob ? 0 : 20 }}>
       <div onClick={e => e.stopPropagation()} style={{ width: mob ? '100vw' : 'min(1080px,96vw)', height: mob ? '100vh' : 'min(92vh,900px)', background: COUL.surface, borderRadius: mob ? 0 : 16, overflow: 'hidden', display: 'flex', flexDirection: mob ? 'column' : 'row', boxShadow: '0 20px 60px rgba(0,0,0,.3)' }}>
 
         {/* ── Colonne gauche : aperçu du document ── */}
@@ -2515,7 +2523,7 @@ function EnvoiFactureModal({ doc, b64, fileName, onClose, onSent }) {
   const lbl = { fontSize: 12, fontWeight: 700, color: COUL.texteDoux, marginBottom: 4, display: 'block' }
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.5)', zIndex: 9000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '5vh 16px', overflowY: 'auto' }}>
+    <div {...voile(onClose)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.5)', zIndex: 9000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '5vh 16px', overflowY: 'auto' }}>
       <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 16, width: '100%', maxWidth: 560, boxShadow: '0 20px 60px rgba(0,0,0,.25)', overflow: 'hidden' }}>
         <div style={{ background: C, color: COUL.blanc, padding: '16px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: 17, fontWeight: 800 }}>Envoyer la facture {doc.numero}</div>
@@ -2634,7 +2642,7 @@ function ModalPaiement({ facture, factures, onClose, onLie }) {
   const inp2 = { padding: '9px 11px', border: `1px solid ${COUL.bord}`, borderRadius: 9, fontSize: 13.5, fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' }
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', zIndex: 9500, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '5vh 14px', overflowY: 'auto' }}>
+    <div {...voile(onClose)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', zIndex: 9500, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '5vh 14px', overflowY: 'auto' }}>
       <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 14, width: '100%', maxWidth: 680, boxShadow: '0 20px 60px rgba(0,0,0,.25)', overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '86vh' }}>
         <div style={{ padding: '15px 20px', borderBottom: `1px solid ${COUL.bord}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
           <div style={{ minWidth: 0 }}>
@@ -2721,7 +2729,7 @@ function MenuLigne({ anchor, items, onClose }) {
 
   return (
     <>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1200 }} />
+      <div {...voile(onClose)} style={{ position: 'fixed', inset: 0, zIndex: 1200 }} />
       <div ref={ref} style={{ position: 'fixed', top: pos.top, right: Math.max(8, window.innerWidth - anchor.right), zIndex: 1201, visibility: pos.pret ? 'visible' : 'hidden', background: COUL.surface, border: `1px solid ${COUL.bord}`, borderRadius: 10, boxShadow: '0 10px 30px rgba(15,23,42,.18)', minWidth: 206, overflow: 'hidden', textAlign: 'left' }}>
         {items.filter(Boolean).map((it, k) => it.sep ? (
           <div key={k} style={{ height: 1, background: COUL.bord }} />
