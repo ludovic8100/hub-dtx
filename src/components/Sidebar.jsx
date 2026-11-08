@@ -55,6 +55,7 @@ const MODULES = {
     { key: 'lode_dashboard',    label: 'Tableau de bord', icon: 'ti-layout-dashboard', path: '/lode' },
     { key: 'lode_notesfrais', label: 'Notes de frais', icon: 'ti-receipt', path: '/lode/notes-frais' },
     { key: 'lode_clients',      label: 'Clients',          icon: 'ti-users',            path: '/lode/clients' },
+    { key: 'lode_comptabilite', label: 'Dossiers',         icon: 'ti-folders',          path: '/lode/dossiers' },
     { key: 'lode_devis',        label: 'Devis & Factures', icon: 'ti-file-invoice',     path: '/lode/devis-factures' },
     { key: 'lode_comptabilite', label: 'Comptabilité',     icon: 'ti-calculator',       path: '/lode/comptabilite' },
     { key: 'lode_rentabilite',  label: 'Rentabilité',      icon: 'ti-coin',             path: '/lode/rentabilite' },

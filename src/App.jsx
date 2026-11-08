@@ -43,6 +43,7 @@ const LodeBanque          = lazy(() => import('./pages/lode/LodeBanque'))
 const LodeComptabilite    = lazy(() => import('./pages/lode/LodeComptabilite'))
 const LodeRentabilite     = lazy(() => import('./pages/lode/LodeRentabilite'))
 const LodeDevisFactures   = lazy(() => import('./pages/lode/LodeDevisFactures'))
+const LodeDossiers        = lazy(() => import('./pages/lode/LodeDossiers'))
 const DtxDevisFactures    = lazy(() => import('./pages/dtx/DtxDevisFactures'))
 const ConfigModule        = lazy(() => import('./pages/config/ConfigModule'))
 const LodeDevisAccept     = lazy(() => import('./pages/lode/LodeDevisAccept'))
@@ -172,6 +173,7 @@ export default function App() {
           {/* LODE */}
           <Route path="/lode"               element={<P need="lode_dashboard"><DashboardLode /></P>} />
           <Route path="/lode/clients"       element={<P need="lode_clients"><LodeClients /></P>} />
+          <Route path="/lode/dossiers"      element={<P need="lode_comptabilite"><LodeDossiers /></P>} />
           <Route path="/lode/devis-factures" element={<P need="lode_devis"><LodeDevisFactures /></P>} />
           <Route path="/dtx/devis-factures"  element={<P need="dtx_devis"><DtxDevisFactures /></P>} />
           <Route path="/config" element={<A><ConfigModule /></A>} />
