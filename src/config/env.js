@@ -16,7 +16,7 @@ const PROD = {
   N8N_URL:           'https://n8n.srv1082740.hstgr.cloud',
   SHAREPOINT_SITE:   'https://dynassur.sharepoint.com/sites/ADMINISTRATION',
   SHAREPOINT_ROOT:   'Documents partages',
-  HUB_URL:           'https://hub-dtx.vercel.app',
+  HUB_URL:           'https://hub.dtx-group.be',
 }
 
 export const APP_ENV = String(E.VITE_APP_ENV || 'production').toLowerCase()

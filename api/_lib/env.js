@@ -17,7 +17,7 @@ const PROD = {
   // Boîte Graph qui expédie les mails du Hub (repris de « Tickets - Alertes mail »).
   MAIL_EXPEDITEUR_ID: '4614cde7-a3af-40a7-a945-b95536399ead',
   SHAREPOINT_ROOT:   'Documents partages',
-  HUB_URL:           'https://hub-dtx.vercel.app',
+  HUB_URL:           'https://hub.dtx-group.be',
 }
 
 const env = process.env

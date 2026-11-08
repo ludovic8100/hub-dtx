@@ -8,6 +8,7 @@ import Login              from './pages/Login'
 import AuthCallback       from './pages/AuthCallback'
 import AccessDenied       from './pages/AccessDenied'
 import BandeauEnv         from './components/BandeauEnv'
+import AncienneAdresse    from './pages/AncienneAdresse'
 import ErrorBoundary      from './components/ErrorBoundary'
 import { COUL } from './lib/theme'
 
@@ -107,7 +108,20 @@ const P = ({ children, need }) => <ProtectedRoute need={need}>{children}</Protec
 const A = ({ children }) => <ProtectedRoute requireAdmin>{children}</ProtectedRoute>
 
 
+// L'ancienne adresse du Hub, retiree le 07/11 puis remise le 08/11 pour
+// servir une page d'aiguillage. Elle ne doit PAS servir l'application : qui
+// arrive la a un favori perime, et doit le remplacer — pas travailler ici.
+//
+// Comparaison exacte, pas un `includes` : les deux autres alias Vercel
+// (hub-dtx-dynassur-s-projects, hub-dtx-git-main-...) restent la porte de
+// secours si le DNS de dtx-group.be tombe, et doivent continuer a servir le
+// Hub normalement.
+const ANCIENNE_ADRESSE = 'hub-dtx.vercel.app'
+
 export default function App() {
+  if (typeof window !== 'undefined' && window.location.hostname === ANCIENNE_ADRESSE) {
+    return <AncienneAdresse />
+  }
   return (
     <BrowserRouter>
       <AuthProvider>
