@@ -412,6 +412,49 @@ Ce n'était possible qu'à une condition, vérifiée avant d'y toucher : `COUL` 
 un suffixe d'opacité. ⚠️ **Écrire `COUL.bord + '80'` casserait tout en silence** —
 pour une couleur translucide, poser une valeur `rgba()` en dur ou ajouter un jeton.
 
+### Une saison se voit, ou elle n'existe pas (08/11/2026)
+
+Ludovic, deux fois à trois jours d'intervalle : *« dans les templates Noël,
+Nouvel An, Vacances, tu étais censé mettre de la décoration. Ici il n'y a rien
+à part le fond qui change. »* Il avait raison les deux fois, et pour **trois**
+raisons empilées.
+
+**1. Un `::after` ne peut afficher qu'UN symbole.** La décoration était un
+unique flocon à 16 % d'opacité, à moitié coupé en bas du menu. Ce n'était pas
+de la décoration, c'était une trace. Le motif est désormais une **tuile SVG
+répétée**, portée par le jeton `saisonMotif` — trois symboles décalés pour que
+la répétition ne se voie pas, en `data:` URI pour qu'aucun fichier ne manque.
+
+**2. ⚠️ `background` en ligne efface `background-image` d'une classe.** Le
+menu portait `style={{ background: COUL.texteFort }}`. La propriété raccourcie
+remet `background-image` à `none`, **et un style en ligne l'emporte sur une
+classe** : le motif était écrasé avant d'être affiché. Les deux zones
+concernées (`Layout` et `Header`) utilisent maintenant `backgroundColor`.
+**Tout nouveau fond posé en ligne sur un élément décoré doit employer la forme
+longue.**
+
+**3. La page de garde ne changeait que son image.** Son dégradé était écrit en
+dur en bleu nuit : identique à Noël, au Nouvel An et en Vacances. Elle calcule
+désormais ses couleurs depuis `FONDS_GARDE`, une table écrite en dur **dans le
+fichier et non lue depuis les variables CSS** — pour la même raison que
+`COUL_BRUT` : cette page s'affiche **avant** toute connexion, donc avant que
+les variables d'ambiance ne soient posées.
+
+Et une erreur de méthode qui a coûté deux allers-retours : j'ai injecté les
+motifs par script sans reguillemeter la valeur. `saisonMotif: url('data:…')`
+est un **appel de fonction** en JavaScript, pas une chaîne — le module de
+thème échouait au chargement et **toutes** les variables sortaient vides. Le
+`npm run build` passait : une erreur d'exécution ne se voit pas à la
+compilation.
+
+### Le Groupe porte l'icône DTX
+
+`ENTITES.groupe` n'avait pas de logo, Hexagroup non plus alors que son fichier
+existe dans `/public` depuis le début. Le Groupe, c'est le Hub lui-même : il
+porte l'icône DTX, servie depuis `/public` et non depuis le stockage Supabase
+— l'identité de l'application doit s'afficher même si le stockage est
+injoignable.
+
 ### ⚠️ Trois endroits ne savent pas lire `var()`, et échouent SANS RIEN DIRE
 
 | Où | Ce qui se passe |
