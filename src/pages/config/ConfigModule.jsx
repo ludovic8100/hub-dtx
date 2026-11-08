@@ -296,8 +296,22 @@ export default function ConfigModule() {
     const identiteCorrigee = _identiteChargee !== undefined
       && _identiteChargee !== `${nomF}|${prenomF}` && (nomF || prenomF)
 
+    // ⚠️ cout_horaire est une colonne GÉNÉRÉE : Postgres refuse toute écriture
+    // dessus. Comme la fiche est chargée par select('*'), elle arrive ici dans
+    // `rest` et ferait échouer l'enregistrement entier — et le message
+    // d'erreur parlerait d'une colonne que personne n'a saisie.
+    delete rest.cout_horaire
+
+    const nbOuNull = (v) => (v === '' || v === null || v === undefined) ? null : Number(String(v).replace(',', '.'))
+
     const payload = {
       ...rest,
+      cout_brut_mensuel:     nbOuNull(rest.cout_brut_mensuel),
+      cout_mois_payes:       nbOuNull(rest.cout_mois_payes),
+      cout_charges_pct:      nbOuNull(rest.cout_charges_pct),
+      cout_vehicule_mensuel: nbOuNull(rest.cout_vehicule_mensuel),
+      cout_autres_mensuel:   nbOuNull(rest.cout_autres_mensuel),
+      cout_heures_annuelles: nbOuNull(rest.cout_heures_annuelles),
       // Corrigee a la main : la fiche ne doit plus annoncer « deduit ».
       ...(identiteCorrigee ? { source_identite: 'saisie' } : {}),
       email: email || null,
@@ -942,6 +956,53 @@ export default function ConfigModule() {
                     <Toggle label="Connexion au Hub active" on={!!selUser.compte_hub_actif} onClick={() => setSelUser(u => ({ ...u, compte_hub_actif: !u.compte_hub_actif }))} />
                     <Toggle label="Employé" on={!!selUser.est_employe} onClick={() => setSelUser(u => ({ ...u, est_employe: !u.est_employe }))} />
                   </div>
+
+                  {/* ── Coût horaire ────────────────────────────────────────
+                      Ludovic : « on place son salaire brut, le coût de sa
+                      voiture, etc., et tu calcules le taux horaire global ».
+
+                      Le taux affiché ici est le taux COURANT. Un chantier ne
+                      le lit jamais au moment de l'affichage : il garde celui
+                      qui lui a été appliqué (dossiers.mo_taux_horaire). Sans
+                      ça, augmenter un salaire aujourd'hui réécrirait la marge
+                      d'un chantier de 2023. */}
+                  <details style={{ marginBottom: 14, border: `1px solid ${COUL.bord}`, borderRadius: 10, overflow: 'hidden' }}>
+                    <summary style={{ padding: '10px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: COUL.texteMoyen, background: COUL.fondDoux, listStyle: 'revert' }}>
+                      Coût horaire
+                      {selUser.cout_horaire != null && (
+                        <span style={{ marginLeft: 10, color: '#0080BD', fontWeight: 800 }}>
+                          {Number(selUser.cout_horaire).toLocaleString('fr-BE', { minimumFractionDigits: 2 })} €/h
+                        </span>
+                      )}
+                    </summary>
+                    <div style={{ padding: 14 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }}>
+                        {[
+                          ['cout_brut_mensuel',     'Brut mensuel (€)',       'ex. 2800'],
+                          ['cout_mois_payes',       'Mois payés par an',      '13,92'],
+                          ['cout_charges_pct',      'Charges patronales (%)', '25'],
+                          ['cout_vehicule_mensuel', 'Véhicule / mois (€)',    'leasing + carburant + assurance'],
+                          ['cout_autres_mensuel',   'Autres / mois (€)',      'téléphone, outillage'],
+                          ['cout_heures_annuelles', 'Heures prestées / an',   '1530'],
+                        ].map(([cle, lab, ph]) => (
+                          <label key={cle} style={{ fontSize: 12, fontWeight: 600, color: COUL.texteMoyen }}>
+                            {lab}
+                            <input value={selUser[cle] ?? ''} inputMode="decimal" placeholder={ph}
+                              onChange={e => setSelUser(u => ({ ...u, [cle]: e.target.value }))}
+                              style={{ ...inp, marginTop: 4, width: '100%' }} />
+                          </label>
+                        ))}
+                      </div>
+                      <div style={{ marginTop: 10, fontSize: 11.5, color: COUL.texteFaible, lineHeight: 1.55, background: COUL.fondDoux, borderRadius: 8, padding: '9px 11px' }}>
+                        <strong>13,92 mois</strong> = 12 + 13ᵉ mois + 0,92 de double pécule, la base belge.<br />
+                        <strong>1 530 h et non 1 820</strong> : les congés, jours fériés, maladie, formation et
+                        trajets ne sont pas des heures facturables. Diviser par 1 820 donne un taux trop bas
+                        d'environ 20 %, et fait paraître les chantiers plus rentables qu'ils ne le sont.<br />
+                        Le taux est <strong>recalculé par la base</strong> après enregistrement. Un chantier
+                        déjà saisi garde le sien : la main-d'œuvre d'il y a trois ans ne change pas.
+                      </div>
+                    </div>
+                  </details>
 
                   {selUser.id && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>

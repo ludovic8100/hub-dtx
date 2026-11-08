@@ -148,7 +148,7 @@ export default function LodeDossiers() {
     setLoading(true)
     const [d, a, v] = await Promise.all([
       supabase.from('dossiers')
-        .select('id,numero,titre,client_nom,client_type,client_id,statut,montant_a_facturer,date_debut,created_at,mo_heures,mo_visites')
+        .select('id,numero,titre,client_nom,client_type,client_id,statut,montant_a_facturer,date_debut,created_at,mo_heures,mo_visites,mo_collaborateur_id,mo_taux_horaire')
         .eq('societe', 'LODE').order('created_at', { ascending: false }),
       supabase.from('factures_achat')
         .select('id,fichier_id,nom,fournisseur,montant,date_facture,url,destination_type,destination_id,destination_nom,transaction_id')
@@ -251,7 +251,7 @@ export default function LodeDossiers() {
         type: 'intervention',
         montant_a_facturer: montantNum,
         date_debut: new Date().toISOString().slice(0, 10),
-      }).select('id,numero,titre,client_nom,client_type,client_id,statut,montant_a_facturer,date_debut,created_at,mo_heures,mo_visites').single()
+      }).select('id,numero,titre,client_nom,client_type,client_id,statut,montant_a_facturer,date_debut,created_at,mo_heures,mo_visites,mo_collaborateur_id,mo_taux_horaire').single()
 
       if (error) { setErreur(`Création refusée — ${error.message}`); return false }
       setDossiers(p => [data, ...p])
@@ -769,6 +769,35 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, onClose, onE
   const [rattacher, setRattacher] = useState(false)
   const [mo, setMo] = useState(false)
   const [heures, setHeures] = useState(dossier.mo_heures == null ? '' : String(dossier.mo_heures))
+  const [qui, setQui] = useState(dossier.mo_collaborateur_id || '')
+  const [taux, setTaux] = useState(dossier.mo_taux_horaire == null ? '' : String(dossier.mo_taux_horaire))
+  const [employes, setEmployes] = useState([])
+  useEffect(() => {
+    let annule = false
+    supabase.from('collaborateurs').select('id,nom_complet,cout_horaire')
+      .eq('compte_hub_actif', true).order('nom_complet')
+      .then(({ data }) => { if (!annule) setEmployes(data || []) })
+    return () => { annule = true }
+  }, [])
+
+  // ⚠️ LE TAUX SE PROPOSE, IL NE SE LIT PAS.
+  //
+  // Choisir une personne PRÉ-REMPLIT son coût horaire courant — mais une fois
+  // enregistré, c'est le dossier qui le porte. Relire la fiche employé à
+  // l'affichage ferait bouger la marge d'un chantier de 2023 le jour où on
+  // augmente un salaire. Ludovic : « la M.O. d'il y a trois ans, c'était la
+  // M.O. d'il y a trois ans ».
+  const choisirQui = (id) => {
+    setQui(id)
+    if (!id) return
+    const e = employes.find(x => String(x.id) === String(id))
+    if (e?.cout_horaire != null && !taux) setTaux(String(e.cout_horaire))
+  }
+  const coutMo = (() => {
+    const h = Number(String(heures).replace(',', '.'))
+    const t = Number(String(taux).replace(',', '.'))
+    return Number.isFinite(h) && Number.isFinite(t) && h > 0 && t > 0 ? h * t : null
+  })()
   const [visites, setVisites] = useState(dossier.mo_visites == null ? '' : String(dossier.mo_visites))
 
   const coute    = achats.reduce((s, a) => s + (Number(a.montant) || 0), 0)
@@ -783,6 +812,8 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, onClose, onE
     || statut !== (dossier.statut || 'ouvert')
     || heures !== (dossier.mo_heures == null ? '' : String(dossier.mo_heures))
     || visites !== (dossier.mo_visites == null ? '' : String(dossier.mo_visites))
+    || String(qui) !== String(dossier.mo_collaborateur_id || '')
+    || taux !== (dossier.mo_taux_horaire == null ? '' : String(dossier.mo_taux_horaire))
 
   async function enregistrer() {
     if (!titre.trim()) { setErreur("L'intervention ne peut pas être vide."); return }
@@ -800,6 +831,8 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, onClose, onE
       statut,
       mo_heures: h,
       mo_visites: vi == null ? null : Math.round(vi),
+      mo_collaborateur_id: qui === '' ? null : Number(qui),
+      mo_taux_horaire: nb(taux),
       updated_at: new Date().toISOString(),
     }
     const { error } = await supabase.from('dossiers').update(patch).eq('id', dossier.id)
@@ -879,7 +912,10 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, onClose, onE
                 {dossier.mo_heures != null || dossier.mo_visites != null
                   ? <>
                       <strong>{dossier.mo_heures ?? '—'} h</strong> · {dossier.mo_visites ?? '—'} visite{(dossier.mo_visites || 0) > 1 ? 's' : ''}
-                      <span style={{ color: COUL.texteFaible }}> · coût — </span>
+                      {dossier.mo_taux_horaire != null && dossier.mo_heures != null
+                        ? <> · <strong style={{ color: COUL.texteFort }}>{eur(dossier.mo_heures * dossier.mo_taux_horaire)}</strong>
+                            <span style={{ color: COUL.texteFaible }}> ({eur(dossier.mo_taux_horaire)}/h)</span></>
+                        : <span style={{ color: COUL.texteFaible }}> · coût — </span>}
                     </>
                   : <span style={{ color: COUL.texteFaible }}>Non renseignée.</span>}
               </div>
@@ -895,18 +931,39 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, onClose, onE
                     <label style={lbl}>Visites chez le client</label>
                     <input value={visites} onChange={e => setVisites(e.target.value)} inputMode="numeric" placeholder="ex. 2" style={{ ...inp, width: '100%' }} />
                   </div>
-                  <div style={{ flex: '1 1 130px', opacity: 0.55 }}>
+                  <div style={{ flex: '1 1 130px' }}>
                     <label style={lbl}>Coût main-d'œuvre</label>
-                    <input value="—" readOnly disabled style={{ ...inp, width: '100%', background: COUL.fond, cursor: 'not-allowed' }} />
+                    <input value={coutMo == null ? '—' : eur(coutMo)} readOnly
+                      style={{ ...inp, width: '100%', background: COUL.fond, fontWeight: 700,
+                               color: coutMo == null ? COUL.texteFaible : COUL.texteFort }} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
+                  <div style={{ flex: '2 1 200px' }}>
+                    <label style={lbl}>Qui a presté</label>
+                    <select value={qui} onChange={e => choisirQui(e.target.value)} style={{ ...inp, width: '100%' }}>
+                      <option value="">—</option>
+                      {employes.map(e => (
+                        <option key={e.id} value={e.id}>
+                          {e.nom_complet}{e.cout_horaire != null ? ` · ${e.cout_horaire} €/h` : ' · taux non défini'}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{ flex: '1 1 150px' }}>
+                    <label style={lbl}>Taux horaire appliqué (€)</label>
+                    <input value={taux} onChange={e => setTaux(e.target.value)} inputMode="decimal"
+                      placeholder="pré-rempli depuis la fiche" style={{ ...inp, width: '100%' }} />
                   </div>
                 </div>
                 {/* Le coût reste grisé tant qu'aucun taux horaire n'existe en
                     base. Afficher un montant calculé sur un taux inventé serait
                     pire que de n'afficher rien : un chiffre faux se propage. */}
                 <div style={{ fontSize: 11.5, color: COUL.texteFaible, marginTop: 8, lineHeight: 1.5, background: COUL.fondDoux, borderRadius: 8, padding: '8px 10px' }}>
-                  Le coût n'est pas calculé : <strong>aucun taux horaire n'est défini</strong>. Les heures et
-                  les visites sont enregistrées dès maintenant — le jour où le taux sera posé, il s'appliquera
-                  aux chantiers déjà mesurés.
+                  Le taux est <strong>pré-rempli</strong> depuis la fiche de la personne, puis <strong>figé sur
+                  ce chantier</strong> : il ne bougera plus si le salaire augmente. La main-d'œuvre d'il y a
+                  trois ans reste celle d'il y a trois ans. Le taux de chacun se règle dans
+                  <strong> Paramètres → Collaborateurs → Coût horaire</strong>.
                 </div>
               </div>
             )}
