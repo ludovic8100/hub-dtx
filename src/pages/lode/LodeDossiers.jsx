@@ -56,9 +56,42 @@ const tdR = { ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
 const inp = { padding: '8px 10px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, fontFamily: FONT, background: COUL.surface, boxSizing: 'border-box' }
 const btn = { padding: '9px 14px', borderRadius: 8, border: 'none', background: OR, color: COUL.blanc, fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: FONT }
 
-function Kpi({ label, value, c, sub }) {
+// Tri générique. Les valeurs nulles vont toujours en fin, dans les deux
+// sens : une donnée absente n'est ni la plus grande ni la plus petite, et la
+// voir remonter en tête à chaque inversion de tri est désorientant.
+function trier(lignes, col, sens) {
+  const signe = sens === 'asc' ? 1 : -1
+  return [...lignes].sort((a, b) => {
+    const x = a[col], y = b[col]
+    const xVide = x === null || x === undefined || x === ''
+    const yVide = y === null || y === undefined || y === ''
+    if (xVide && yVide) return 0
+    if (xVide) return 1
+    if (yVide) return -1
+    if (typeof x === 'number' && typeof y === 'number') return (x - y) * signe
+    return String(x).localeCompare(String(y), 'fr', { numeric: true }) * signe
+  })
+}
+
+function ThTri({ label, col, tri, setTri, droite }) {
+  const actif = tri.col === col
   return (
-    <div style={{ flex: '1 1 160px', background: COUL.surface, border: '1px solid #e2e8f0', borderRadius: 12, padding: '12px 14px' }}>
+    <th onClick={() => setTri(t => ({ col, sens: t.col === col && t.sens === 'asc' ? 'desc' : 'asc' }))}
+      style={{ ...(droite ? thR : th), cursor: 'pointer', userSelect: 'none', color: actif ? OR : COUL.texteFaible }}>
+      {label}
+      <span style={{ marginLeft: 4, opacity: actif ? 1 : 0.25 }}>{actif && tri.sens === 'desc' ? '▼' : '▲'}</span>
+    </th>
+  )
+}
+
+function Kpi({ label, value, c, sub, onClic, actif }) {
+  return (
+    <div onClick={onClic} title={onClic ? 'Ouvrir' : undefined} style={{
+      flex: '1 1 160px', background: COUL.surface, borderRadius: 12, padding: '12px 14px',
+      border: `1px solid ${actif ? c : '#e2e8f0'}`,
+      cursor: onClic ? 'pointer' : 'default',
+      boxShadow: actif ? `0 0 0 1px ${c}` : 'none',
+    }}>
       <div style={{ fontSize: 10.5, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.04em' }}>{label}</div>
       <div style={{ fontSize: 22, fontWeight: 800, color: c }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: COUL.texteFaible, marginTop: 2 }}>{sub}</div>}
@@ -75,6 +108,8 @@ export default function LodeDossiers() {
   const [nouveau, setNouveau] = useState(null)   // dossier fraîchement créé, à montrer en grand
   const [aAttribuer, setAAttribuer] = useState(null) // facture d'achat en cours d'attribution
   const [erreur, setErreur] = useState('')
+  const [tri, setTri]   = useState({ col: 'numero', sens: 'desc' })
+  const [triA, setTriA] = useState({ col: 'date_facture', sens: 'desc' })
 
   async function charger() {
     setLoading(true)
@@ -115,9 +150,28 @@ export default function LodeDossiers() {
     return m
   }, [dossiers, achats, ventes])
 
+  // Les colonnes calculées doivent exister AVANT le tri, sinon on ne peut
+  // pas trier sur « Manquant » — qui est précisément la colonne qu'on veut
+  // trier en premier.
+  const lignes = useMemo(() => dossiers.map(d => {
+    const c = parDossier[d.id] || {}
+    const aFact = d.montant_a_facturer == null ? null : Number(d.montant_a_facturer)
+    return {
+      ...d,
+      coute:    c.nbAchats ? c.coute : null,
+      nbAchats: c.nbAchats || 0,
+      aFact,
+      facture:  c.nbVentes ? c.facture : null,
+      encaisse: c.nbVentes ? c.encaisse : null,
+      manque:   aFact == null ? null : Math.max(0, aFact - (c.facture || 0)),
+    }
+  }), [dossiers, parDossier])
+
+  const lignesTriees = useMemo(() => trier(lignes, tri.col, tri.sens), [lignes, tri])
+
   const nonAffectes = useMemo(
-    () => achats.filter(a => !a.destination_type),
-    [achats])
+    () => trier(achats.filter(a => !a.destination_type), triA.col, triA.sens),
+    [achats, triA])
 
   // Le chiffre qui justifie l'écran : ce qui a été annoncé au client et
   // jamais facturé. Null quand aucun prix n'a été saisi — on ne déduit pas
@@ -167,11 +221,14 @@ export default function LodeDossiers() {
         </div>
 
         <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
-          <Kpi label="Dossiers ouverts" value={dossiers.filter(d => d.statut !== 'clos').length} c={OR} />
+          <Kpi label="Dossiers ouverts" value={dossiers.filter(d => d.statut !== 'clos').length} c={OR}
+               onClic={() => setOnglet('dossiers')} actif={onglet === 'dossiers'} sub="voir la liste" />
           <Kpi label="Achats à attribuer" value={nonAffectes.length} c={nonAffectes.length ? COUL.danger : COUL.succes}
+               onClic={() => setOnglet('attribuer')} actif={onglet === 'attribuer'}
                sub={nonAffectes.length ? eur(nonAffectes.reduce((s, a) => s + (Number(a.montant) || 0), 0)) : 'tout est affecté'} />
           <Kpi label="Annoncé, pas facturé" value={manquantTotal > 0 ? eur(manquantTotal) : '—'} c={manquantTotal > 0 ? COUL.danger : COUL.texteFaible}
-               sub={dossiers.some(d => d.montant_a_facturer != null) ? 'sur les dossiers chiffrés' : 'aucun prix client saisi'} />
+               onClic={() => { setOnglet('dossiers'); setTri({ col: 'manque', sens: 'desc' }) }}
+               sub={dossiers.some(d => d.montant_a_facturer != null) ? 'trier par manquant' : 'aucun prix client saisi'} />
         </div>
 
         <div style={{ display: 'flex', gap: 0, marginTop: 18, borderBottom: '2px solid #e2e8f0' }}>
@@ -194,29 +251,32 @@ export default function LodeDossiers() {
             <div style={{ ...card, padding: 0, overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 760 }}>
                 <thead><tr>
-                  <th style={th}>N°</th><th style={th}>Intervention</th><th style={th}>Client</th>
-                  <th style={thR}>Coûté</th><th style={thR}>À facturer</th><th style={thR}>Facturé</th>
-                  <th style={thR}>Encaissé</th><th style={thR}>Manquant</th>
+                  <ThTri label="N°"          col="numero"     tri={tri} setTri={setTri} />
+                  <ThTri label="Intervention" col="titre"      tri={tri} setTri={setTri} />
+                  <ThTri label="Client"       col="client_nom" tri={tri} setTri={setTri} />
+                  <ThTri label="Coûté"        col="coute"      tri={tri} setTri={setTri} droite />
+                  <ThTri label="À facturer"   col="aFact"      tri={tri} setTri={setTri} droite />
+                  <ThTri label="Facturé"      col="facture"    tri={tri} setTri={setTri} droite />
+                  <ThTri label="Encaissé"     col="encaisse"   tri={tri} setTri={setTri} droite />
+                  <ThTri label="Manquant"     col="manque"     tri={tri} setTri={setTri} droite />
                 </tr></thead>
                 <tbody>
                   {dossiers.length === 0 && <tr><td style={{ ...td, textAlign: 'center', padding: 36, color: COUL.texteFaible }} colSpan={8}>
                     Aucun dossier. Crée le premier ci-dessus — son numéro est la référence à taper chez le fournisseur.
                   </td></tr>}
-                  {dossiers.map(d => {
-                    const c = parDossier[d.id] || {}
-                    const aFact = d.montant_a_facturer == null ? null : Number(d.montant_a_facturer)
-                    const manque = aFact == null ? null : Math.max(0, aFact - (c.facture || 0))
+                  {lignesTriees.map(d => {
+                    const vide = <span style={{ color: '#cbd5e1' }}>—</span>
                     return (
                       <tr key={d.id}>
                         <td style={{ ...td, fontWeight: 700, fontFamily: 'ui-monospace, Menlo, Consolas, monospace', fontSize: 12 }}>{d.numero || '—'}</td>
-                        <td style={td}>{d.titre}</td>
+                        <td style={td}>{d.titre}{d.nbAchats > 0 && <span style={{ fontSize: 11, color: COUL.texteFaible, marginLeft: 6 }}>· {d.nbAchats} achat{d.nbAchats > 1 ? 's' : ''}</span>}</td>
                         <td style={{ ...td, color: COUL.texteDoux }}>{d.client_nom || '—'}</td>
-                        <td style={tdR}>{c.nbAchats ? eur(c.coute) : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
-                        <td style={tdR}>{aFact == null ? <span style={{ color: '#cbd5e1' }}>—</span> : eur(aFact)}</td>
-                        <td style={tdR}>{c.nbVentes ? eur(c.facture) : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
-                        <td style={tdR}>{c.nbVentes ? eur(c.encaisse) : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
-                        <td style={{ ...tdR, fontWeight: 700, color: manque > 0 ? COUL.danger : COUL.texteFaible }}>
-                          {manque == null ? '—' : manque > 0 ? eur(manque) : '✓'}
+                        <td style={tdR}>{d.coute == null ? vide : eur(d.coute)}</td>
+                        <td style={tdR}>{d.aFact == null ? vide : eur(d.aFact)}</td>
+                        <td style={tdR}>{d.facture == null ? vide : eur(d.facture)}</td>
+                        <td style={tdR}>{d.encaisse == null ? vide : eur(d.encaisse)}</td>
+                        <td style={{ ...tdR, fontWeight: 700, color: d.manque > 0 ? COUL.danger : COUL.texteFaible }}>
+                          {d.manque == null ? '—' : d.manque > 0 ? eur(d.manque) : '✓'}
                         </td>
                       </tr>
                     )
@@ -231,8 +291,12 @@ export default function LodeDossiers() {
           <div style={{ ...card, padding: 0, overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
               <thead><tr>
-                <th style={th}>Date</th><th style={th}>Fournisseur</th><th style={th}>Facture</th>
-                <th style={thR}>Montant</th><th style={th}>Payée</th><th style={th}></th>
+                <ThTri label="Date"        col="date_facture"   tri={triA} setTri={setTriA} />
+                <ThTri label="Fournisseur" col="fournisseur"    tri={triA} setTri={setTriA} />
+                <ThTri label="Facture"     col="nom"            tri={triA} setTri={setTriA} />
+                <ThTri label="Montant"     col="montant"        tri={triA} setTri={setTriA} droite />
+                <ThTri label="Payée"       col="transaction_id" tri={triA} setTri={setTriA} />
+                <th style={th}></th>
               </tr></thead>
               <tbody>
                 {nonAffectes.length === 0 && <tr><td style={{ ...td, textAlign: 'center', padding: 36, color: COUL.succes }} colSpan={6}>
