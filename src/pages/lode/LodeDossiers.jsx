@@ -74,13 +74,31 @@ function trier(lignes, col, sens) {
   })
 }
 
+// L'entête dit qu'on peut cliquer AVANT qu'on ait cliqué. Première version :
+// une flèche à 25 % d'opacité, donc invisible — personne ne pouvait deviner
+// que les colonnes étaient triables. Une affordance qu'il faut découvrir par
+// hasard n'existe pas.
 function ThTri({ label, col, tri, setTri, droite }) {
   const actif = tri.col === col
+  const [survol, setSurvol] = useState(false)
   return (
     <th onClick={() => setTri(t => ({ col, sens: t.col === col && t.sens === 'asc' ? 'desc' : 'asc' }))}
-      style={{ ...(droite ? thR : th), cursor: 'pointer', userSelect: 'none', color: actif ? OR : COUL.texteFaible }}>
+      onMouseEnter={() => setSurvol(true)} onMouseLeave={() => setSurvol(false)}
+      title={`Trier par ${label}`}
+      style={{
+        ...(droite ? thR : th), cursor: 'pointer', userSelect: 'none',
+        color: actif ? OR : survol ? COUL.texteDoux : COUL.texteFaible,
+        background: actif ? '#fff7ed' : survol ? COUL.fond : 'transparent',
+        transition: 'background .12s, color .12s',
+      }}>
       {label}
-      <span style={{ marginLeft: 4, opacity: actif ? 1 : 0.25 }}>{actif && tri.sens === 'desc' ? '▼' : '▲'}</span>
+      <span style={{
+        marginLeft: 5, fontSize: 9, letterSpacing: '-1px',
+        color: actif ? OR : '#94a3b8',
+        opacity: actif ? 1 : 0.8,
+      }}>
+        {actif ? (tri.sens === 'desc' ? '▼' : '▲') : '⇅'}
+      </span>
     </th>
   )
 }
