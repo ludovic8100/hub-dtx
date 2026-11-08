@@ -26,7 +26,17 @@ const fmtDate = d => {
 }
 const inp = { padding: '8px 10px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, fontFamily: FONT, background: COUL.surface, boxSizing: 'border-box' }
 
+// Société → table de clients. Une société absente de cette table ne se voit
+// PAS proposer « Client direct ».
+//
+// ⚠️ Sans ça, une facture DYNASSUR ou DTX se voyait proposer les clients de
+// LODE — et l'attribution croisée se serait faite en silence, exactement
+// comme le devis Dewez rattaché au chantier Detilloux. Ce panneau est partagé
+// par toutes les sociétés depuis qu'il sert aussi la comptabilité.
+const TABLE_TIERS = { LODE: 'lode_clients' }
+
 export default function PanneauAttribuer({ facture, dossiers, onClose, onChoisir }) {
+  const tableTiers = TABLE_TIERS[facture.societe]
   const [type, setType] = useState('dossier')
   const [q, setQ] = useState('')
   const [tiers, setTiers] = useState([])
@@ -35,13 +45,13 @@ export default function PanneauAttribuer({ facture, dossiers, onClose, onChoisir
   // Les tiers ne se chargent que si on en demande : une liste de clients
   // qu'on n'ouvrira jamais n'a pas à coûter une requête à chaque ouverture.
   useEffect(() => {
-    if (type !== 'tiers') return
+    if (type !== 'tiers' || !tableTiers) return
     let annule = false
     setChargeTiers(true)
-    supabase.from('lode_clients').select('id,nom,prenom,denomination,ville').order('nom').limit(300)
+    supabase.from(tableTiers).select('id,nom,prenom,denomination,ville').order('nom').limit(300)
       .then(({ data }) => { if (!annule) { setTiers(data || []); setChargeTiers(false) } })
     return () => { annule = true }
-  }, [type])
+  }, [type, tableTiers])
 
   const nomTiers = (c) => c.denomination || [c.prenom, c.nom].filter(Boolean).join(' ') || '(sans nom)'
   const terme = q.trim().toLowerCase()
@@ -56,7 +66,7 @@ export default function PanneauAttribuer({ facture, dossiers, onClose, onChoisir
   // proposer donnerait un choix qui ne mène nulle part.
   const TYPES = [
     { code: 'dossier',     label: 'Chantier / dossier', icone: 'ti-folder',   aide: 'Pour un client, un chantier identifié' },
-    { code: 'tiers',       label: 'Client direct',      icone: 'ti-user',     aide: 'Sans dossier ouvert' },
+    ...(tableTiers ? [{ code: 'tiers', label: 'Client direct', icone: 'ti-user', aide: 'Sans dossier ouvert' }] : []),
     { code: 'structure',   label: 'Structure',          icone: 'ti-building', aide: 'Loyer, énergie, téléphone, assurances' },
     { code: 'consommable', label: 'Consommable',        icone: 'ti-box',      aide: 'Visserie, petit matériel — jamais sur un chantier' },
   ]
