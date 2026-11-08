@@ -7,6 +7,7 @@ import { useAuth } from '../../lib/auth'
 import { bootstrapConfigs } from '../../lib/bootstrapConfigs'
 import GestionCategories from './GestionCategories'
 import GestionFournisseurs from './GestionFournisseurs'
+import GestionAmbiances from './GestionAmbiances'
 import BceSearch from '../../components/BceSearch'
 import { COUL } from '../../lib/theme'
 
@@ -559,7 +560,7 @@ export default function ConfigModule() {
     return clef(a).localeCompare(clef(b), 'fr', { sensitivity: 'base' })
   })
 
-  const TABS = [['societes', '🏢 Sociétés'], ['documents', '📄 Documents'], ['users', '👥 Utilisateurs & acteurs métier'], ['categories', '🏷️ Catégories compta'], ['fournisseurs', '🚚 Fournisseurs']]
+  const TABS = [['societes', '🏢 Sociétés'], ['documents', '📄 Documents'], ['users', '👥 Utilisateurs & acteurs métier'], ['categories', '🏷️ Catégories compta'], ['fournisseurs', '🚚 Fournisseurs'], ['ambiances', '🎨 Ambiances']]
 
   return (
     <Layout currentPage="Configuration">
@@ -578,6 +579,7 @@ export default function ConfigModule() {
 
         {tab === 'categories' && <GestionCategories />}
         {tab === 'fournisseurs' && <GestionFournisseurs />}
+        {tab === 'ambiances' && <GestionAmbiances />}
 
 
         {/* ─────────── SOCIÉTÉS & DOCUMENTS ─────────── */}

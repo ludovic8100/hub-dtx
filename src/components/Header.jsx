@@ -3,7 +3,6 @@ import { useAuth, SOCIETES_CONFIG } from '../lib/auth'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { COUL } from '../lib/theme'
-import SelecteurAmbiance from './SelecteurAmbiance'
 
 const LOGOS = {
   dynassur: '/logo_dynassur.png',
@@ -187,7 +186,7 @@ export default function Header({ currentPage, onToggleMenu, menuOuvert }) {
   }
 
   return (
-    <header style={{
+    <header className="hub-saison-entete" style={{
       height: '56px',
       background: headerBg,
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -269,8 +268,6 @@ export default function Header({ currentPage, onToggleMenu, menuOuvert }) {
             {!mob && 'Changer'}
           </button>
         )}
-
-        <SelecteurAmbiance compact={mob} />
 
         <div title="Taille du texte (75 %–200 %)" style={{
           display: 'flex', alignItems: 'center', gap: 2,

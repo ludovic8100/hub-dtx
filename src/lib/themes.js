@@ -110,7 +110,7 @@ export const AMBIANCES = {
     couverture: '/ambiances/noel.webp',
     label: 'Noël', symbole: '❄',
     clair: {
-      fond: '#f2f7f5', fondDoux: '#e9f2ee', fondAlterne: '#f7fbf9',
+      fond: '#eaf4ef', fondDoux: '#dbeae2', fondAlterne: '#f3faf6',
       saison: '#b8860b', saisonDoux: 'rgba(245,202,120,.22)', saisonLueur: 'rgba(245,182,84,.14)',
     },
     sombre: {
@@ -122,7 +122,7 @@ export const AMBIANCES = {
     couverture: '/ambiances/nouvel-an.webp',
     label: 'Nouvel An', symbole: '✧',
     clair: {
-      fond: '#f8f7fb', fondDoux: '#efedf7', fondAlterne: '#fbfaff',
+      fond: '#f1eefb', fondDoux: '#e3def4', fondAlterne: '#f8f5ff',
       saison: '#a16207', saisonDoux: 'rgba(245,197,107,.22)', saisonLueur: 'rgba(255,212,131,.14)',
     },
     sombre: {
@@ -134,7 +134,7 @@ export const AMBIANCES = {
     couverture: '/ambiances/halloween.webp',
     label: 'Halloween', symbole: '☾',
     clair: {
-      fond: '#f8f5fa', fondDoux: '#efe9f3', fondAlterne: '#fcf9fd',
+      fond: '#f4ecf7', fondDoux: '#e7dcee', fondAlterne: '#faf4fc',
       saison: '#c2410c', saisonDoux: 'rgba(255,128,52,.16)', saisonLueur: 'rgba(172,88,201,.12)',
     },
     sombre: {
@@ -146,7 +146,7 @@ export const AMBIANCES = {
     couverture: '/ambiances/vacances.webp',
     label: 'Vacances', symbole: '☀',
     clair: {
-      fond: '#f0f9fa', fondDoux: '#e2f2f3', fondAlterne: '#f7fdfd',
+      fond: '#e6f6f7', fondDoux: '#d2ecee', fondAlterne: '#f2fcfd',
       saison: '#0f766e', saisonDoux: 'rgba(83,224,203,.20)', saisonLueur: 'rgba(40,203,210,.12)',
     },
     sombre: {
@@ -200,6 +200,25 @@ export function cssDesAmbiances() {
   // `color-scheme` fait suivre les éléments natifs — ascenseurs, cases à
   // cocher, sélecteurs de date. Sans lui, un thème sombre garde des
   // ascenseurs blancs, et ça se voit immédiatement.
+  // ── Ce qui rend une saison VISIBLE ────────────────────────────────────
+  //
+  // Les jetons `saison*` existaient sans consommateur : seul le fond de page
+  // changeait, de deux ou trois pour cent. Ludovic, 08/11 : « on ne voit rien
+  // dans les saisons a part le fond qui change de couleur ». C'etait exact.
+  //
+  // Trois marques, toutes decoratives et toutes `pointer-events:none` : elles
+  // ne doivent jamais attraper un clic ni gener un lecteur d'ecran.
+  regles.push(
+    // Une lueur en haut a droite de la zone de travail.
+    `.hub-saison-zone{background-image:radial-gradient(ellipse 62% 38% at 95% 0%,var(${VAR('saisonLueur')}),transparent 72%)}`,
+    // Un lavis dans l'en-tete, du cote droit. PAS de pseudo-element ici :
+    // l'en-tete porte des menus deroulants, et l'`overflow:hidden` qu'un
+    // ornement imposerait les couperait net.
+    `.hub-saison-entete{background-image:linear-gradient(90deg,transparent 40%,var(${VAR('saisonDoux')}) 100%)}`,
+    // Le symbole de la saison, en filigrane au bas du menu.
+    `.hub-saison-volet{position:relative}`,
+    `.hub-saison-volet::after{content:var(${VAR('saisonSymbole')});position:absolute;right:-6px;bottom:-34px;font-size:120px;line-height:1;color:var(${VAR('saison')});opacity:.16;pointer-events:none}`,
+  )
   regles.push('html[data-mode="sombre"]{color-scheme:dark}')
   regles.push('html[data-mode="clair"]{color-scheme:light}')
   // Le fond du document lui-même, sinon le sur-défilement montre du blanc.
@@ -208,48 +227,89 @@ export function cssDesAmbiances() {
   return regles.join('\n')
 }
 
-const CLE_STOCKAGE = 'hubdtx.ambiance.v1'
+// ── Le réglage du groupe ────────────────────────────────────────────────────
+//
+// Règle donnée par Ludovic le 08/11 : « c'est un admin qui change pour tout
+// le monde ». Il n'y a donc AUCUNE préférence par utilisateur, et le
+// sélecteur a quitté l'en-tête. La seule source est la table
+// `ref_ambiances`, réglée dans Paramètres → Ambiances.
+//
+// Ce que le navigateur garde n'est pas un choix : c'est un CACHE du réglage
+// du groupe. Il sert à poser la bonne ambiance dès le premier pixel, avant
+// toute requête — sinon chaque chargement afficherait Standard une
+// demi-seconde puis basculerait.
 
-/** Le choix mémorisé, ou Standard/clair. Toute lecture de stockage est
- *  protégée : en navigation privée elle peut lever. */
-export function preferenceLue() {
+const CLE_CACHE = 'hubdtx.ambiance.v2'
+
+/** Le réglage de repli, identique au catalogue de la migration. Il ne sert
+ *  qu'avant la première réponse de la base. Tout est éteint : tant que
+ *  personne n'a touché à Paramètres, le Hub reste en Standard. */
+export const REGLES_DEFAUT = [
+  { code: 'standard',  actif: false, forcee: false, debut_mois: null, debut_jour: null, fin_mois: null, fin_jour: null },
+  { code: 'noel',      actif: false, forcee: false, debut_mois: 12, debut_jour: 1,  fin_mois: 12, fin_jour: 26 },
+  { code: 'nouvel-an', actif: false, forcee: false, debut_mois: 12, debut_jour: 27, fin_mois: 1,  fin_jour: 6 },
+  { code: 'halloween', actif: false, forcee: false, debut_mois: 10, debut_jour: 24, fin_mois: 11, fin_jour: 2 },
+  { code: 'vacances',  actif: false, forcee: false, debut_mois: 7,  debut_jour: 1,  fin_mois: 8,  fin_jour: 31 },
+]
+
+export function reglesLues() {
   try {
-    const brut = localStorage.getItem(CLE_STOCKAGE)
-    if (!brut) return { ambiance: 'standard', mode: 'clair', auto: false }
-    const p = JSON.parse(brut)
-    return {
-      ambiance: CLES_AMBIANCE.includes(p.ambiance) ? p.ambiance : 'standard',
-      mode: MODES.includes(p.mode) ? p.mode : 'clair',
-      auto: p.auto === true,
-    }
-  } catch { return { ambiance: 'standard', mode: 'clair', auto: false } }
+    const brut = localStorage.getItem(CLE_CACHE)
+    if (!brut) return REGLES_DEFAUT
+    const r = JSON.parse(brut)
+    return Array.isArray(r) && r.length ? r : REGLES_DEFAUT
+  } catch { return REGLES_DEFAUT }
 }
 
-export function preferenceEcrite(p) {
-  try { localStorage.setItem(CLE_STOCKAGE, JSON.stringify(p)) } catch { /* sans effet */ }
+export function reglesEcrites(regles) {
+  try { localStorage.setItem(CLE_CACHE, JSON.stringify(regles || [])) } catch { /* sans effet */ }
 }
 
-/** L'ambiance que le calendrier propose — JAMAIS imposée.
- *  Dates volontairement larges côté Noël (le Hub sert du 1er décembre au
- *  Nouvel An) et étroites côté Halloween. Heure belge : on lit la date
- *  locale du navigateur, qui l'est pour tout le monde ici. */
-export function ambianceDuCalendrier(date = new Date()) {
+/** Le jour `j/m` tombe-t-il dans la fenêtre d'une saison ?
+ *
+ *  Une fenêtre peut ENJAMBER LE NOUVEL AN (27/12 → 06/01). Comparer
+ *  bêtement `debut <= jour <= fin` donnerait faux pour toutes celles-là —
+ *  c'est le piège de ce calcul, et il ne se voit qu'une fois par an. */
+export function dansLaFenetre(regle, mois, jour) {
+  const { debut_mois: dm, debut_jour: dj, fin_mois: fm, fin_jour: fj } = regle || {}
+  if (!dm || !dj || !fm || !fj) return false
+  const v = mois * 100 + jour, d = dm * 100 + dj, f = fm * 100 + fj
+  return d <= f ? (v >= d && v <= f) : (v >= d || v <= f)
+}
+
+/** L'ambiance que le groupe affiche aujourd'hui.
+ *
+ *  Deux façons de choisir, et une seule gagne :
+ *    1. une ambiance IMPOSÉE par l'administrateur — les dates sont ignorées ;
+ *    2. sinon le calendrier : la première saison active dont la fenêtre
+ *       couvre aujourd'hui ;
+ *    3. sinon Standard.
+ *
+ *  Deux saisons qui se chevauchent ne sont pas une erreur : l'ordre tranche,
+ *  et l'écran de Paramètres le dit. */
+export function ambianceEffective(date = new Date(), regles = reglesLues()) {
+  const liste = regles || []
+  const imposee = liste.find(r => r.forcee && CLES_AMBIANCE.includes(r.code))
+  if (imposee) return imposee.code
   const m = date.getMonth() + 1, j = date.getDate()
-  if (m === 12 && j >= 1 && j <= 26) return 'noel'
-  if ((m === 12 && j >= 27) || (m === 1 && j <= 6)) return 'nouvel-an'
-  if (m === 10 && j >= 24) return 'halloween'
-  if (m === 11 && j <= 2) return 'halloween'
-  if (m === 7 || m === 8) return 'vacances'
+  for (const r of liste) {
+    if (r.actif && CLES_AMBIANCE.includes(r.code) && dansLaFenetre(r, m, j)) return r.code
+  }
   return 'standard'
 }
 
 /** Pose l'ambiance sur <html>. C'est le seul geste qui change l'apparence :
- *  deux attributs, et les 2 628 `var()` suivent. */
-export function appliquer({ ambiance, mode }) {
+ *  un attribut, et les 2 628 `var()` suivent.
+ *
+ *  Le mode reste `clair` : la bascule sombre a été retirée (décision du
+ *  07/11), mais l'attribut est posé quand même pour que la feuille trouve
+ *  toujours son bloc. */
+export function appliquer(regles = reglesLues()) {
   if (typeof document === 'undefined') return
+  const code = ambianceEffective(new Date(), regles)
   const r = document.documentElement
-  r.setAttribute('data-ambiance', CLES_AMBIANCE.includes(ambiance) ? ambiance : 'standard')
-  r.setAttribute('data-mode', MODES.includes(mode) ? mode : 'clair')
+  r.setAttribute('data-ambiance', CLES_AMBIANCE.includes(code) ? code : 'standard')
+  r.setAttribute('data-mode', 'clair')
 }
 
 /** Injecte la feuille une seule fois. Le Hub n'a aucune feuille de style
