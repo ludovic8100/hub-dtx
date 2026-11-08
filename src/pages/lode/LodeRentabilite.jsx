@@ -4,6 +4,7 @@ import Layout from '../../components/Layout'
 import { LODE } from '../../lib/lodeConfig'
 import { StatBanner } from '../../components/ui/AccountableUI'
 import { COUL } from '../../lib/theme'
+import PanneauAttribuer from '../../components/PanneauAttribuer'
 
 const FONT = "'Source Sans Pro', sans-serif"
 const OR = COUL.orange, ORD = '#7c2d12'
@@ -63,19 +64,22 @@ export default function LodeRentabilite() {
   const [filtre, setFiltre] = useState('non')
   const [saving, setSaving] = useState(null)
   const [apercu, setApercu] = useState(null)
+  const [dossiers, setDossiers] = useState([])
   const [qR, setQR] = useState('')
   const [filtreR, setFiltreR] = useState('non')
 
   const charger = async () => {
     setLoading(true)
-    const [d, f, a, t, c] = await Promise.all([
-      supabase.from('lode_devis').select('id,numero,objet,client_nom,statut,total_ht,date_devis,responsable').order('date_devis', { ascending: false }),
-      supabase.from('lode_factures').select('id,numero,devis_id,type,total_ht,date_facture,responsable'),
-      supabase.from('factures_achat').select('id,nom,montant,date_facture,lode_devis_id,tva_taux,fichier_id').eq('societe', 'LODE').eq('sens', 'achat').order('date_facture', { ascending: false }),
+    const [d, f, a, t, c, dos] = await Promise.all([
+      supabase.from('lode_devis').select('id,numero,objet,client_nom,statut,total_ht,date_devis,responsable,dossier_id').order('date_devis', { ascending: false }),
+      supabase.from('lode_factures').select('id,numero,devis_id,dossier_id,type,total_ht,date_facture,responsable'),
+      supabase.from('factures_achat').select('id,nom,montant,date_facture,lode_devis_id,destination_type,destination_id,destination_nom,tva_taux,fichier_id').eq('societe', 'LODE').eq('sens', 'achat').order('date_facture', { ascending: false }),
       supabase.from('transactions').select('id,montant,date_valeur,categorie_id,activite,responsable,contrepartie_nom').eq('activite', 'rental'),
       supabase.from('categories').select('id,nom'),
+      supabase.from('dossiers').select('id,numero,titre,client_nom,statut').eq('societe', 'LODE').order('created_at', { ascending: false }),
     ])
     setDevis(d.data || []); setFactures(f.data || []); setAchats(a.data || []); setTx(t.data || [])
+    setDossiers(dos.data || [])
     setCats(Object.fromEntries((c.data || []).map(x => [x.id, x.nom]))); setLoading(false)
   }
   useEffect(() => { charger() }, [])
@@ -92,14 +96,72 @@ export default function LodeRentabilite() {
   // ---- PROTECT (vente / chantiers) ----
   const facturesF = useMemo(() => factures.filter(f => inY(f.date_facture)), [factures, annee])
   const achatsF = useMemo(() => achats.filter(a => inY(a.date_facture)), [achats, annee])
-  const caParDevis = useMemo(() => { const m = {}; for (const f of facturesF) { if (!f.devis_id) continue; (m[f.devis_id] ||= { ht: 0, n: 0 }); m[f.devis_id].ht += Number(f.total_ht) || 0; m[f.devis_id].n++ } return m }, [facturesF])
-  const achParDevis = useMemo(() => { const m = {}; for (const a of achatsF) { if (!a.lode_devis_id) continue; (m[a.lode_devis_id] ||= { v: 0, n: 0 }); m[a.lode_devis_id].v += achHT(a); m[a.lode_devis_id].n++ } return m }, [achatsF])
+  // ⚠️ LE CHANTIER EST LE DOSSIER, PLUS LE DEVIS.
+  //
+  // Ludovic : « tu as toujours la liste rattacher les achats à un chantier
+  // dans rentabilité ». Il avait raison, et le problème était plus profond
+  // qu'un écran en double : cette page rattachait les achats à un DEVIS
+  // (factures_achat.lode_devis_id) pendant que la comptabilité et l'écran
+  // Dossiers les rattachent à un DOSSIER (destination_type/destination_id).
+  //
+  // Deux notions rivales de « chantier » qui ne se parlaient pas : la marge
+  // calculée ici ignorait tout ce qui était attribué ailleurs. Mesuré avant
+  // d'y toucher : 5 achats sur 483 passaient par l'ancien lien, soit 1 %.
+  //
+  // Un devis n'est d'ailleurs pas un chantier : un chantier peut en porter
+  // plusieurs (porte ET châssis chez le même client), et un dépannage n'en a
+  // aucun. Le dossier est la bonne maille.
+  //
+  // lode_devis_id est conservé en REPLI, pas en concurrent : un achat
+  // rattaché à un devis compte sur le dossier de ce devis. Rien n'est perdu,
+  // et rien de nouveau ne s'y écrit.
+  const dossierDuDevis = useMemo(
+    () => Object.fromEntries(devis.filter(d => d.dossier_id).map(d => [d.id, d.dossier_id])),
+    [devis])
 
-  const chantiersAll = useMemo(() => devis.map(d => {
-    const ca = caParDevis[d.id] || { ht: 0, n: 0 }, ac = achParDevis[d.id] || { v: 0, n: 0 }
+  const caParDossier = useMemo(() => {
+    const m = {}
+    for (const f of facturesF) {
+      const dos = f.dossier_id || (f.devis_id ? dossierDuDevis[f.devis_id] : null)
+      if (!dos) continue
+      ;(m[dos] ||= { ht: 0, n: 0 }); m[dos].ht += Number(f.total_ht) || 0; m[dos].n++
+    }
+    return m
+  }, [facturesF, dossierDuDevis])
+
+  const achParDossier = useMemo(() => {
+    const m = {}
+    for (const a of achatsF) {
+      const dos = a.destination_type === 'dossier'
+        ? a.destination_id
+        : (a.lode_devis_id ? dossierDuDevis[a.lode_devis_id] : null)
+      if (!dos) continue
+      ;(m[dos] ||= { v: 0, n: 0 }); m[dos].v += achHT(a); m[dos].n++
+    }
+    return m
+  }, [achatsF, dossierDuDevis])
+
+  // Le responsable vit sur le devis, pas sur le dossier : on prend celui du
+  // premier devis rattaché. Approximatif et assumé — mieux vaut un commercial
+  // probable qu'une colonne vide.
+  const respDuDossier = useMemo(() => {
+    const m = {}
+    for (const d of devis) if (d.dossier_id && d.responsable && !m[d.dossier_id]) m[d.dossier_id] = d.responsable
+    return m
+  }, [devis])
+
+  const chantiersAll = useMemo(() => dossiers.map(d => {
+    const ca = caParDossier[d.id] || { ht: 0, n: 0 }, ac = achParDossier[d.id] || { v: 0, n: 0 }
     const marge = ca.ht - ac.v
-    return { ...d, caHT: ca.ht, caN: ca.n, achat: ac.v, achatN: ac.n, marge, margePct: ca.ht > 0 ? marge / ca.ht * 100 : null, actif: ca.ht > 0 || ac.v > 0 }
-  }), [devis, caParDevis, achParDevis])
+    return {
+      ...d,
+      objet: d.titre,
+      responsable: respDuDossier[d.id] || '',
+      caHT: ca.ht, caN: ca.n, achat: ac.v, achatN: ac.n,
+      marge, margePct: ca.ht > 0 ? marge / ca.ht * 100 : null,
+      actif: ca.ht > 0 || ac.v > 0,
+    }
+  }), [dossiers, caParDossier, achParDossier, respDuDossier])
   const chantiers = useMemo(() => chantiersAll.filter(c => resp === 'all' || (c.responsable || '') === resp).sort((a, b) => (b.caHT + b.achat) - (a.caHT + a.achat)), [chantiersAll, resp])
 
   const parCommercial = useMemo(() => {
@@ -112,15 +174,19 @@ export default function LodeRentabilite() {
   const achTot = useMemo(() => achatsF.reduce((s, a) => s + achHT(a), 0), [achatsF])
   const achTotTTC = useMemo(() => achatsF.reduce((s, a) => s + (Number(a.montant) || 0), 0), [achatsF])
   const caHorsCh = useMemo(() => facturesF.filter(f => !f.devis_id).reduce((s, f) => s + (Number(f.total_ht) || 0), 0), [facturesF])
-  const fraisGen = useMemo(() => achatsF.filter(a => !a.lode_devis_id).reduce((s, a) => s + achHT(a), 0), [achatsF])
-  const fraisGenN = useMemo(() => achatsF.filter(a => !a.lode_devis_id).length, [achatsF])
+  const nonAffecte = (a) => !a.destination_type && !a.lode_devis_id
+  const fraisGen = useMemo(() => achatsF.filter(nonAffecte).reduce((s, a) => s + achHT(a), 0), [achatsF])
+  const fraisGenN = useMemo(() => achatsF.filter(nonAffecte).length, [achatsF])
 
-  const optionsDevis = useMemo(() => devis.map(d => ({ id: d.id, label: `${d.numero} · ${(d.objet || '').slice(0, 34)}${d.client_nom ? ' · ' + d.client_nom : ''}` })), [devis])
-  const rattacher = async (id, dv) => {
-    setSaving(id)
-    const { error } = await supabase.from('factures_achat').update({ lode_devis_id: dv || null }).eq('id', id)
-    if (!error) setAchats(p => p.map(a => a.id === id ? { ...a, lode_devis_id: dv || null } : a))
-    setSaving(null)
+  // L'attribution passe par le MÊME panneau que la comptabilité et l'écran
+  // Dossiers. Il y avait ici un sélecteur de devis concurrent : trois écrans,
+  // trois mécanismes, et des chiffres qui ne pouvaient que diverger.
+  const [aAttribuer, setAAttribuer] = useState(null)
+  const attribuerAchat = async (facture, patch) => {
+    const { error } = await supabase.from('factures_achat').update(patch).eq('id', facture.id)
+    if (error) { alert(`Attribution refusée — ${error.message}`); return }
+    setAchats(p => p.map(a => a.id === facture.id ? { ...a, ...patch } : a))
+    setAAttribuer(null)
   }
   const setTaux = async (id, v) => {
     setSaving(id)
@@ -137,7 +203,7 @@ export default function LodeRentabilite() {
   }
   const achatsListe = useMemo(() => {
     let l = achats
-    if (filtre === 'non') l = l.filter(a => !a.lode_devis_id)
+    if (filtre === 'non') l = l.filter(nonAffecte)
     if (q.trim()) { const s = q.toLowerCase(); l = l.filter(a => (a.nom || '').toLowerCase().includes(s)) }
     return l
   }, [achats, filtre, q])
@@ -271,10 +337,10 @@ export default function LodeRentabilite() {
 
             <div style={card}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-                <div style={{ fontSize: 14, fontWeight: 800, color: ORD }}>Rattacher les achats à un chantier</div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: ORD }}>Achats — taux de TVA et attribution</div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <input placeholder="Fournisseur…" value={q} onChange={e => setQ(e.target.value)} style={{ ...inp, minWidth: 180 }} />
-                  <select value={filtre} onChange={e => setFiltre(e.target.value)} style={inp}><option value="non">Non rattachés</option><option value="tous">Tous</option></select>
+                  <select value={filtre} onChange={e => setFiltre(e.target.value)} style={inp}><option value="non">Non attribués</option><option value="tous">Tous</option></select>
                 </div>
               </div>
               <div style={{ fontSize: 12, color: COUL.texteFaible, margin: '6px 0 10px' }}>{achatsListe.length} achat(s){achatsListe.length > 80 ? ' — 80 affichés' : ''}.</div>
@@ -283,7 +349,7 @@ export default function LodeRentabilite() {
                   <thead><tr><th style={th}></th><th style={th}>Date</th><th style={th}>Fournisseur</th><th style={thR}>Montant TTC</th><th style={th}>TVA</th><th style={thR}>HT</th><th style={th}>Chantier</th></tr></thead>
                   <tbody>
                     {achatsListe.slice(0, 80).map(a => (
-                      <tr key={a.id} style={a.lode_devis_id ? { background: COUL.succesFondDoux } : null}>
+                      <tr key={a.id} style={(a.destination_type || a.lode_devis_id) ? { background: COUL.succesFondDoux } : null}>
                         <td style={{ ...td, textAlign: 'center', width: 44 }}>
                           {a.fichier_id ? <button title="Aperçu facture" onClick={() => setApercu(c => c && c.pin && c.fid === a.fichier_id ? null : { fid: a.fichier_id, nom: (a.nom || '').replace(/\.pdf$/i, ''), pin: true })} onMouseEnter={() => { if (CAN_HOVER) setApercu(c => c && c.pin ? c : { fid: a.fichier_id, nom: (a.nom || '').replace(/\.pdf$/i, ''), pin: false }) }} onMouseLeave={() => setApercu(c => c && c.pin ? c : null)} style={{ border: '1px solid #e2e8f0', background: COUL.surface, borderRadius: 8, padding: '4px 8px', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>📄</button> : <span style={{ color: COUL.bordFort }}>—</span>}
                         </td>
@@ -297,10 +363,15 @@ export default function LodeRentabilite() {
                         </td>
                         <td style={tdR}>{eur(achHT(a))}</td>
                         <td style={td}>
-                          <select value={a.lode_devis_id || ''} disabled={saving === a.id} onChange={e => rattacher(a.id, e.target.value)} style={{ ...inp, minWidth: 230, opacity: saving === a.id ? 0.5 : 1 }}>
-                            <option value="">— Hors chantier (frais généraux)</option>
-                            {optionsDevis.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-                          </select>
+                          <span onClick={() => setAAttribuer(a)}
+                            title={a.destination_nom ? `${a.destination_nom} — cliquer pour changer` : 'Attribuer'}
+                            style={{
+                              display: 'inline-block', cursor: 'pointer', fontSize: 12.5, fontWeight: 600,
+                              maxWidth: 230, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                              color: a.destination_nom ? COUL.texteDoux : OR,
+                            }}>
+                            {a.destination_nom || (a.lode_devis_id ? 'devis (ancien lien)' : '+ attribuer')}
+                          </span>
                         </td>
                       </tr>
                     ))}
@@ -309,7 +380,12 @@ export default function LodeRentabilite() {
                 </table>
               </div>
             </div>
-            {apercu && <ApercuFacture fid={apercu.fid} nom={apercu.nom} pin={apercu.pin} onClose={() => setApercu(null)} />}
+            {aAttribuer && (
+        <PanneauAttribuer facture={aAttribuer} dossiers={dossiers}
+          onClose={() => setAAttribuer(null)}
+          onChoisir={patch => attribuerAchat(aAttribuer, patch)} />
+      )}
+      {apercu && <ApercuFacture fid={apercu.fid} nom={apercu.nom} pin={apercu.pin} onClose={() => setApercu(null)} />}
           </> : <>
             {/* RENTAL */}
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 4 }}>
