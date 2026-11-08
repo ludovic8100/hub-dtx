@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { sansExtraits } from '../lib/factures'
 import { COUL } from '../lib/theme'
+import PanneauAttribuer from './PanneauAttribuer'
 
 const FONT = "'Source Sans Pro', sans-serif"
 const fmt = (v) => v === null || v === undefined ? '—'
@@ -50,8 +51,20 @@ function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, s
   const [lierPaiement, setLierPaiement] = useState(null) // facture en cours de liaison à un mouvement
   const [txAVerifier, setTxAVerifier] = useState([]) // mouvements sortants sans facture (paiements à vérifier)
   const [mvtParTx, setMvtParTx] = useState({})       // { transaction_id: {montant,date_valeur,date_execution,contrepartie_nom} } — pour contrôler la cohérence du rapprochement
-  const [mvtLoaded, setMvtLoaded] = useState(false)  // true une fois les mouvements liés chargés (avant : pas d'alarme)
+  const [mvtLoaded, setMvtLoaded] = useState(false)
+  // Les dossiers servent au panneau d'attribution. Chargés une fois, pas à
+  // chaque ouverture : la liste ne bouge pas pendant qu'on classe.
+  const [dossiers, setDossiers] = useState([])
+  const [aAttribuer, setAAttribuer] = useState(null)  // true une fois les mouvements liés chargés (avant : pas d'alarme)
   const PAR_PAGE = 100
+
+  // Attribuer la facture à un chantier, depuis l'endroit où on la regarde.
+  async function attribuer(facture, patch) {
+    const { error } = await supabase.from('factures_achat').update(patch).eq('id', facture.id)
+    if (error) { alert(`Attribution refusée — ${error.message}`); return }
+    setFactures(prev => prev.map(f => f.id === facture.id ? { ...f, ...patch } : f))
+    setAAttribuer(null)
+  }
 
   // Lier une facture à un mouvement bancaire (écrit les DEUX côtés du lien)
   async function lierTransaction(facture, txs) {
@@ -91,8 +104,17 @@ function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, s
   }
 
   useEffect(() => {
+    if (vente) return
+    let annule = false
+    supabase.from('dossiers').select('id,numero,titre,client_nom,statut')
+      .in('societe', societeCodes).order('created_at', { ascending: false })
+      .then(({ data }) => { if (!annule) setDossiers(data || []) })
+    return () => { annule = true }
+  }, [societeCodes.join(','), vente])
+
+  useEffect(() => {
     setLoading(true)
-    chargerTout('factures_achat', 'fichier_id,nom,societe,montant,date_facture,url,transaction_id,sens', societeCodes, sens)
+    chargerTout('factures_achat', 'id,fichier_id,nom,societe,montant,date_facture,url,transaction_id,sens,fournisseur,destination_type,destination_id,destination_nom', societeCodes, sens)
       .then(rows => {
         const propres = sansExtraits(rows) // exclure les extraits de compte bancaires
         propres.sort((a, b) => (b.date_facture || '').localeCompare(a.date_facture || ''))
@@ -198,12 +220,16 @@ function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, s
   const facturesPage = filtrees.slice((page - 1) * PAR_PAGE, page * PAR_PAGE)
   const multiSociete = societeCodes.length > 1
   const ouvrir = (f) => { if (f.url) window.open(f.url, '_blank', 'noopener,noreferrer') }
+  // La colonne « Chantier » n'existe que sur les ACHATS : une facture de
+  // vente est déjà rattachée à son client, elle n'a pas de destination.
+  const colChantier = vente ? [] : ['170px']
+  const entChantier = vente ? [] : ['Chantier']
   const cols = multiSociete
-    ? (masquerMontant ? ['120px', '110px', '110px', '1fr', '46px'] : ['120px', '110px', '110px', '1fr', '130px', '46px'])
-    : (masquerMontant ? ['110px', '110px', '1fr', '46px'] : ['110px', '110px', '1fr', '130px', '46px'])
+    ? (masquerMontant ? ['120px', '110px', '110px', '1fr', ...colChantier, '46px'] : ['120px', '110px', '110px', '1fr', '130px', ...colChantier, '46px'])
+    : (masquerMontant ? ['110px', '110px', '1fr', ...colChantier, '46px'] : ['110px', '110px', '1fr', '130px', ...colChantier, '46px'])
   const entetes = multiSociete
-    ? (masquerMontant ? ['Société', 'Statut', 'Date', 'Facture', ''] : ['Société', 'Statut', 'Date', 'Facture', 'Montant', ''])
-    : (masquerMontant ? ['Statut', 'Date', 'Facture', ''] : ['Statut', 'Date', 'Facture', 'Montant', ''])
+    ? (masquerMontant ? ['Société', 'Statut', 'Date', 'Facture', ...entChantier, ''] : ['Société', 'Statut', 'Date', 'Facture', 'Montant', ...entChantier, ''])
+    : (masquerMontant ? ['Statut', 'Date', 'Facture', ...entChantier, ''] : ['Statut', 'Date', 'Facture', 'Montant', ...entChantier, ''])
 
   if (loading) return <div style={{ padding: '50px', textAlign: 'center', color: COUL.texteFaible }}>Chargement…</div>
 
@@ -247,6 +273,22 @@ function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, s
             <span style={{ fontSize: '12.5px', color: COUL.texteDoux, fontWeight: '600' }}>{fmtDate(f.date_facture)}</span>,
             <span style={{ fontSize: '13px', color: COUL.texteFort, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '10px' }}>{(f.nom || '').replace(/\.pdf$/i, '')}</span>,
             ...(masquerMontant ? [] : [<span style={{ textAlign: 'right', display: 'block', fontSize: '13.5px', fontWeight: '700', color: f.montant == null ? '#cbd5e1' : (vente ? '#16a34a' : COUL.danger) }}>{f.montant == null ? '—' : (vente ? '+ ' : '- ') + fmt(Math.abs(f.montant))}</span>]),
+            // Un clic sur la cellule suffit : le geste est là où est la facture.
+            ...(vente ? [] : [
+              <span onClick={(e) => { e.stopPropagation(); setAAttribuer(f) }}
+                title={f.destination_nom ? `${f.destination_nom} — cliquer pour changer` : 'Attribuer à un chantier'}
+                style={{
+                  display: 'block', cursor: 'pointer', fontSize: '12px', fontWeight: '600',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  // Le montant est calé à droite de sa colonne : sans cette
+                  // marge, les deux se touchent et « 1 824,96 €DOS-2026-001 »
+                  // se lit comme un seul mot.
+                  paddingLeft: '14px', paddingRight: '8px',
+                  color: f.destination_nom ? COUL.texteDoux : COUL.orange,
+                }}>
+                {f.destination_nom || '+ attribuer'}
+              </span>,
+            ]),
             <button onClick={(e) => { e.stopPropagation(); basculerSens(f) }} title={vente ? 'Reclasser dans les Dépenses' : 'Reclasser dans les Rentrées'} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '30px', height: '30px', margin: '0 auto', borderRadius: '7px', border: '1px solid #e2e8f0', background: COUL.surface, color: COUL.texteDoux, cursor: 'pointer' }}><i className="ti ti-transfer" style={{ fontSize: '16px' }} /></button>,
           ]
           return <Ligne key={f.fichier_id} cols={cols} items={cells} onClick={() => ouvrir(f)} clickable={!!f.url} alt={i % 2 === 1} title={f.nom} />
@@ -254,6 +296,11 @@ function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, s
       </div>
       <Pagination page={page} totalPages={totalPages} setPage={setPage} total={filtrees.length} />
       {lierPaiement && <PanneauLierPaiement facture={lierPaiement} color={color} tousComptes={tousComptes} onClose={() => setLierPaiement(null)} onLier={(tx) => lierTransaction(lierPaiement, tx)} />}
+      {aAttribuer && (
+        <PanneauAttribuer facture={aAttribuer} dossiers={dossiers}
+          onClose={() => setAAttribuer(null)}
+          onChoisir={patch => attribuer(aAttribuer, patch)} />
+      )}
     </>
   )
 }
