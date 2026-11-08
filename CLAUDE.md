@@ -264,6 +264,98 @@ parallèles, ou un seul par société ? » de la feuille de route.
 par mois via Accountable (facture 2026-329 au 01/10/2026), contre 23 factures au
 total pour LODE. C'est le vrai volume du groupe.
 
+## Architecture : ce qui est tranché (08/11/2026)
+
+Décisions prises avec Ludovic les 06-08/11. Ce ne sont pas des tâches — ce sont
+des contraintes. Le détail opérationnel vit dans le tableau des chantiers,
+domaine « Architecture & chantier LODE ».
+
+### Portée
+
+**Multi-tenant : non.** Le Hub ne servira jamais de plateforme à un client
+extérieur. L'objectif est de *vendre le concept*, pas le logiciel. Ne pas
+payer le prix d'une architecture multi-locataire pour un besoin qui n'existera
+pas.
+
+**Mais trois garde-fous gratuits à tenir quand même**, parce qu'ils ne coûtent
+rien aujourd'hui et coûtent cher plus tard :
+
+- une colonne `societe` sur **toute** table nouvelle ;
+- **aucune règle métier en dur sur un nom de société** — tout paramétrable en
+  base ;
+- une société qui disparaît se **désactive** (`societes.actif`), elle ne se
+  supprime pas.
+
+**Portail client type MyBroker : confirmé.** Il exige un second mode
+d'authentification — le bloc 3 de `docs/DROITS-ACCES.md` n'est donc plus une
+option, il est obligatoire.
+
+**Règle d'exposition.** Tout objet exposé hors du Hub passe par **une vue
+dédiée, colonnes listées explicitement**. Jamais `select *`, jamais
+`to_jsonb(ligne)`. ⚠️ `lode_devis_public()` viole déjà cette règle : elle
+renvoie `notes`, `responsable`, `opened_at` et `relance_sent_at` au client qui
+ouvre son devis.
+
+**Construire ou acheter.** Le Hub construit ce qui est **spécifique au
+groupe** et achète ce qui est **standard dans un métier**. Jamais : paie,
+comptabilité légale, TVA, signature électronique, e-mailing de masse, caisse
+de boutique. Le trading reste hors du Hub.
+
+### Modèle de données
+
+**Le pivot dépend de l'activité** : le **tiers** pour les activités de relation
+(courtage, chantier), le **bien** pour le locatif et les projets immobiliers.
+*Airbnb n'est pas un client, c'est un canal* — s'en souvenir évite de créer un
+client « Airbnb » qui porterait tous les séjours.
+
+**Généralisation : tout flux a une destination.** `destination_type`
+(tiers / bien / structure / consommable) + `destination_id`, à poser sur
+`factures_achat` **et** sur `transactions` — pas seulement `client_id`.
+
+**L'affectation se fait depuis la banque autant que depuis la facture.** Sur
+les projets immobiliers (Tongres 120, Seraing), beaucoup d'achats n'ont
+aucune facture : le mouvement bancaire est alors le seul canal. Un modèle qui
+n'affecte qu'à partir des factures laisserait ces projets sans analytique.
+
+**Table `dossiers`** : générique, avec `societe`. Gestion structurée d'un côté,
+pièces libres de l'autre, et **zéro champ obligatoire côté terrain**. Les notes
+techniques entrent comme pièces jointes, jamais comme données structurées —
+sinon personne ne les saisit et le module meurt.
+
+**Pas de module stock.** Quelques pièces d'avance marquées à la main, les
+consommables sur une destination dédiée, et **jamais d'alerte dessus**.
+
+**Coût de revient, sans aucune saisie de temps** : matériel affecté, plus
+**8,6 %** de frais de chantier recalculés chaque trimestre, plus la
+main-d'œuvre par **barème forfaitaire** par type d'intervention. Kilomètres
+calculés depuis l'adresse client, stockée une seule fois. Un **coût horaire
+théorique paramétrable** s'applique même quand personne n'est payé — sans lui,
+un chantier fait bénévolement paraît infiniment rentable.
+
+**Numéro métier sur quatre objets seulement** : factures de vente (obligation
+légale), devis, clients, dossiers. Format `<préfixe>-<année>-<séquence>`,
+séquence par type/société/année, générée par une **fonction PostgreSQL** donc
+atomique. **Le numéro s'attribue à l'émission, jamais au brouillon** — constat
+du 08/11 : `lode_factures` 2026-025 et 2026-026 sont des brouillons déjà
+numérotés, et 2026-003, 004 et 005 manquent.
+
+### SharePoint : un site par société
+
+`/sites/DYNASSUR`, `/sites/LODE`, `/sites/DTX`, `/sites/HEXAGROUP`,
+`/sites/GROUPE`. PRIVE doit sortir d'un OneDrive personnel.
+
+⚠️ **Ne pas migrer à la main.** Déplacer 2 217 fichiers semble faisable, mais
+casserait **7 386 URL dans `factures_achat`**, plus 1 137 et 529 dans
+`transactions`. Déplacement et réécriture doivent être **le même script**,
+société par société. Commencer par PRIVE (103 fichiers), le plus petit lot.
+
+### Process : ce qui ne doit dépendre de personne
+
+JCL met le nom du client dans « Votre référence » chez Winsol. C'est un
+**bonus, pas une pierre angulaire** : aucun maillon du système ne doit dépendre
+de la discipline de quelqu'un. Tout mécanisme qui n'a de valeur que si une
+personne pense à faire un geste est un mécanisme qui tombera.
+
 ## Les cinq ambiances (07/11/2026)
 
 Standard, Noël, Nouvel An, Halloween, Vacances. Sélecteur dans l'en-tête
