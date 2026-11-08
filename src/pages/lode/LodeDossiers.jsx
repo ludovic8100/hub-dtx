@@ -149,7 +149,7 @@ export default function LodeDossiers() {
     setLoading(true)
     const [d, a, v, dv] = await Promise.all([
       supabase.from('dossiers')
-        .select('id,numero,titre,client_nom,client_type,client_id,statut,montant_a_facturer,date_debut,created_at,mo_heures,mo_visites,mo_collaborateur_id,mo_taux_horaire')
+        .select('id,numero,titre,client_nom,client_type,client_id,statut,montant_a_facturer,date_debut,created_at,mo_heures,mo_visites,mo_collaborateur_id,mo_taux_horaire,responsable')
         .eq('societe', 'LODE').order('created_at', { ascending: false }),
       supabase.from('factures_achat')
         .select('id,fichier_id,nom,fournisseur,montant,date_facture,url,destination_type,destination_id,destination_nom,transaction_id')
@@ -258,7 +258,7 @@ export default function LodeDossiers() {
         type: 'intervention',
         montant_a_facturer: montantNum,
         date_debut: new Date().toISOString().slice(0, 10),
-      }).select('id,numero,titre,client_nom,client_type,client_id,statut,montant_a_facturer,date_debut,created_at,mo_heures,mo_visites,mo_collaborateur_id,mo_taux_horaire').single()
+      }).select('id,numero,titre,client_nom,client_type,client_id,statut,montant_a_facturer,date_debut,created_at,mo_heures,mo_visites,mo_collaborateur_id,mo_taux_horaire,responsable').single()
 
       if (error) { setErreur(`Création refusée — ${error.message}`); return false }
       setDossiers(p => [data, ...p])
@@ -342,6 +342,7 @@ export default function LodeDossiers() {
                   <ThTri label="N°"          col="numero"     tri={tri} setTri={setTri} />
                   <ThTri label="Intervention" col="titre"      tri={tri} setTri={setTri} />
                   <ThTri label="Client"       col="client_nom" tri={tri} setTri={setTri} />
+                  <ThTri label="Comm."        col="responsable" tri={tri} setTri={setTri} />
                   <ThTri label="Coûté"        col="coute"      tri={tri} setTri={setTri} droite />
                   <ThTri label="À facturer"   col="aFact"      tri={tri} setTri={setTri} droite />
                   <ThTri label="Facturé"      col="facture"    tri={tri} setTri={setTri} droite />
@@ -349,7 +350,7 @@ export default function LodeDossiers() {
                   <ThTri label="Manquant"     col="manque"     tri={tri} setTri={setTri} droite />
                 </tr></thead>
                 <tbody>
-                  {dossiers.length === 0 && <tr><td style={{ ...td, textAlign: 'center', padding: 36, color: COUL.texteFaible }} colSpan={8}>
+                  {dossiers.length === 0 && <tr><td style={{ ...td, textAlign: 'center', padding: 36, color: COUL.texteFaible }} colSpan={9}>
                     Aucun dossier. Crée le premier ci-dessus — son numéro est la référence à taper chez le fournisseur.
                   </td></tr>}
                   {lignesTriees.map(d => {
@@ -362,6 +363,7 @@ export default function LodeDossiers() {
                         <td style={{ ...td, fontWeight: 700, fontFamily: 'ui-monospace, Menlo, Consolas, monospace', fontSize: 12 }}>{d.numero || '—'}</td>
                         <td style={td}>{d.titre}{d.nbAchats > 0 && <span style={{ fontSize: 11, color: COUL.texteFaible, marginLeft: 6 }}>· {d.nbAchats} achat{d.nbAchats > 1 ? 's' : ''}</span>}</td>
                         <td style={{ ...td, color: COUL.texteDoux }}>{d.client_nom || '—'}</td>
+                        <td style={{ ...td, fontSize: 12, fontWeight: 700, color: d.responsable ? OR : '#cbd5e1' }}>{d.responsable || '—'}</td>
                         <td style={tdR}>{d.coute == null ? vide : eur(d.coute)}</td>
                         <td style={tdR}>{d.aFact == null ? vide : eur(d.aFact)}</td>
                         <td style={tdR}>{d.facture == null ? vide : eur(d.facture)}</td>
@@ -734,6 +736,7 @@ async function devisDepuisDossier(d) {
     client_id: d.client_type === 'lode_client' ? d.client_id : null,
     client_nom: d.client_nom || '',
     objet: d.titre || '',
+    responsable: d.responsable || '',
   }
   if (!base.client_id) return base
 
@@ -777,12 +780,13 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
   const [rattacher, setRattacher] = useState(false)
   const [mo, setMo] = useState(false)
   const [heures, setHeures] = useState(dossier.mo_heures == null ? '' : String(dossier.mo_heures))
+  const [commercial, setCommercial] = useState(dossier.responsable || '')
   const [qui, setQui] = useState(dossier.mo_collaborateur_id || '')
   const [taux, setTaux] = useState(dossier.mo_taux_horaire == null ? '' : String(dossier.mo_taux_horaire))
   const [employes, setEmployes] = useState([])
   useEffect(() => {
     let annule = false
-    supabase.from('collaborateurs').select('id,nom_complet,cout_horaire')
+    supabase.from('collaborateurs').select('id,code,nom_complet,cout_horaire')
       .eq('compte_hub_actif', true).order('nom_complet')
       .then(({ data }) => { if (!annule) setEmployes(data || []) })
     return () => { annule = true }
@@ -820,6 +824,7 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
     || statut !== (dossier.statut || 'ouvert')
     || heures !== (dossier.mo_heures == null ? '' : String(dossier.mo_heures))
     || visites !== (dossier.mo_visites == null ? '' : String(dossier.mo_visites))
+    || commercial !== (dossier.responsable || '')
     || String(qui) !== String(dossier.mo_collaborateur_id || '')
     || taux !== (dossier.mo_taux_horaire == null ? '' : String(dossier.mo_taux_horaire))
 
@@ -839,6 +844,7 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
       statut,
       mo_heures: h,
       mo_visites: vi == null ? null : Math.round(vi),
+      responsable: commercial || null,
       mo_collaborateur_id: qui === '' ? null : Number(qui),
       mo_taux_horaire: nb(taux),
       updated_at: new Date().toISOString(),
@@ -885,6 +891,20 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
             <div style={{ flex: '1 1 140px' }}>
               <label style={lbl}>Prix annoncé (TTC)</label>
               <input value={montant} onChange={e => setMontant(e.target.value)} inputMode="decimal" placeholder="—" style={{ ...inp, width: '100%' }} />
+            </div>
+            <div style={{ flex: '1 1 140px' }}>
+              {/* Le commercial vit sur le CHANTIER, pas seulement sur le devis :
+                  un dépannage n'a pas de devis, et un chantier peut en porter
+                  deux. Le déduire du premier devis — ce que faisait Rentabilité
+                  faute de mieux — donnait une colonne vide ou un résultat
+                  arbitraire. */}
+              <label style={lbl}>Commercial</label>
+              <select value={commercial} onChange={e => setCommercial(e.target.value)} style={{ ...inp, width: '100%' }}>
+                <option value="">—</option>
+                {employes.filter(e => e.code).map(e => (
+                  <option key={e.id} value={e.code}>{e.code} — {e.nom_complet}</option>
+                ))}
+              </select>
             </div>
             <div style={{ flex: '1 1 140px' }}>
               <label style={lbl}>État</label>

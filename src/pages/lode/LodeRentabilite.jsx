@@ -76,7 +76,7 @@ export default function LodeRentabilite() {
       supabase.from('factures_achat').select('id,nom,montant,date_facture,lode_devis_id,destination_type,destination_id,destination_nom,tva_taux,fichier_id').eq('societe', 'LODE').eq('sens', 'achat').order('date_facture', { ascending: false }),
       supabase.from('transactions').select('id,montant,date_valeur,categorie_id,activite,responsable,contrepartie_nom').eq('activite', 'rental'),
       supabase.from('categories').select('id,nom'),
-      supabase.from('dossiers').select('id,numero,titre,client_nom,statut').eq('societe', 'LODE').order('created_at', { ascending: false }),
+      supabase.from('dossiers').select('id,numero,titre,client_nom,statut,responsable').eq('societe', 'LODE').order('created_at', { ascending: false }),
     ])
     setDevis(d.data || []); setFactures(f.data || []); setAchats(a.data || []); setTx(t.data || [])
     setDossiers(dos.data || [])
@@ -141,9 +141,12 @@ export default function LodeRentabilite() {
     return m
   }, [achatsF, dossierDuDevis])
 
-  // Le responsable vit sur le devis, pas sur le dossier : on prend celui du
-  // premier devis rattaché. Approximatif et assumé — mieux vaut un commercial
-  // probable qu'une colonne vide.
+  // Le commercial vit désormais SUR LE DOSSIER (migration du 08/11).
+  //
+  // Avant, il était déduit du premier devis rattaché : colonne vide sur les
+  // dépannages, qui n'ont pas de devis, et résultat arbitraire quand un
+  // chantier en portait deux. Le devis reste un REPLI pour les dossiers
+  // antérieurs à la colonne, pas une source concurrente.
   const respDuDossier = useMemo(() => {
     const m = {}
     for (const d of devis) if (d.dossier_id && d.responsable && !m[d.dossier_id]) m[d.dossier_id] = d.responsable
@@ -156,7 +159,7 @@ export default function LodeRentabilite() {
     return {
       ...d,
       objet: d.titre,
-      responsable: respDuDossier[d.id] || '',
+      responsable: d.responsable || respDuDossier[d.id] || '',
       caHT: ca.ht, caN: ca.n, achat: ac.v, achatN: ac.n,
       marge, margePct: ca.ht > 0 ? marge / ca.ht * 100 : null,
       actif: ca.ht > 0 || ac.v > 0,
