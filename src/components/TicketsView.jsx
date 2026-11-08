@@ -1,3 +1,4 @@
+import { voile } from '../lib/voile'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
@@ -449,7 +450,7 @@ function TicketCard({ t, codeLabel, onOpen }) {
 
 function Overlay({ children, onClose, wide }) {
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }}>
+    <div {...voile(onClose)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 16, width: '100%', maxWidth: wide ? 760 : 520, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>{children}</div>
     </div>
   )

@@ -1,3 +1,4 @@
+import { voile } from '../../lib/voile'
 import { n8nWebhook } from '../../config/env'
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
@@ -690,7 +691,7 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
     : [{ type: 'cree', detail: 'Devis créé', created_at: doc.created_at }]
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: mob ? 0 : 20 }}>
+    <div {...voile(onClose)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: mob ? 0 : 20 }}>
       <div onClick={e => e.stopPropagation()} style={{ width: mob ? '100vw' : 'min(1080px,96vw)', height: mob ? '100vh' : 'min(92vh,900px)', background: COUL.surface, borderRadius: mob ? 0 : 16, overflow: 'hidden', display: 'flex', flexDirection: mob ? 'column' : 'row', boxShadow: '0 20px 60px rgba(0,0,0,.3)' }}>
 
         {/* ── Colonne gauche : aperçu du document ── */}

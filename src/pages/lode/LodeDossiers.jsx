@@ -1,3 +1,4 @@
+import { voile } from '../../lib/voile'
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
@@ -596,7 +597,7 @@ function PanneauNouveauDossier({ onClose, onCreer }) {
   )
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, padding: 16 }}>
+    <div {...voile(onClose)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, padding: 16 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 14, width: 'min(620px, 96vw)', maxHeight: '88vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
 
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
@@ -853,7 +854,6 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
       statut,
       mo_heures: h,
       mo_visites: vi == null ? null : Math.round(vi),
-      responsable: commercial || null,
       mo_collaborateur_id: qui === '' ? null : Number(qui),
       mo_taux_horaire: nb(taux),
       updated_at: new Date().toISOString(),
@@ -870,12 +870,22 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
     // recalage, le prochain dossier créé reprendrait un numéro déjà attribué
     // et l'index unique refuserait l'écriture — des semaines plus tard, chez
     // quelqu'un qui n'aura rien fait de mal.
+    // Le commercial se propage au devis et aux factures de vente du chantier.
+    // Les factures d'ACHAT n'ont pas de colonne : elles sont déjà rattachées
+    // au chantier, donc elles héritent. Une quatrième copie serait une
+    // quatrième occasion de diverger.
+    if (commercial !== (dossier.responsable || '')) {
+      const { error: eSync } = await supabase.rpc('synchroniser_commercial', {
+        p_dossier_id: dossier.id, p_code: commercial || null,
+      })
+      if (eSync) { setErreur(`Commercial non propagé — ${eSync.message}`); return }
+    }
     if (patch.numero && patch.numero !== dossier.numero) {
       await supabase.rpc('caler_numero', {
         p_type: 'dossier', p_societe: dossier.societe || 'LODE', p_numero: patch.numero,
       })
     }
-    onEnregistre(patch)
+    onEnregistre({ ...patch, responsable: commercial || null })
     // Enregistrer ferme la fenêtre.
     //
     // Ludovic : « quand on clique sur clos puis enregistrer, il doit fermer
@@ -890,7 +900,7 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
   const lbl = { display: 'block', fontSize: 10.5, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, padding: 16 }}>
+    <div {...voile(onClose)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, padding: 16 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 14, width: 'min(700px, 96vw)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
 
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -1111,7 +1121,7 @@ function ChoisirFacture({ achats, dossier, onClose, onChoisir }) {
     `${a.fournisseur || ''} ${a.nom || ''} ${a.numero || ''}`.toLowerCase().includes(terme))
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2100, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, padding: 16 }}>
+    <div {...voile(onClose)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2100, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, padding: 16 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 14, width: 'min(560px, 96vw)', maxHeight: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
           <div style={{ fontSize: 15, fontWeight: 800, color: COUL.texteFort }}>Rattacher une facture</div>
@@ -1194,7 +1204,7 @@ function Ligne2({ gauche, sousGauche, droite, sousDroite, tonDroite }) {
 function PanneauNumero({ dossier, onClose }) {
   const [copie, setCopie] = useState(false)
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, padding: 16 }}>
+    <div {...voile(onClose)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, padding: 16 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 14, width: 'min(420px, 94vw)', padding: '26px 24px', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
         <div style={{ fontSize: 13.5, color: COUL.texteDoux, marginBottom: 6 }}>Dossier créé</div>
         <div style={{ fontSize: 15, fontWeight: 700, color: COUL.texteFort, marginBottom: 16 }}>{dossier.titre}</div>
