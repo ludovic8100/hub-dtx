@@ -432,6 +432,12 @@ export default function LodeDossiers() {
         <FicheDossier
           dossier={ouvert}
           achats={achats.filter(a => a.destination_type === 'dossier' && a.destination_id === ouvert.id)}
+          achatsLibres={achats.filter(a => !a.destination_type)}
+          onRattacher={(facture) => affecter(facture, {
+            destination_type: 'dossier',
+            destination_id: ouvert.id,
+            destination_nom: `${ouvert.numero ? ouvert.numero + ' · ' : ''}${ouvert.titre}`,
+          })}
           ventes={ventes.filter(v => v.dossier_id === ouvert.id)}
           onClose={() => setOuvert(null)}
           onEnregistre={(patch) => {
@@ -740,7 +746,7 @@ async function devisDepuisDossier(d) {
 // Les deux vont ensemble : un dossier qu'on ne peut pas corriger est un
 // dossier qu'on recrée, et un dossier qui ne débouche sur rien n'a pas de
 // raison d'exister.
-function FicheDossier({ dossier, achats, ventes, onClose, onEnregistre, onDevis }) {
+function FicheDossier({ dossier, achats, achatsLibres = [], ventes, onClose, onEnregistre, onDevis, onRattacher }) {
   const [titre, setTitre] = useState(dossier.titre || '')
   const [date, setDate] = useState((dossier.date_debut || '').slice(0, 10))
   const [montant, setMontant] = useState(dossier.montant_a_facturer == null ? '' : String(dossier.montant_a_facturer))
@@ -748,6 +754,7 @@ function FicheDossier({ dossier, achats, ventes, onClose, onEnregistre, onDevis 
   const [occupe, setOccupe] = useState(false)
   const [erreur, setErreur] = useState('')
   const [enregistre, setEnregistre] = useState(false)
+  const [rattacher, setRattacher] = useState(false)
 
   const coute    = achats.reduce((s, a) => s + (Number(a.montant) || 0), 0)
   const facture  = ventes.reduce((s, v) => s + (Number(v.total_ttc) || 0), 0)
@@ -828,8 +835,16 @@ function FicheDossier({ dossier, achats, ventes, onClose, onEnregistre, onDevis 
             ))}
           </div>
 
-          <Section titre={`Achats rattachés (${achats.length})`}>
-            {achats.length === 0 && <Vide texte="Aucun achat rattaché. Onglet « Achats à attribuer » pour en rattacher un." />}
+          <Section titre={`Achats rattachés (${achats.length})`}
+            action={achatsLibres.length > 0 && (
+              <button onClick={() => setRattacher(true)} style={{
+                border: `1px solid ${OR}`, background: COUL.surface, color: OR, borderRadius: 7,
+                padding: '4px 9px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: FONT,
+              }}>+ Rattacher une facture</button>
+            )}>
+            {achats.length === 0 && <Vide texte={achatsLibres.length
+              ? "Aucun achat rattaché — utilise le bouton ci-dessus."
+              : "Aucun achat rattaché, et aucune facture d'achat en attente."} />}
             {achats.map(a => (
               <Ligne2 key={a.id}
                 gauche={a.fournisseur || 'fournisseur inconnu'}
@@ -855,6 +870,12 @@ function FicheDossier({ dossier, achats, ventes, onClose, onEnregistre, onDevis 
 
         {erreur && <div style={{ padding: '10px 20px', fontSize: 12.5, color: COUL.dangerFonce, background: COUL.dangerFondDoux }}>{erreur}</div>}
 
+        {rattacher && (
+          <ChoisirFacture achats={achatsLibres} dossier={dossier}
+            onClose={() => setRattacher(false)}
+            onChoisir={(f) => { onRattacher?.(f); setRattacher(false) }} />
+        )}
+
         <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           <button onClick={onDevis} style={{ ...btn, background: COUL.surface, color: OR, border: `1px solid ${OR}` }}>
             <i className="ti ti-file-plus" style={{ marginRight: 6 }} />Créer un devis
@@ -871,10 +892,76 @@ function FicheDossier({ dossier, achats, ventes, onClose, onEnregistre, onDevis 
   )
 }
 
-function Section({ titre, children }) {
+// Choisir une facture d'achat à rattacher au dossier.
+//
+// C'est le même geste que la colonne « Chantier » de la comptabilité, pris
+// par l'autre bout : là on part de la facture, ici on part du chantier.
+// Les deux existent parce qu'on n'aborde pas toujours le problème du même
+// côté — « cette facture, c'est pour quoi ? » et « ce chantier, qu'est-ce
+// qu'il m'a coûté ? » sont deux questions, pas deux écrans.
+function ChoisirFacture({ achats, dossier, onClose, onChoisir }) {
+  const [q, setQ] = useState('')
+  const terme = q.trim().toLowerCase()
+  const liste = !terme ? achats : achats.filter(a =>
+    `${a.fournisseur || ''} ${a.nom || ''} ${a.numero || ''}`.toLowerCase().includes(terme))
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2100, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, padding: 16 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 14, width: 'min(560px, 96vw)', maxHeight: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
+          <div style={{ fontSize: 15, fontWeight: 800, color: COUL.texteFort }}>Rattacher une facture</div>
+          <div style={{ fontSize: 12.5, color: COUL.texteDoux, marginTop: 3 }}>
+            vers <strong>{dossier.numero}</strong> · {dossier.titre}
+          </div>
+        </div>
+        <div style={{ padding: '12px 20px', borderBottom: '1px solid #f1f5f9' }}>
+          <input value={q} onChange={e => setQ(e.target.value)} autoFocus
+            placeholder="Fournisseur, numéro, nom de fichier…" style={{ ...inp, width: '100%' }} />
+          <div style={{ fontSize: 11, color: COUL.texteFaible, marginTop: 6 }}>
+            {liste.length} facture{liste.length > 1 ? 's' : ''} sans destination
+          </div>
+        </div>
+        <div style={{ overflowY: 'auto', flex: 1, minHeight: 100 }}>
+          {liste.length === 0 && (
+            <div style={{ padding: 28, textAlign: 'center', color: COUL.texteFaible, fontSize: 13 }}>
+              Aucune facture en attente ne correspond.
+            </div>
+          )}
+          {liste.map(a => (
+            <div key={a.id} onClick={() => onChoisir(a)}
+              style={{ padding: '10px 20px', borderBottom: '1px solid #f8fafc', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline' }}
+              onMouseEnter={e => { e.currentTarget.style.background = COUL.fond }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: COUL.texteFort }}>{a.fournisseur || 'fournisseur inconnu'}</div>
+                <div style={{ fontSize: 11.5, color: COUL.texteFaible, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {fmtDate(a.date_facture)}{a.numero ? ' · n°' + a.numero : ''}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{eur(a.montant)}</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: a.transaction_id ? COUL.succes : COUL.danger }}>
+                  {a.transaction_id ? 'payée' : 'non payée'}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9', textAlign: 'right' }}>
+          <button onClick={onClose} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid #e2e8f0', background: COUL.surface, color: COUL.texteDoux, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: FONT }}>Fermer</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Section({ titre, children, action }) {
   return (
     <div style={{ borderTop: '1px solid #f1f5f9' }}>
-      <div style={{ padding: '10px 20px 4px', fontSize: 10.5, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.04em' }}>{titre}</div>
+      <div style={{ padding: '10px 20px 4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+        <span style={{ fontSize: 10.5, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.04em' }}>{titre}</span>
+        {action || null}
+      </div>
       <div style={{ paddingBottom: 8 }}>{children}</div>
     </div>
   )
