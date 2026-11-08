@@ -2072,7 +2072,7 @@ function Row2({ l, v }) {
   return <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', color: COUL.texteDoux }}><span>{l}</span><span>{v}</span></div>
 }
 
-function SuiviModal({ doc, color, onClose, onChanged }) {
+function SuiviModal({ doc, color, onClose, onChanged, onConvertir, factureLiee }) {
   const mob = useMobile()
   const [events, setEvents] = useState(null)
   const [lignes, setLignes] = useState([])
@@ -2235,11 +2235,36 @@ function SuiviModal({ doc, color, onClose, onChanged }) {
             <button onClick={copier} style={{ padding: '9px 14px', border: 'none', borderRadius: 8, background: color, color: COUL.blanc, fontWeight: 700, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>{copied ? '✓ Copié' : 'Copier'}</button>
           </div>
 
-          {/* Actions d'envoi */}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 22 }}>
-            <button onClick={envoyerEmail} disabled={sending} style={{ flex: 1, minWidth: 180, padding: '11px 16px', border: 'none', borderRadius: 10, background: COUL.succes, color: COUL.blanc, fontWeight: 700, fontSize: 14, cursor: sending ? 'wait' : 'pointer' }}>{sending ? '…' : '📧 Envoyer par email'}</button>
-            <button onClick={() => marquerEnvoye(false)} style={{ padding: '11px 16px', border: '1px solid #e2e8f0', borderRadius: 10, background: COUL.surface, color: COUL.texteDoux, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Marquer envoyé</button>
-          </div>
+          {/* L'ACTION QUI SUIT DEPEND DU STATUT.
+              Ludovic : « des que le devis est accepte, le bouton transformer
+              en facture doit apparaitre, ce bouton ne doit pas rester dans le
+              menu ». Un devis accepte n'a plus a etre envoye : la seule suite
+              logique est de le facturer. Enterrer ce geste dans un menu
+              deroulant, c'est le rendre invisible au moment ou il compte. */}
+          {statut === 'accepté' ? (
+            <div style={{ marginBottom: 22 }}>
+              {factureLiee ? (
+                <div style={{ padding: '12px 14px', borderRadius: 10, background: COUL.fond, border: `1px solid ${COUL.bord}`, fontSize: 13.5, color: COUL.texteDoux }}>
+                  🔒 Déjà facturé — facture <strong style={{ color: COUL.texte }}>{factureLiee.numero}</strong>.
+                </div>
+              ) : (
+                <>
+                  <button onClick={() => onConvertir?.(doc)}
+                    style={{ width: '100%', padding: '13px 16px', border: 'none', borderRadius: 10, background: COUL.succes, color: COUL.blanc, fontWeight: 800, fontSize: 15, cursor: 'pointer' }}>
+                    → Convertir en facture
+                  </button>
+                  <div style={{ fontSize: 11.5, color: COUL.texteFaible, marginTop: 6, textAlign: 'center' }}>
+                    Le devis reste consultable ; la facture reprend ses articles et son client.
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 22 }}>
+              <button onClick={envoyerEmail} disabled={sending} style={{ flex: 1, minWidth: 180, padding: '11px 16px', border: 'none', borderRadius: 10, background: COUL.succes, color: COUL.blanc, fontWeight: 700, fontSize: 14, cursor: sending ? 'wait' : 'pointer' }}>{sending ? '…' : '📧 Envoyer par email'}</button>
+              <button onClick={() => marquerEnvoye(false)} style={{ padding: '11px 16px', border: '1px solid #e2e8f0', borderRadius: 10, background: COUL.surface, color: COUL.texteDoux, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Marquer envoyé</button>
+            </div>
+          )}
 
           {/* Timeline */}
           <div style={{ fontSize: 11, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', marginBottom: 12 }}>Historique</div>
@@ -2798,6 +2823,20 @@ export default function LodeDevisFactures() {
   })
 
   // Suivi acomptes : dossiers (par devis) avec un acompte facture mais un reste a facturer > 0.
+  // Les devis acceptés qui attendent leur facture.
+  //
+  // Ludovic : « dès que le devis est accepté, le bouton transformer en
+  // facture doit apparaître, ce bouton ne doit pas rester dans le menu ».
+  //
+  // Un geste qui n'a de valeur qu'à un moment précis ne doit pas être rangé
+  // dans un menu déroulant : au mieux on le cherche, au pire on l'oublie —
+  // et un devis accepté jamais facturé est exactement l'oubli qui coûte de
+  // l'argent. Il monte donc en bandeau, comme « À solder » pour les factures.
+  // ⚠️ Pas de `COUL.x || '#fallback'` dans ce bandeau : depuis le passage aux
+  // variables CSS, COUL.succesBord vaut la CHAÎNE « var(--hub-succesBord) »,
+  // donc toujours vraie. Un repli par `||` sur un jeton COUL est du code mort.
+  const aFacturer = devis.filter(d => d.statut === 'accepté' && !factureDuDevis(d.id))
+
   const aSolder = (() => {
     const acs = factures.filter(x => x.type === 'acompte')
     if (!acs.length) return []
@@ -2832,9 +2871,6 @@ export default function LodeDevisFactures() {
   // pas « changer le statut » mais « facturer » : elle passe en tete.
   const itemsStatut = (doc) => {
     const suite = []
-    if (tab === 'devis' && doc.statut === 'accepté') {
-      suite.push({ icon: '→', label: 'Convertir en facture', onClick: () => convertir(doc) }, { sep: true })
-    }
     if (tab === 'devis' && doc.statut === 'envoyé') {
       suite.push({ icon: '📊', label: 'Voir si le client a ouvert', onClick: () => setSuivi(doc) }, { sep: true })
     }
@@ -2868,8 +2904,6 @@ export default function LodeDevisFactures() {
       tab !== 'devis' && { icon: '✉', label: 'Envoyer par mail', disabled: busy === doc.id + 'mail', onClick: () => ouvrirEnvoiFacture(doc) },
       PEPPOL_ACTIF && tab === 'factures' && doc.client_tva && doc.statut !== 'payée' && doc.statut !== 'annulée'
         && { icon: '📨', label: 'Envoyer via Peppol', disabled: busy === doc.id + 'peppol', onClick: () => envoyerPeppol(doc) },
-      tab === 'devis' && doc.statut === 'accepté' && { sep: true },
-      tab === 'devis' && doc.statut === 'accepté' && { icon: '→', label: 'Convertir en facture', onClick: () => convertir(doc) },
       tab === 'devis' && { sep: true },
       tab === 'devis' && (factureDuDevis(doc.id)
         ? { icon: '🔒', label: `Facturé (${factureDuDevis(doc.id).numero})`, disabled: true, onClick: () => {} }
@@ -2930,6 +2964,34 @@ export default function LodeDevisFactures() {
 
         <TabsBar color={C} active={tab} onChange={setTab}
           tabs={[{ key: 'devis', label: 'Devis', count: devis.length }, { key: 'factures', label: 'Factures', count: factures.length }]} />
+
+        {tab === 'devis' && aFacturer.length > 0 && (
+          <DataCard style={{ padding: 0, marginBottom: 14, border: `1px solid ${COUL.succesBord}`, overflow: 'hidden' }}>
+            <div style={{ background: COUL.succesFond, color: COUL.succesFonce, fontWeight: 800, fontSize: 13.5, padding: '10px 16px', borderBottom: `1px solid ${COUL.succesBord}` }}>
+              ✅ Accepté, pas encore facturé — {aFacturer.length} devis
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {aFacturer.map(d => (
+                <div key={d.id} style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', justifyContent: 'space-between', padding: '11px 16px', borderTop: '1px solid #f8fafc' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, color: COUL.texte, fontSize: 14 }}>{d.client_nom}</div>
+                    <div style={{ color: COUL.texteFaible, fontSize: 12 }}>
+                      Devis {d.numero}{d.objet ? ' · ' + d.objet : ''}
+                      {d.accepted_at ? ' · accepté le ' + new Date(d.accepted_at).toLocaleDateString('fr-BE') : ''}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 10.5, color: COUL.succesFonce, fontWeight: 700, textTransform: 'uppercase', letterSpacing: .3 }}>Montant</div>
+                      <div style={{ fontWeight: 800, color: COUL.succesFonce, fontSize: 16 }}>{eur(d.total_ttc)}</div>
+                    </div>
+                    <button onClick={() => convertir(d)} style={{ background: COUL.succes, color: COUL.blanc, border: 'none', borderRadius: 9, padding: '9px 15px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>Convertir en facture</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </DataCard>
+        )}
 
         {tab === 'factures' && aSolder.length > 0 && (
           <DataCard style={{ padding: 0, marginBottom: 14, border: '1px solid #fed7aa', overflow: 'hidden' }}>
@@ -3096,7 +3158,12 @@ export default function LodeDevisFactures() {
       </div>
 
       {editing && <Editeur type={editing.type} doc={editing.doc} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load() }} />}
-      {suivi && <SuiviModal doc={suivi} color={C} onClose={() => setSuivi(null)} onChanged={() => { load() }} />}
+      {suivi && (
+        <SuiviModal doc={suivi} color={C}
+          factureLiee={factureDuDevis(suivi.id)}
+          onConvertir={(d) => { setSuivi(null); convertir(d) }}
+          onClose={() => setSuivi(null)} onChanged={() => { load() }} />
+      )}
       {apercu && <ApercuFacture fid={apercu.fid} nom={apercu.nom} />}
       {paiement && (
         <ModalPaiement
