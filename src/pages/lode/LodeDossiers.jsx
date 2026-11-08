@@ -148,7 +148,7 @@ export default function LodeDossiers() {
     setLoading(true)
     const [d, a, v] = await Promise.all([
       supabase.from('dossiers')
-        .select('id,numero,titre,client_nom,statut,montant_a_facturer,date_debut,created_at')
+        .select('id,numero,titre,client_nom,client_type,client_id,statut,montant_a_facturer,date_debut,created_at,mo_heures,mo_visites')
         .eq('societe', 'LODE').order('created_at', { ascending: false }),
       supabase.from('factures_achat')
         .select('id,fichier_id,nom,fournisseur,montant,date_facture,url,destination_type,destination_id,destination_nom,transaction_id')
@@ -251,7 +251,7 @@ export default function LodeDossiers() {
         type: 'intervention',
         montant_a_facturer: montantNum,
         date_debut: new Date().toISOString().slice(0, 10),
-      }).select('id,numero,titre,client_nom,statut,montant_a_facturer,date_debut,created_at').single()
+      }).select('id,numero,titre,client_nom,client_type,client_id,statut,montant_a_facturer,date_debut,created_at,mo_heures,mo_visites').single()
 
       if (error) { setErreur(`Création refusée — ${error.message}`); return false }
       setDossiers(p => [data, ...p])
@@ -767,6 +767,9 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, onClose, onE
   const [occupe, setOccupe] = useState(false)
   const [erreur, setErreur] = useState('')
   const [rattacher, setRattacher] = useState(false)
+  const [mo, setMo] = useState(false)
+  const [heures, setHeures] = useState(dossier.mo_heures == null ? '' : String(dossier.mo_heures))
+  const [visites, setVisites] = useState(dossier.mo_visites == null ? '' : String(dossier.mo_visites))
 
   const coute    = achats.reduce((s, a) => s + (Number(a.montant) || 0), 0)
   const facture  = ventes.reduce((s, v) => s + (Number(v.total_ttc) || 0), 0)
@@ -778,16 +781,25 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, onClose, onE
     || date !== (dossier.date_debut || '').slice(0, 10)
     || montant !== (dossier.montant_a_facturer == null ? '' : String(dossier.montant_a_facturer))
     || statut !== (dossier.statut || 'ouvert')
+    || heures !== (dossier.mo_heures == null ? '' : String(dossier.mo_heures))
+    || visites !== (dossier.mo_visites == null ? '' : String(dossier.mo_visites))
 
   async function enregistrer() {
     if (!titre.trim()) { setErreur("L'intervention ne peut pas être vide."); return }
     if (aFact != null && Number.isNaN(aFact)) { setErreur('Le prix annoncé doit être un nombre.'); return }
     setOccupe(true); setErreur('')
+    const nb = (v) => v === '' ? null : Number(String(v).replace(',', '.'))
+    const h = nb(heures), vi = nb(visites)
+    if ((h != null && (Number.isNaN(h) || h < 0)) || (vi != null && (Number.isNaN(vi) || vi < 0))) {
+      setErreur('Les heures et les visites doivent être des nombres positifs.'); setOccupe(false); return
+    }
     const patch = {
       titre: titre.trim(),
       date_debut: date || null,
       montant_a_facturer: aFact,
       statut,
+      mo_heures: h,
+      mo_visites: vi == null ? null : Math.round(vi),
       updated_at: new Date().toISOString(),
     }
     const { error } = await supabase.from('dossiers').update(patch).eq('id', dossier.id)
@@ -854,6 +866,51 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, onClose, onE
               </div>
             ))}
           </div>
+
+          <Section titre="Main-d'œuvre réelle"
+            action={(
+              <button onClick={() => setMo(m => !m)} style={{
+                border: `1px solid ${OR}`, background: mo ? '#fff7ed' : COUL.surface, color: OR, borderRadius: 7,
+                padding: '4px 9px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: FONT,
+              }}>{mo ? 'Replier' : 'Saisir heures et visites'}</button>
+            )}>
+            {!mo && (
+              <div style={{ padding: '2px 20px 12px', fontSize: 12.5, color: COUL.texteDoux }}>
+                {dossier.mo_heures != null || dossier.mo_visites != null
+                  ? <>
+                      <strong>{dossier.mo_heures ?? '—'} h</strong> · {dossier.mo_visites ?? '—'} visite{(dossier.mo_visites || 0) > 1 ? 's' : ''}
+                      <span style={{ color: COUL.texteFaible }}> · coût — </span>
+                    </>
+                  : <span style={{ color: COUL.texteFaible }}>Non renseignée.</span>}
+              </div>
+            )}
+            {mo && (
+              <div style={{ padding: '2px 20px 14px' }}>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <div style={{ flex: '1 1 130px' }}>
+                    <label style={lbl}>Heures prestées</label>
+                    <input value={heures} onChange={e => setHeures(e.target.value)} inputMode="decimal" placeholder="ex. 6,5" style={{ ...inp, width: '100%' }} />
+                  </div>
+                  <div style={{ flex: '1 1 130px' }}>
+                    <label style={lbl}>Visites chez le client</label>
+                    <input value={visites} onChange={e => setVisites(e.target.value)} inputMode="numeric" placeholder="ex. 2" style={{ ...inp, width: '100%' }} />
+                  </div>
+                  <div style={{ flex: '1 1 130px', opacity: 0.55 }}>
+                    <label style={lbl}>Coût main-d'œuvre</label>
+                    <input value="—" readOnly disabled style={{ ...inp, width: '100%', background: COUL.fond, cursor: 'not-allowed' }} />
+                  </div>
+                </div>
+                {/* Le coût reste grisé tant qu'aucun taux horaire n'existe en
+                    base. Afficher un montant calculé sur un taux inventé serait
+                    pire que de n'afficher rien : un chiffre faux se propage. */}
+                <div style={{ fontSize: 11.5, color: COUL.texteFaible, marginTop: 8, lineHeight: 1.5, background: COUL.fondDoux, borderRadius: 8, padding: '8px 10px' }}>
+                  Le coût n'est pas calculé : <strong>aucun taux horaire n'est défini</strong>. Les heures et
+                  les visites sont enregistrées dès maintenant — le jour où le taux sera posé, il s'appliquera
+                  aux chantiers déjà mesurés.
+                </div>
+              </div>
+            )}
+          </Section>
 
           <Section titre={`Achats rattachés (${achats.length})`}
             action={achatsLibres.length > 0 && (
