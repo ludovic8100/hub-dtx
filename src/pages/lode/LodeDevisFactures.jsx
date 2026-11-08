@@ -164,6 +164,16 @@ function Editeur({ type, doc, onClose, onSaved }) {
   // On BLOQUE donc l'enregistrement — mais sans jamais laisser dans une
   // impasse : si aucun chantier n'existe, un bouton le crée depuis ce que le
   // devis sait déjà (le client et l'objet).
+  // Une seule source pour les commerciaux, partagée avec l'écran Dossiers.
+  const [responsables, setResponsables] = useState([])
+  useEffect(() => {
+    let annule = false
+    supabase.from('collaborateurs').select('code,nom_complet')
+      .eq('actif', true).not('code', 'is', null).order('nom_complet')
+      .then(({ data }) => { if (!annule) setResponsables(data || []) })
+    return () => { annule = true }
+  }, [])
+
   const [dossiersDispo, setDossiersDispo] = useState([])
   const [creationDossier, setCreationDossier] = useState(false)
   useEffect(() => {
@@ -1008,11 +1018,13 @@ function Editeur({ type, doc, onClose, onSaved }) {
                 </div>
               )}
               <div><label style={lbl}>Responsable</label>
+                {/* La liste vient de `collaborateurs`, plus de trois noms écrits
+                    en dur ici. Deux écrans avec deux listes différentes, c'est
+                    exactement ce que Ludovic a vu : « je ne comprends pas
+                    pourquoi un seul, et dans devis j'ai les trois ». */}
                 <select style={inp} value={f.responsable || ''} onChange={e => set('responsable', e.target.value)}>
                   <option value="">—</option>
-                  <option value="LDE">LDE — Ludovic Detilloux</option>
-                  <option value="JCL">JCL — Jean-Charles Lorange</option>
-                  <option value="LLO">LLO — Ludivine Lorange</option>
+                  {responsables.map(r => <option key={r.code} value={r.code}>{r.code} — {r.nom_complet}</option>)}
                 </select>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>

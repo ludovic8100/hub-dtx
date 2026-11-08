@@ -786,8 +786,14 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
   const [employes, setEmployes] = useState([])
   useEffect(() => {
     let annule = false
+    // ⚠️ PAS de filtre sur `compte_hub_actif`.
+    //
+    // Un commercial n'a pas besoin d'un accès au Hub pour qu'un chantier lui
+    // soit attribué — JCL n'en a aucun aujourd'hui, et c'est précisément la
+    // personne qu'on veut créditer. Filtrer sur la connexion revenait à
+    // confondre « qui travaille ici » et « qui peut se connecter ».
     supabase.from('collaborateurs').select('id,code,nom_complet,cout_horaire')
-      .eq('compte_hub_actif', true).order('nom_complet')
+      .eq('actif', true).not('code', 'is', null).order('nom_complet')
       .then(({ data }) => { if (!annule) setEmployes(data || []) })
     return () => { annule = true }
   }, [])
