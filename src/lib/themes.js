@@ -59,7 +59,7 @@ export const BASE_CLAIR = {
   alerteFond: '#fef3c7', alerteFondDoux: '#fffbeb',
   info: '#2563eb', infoFond: '#eff6ff', infoFondDoux: '#f0f9ff',
 
-  saison: '#5dafff', saisonDoux: 'rgba(74,153,237,.13)',
+  saison: '#5dafff', saisonDoux: 'rgba(74,153,237,.13)', saisonMotif: 'none',
   saisonLueur: 'rgba(30,128,236,.10)', saisonSymbole: "'✦'",
 }
 
@@ -103,19 +103,19 @@ export const AMBIANCES = {
   standard: {
     couverture: '/ambiances/standard.webp',
     label: 'Standard', symbole: '✦',
-    clair: { saison: '#5dafff', saisonDoux: 'rgba(74,153,237,.13)', saisonLueur: 'rgba(30,128,236,.10)' },
-    sombre: { saison: '#5daffF', saisonDoux: 'rgba(74,153,237,.15)', saisonLueur: 'rgba(30,128,236,.22)' },
+    clair: { saison: '#5dafff', saisonDoux: 'rgba(74,153,237,.13)', saisonMotif: 'none', saisonLueur: 'rgba(30,128,236,.10)' },
+    sombre: { saison: '#5daffF', saisonDoux: 'rgba(74,153,237,.15)', saisonMotif: 'none', saisonLueur: 'rgba(30,128,236,.22)' },
   },
   noel: {
     couverture: '/ambiances/noel.webp',
     label: 'Noël', symbole: '❄',
     clair: {
       fond: '#eaf4ef', fondDoux: '#dbeae2', fondAlterne: '#f3faf6',
-      saison: '#b8860b', saisonDoux: 'rgba(245,202,120,.22)', saisonLueur: 'rgba(245,182,84,.14)',
+      saison: '#b8860b', saisonDoux: 'rgba(245,202,120,.22)', saisonMotif: "url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2796%27%20height%3D%2796%27%20viewBox%3D%270%200%2096%2096%27%3E%3Ctext%20x%3D%2712%27%20y%3D%2730%27%20font-size%3D%2722%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.22%27%3E%E2%9D%84%3C%2Ftext%3E%3Ctext%20x%3D%2760%27%20y%3D%2758%27%20font-size%3D%2715%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%9C%A6%3C%2Ftext%3E%3Ctext%20x%3D%2726%27%20y%3D%2784%27%20font-size%3D%2717%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%9D%85%3C%2Ftext%3E%3C%2Fsvg%3E')", saisonLueur: 'rgba(245,182,84,.14)',
     },
     sombre: {
       fond: '#071927', fondDoux: '#061d2c', surface: '#102b3c', surfaceHaute: '#16354b',
-      saison: '#f5ca78', saisonDoux: 'rgba(245,202,120,.14)', saisonLueur: 'rgba(245,182,84,.18)',
+      saison: '#f5ca78', saisonDoux: 'rgba(245,202,120,.14)', saisonMotif: "url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2796%27%20height%3D%2796%27%20viewBox%3D%270%200%2096%2096%27%3E%3Ctext%20x%3D%2712%27%20y%3D%2730%27%20font-size%3D%2722%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.22%27%3E%E2%9D%84%3C%2Ftext%3E%3Ctext%20x%3D%2760%27%20y%3D%2758%27%20font-size%3D%2715%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%9C%A6%3C%2Ftext%3E%3Ctext%20x%3D%2726%27%20y%3D%2784%27%20font-size%3D%2717%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%9D%85%3C%2Ftext%3E%3C%2Fsvg%3E')", saisonLueur: 'rgba(245,182,84,.18)',
     },
   },
   'nouvel-an': {
@@ -123,11 +123,11 @@ export const AMBIANCES = {
     label: 'Nouvel An', symbole: '✧',
     clair: {
       fond: '#f1eefb', fondDoux: '#e3def4', fondAlterne: '#f8f5ff',
-      saison: '#a16207', saisonDoux: 'rgba(245,197,107,.22)', saisonLueur: 'rgba(255,212,131,.14)',
+      saison: '#a16207', saisonDoux: 'rgba(245,197,107,.22)', saisonMotif: "url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2796%27%20height%3D%2796%27%20viewBox%3D%270%200%2096%2096%27%3E%3Ctext%20x%3D%2712%27%20y%3D%2730%27%20font-size%3D%2722%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.22%27%3E%E2%9C%A7%3C%2Ftext%3E%3Ctext%20x%3D%2760%27%20y%3D%2758%27%20font-size%3D%2715%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%98%85%3C%2Ftext%3E%3Ctext%20x%3D%2726%27%20y%3D%2784%27%20font-size%3D%2717%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%9C%A6%3C%2Ftext%3E%3C%2Fsvg%3E')", saisonLueur: 'rgba(255,212,131,.14)',
     },
     sombre: {
       fond: '#0a1127', fondDoux: '#0b1630', surface: '#172541', surfaceHaute: '#1d3051',
-      saison: '#f2c676', saisonDoux: 'rgba(245,197,107,.15)', saisonLueur: 'rgba(255,212,131,.18)',
+      saison: '#f2c676', saisonDoux: 'rgba(245,197,107,.15)', saisonMotif: "url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2796%27%20height%3D%2796%27%20viewBox%3D%270%200%2096%2096%27%3E%3Ctext%20x%3D%2712%27%20y%3D%2730%27%20font-size%3D%2722%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.22%27%3E%E2%9C%A7%3C%2Ftext%3E%3Ctext%20x%3D%2760%27%20y%3D%2758%27%20font-size%3D%2715%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%98%85%3C%2Ftext%3E%3Ctext%20x%3D%2726%27%20y%3D%2784%27%20font-size%3D%2717%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%9C%A6%3C%2Ftext%3E%3C%2Fsvg%3E')", saisonLueur: 'rgba(255,212,131,.18)',
     },
   },
   halloween: {
@@ -135,11 +135,11 @@ export const AMBIANCES = {
     label: 'Halloween', symbole: '☾',
     clair: {
       fond: '#f4ecf7', fondDoux: '#e7dcee', fondAlterne: '#faf4fc',
-      saison: '#c2410c', saisonDoux: 'rgba(255,128,52,.16)', saisonLueur: 'rgba(172,88,201,.12)',
+      saison: '#c2410c', saisonDoux: 'rgba(255,128,52,.16)', saisonMotif: "url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2796%27%20height%3D%2796%27%20viewBox%3D%270%200%2096%2096%27%3E%3Ctext%20x%3D%2712%27%20y%3D%2730%27%20font-size%3D%2722%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.22%27%3E%E2%98%BE%3C%2Ftext%3E%3Ctext%20x%3D%2760%27%20y%3D%2758%27%20font-size%3D%2715%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%9C%A6%3C%2Ftext%3E%3Ctext%20x%3D%2726%27%20y%3D%2784%27%20font-size%3D%2717%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%98%85%3C%2Ftext%3E%3C%2Fsvg%3E')", saisonLueur: 'rgba(172,88,201,.12)',
     },
     sombre: {
       fond: '#120f26', fondDoux: '#151026', surface: '#231c39', surfaceHaute: '#2d2247',
-      saison: '#ff9a51', saisonDoux: 'rgba(255,128,52,.14)', saisonLueur: 'rgba(172,88,201,.19)',
+      saison: '#ff9a51', saisonDoux: 'rgba(255,128,52,.14)', saisonMotif: "url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2796%27%20height%3D%2796%27%20viewBox%3D%270%200%2096%2096%27%3E%3Ctext%20x%3D%2712%27%20y%3D%2730%27%20font-size%3D%2722%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.22%27%3E%E2%98%BE%3C%2Ftext%3E%3Ctext%20x%3D%2760%27%20y%3D%2758%27%20font-size%3D%2715%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%9C%A6%3C%2Ftext%3E%3Ctext%20x%3D%2726%27%20y%3D%2784%27%20font-size%3D%2717%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%98%85%3C%2Ftext%3E%3C%2Fsvg%3E')", saisonLueur: 'rgba(172,88,201,.19)',
     },
   },
   vacances: {
@@ -147,11 +147,11 @@ export const AMBIANCES = {
     label: 'Vacances', symbole: '☀',
     clair: {
       fond: '#e6f6f7', fondDoux: '#d2ecee', fondAlterne: '#f2fcfd',
-      saison: '#0f766e', saisonDoux: 'rgba(83,224,203,.20)', saisonLueur: 'rgba(40,203,210,.12)',
+      saison: '#0f766e', saisonDoux: 'rgba(83,224,203,.20)', saisonMotif: "url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2796%27%20height%3D%2796%27%20viewBox%3D%270%200%2096%2096%27%3E%3Ctext%20x%3D%2712%27%20y%3D%2730%27%20font-size%3D%2722%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.22%27%3E%E2%98%80%3C%2Ftext%3E%3Ctext%20x%3D%2760%27%20y%3D%2758%27%20font-size%3D%2715%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%89%88%3C%2Ftext%3E%3Ctext%20x%3D%2726%27%20y%3D%2784%27%20font-size%3D%2717%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%9C%A6%3C%2Ftext%3E%3C%2Fsvg%3E')", saisonLueur: 'rgba(40,203,210,.12)',
     },
     sombre: {
       fond: '#071d2b', fondDoux: '#082438', surface: '#0b3243', surfaceHaute: '#144358',
-      saison: '#8ee8d3', saisonDoux: 'rgba(83,224,203,.15)', saisonLueur: 'rgba(40,203,210,.18)',
+      saison: '#8ee8d3', saisonDoux: 'rgba(83,224,203,.15)', saisonMotif: "url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2796%27%20height%3D%2796%27%20viewBox%3D%270%200%2096%2096%27%3E%3Ctext%20x%3D%2712%27%20y%3D%2730%27%20font-size%3D%2722%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.22%27%3E%E2%98%80%3C%2Ftext%3E%3Ctext%20x%3D%2760%27%20y%3D%2758%27%20font-size%3D%2715%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%89%88%3C%2Ftext%3E%3Ctext%20x%3D%2726%27%20y%3D%2784%27%20font-size%3D%2717%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%9C%A6%3C%2Ftext%3E%3C%2Fsvg%3E')", saisonLueur: 'rgba(40,203,210,.18)',
     },
   },
 }
@@ -214,10 +214,21 @@ export function cssDesAmbiances() {
     // Un lavis dans l'en-tete, du cote droit. PAS de pseudo-element ici :
     // l'en-tete porte des menus deroulants, et l'`overflow:hidden` qu'un
     // ornement imposerait les couperait net.
-    `.hub-saison-entete{background-image:linear-gradient(90deg,transparent 40%,var(${VAR('saisonDoux')}) 100%)}`,
+    // L'en-tête portait un dégradé partant de 40 % : invisible sur un bandeau
+    // de 56 px. Il part désormais de la gauche et porte le motif à droite.
+    `.hub-saison-entete{background-image:var(${VAR('saisonMotif')}),linear-gradient(90deg,transparent 0%,var(${VAR('saisonDoux')}) 100%);background-repeat:repeat,no-repeat;background-size:96px 96px,100% 100%;background-position:right center,center}`,
     // Le symbole de la saison, en filigrane au bas du menu.
-    `.hub-saison-volet{position:relative}`,
-    `.hub-saison-volet::after{content:var(${VAR('saisonSymbole')});position:absolute;right:-6px;bottom:-34px;font-size:120px;line-height:1;color:var(${VAR('saison')});opacity:.16;pointer-events:none}`,
+    // ⚠️ UN `::after` NE PEUT AFFICHER QU'UN SEUL SYMBOLE.
+    //
+    // Ludovic : « dans les templates Noël, Nouvel An, Vacances, tu étais censé
+    // mettre de la décoration. Ici il n'y a rien à part le fond ». Mesuré sur
+    // capture : un unique flocon, à 16 % d'opacité, à moitié coupé en bas du
+    // menu. Ce n'était pas de la décoration, c'était une trace.
+    //
+    // Le motif est donc une TUILE SVG répétée, portée par le jeton
+    // `saisonMotif` — trois symboles décalés pour que la répétition ne se
+    // voie pas. En Standard il vaut `none` : pas d'ambiance, pas de motif.
+    `.hub-saison-volet{position:relative;background-image:var(${VAR('saisonMotif')});background-repeat:repeat;background-size:96px 96px}`,
   )
   regles.push('html[data-mode="sombre"]{color-scheme:dark}')
   regles.push('html[data-mode="clair"]{color-scheme:light}')

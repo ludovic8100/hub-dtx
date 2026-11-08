@@ -94,11 +94,16 @@ export default function Layout({ children, currentPage }) {
         {/* Sidebar — modules uniquement, plus de SocieteSelector */}
         {sidebarVisible && (
           <aside className="hub-saison-volet" style={{
+            // ⚠️ `backgroundColor` ET NON `background`.
+            // La propriété raccourcie remet `background-image` à none, et un
+            // style en ligne l'emporte sur une classe : le motif de saison de
+            // `.hub-saison-volet` était donc écrasé avant d'être affiché.
+            // D'où « il n'y a rien à part le fond qui change ».
             width: '220px',
             minWidth: '220px',
             display: 'flex',
             flexDirection: 'column',
-            background: COUL.texteFort,
+            backgroundColor: COUL.texteFort,
             borderRight: '1px solid rgba(255,255,255,0.07)',
             overflowY: 'auto',
             ...(isMobile ? {

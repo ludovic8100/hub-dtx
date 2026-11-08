@@ -187,8 +187,10 @@ export default function Header({ currentPage, onToggleMenu, menuOuvert }) {
 
   return (
     <header className="hub-saison-entete" style={{
+      // `backgroundColor` et non `background` : le raccourci effacerait le
+      // motif de saison posé par la classe.
       height: '56px',
-      background: headerBg,
+      backgroundColor: headerBg,
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       padding: '0 16px 0 0',
       position: 'sticky', top: 0, zIndex: 100,

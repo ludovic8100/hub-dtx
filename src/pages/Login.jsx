@@ -34,6 +34,20 @@ import { AMBIANCES, ambianceEffective } from '../lib/themes'
 // même si l'administrateur a mis Noël. Dès la première connexion, le cache
 // est à jour et la page de garde suit.
 
+// Les fonds de la page de garde, un par ambiance.
+//
+// Écrits en dur ici et NON lus depuis les variables CSS, pour la même raison
+// que COUL_BRUT : cette page s'affiche avant toute connexion, et les variables
+// d'ambiance ne sont posées qu'ensuite. Une valeur en dur qui s'assume vaut
+// mieux qu'une variable qui rendrait du vide.
+const FONDS_GARDE = {
+  standard:    { fondSombre: '#061325', fondMoyen: '#0d2f5e', halo: 'rgba(30,128,236,.22)' },
+  noel:        { fondSombre: '#04141f', fondMoyen: '#0b3040', halo: 'rgba(245,202,120,.20)' },
+  'nouvel-an': { fondSombre: '#070c1d', fondMoyen: '#17254a', halo: 'rgba(245,197,107,.22)' },
+  halloween:   { fondSombre: '#0d0a1c', fondMoyen: '#2b2144', halo: 'rgba(255,128,52,.20)' },
+  vacances:    { fondSombre: '#04141e', fondMoyen: '#0b3a4b', halo: 'rgba(83,224,203,.20)' },
+}
+
 export default function Login() {
   const { user, loading, signInWithMicrosoft, erreurConnexion } = useAuth()
 
@@ -41,7 +55,16 @@ export default function Login() {
   // (sinon un simple retour sur /login masque une connexion pourtant réussie).
   if (!loading && user) return <Navigate to="/" replace />
 
-  const ambiance = AMBIANCES[ambianceEffective()] || AMBIANCES.standard
+  const cle = ambianceEffective()
+  const ambiance = AMBIANCES[cle] || AMBIANCES.standard
+
+  // La page de garde n'est PAS connectée : elle ne peut pas lire les variables
+  // CSS posées après connexion. Elle calcule donc ses couleurs directement
+  // depuis l'ambiance, comme le fait déjà COUL_BRUT pour les canvas et les PDF.
+  const COUL_BRUT_AMBIANCE = FONDS_GARDE[cle] || FONDS_GARDE.standard
+  // Le fond de la page de garde est sombre dans toutes les ambiances : on
+  // prend donc le motif du mode sombre, dont les symboles sont clairs.
+  const motifSaison = ambiance.sombre?.saisonMotif || ambiance.clair?.saisonMotif || 'none'
 
   return (
     <div style={{
@@ -49,9 +72,19 @@ export default function Login() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      // Le dégradé reprend le bleu nuit des couvertures : l'image s'y pose
-      // sans découpe visible, quelle que soit la taille de l'écran.
-      background: 'linear-gradient(160deg, #061325 0%, #0d2f5e 55%, #0b2446 100%)',
+      // ⚠️ LA PAGE ENTIÈRE SUIT L'AMBIANCE, PAS SEULEMENT L'IMAGE.
+      //
+      // Ludovic : « dans la page de garde, tu n'as changé que l'image, pas
+      // toute la page ». C'était exact : le dégradé était écrit en dur en
+      // bleu nuit, donc identique à Noël, au Nouvel An et en Vacances —
+      // l'image changeait, son cadre non.
+      //
+      // Le dégradé est désormais bâti sur les jetons de l'ambiance, et le
+      // motif de saison se pose par-dessus.
+      backgroundColor: COUL_BRUT_AMBIANCE.fondSombre,
+      backgroundImage: `${motifSaison && motifSaison !== 'none' ? motifSaison + ',' : ''}radial-gradient(ellipse 120% 80% at 50% 0%, ${COUL_BRUT_AMBIANCE.halo}, transparent 70%), linear-gradient(160deg, ${COUL_BRUT_AMBIANCE.fondSombre} 0%, ${COUL_BRUT_AMBIANCE.fondMoyen} 55%, ${COUL_BRUT_AMBIANCE.fondSombre} 100%)`,
+      backgroundRepeat: 'repeat, no-repeat, no-repeat',
+      backgroundSize: '96px 96px, 100% 100%, 100% 100%',
       padding: '28px 16px',
       fontFamily: "'Source Sans Pro', sans-serif",
     }}>
