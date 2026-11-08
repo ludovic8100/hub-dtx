@@ -133,6 +133,11 @@ export default function LodeDossiers() {
   const navigate = useNavigate()
   const [tri, setTri]   = useState({ col: 'numero', sens: 'desc' })
   const [triA, setTriA] = useState({ col: 'date_facture', sens: 'desc' })
+  // Sans cette bascule, « Retirer l'attribution » serait inatteignable : un
+  // achat déjà attribué ne figure plus dans la corbeille. Une corbeille qui
+  // ne montre que les erreurs futures et jamais les erreurs passées ne sert
+  // qu'à moitié — on ne peut pas corriger ce qu'on ne voit plus.
+  const [toutVoir, setToutVoir] = useState(false)
 
   async function charger() {
     setLoading(true)
@@ -196,6 +201,10 @@ export default function LodeDossiers() {
     () => trier(achats.filter(a => !a.destination_type), triA.col, triA.sens),
     [achats, triA])
 
+  const listeAchats = useMemo(
+    () => toutVoir ? trier(achats, triA.col, triA.sens) : nonAffectes,
+    [toutVoir, achats, nonAffectes, triA])
+
   // Le chiffre qui justifie l'écran : ce qui a été annoncé au client et
   // jamais facturé. Null quand aucun prix n'a été saisi — on ne déduit pas
   // un manque d'une absence de donnée.
@@ -248,15 +257,17 @@ export default function LodeDossiers() {
     }
   }
 
-  async function affecter(facture, dossier) {
+  // Une facture d'achat ne va pas forcément sur un chantier.
+  //
+  // Première version : on ne pouvait l'attribuer qu'à un dossier. Du coup
+  // l'électricité, le téléphone et la visserie restaient éternellement dans
+  // la corbeille « Achats à attribuer » — qui se remplissait de lignes
+  // parfaitement en ordre et devenait du bruit. Une corbeille qu'on ne peut
+  // pas vider, personne ne l'ouvre.
+  async function affecter(facture, patch) {
     setErreur('')
-    const patch = {
-      destination_type: 'dossier',
-      destination_id: dossier.id,
-      destination_nom: `${dossier.numero ? dossier.numero + ' · ' : ''}${dossier.titre}`,
-    }
     const { error } = await supabase.from('factures_achat').update(patch).eq('id', facture.id)
-    if (error) { setErreur(error.message); return }
+    if (error) { setErreur(`Attribution refusée — ${error.message}`); return }
     setAchats(p => p.map(a => a.id === facture.id ? { ...a, ...patch } : a))
     setAAttribuer(null)
   }
@@ -347,6 +358,18 @@ export default function LodeDossiers() {
         )}
 
         {!loading && onglet === 'attribuer' && (
+          <>
+          <div style={{ ...card, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, color: COUL.texteDoux, cursor: 'pointer' }}>
+              <input type="checkbox" checked={toutVoir} onChange={e => setToutVoir(e.target.checked)} />
+              Montrer aussi les achats déjà attribués
+            </label>
+            <span style={{ fontSize: 12.5, color: COUL.texteFaible }}>
+              {toutVoir
+                ? `${achats.length} achat${achats.length > 1 ? 's' : ''} · ${nonAffectes.length} sans destination`
+                : 'pour corriger une attribution, coche la case'}
+            </span>
+          </div>
           <div style={{ ...card, padding: 0, overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
               <thead><tr>
@@ -355,13 +378,14 @@ export default function LodeDossiers() {
                 <ThTri label="Facture"     col="nom"            tri={triA} setTri={setTriA} />
                 <ThTri label="Montant"     col="montant"        tri={triA} setTri={setTriA} droite />
                 <ThTri label="Payée"       col="transaction_id" tri={triA} setTri={setTriA} />
+                <ThTri label="Destination" col="destination_nom" tri={triA} setTri={setTriA} />
                 <th style={th}></th>
               </tr></thead>
               <tbody>
-                {nonAffectes.length === 0 && <tr><td style={{ ...td, textAlign: 'center', padding: 36, color: COUL.succes }} colSpan={6}>
+                {listeAchats.length === 0 && <tr><td style={{ ...td, textAlign: 'center', padding: 36, color: COUL.succes }} colSpan={7}>
                   Tous les achats LODE sont affectés.
                 </td></tr>}
-                {nonAffectes.map(a => (
+                {listeAchats.map(a => (
                   <tr key={a.id}>
                     <td style={{ ...td, whiteSpace: 'nowrap' }}>{fmtDate(a.date_facture)}</td>
                     <td style={td}>{a.fournisseur || <span style={{ color: COUL.texteFaible }}>inconnu</span>}</td>
@@ -374,14 +398,23 @@ export default function LodeDossiers() {
                     <td style={td}>{a.transaction_id
                       ? <span style={{ fontSize: 11, fontWeight: 700, color: COUL.succes }}>payée</span>
                       : <span style={{ fontSize: 11, fontWeight: 700, color: COUL.danger }}>non payée</span>}</td>
+                    <td style={{ ...td, color: a.destination_nom ? COUL.texteDoux : '#cbd5e1', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {a.destination_nom || '—'}
+                    </td>
                     <td style={{ ...td, textAlign: 'right' }}>
-                      <button onClick={() => setAAttribuer(a)} style={{ ...btn, padding: '6px 11px', fontSize: 12.5 }}>Attribuer</button>
+                      <button onClick={() => setAAttribuer(a)} style={{
+                        ...btn, padding: '6px 11px', fontSize: 12.5,
+                        background: a.destination_type ? COUL.surface : OR,
+                        color: a.destination_type ? COUL.texteDoux : COUL.blanc,
+                        border: a.destination_type ? '1px solid #e2e8f0' : 'none',
+                      }}>{a.destination_type ? 'Changer' : 'Attribuer'}</button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 
@@ -410,7 +443,7 @@ export default function LodeDossiers() {
       {nouveau && <PanneauNumero dossier={nouveau} onClose={() => setNouveau(null)} />}
       {aAttribuer && (
         <PanneauAttribuer facture={aAttribuer} dossiers={dossiers}
-          onClose={() => setAAttribuer(null)} onChoisir={d => affecter(aAttribuer, d)} />
+          onClose={() => setAAttribuer(null)} onChoisir={patch => affecter(aAttribuer, patch)} />
       )}
     </Layout>
   )
@@ -891,39 +924,126 @@ function PanneauNumero({ dossier, onClose }) {
 }
 
 function PanneauAttribuer({ facture, dossiers, onClose, onChoisir }) {
+  const [type, setType] = useState('dossier')
   const [q, setQ] = useState('')
+  const [tiers, setTiers] = useState([])
+  const [chargeTiers, setChargeTiers] = useState(false)
+
+  // Les tiers ne se chargent que si on en demande : une liste de clients
+  // qu'on n'ouvrira jamais n'a pas à coûter une requête à chaque ouverture.
+  useEffect(() => {
+    if (type !== 'tiers') return
+    let annule = false
+    setChargeTiers(true)
+    supabase.from('lode_clients').select('id,nom,prenom,denomination,ville').order('nom').limit(300)
+      .then(({ data }) => { if (!annule) { setTiers(data || []); setChargeTiers(false) } })
+    return () => { annule = true }
+  }, [type])
+
+  const nomTiers = (c) => c.denomination || [c.prenom, c.nom].filter(Boolean).join(' ') || '(sans nom)'
+  const terme = q.trim().toLowerCase()
+
   const ouverts = dossiers.filter(d => d.statut !== 'clos')
-  const liste = !q.trim() ? ouverts : ouverts.filter(d =>
-    `${d.numero || ''} ${d.titre || ''} ${d.client_nom || ''}`.toLowerCase().includes(q.trim().toLowerCase()))
+  const listeDossiers = !terme ? ouverts : ouverts.filter(d =>
+    `${d.numero || ''} ${d.titre || ''} ${d.client_nom || ''}`.toLowerCase().includes(terme))
+  const listeTiers = !terme ? tiers : tiers.filter(c =>
+    `${nomTiers(c)} ${c.ville || ''}`.toLowerCase().includes(terme))
+
+  // 'bien' est accepté par la base mais la table n'existe pas encore : le
+  // proposer donnerait un choix qui ne mène nulle part.
+  const TYPES = [
+    { code: 'dossier',     label: 'Chantier / dossier', icone: 'ti-folder',   aide: 'Pour un client, un chantier identifié' },
+    { code: 'tiers',       label: 'Client direct',      icone: 'ti-user',     aide: 'Sans dossier ouvert' },
+    { code: 'structure',   label: 'Structure',          icone: 'ti-building', aide: 'Loyer, énergie, téléphone, assurances' },
+    { code: 'consommable', label: 'Consommable',        icone: 'ti-box',      aide: 'Visserie, petit matériel — jamais sur un chantier' },
+  ]
+
+  const choisirSimple = (t) => onChoisir({ destination_type: t.code, destination_id: null, destination_nom: t.label })
+  const retirer = () => onChoisir({ destination_type: null, destination_id: null, destination_nom: null })
+
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, padding: 16 }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 14, width: 'min(520px, 96vw)', maxHeight: '84vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 14, width: 'min(560px, 96vw)', maxHeight: '86vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
-          <div style={{ fontSize: 15, fontWeight: 800, color: COUL.texteFort }}>Cet achat, c&apos;est pour quel dossier&nbsp;?</div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: COUL.texteFort }}>Cet achat, c&apos;est pour quoi&nbsp;?</div>
           <div style={{ fontSize: 12.5, color: COUL.texteDoux, marginTop: 3 }}>
             {facture.fournisseur || 'fournisseur inconnu'} — <strong>{eur(facture.montant)}</strong> — {fmtDate(facture.date_facture)}
           </div>
         </div>
-        <div style={{ padding: '12px 20px', borderBottom: '1px solid #f1f5f9' }}>
-          <input value={q} onChange={e => setQ(e.target.value)} autoFocus placeholder="Numéro, intervention, client…" style={{ ...inp, width: '100%' }} />
+
+        <div style={{ padding: '12px 20px', borderBottom: '1px solid #f1f5f9', display: 'grid', gap: 7 }}>
+          {TYPES.map(t => {
+            const actif = type === t.code
+            const simple = t.code === 'structure' || t.code === 'consommable'
+            return (
+              <button key={t.code}
+                onClick={() => simple ? choisirSimple(t) : (setType(t.code), setQ(''))}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 11, width: '100%', textAlign: 'left',
+                  padding: '9px 11px', borderRadius: 9, cursor: 'pointer', fontFamily: FONT,
+                  border: `1px solid ${actif && !simple ? OR : '#e2e8f0'}`,
+                  background: actif && !simple ? '#fff7ed' : COUL.surface,
+                }}>
+                <i className={`ti ${t.icone}`} style={{ fontSize: 17, color: actif && !simple ? OR : COUL.texteFaible }} />
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: 13.5, fontWeight: 700, color: COUL.texteFort }}>{t.label}</span>
+                  <span style={{ display: 'block', fontSize: 11.5, color: COUL.texteFaible }}>{t.aide}</span>
+                </span>
+              </button>
+            )
+          })}
         </div>
-        <div style={{ overflowY: 'auto', flex: 1 }}>
-          {liste.length === 0 && <div style={{ padding: 30, textAlign: 'center', color: COUL.texteFaible, fontSize: 13 }}>
-            Aucun dossier ouvert ne correspond. Crée-le d&apos;abord dans l&apos;onglet Dossiers.
-          </div>}
-          {liste.map(d => (
-            <div key={d.id} onClick={() => onChoisir(d)} style={{ padding: '11px 20px', borderBottom: '1px solid #f8fafc', cursor: 'pointer' }}
-              onMouseEnter={e => { e.currentTarget.style.background = COUL.fond }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: COUL.texteFort }}>
-                <span style={{ fontFamily: 'ui-monospace, Menlo, Consolas, monospace', fontSize: 12, color: OR, marginRight: 8 }}>{d.numero}</span>
-                {d.titre}
-              </div>
-              <div style={{ fontSize: 11.5, color: COUL.texteFaible }}>{d.client_nom || 'sans client'}</div>
+
+        {(type === 'dossier' || type === 'tiers') && (
+          <>
+            <div style={{ padding: '11px 20px', borderBottom: '1px solid #f1f5f9' }}>
+              <input value={q} onChange={e => setQ(e.target.value)} autoFocus
+                placeholder={type === 'dossier' ? 'Numéro, intervention, client…' : 'Nom du client…'}
+                style={{ ...inp, width: '100%' }} />
             </div>
-          ))}
-        </div>
-        <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9', textAlign: 'right' }}>
+            <div style={{ overflowY: 'auto', flex: 1, minHeight: 100 }}>
+              {type === 'dossier' && listeDossiers.map(d => (
+                <div key={d.id} onClick={() => onChoisir({
+                    destination_type: 'dossier', destination_id: d.id,
+                    destination_nom: `${d.numero ? d.numero + ' · ' : ''}${d.titre}`,
+                  })}
+                  style={{ padding: '11px 20px', borderBottom: '1px solid #f8fafc', cursor: 'pointer' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = COUL.fond }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: COUL.texteFort }}>
+                    <span style={{ fontFamily: 'ui-monospace, Menlo, Consolas, monospace', fontSize: 12, color: OR, marginRight: 8 }}>{d.numero}</span>
+                    {d.titre}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: COUL.texteFaible }}>{d.client_nom || 'sans client'}</div>
+                </div>
+              ))}
+              {type === 'dossier' && listeDossiers.length === 0 && (
+                <div style={{ padding: 28, textAlign: 'center', color: COUL.texteFaible, fontSize: 13 }}>
+                  Aucun dossier ouvert ne correspond. Crée-le d&apos;abord dans l&apos;onglet Dossiers.
+                </div>
+              )}
+              {type === 'tiers' && chargeTiers && <div style={{ padding: 28, textAlign: 'center', color: COUL.texteFaible, fontSize: 13 }}>Chargement…</div>}
+              {type === 'tiers' && !chargeTiers && listeTiers.map(c => (
+                <div key={c.id} onClick={() => onChoisir({ destination_type: 'tiers', destination_id: c.id, destination_nom: nomTiers(c) })}
+                  style={{ padding: '11px 20px', borderBottom: '1px solid #f8fafc', cursor: 'pointer' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = COUL.fond }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: COUL.texteFort }}>{nomTiers(c)}</div>
+                  <div style={{ fontSize: 11.5, color: COUL.texteFaible }}>{c.ville || '—'}</div>
+                </div>
+              ))}
+              {type === 'tiers' && !chargeTiers && listeTiers.length === 0 && (
+                <div style={{ padding: 28, textAlign: 'center', color: COUL.texteFaible, fontSize: 13 }}>Aucun client ne correspond.</div>
+              )}
+            </div>
+          </>
+        )}
+
+        <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+          {facture.destination_type
+            ? <button onClick={retirer} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #e2e8f0', background: COUL.surface, color: COUL.danger, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: FONT }}>Retirer l&apos;attribution</button>
+            : <span />}
           <button onClick={onClose} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid #e2e8f0', background: COUL.surface, color: COUL.texteDoux, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: FONT }}>Fermer</button>
         </div>
       </div>
