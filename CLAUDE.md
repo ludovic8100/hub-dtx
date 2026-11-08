@@ -309,8 +309,42 @@ de boutique. Le trading reste hors du Hub.
 client « Airbnb » qui porterait tous les séjours.
 
 **Généralisation : tout flux a une destination.** `destination_type`
-(tiers / bien / structure / consommable) + `destination_id`, à poser sur
-`factures_achat` **et** sur `transactions` — pas seulement `client_id`.
+(tiers / bien / **dossier** / structure / consommable) + `destination_id`, posé le
+08/11 sur `factures_achat` **et** sur `transactions` — pas seulement `client_id`.
+
+#### Destination et refacturation sont DEUX axes (08/11/2026)
+
+Le carnet listait la facture de vente parmi les choses à lier. **Une facture de
+vente n'est pas une destination : c'est la preuve que la destination a été
+refacturée.** Les confondre casse le cas le plus courant — un achat affecté à un
+chantier mais **inclus dans un forfait**, donc jamais refacturé seul. Sans cet
+état, l'écran « À refacturer » se remplit de lignes qui n'y ont rien à faire, et
+plus personne ne l'ouvre au bout d'un mois.
+
+D'où `factures_achat.refacture_statut` ∈ `a_refacturer` · `refacture` · `inclus` ·
+`non_refacturable`, avec `refacture_societe` + `refacture_facture_id`. Un CHECK
+refuse `refacture` sans facture en face : un statut sans preuve est une
+affirmation.
+
+⚠️ **`destination_id` est du `text`, et ce n'est pas de la paresse.** Les cibles
+n'ont pas le même type de clé — `clients.id` est **bigint**, `lode_clients.id` et
+`dossiers.id` sont **uuid**. Une colonne polymorphe ne peut donc être ni l'un ni
+l'autre, et aucune clé étrangère n'est possible. C'est le prix direct de « chaque
+entité reste séparée ». La cohérence tient par deux CHECK (vérifiés en test :
+type inconnu refusé, `dossier` sans identifiant refusé, `structure` sans
+identifiant accepté) et par le code — pas par le moteur.
+
+⚠️ **`transactions` n'a pas de colonne `societe`** : elle passe par
+`compte_id` → `comptes_bancaires."ENTITE"`. Toute lecture par société doit
+joindre. Elle porte aussi une colonne `activite` à moitié morte (`rental` 321,
+`protect` 47, **null 6 278**, libellés anglais, aucun référentiel) — à absorber
+dans `destination_type` ou à supprimer, pas à laisser vivre à côté.
+
+**Les numéros métier passent par `prochain_numero(type, societe, prefixe)`**, qui
+s'appuie sur `numeros_sequences` et un `ON CONFLICT … DO UPDATE` — atomique, donc
+deux sessions simultanées ne peuvent pas obtenir le même numéro, contrairement à
+un `max(numero)+1` lu puis écrit. Séquence indépendante par type, société et
+année (vérifié : LODE 001, 002 pendant que DTX repart à 001).
 
 **L'affectation se fait depuis la banque autant que depuis la facture.** Sur
 les projets immobiliers (Tongres 120, Seraing), beaucoup d'achats n'ont
