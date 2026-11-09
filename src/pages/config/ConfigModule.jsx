@@ -1074,7 +1074,8 @@ export default function ConfigModule() {
                     <F label="Titre / fonction" value={selUser.titre} onChange={v => setSelUser(u => ({ ...u, titre: v }))} />
                     <F label="GSM" value={selUser.gsm} onChange={v => setSelUser(u => ({ ...u, gsm: v }))} />
                     {/* Poste 3CX : relie le collaborateur à ses appels (module Appels, vue v_appels). */}
-                    <F label="Poste 3CX" value={selUser.extension} onChange={v => setSelUser(u => ({ ...u, extension: v.trim() || null }))} />
+                    <F label="IBAN (compte en banque)" value={selUser.iban} onChange={v => setSelUser(u => ({ ...u, iban: v }))} />
+                    <F label="BIC" value={selUser.bic} onChange={v => setSelUser(u => ({ ...u, bic: v }))} />
                     <F label="Adresse" value={selUser.adresse} onChange={v => setSelUser(u => ({ ...u, adresse: v }))} />
                     <F label="Code postal" value={selUser.code_postal} onChange={v => setSelUser(u => ({ ...u, code_postal: v }))} />
                     <F label="Ville" value={selUser.ville} onChange={v => setSelUser(u => ({ ...u, ville: v }))} />
@@ -1201,23 +1202,25 @@ export default function ConfigModule() {
                                   </select>
                                 </div>
                                 <div>
-                                  <Lbl>N° de sous-agent</Lbl>
+                                  <Lbl>N° d'apporteur (Brio)</Lbl>
                                   <input type="number" value={r.numero_sous_agent ?? ''} onChange={e => majSoc(code, { numero_sous_agent: e.target.value })} style={inp} />
                                 </div>
+                                {/* 3CX est le central de Dynassur : le poste n'est
+                                    pas une coordonnée personnelle, il n'a de sens
+                                    que dans cette société. */}
+                                <F label="Poste 3CX" value={selUser.extension} onChange={v => setSelUser(u => ({ ...u, extension: (v || '').trim() || null }))} />
                               </Grid>
-                              <div style={{ marginTop: 9 }}>
-                                <Lbl>Portefeuilles gérés — plusieurs possibles</Lbl>
-                                <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginTop: 4 }}>
-                                  {portefeuilles.map(pf => (
-                                    <label key={pf.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13.5,
-                                      border: `1px solid ${COUL.bord}`, borderRadius: 8, padding: '5px 10px', cursor: 'pointer', background: COUL.surface }}>
-                                      <input type="checkbox" checked={(r.portefeuilles || []).includes(pf.id)}
-                                        onChange={() => basculerDansListe(code, 'portefeuilles', pf.id)} />
-                                      {pf.libelle}
-                                    </label>
-                                  ))}
-                                </div>
-                              </div>
+                              {/* ⚠️ PAS DE « PORTEFEUILLES GÉRÉS » ICI.
+                                  Je l'avais ajouté, Ludovic a demandé ce que ça
+                                  voulait dire, et la réponse mesurée est : rien.
+                                  `ref_portefeuilles` contient bien Particulier,
+                                  Professionnel et VIP — mais AUCUN client ne porte
+                                  de portefeuille (la colonne n'existe pas sur
+                                  `clients`) et AUCUN collaborateur n'en a un
+                                  (`portefeuille_id` est vide sur les 54 fiches).
+                                  Cocher « VIP » n'aurait désigné aucun client.
+                                  À remettre le jour où un client saura dire à
+                                  quel portefeuille il appartient. */}
                             </div>
                           )}
 
@@ -1298,14 +1301,18 @@ export default function ConfigModule() {
                       de LODE, qui n'a ni BCE ni IBAN professionnel. */}
                   <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${COUL.bord}` }}>
                     <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.05em', color: COUL.texteFaible, marginBottom: 8 }}>
-                      Identifiants — un seul exemplaire pour la personne
+                      Correspondance avec Qlik
                     </div>
                     <Grid>
                       <F label="Code Hub" value={selUser.code} onChange={v => setSelUser(s => ({ ...s, code: (v || '').toUpperCase() }))} />
-                      <F label="IBAN" value={selUser.iban} onChange={v => setSelUser(s => ({ ...s, iban: v }))} />
-                      <F label="BIC" value={selUser.bic} onChange={v => setSelUser(s => ({ ...s, bic: v }))} />
                       <F label="Alias / noms repris (séparés par ,)" value={selUser.noms_repris_str} onChange={v => setSelUser(s => ({ ...s, noms_repris_str: v }))} />
                     </Grid>
+                    <div style={{ fontSize: 11.5, color: COUL.texteFaible, marginTop: 5, lineHeight: 1.5 }}>
+                      Les <strong>alias</strong> servent à reconnaître la personne quand la production
+                      arrive de Qlik sous une autre orthographe — « DETILLOUX L. », « L. Detilloux ».
+                      L'écran Production s'en sert pour rattacher la ligne au bon code. Six fiches en
+                      ont aujourd'hui. Ils disparaîtront avec Qlik.
+                    </div>
                   </div>
 
                   <div style={{ marginTop: 12 }}>
@@ -1334,7 +1341,20 @@ export default function ConfigModule() {
                       </select>
                     </label>
                     <Toggle label="Connexion au Hub active" on={!!selUser.compte_hub_actif} onClick={() => setSelUser(u => ({ ...u, compte_hub_actif: !u.compte_hub_actif }))} />
-                    <Toggle label="Employé" on={!!selUser.est_employe} onClick={() => setSelUser(u => ({ ...u, est_employe: !u.est_employe }))} />
+                    {/* ⚠️ PLUS DE CASE « EMPLOYÉ » ICI.
+                        Elle ne servait qu'à une chose : alimenter la liste des
+                        bénéficiaires de notes de frais en comptabilité. C'est
+                        maintenant le STATUT, par société, qui le dit — et la
+                        colonne `est_employe` reste écrite automatiquement à
+                        l'enregistrement, pour que la comptabilité continue de
+                        fonctionner sans qu'on ait à cocher deux fois la même
+                        chose à deux endroits. */}
+                    {!!selUser.est_employe && (
+                      <div style={{ fontSize: 12, color: COUL.texteFaible }}>
+                        Reconnu comme <strong>employé</strong> — déduit du statut dans « Sociétés et rôles ».
+                        Apparaît dans les bénéficiaires de notes de frais.
+                      </div>
+                    )}
                   </div>
 
                   {/* ── Coût horaire ────────────────────────────────────────
@@ -1405,8 +1425,14 @@ export default function ConfigModule() {
                       Administrateur du Hub : accès à toutes les sociétés, tous les modules. La grille ci-dessous est sans effet.
                     </div>
                   ) : (
+                    Object.keys(socSel).length === 0 ? (
+                    <div style={{ fontSize: 13, color: COUL.texteFaible, padding: '12px 2px' }}>
+                      Coche d'abord une société dans « Sociétés et rôles » : les modules proposés
+                      sont ceux de la société où la personne travaille.
+                    </div>
+                  ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(260px,1fr))', gap: 14 }}>
-                      {catalogue.map(c => {
+                      {catalogue.filter(c => c.societe in socSel).map(c => {
                         const ui = socUi(c.societe)
                         const actifs = c.modules.filter(m => accesSel.has(`${c.societe}|${m.code}`)).length
                         const tout = actifs === c.modules.length && c.modules.length > 0
@@ -1429,14 +1455,11 @@ export default function ConfigModule() {
                             ))}
                             {c.societe === 'DYNASSUR' && (
                               <div style={{ borderTop: '1px dashed #e2e8f0', marginTop: 6, paddingTop: 6 }}>
-                                <div style={{ fontSize: 10, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Portefeuille clients</div>
-                                <label style={{ display: 'block', marginBottom: 6 }}>
-                                  <Lbl>Bureau</Lbl>
-                                  <select value={selUser.bureau_id ?? ''} onChange={e => setBureau(e.target.value)} style={{ ...inp, padding: '6px 8px' }} disabled={!selUser.id}>
-                                    <option value="">— Aucun —</option>
-                                    {bureaux.map(b => <option key={b.id} value={b.id}>{b.libelle}</option>)}
-                                  </select>
-                                </label>
+                                {/* Le BUREAU n'est plus ici : il est dans le bloc
+                                    Dynassur de « Sociétés et rôles », où il va
+                                    avec le reste de ce qui est propre à Dynassur.
+                                    Il apparaissait deux fois sur la même fiche. */}
+                                <div style={{ fontSize: 10, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Étendue de lecture</div>
                                 <Toggle label="Voir tout le portefeuille (ignore le bureau)" on={!!selUser.voit_tout_portefeuille} small onClick={() => setSelUser(u => ({ ...u, voit_tout_portefeuille: !u.voit_tout_portefeuille }))} />
                                 <div style={{ borderTop: '1px dashed #e2e8f0', marginTop: 6, paddingTop: 6 }}>
                                   <Toggle label="Voir les commissions" on={!!selUser.voir_commissions} small onClick={() => setSelUser(u => ({ ...u, voir_commissions: !u.voir_commissions }))} />
@@ -1450,7 +1473,7 @@ export default function ConfigModule() {
                         </div>
                       )})}
                     </div>
-                  )}
+                  ))}
                 </Section>
 
                 <div style={{ marginTop: 16, borderTop: '1px solid #f1f5f9', paddingTop: 14 }}>
