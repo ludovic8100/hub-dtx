@@ -9,6 +9,7 @@ import GestionCategories from './GestionCategories'
 import GestionFournisseurs from './GestionFournisseurs'
 import GestionAmbiances from './GestionAmbiances'
 import BceSearch from '../../components/BceSearch'
+import InternalClientSearch from '../../components/InternalClientSearch'
 import { COUL } from '../../lib/theme'
 
 // ─── Présentation des sociétés (libellé et couleur de la carte) ─────────────
@@ -281,7 +282,10 @@ export default function ConfigModule() {
     // deux doivent raconter la meme chose, sinon l'ecran et la base
     // divergent sans que personne ne le voie.
     const nomF = (selUser.nom || '').trim(), prenomF = (selUser.prenom || '').trim()
-    const nom = (nomF && prenomF) ? `${nomF} ${prenomF}`
+    // Une personne MORALE garde sa dénomination : un prénom/nom resté dans la
+    // fiche (autofill du navigateur, fiche convertie) ne doit pas la réécrire.
+    const nom = ((selUser.type || 'physique') !== 'morale' && nomF && prenomF)
+              ? `${nomF} ${prenomF}`
               : ((selUser.nom_complet || '').trim() || email || '(sans nom)')
     setResultatUser(null)
     if (!email && !nom) { const m = 'Le nom ou l\'email est obligatoire'; notify('❌ ' + m); setResultatUser({ ok: false, message: m }); return }
@@ -813,6 +817,7 @@ export default function ConfigModule() {
 
             {selUser ? (() => {
               const roleMetier = !!(selUser.est_commercial || selUser.est_gestionnaire || selUser.est_sous_agent)
+              const estMorale = (selUser.type || 'physique') === 'morale'
               return (
               <div style={{ background: COUL.surface, border: '1px solid #e2e8f0', borderRadius: 14, padding: 20 }}>
 
@@ -844,6 +849,58 @@ export default function ConfigModule() {
 
                 {/* ── Coordonnées ── */}
                 <Section titre="Coordonnées">
+                  {/* Physique ou morale, et le choix se VOIT. La colonne `type`
+                      existait depuis le début — 32 physiques, 4 morales, 18
+                      vides — mais aucun champ ne permettait de la choisir :
+                      seul un clic dans la recherche BCE la passait à « morale »,
+                      en silence, dans une section qu'on n'ouvre qu'après. */}
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                    {[['physique', 'Personne physique'], ['morale', 'Personne morale']].map(([v, t]) => (
+                      <button key={v} type="button" onClick={() => setSelUser(u => ({ ...u, type: v }))}
+                        style={{
+                          padding: '7px 14px', borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
+                          fontFamily: 'inherit',
+                          border: `1px solid ${(selUser.type || 'physique') === v ? COUL.bleu : COUL.bord}`,
+                          background: (selUser.type || 'physique') === v ? COUL.bleu : COUL.surface,
+                          color: (selUser.type || 'physique') === v ? COUL.blanc : COUL.texteDoux,
+                        }}>{t}</button>
+                    ))}
+                  </div>
+
+                  {/* Ne pas ré-encoder ce qui existe déjà. Un sous-agent est
+                      souvent déjà client quelque part dans le groupe. */}
+                  <InternalClientSearch
+                    sources={[
+                      { table: 'dyn_clients', label: 'Dynassur', color: COUL.bleu },
+                      { table: 'lode_clients', label: 'LODE', color: '#ea580c' },
+                    ]}
+                    placeholder="Reprendre une fiche déjà encodée dans les clients…"
+                    onSelect={(c) => setSelUser(u => ({
+                      ...u,
+                      type: c.type === 'morale' || c.denomination ? 'morale' : (u.type || 'physique'),
+                      nom_complet: c.denomination || [c.prenom, c.nom].filter(Boolean).join(' ') || u.nom_complet,
+                      nom: c.denomination ? u.nom : (c.nom || u.nom),
+                      prenom: c.denomination ? u.prenom : (c.prenom || u.prenom),
+                      bce: c.numero_bce || u.bce,
+                      adresse: c.adresse || u.adresse,
+                      code_postal: c.cp || u.code_postal,
+                      ville: c.ville || u.ville,
+                      email: u.email || c.email || '',
+                      gsm: u.gsm || c.gsm || c.telephone || '',
+                    }))} />
+
+                  {estMorale && (
+                    <BceSearch onSelect={c => {
+                      const a = c.address || {}
+                      setSelUser(u => ({
+                        ...u, type: 'morale',
+                        nom_complet: c.denomination_with_legal_form || c.denomination || u.nom_complet,
+                        bce: c.cbe_number_formatted || c.cbe_number || u.bce,
+                        adresse: a.street ? `${a.street} ${a.street_number || ''}`.trim() : u.adresse,
+                        code_postal: a.post_code || u.code_postal, ville: a.city || u.ville,
+                      }))
+                    }} />
+                  )}
                   <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
                     {/* Prenom et NOM separes : « nom_complet » melangeait
                         quatre conventions et rendait tout tri impossible.
@@ -854,8 +911,15 @@ export default function ConfigModule() {
                         cases vides avec l'identite de la personne connectee.
                         On ouvrait la fiche « Cezassur SPRL » et on y lisait son
                         propre nom. */}
-                    <div style={{ minWidth: 170 }}><Lbl>Prénom</Lbl><input name="collab-pr" autoComplete="off" data-lpignore="true" value={selUser.prenom || ''} onChange={e => setSelUser(u => ({ ...u, prenom: e.target.value }))} placeholder="(vide pour une société)" style={inp} /></div>
-                    <div style={{ minWidth: 170 }}><Lbl>NOM</Lbl><input name="collab-nm" autoComplete="off" data-lpignore="true" value={selUser.nom || ''} onChange={e => setSelUser(u => ({ ...u, nom: e.target.value.toUpperCase() }))} placeholder="(vide pour une société)" style={{ ...inp, fontWeight: 700 }} /></div>
+                    {!estMorale && <div style={{ minWidth: 170 }}><Lbl>Prénom</Lbl><input name="collab-pr" autoComplete="off" data-lpignore="true" value={selUser.prenom || ''} onChange={e => setSelUser(u => ({ ...u, prenom: e.target.value }))} placeholder="(vide pour une société)" style={inp} /></div>}
+                    {estMorale && <div style={{ minWidth: 260 }}><Lbl>Dénomination</Lbl><input name="collab-dn" autoComplete="off" data-lpignore="true" value={selUser.nom_complet || ''} onChange={e => setSelUser(u => ({ ...u, nom_complet: e.target.value }))} style={inp} /></div>}
+                    {/* Une société n'a pas de prénom : elle a un administrateur,
+                        qui est une personne physique. Texte libre et non une clé
+                        vers collaborateurs — l'administrateur d'une société
+                        partenaire n'a pas de compte dans le Hub. */}
+                    {estMorale && <div style={{ minWidth: 220 }}><Lbl>Administrateur</Lbl><input name="collab-ad" autoComplete="off" data-lpignore="true" value={selUser.administrateur || ''} onChange={e => setSelUser(u => ({ ...u, administrateur: e.target.value }))} style={inp} placeholder="Nom de l'administrateur" /></div>}
+                    {estMorale && <div style={{ minWidth: 170 }}><Lbl>N° BCE</Lbl><input name="collab-bc" autoComplete="off" data-lpignore="true" value={selUser.bce || ''} onChange={e => setSelUser(u => ({ ...u, bce: e.target.value }))} style={inp} /></div>}
+                    {!estMorale && <div style={{ minWidth: 170 }}><Lbl>NOM</Lbl><input name="collab-nm" autoComplete="off" data-lpignore="true" value={selUser.nom || ''} onChange={e => setSelUser(u => ({ ...u, nom: e.target.value.toUpperCase() }))} placeholder="(vide pour une société)" style={{ ...inp, fontWeight: 700 }} /></div>}
                     <div style={{ minWidth: 220 }}><Lbl>Email</Lbl><input name="collab-ml" autoComplete="off" data-lpignore="true" value={selUser.email || ''} onChange={e => setSelUser(u => ({ ...u, email: e.target.value }))} placeholder="prenom@dynassur.be" style={inp} /></div>
                     {/* Le bureau decide de quels clients la personne voit —
                         regle clients_bureau. 38 collaborateurs sur 54 n'en
@@ -884,16 +948,6 @@ export default function ConfigModule() {
 
                 {/* ── Rôle métier & commissions ── */}
                 <Section titre="Rôle métier & commissions">
-                  <BceSearch onSelect={c => {
-                    const a = c.address || {}
-                    setSelUser(s => ({
-                      ...s, type: 'morale',
-                      nom_complet: c.denomination_with_legal_form || c.denomination || s.nom_complet,
-                      bce: c.cbe_number_formatted || c.cbe_number || s.bce,
-                      adresse: a.street ? `${a.street} ${a.street_number || ''}`.trim() : s.adresse,
-                      code_postal: a.post_code || s.code_postal, ville: a.city || s.ville,
-                    }))
-                  }} />
                   <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', margin: '12px 0' }}>
                     <Chk label="Commercial" on={!!selUser.est_commercial} onClick={() => setSelUser(s => ({ ...s, est_commercial: !s.est_commercial }))} />
                     <Chk label="Gestionnaire" on={!!selUser.est_gestionnaire} onClick={() => setSelUser(s => ({ ...s, est_gestionnaire: !s.est_gestionnaire }))} />
