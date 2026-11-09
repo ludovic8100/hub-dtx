@@ -2,6 +2,7 @@ import { voile } from '../../lib/voile'
 import { n8nWebhook } from '../../config/env'
 import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
+import { chargerCollaborateurs, filtrerSociete } from '../../lib/collaborateurs'
 import { PEPPOL_ACTIF } from '../../lib/peppol'
 import Layout from '../../components/Layout'
 import { LODE, TVA_TAUX, CGV, DELAI_PAIEMENT_JOURS } from '../../lib/lodeConfig'
@@ -166,14 +167,18 @@ function Editeur({ type, doc, onClose, onSaved }) {
   // impasse : si aucun chantier n'existe, un bouton le crée depuis ce que le
   // devis sait déjà (le client et l'objet).
   // Une seule source pour les commerciaux, partagée avec l'écran Dossiers.
-  const [responsables, setResponsables] = useState([])
+  const [tousCollabs, setTousCollabs] = useState([])
   useEffect(() => {
     let annule = false
-    supabase.from('collaborateurs').select('code,nom_complet')
-      .eq('actif', true).not('code', 'is', null).order('nom_complet')
-      .then(({ data }) => { if (!annule) setResponsables(data || []) })
+    chargerCollaborateurs('LODE').then(d => { if (!annule) setTousCollabs(d) })
     return () => { annule = true }
   }, [])
+  // Un commercial Dynassur n'a rien à faire dans un devis LODE. On garde
+  // cependant le code déjà enregistré, sinon un devis existant afficherait
+  // un responsable absent de sa propre liste.
+  const responsables = useMemo(
+    () => filtrerSociete(tousCollabs, 'LODE', f.responsable),
+    [tousCollabs, f.responsable])
 
   const [dossiersDispo, setDossiersDispo] = useState([])
   const [creationDossier, setCreationDossier] = useState(false)
@@ -203,8 +208,15 @@ function Editeur({ type, doc, onClose, onSaved }) {
 
   // Changer de client invalide le chantier déjà choisi : il appartenait à
   // quelqu'un d'autre.
+  //
+  // Et quand le client n'a qu'UN chantier ouvert, on le choisit pour lui :
+  // le champ est obligatoire, la liste n'a qu'une entrée, lui demander de la
+  // sélectionner c'est lui demander de confirmer qu'il n'avait pas le choix.
   useEffect(() => {
-    if (!f.dossier_id) return
+    if (!f.dossier_id) {
+      if (dossiersDuClient.length === 1) set('dossier_id', dossiersDuClient[0].id)
+      return
+    }
     if (!dossiersDuClient.some(d => d.id === f.dossier_id)) set('dossier_id', null)
   }, [f.client_id, dossiersDispo])
 

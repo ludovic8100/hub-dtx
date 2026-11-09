@@ -2,6 +2,7 @@ import { voile } from '../../lib/voile'
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { chargerCollaborateurs, filtrerSociete } from '../../lib/collaborateurs'
 import Layout from '../../components/Layout'
 import { COUL } from '../../lib/theme'
 import PanneauAttribuer from '../../components/PanneauAttribuer'
@@ -833,11 +834,18 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
     // soit attribué — JCL n'en a aucun aujourd'hui, et c'est précisément la
     // personne qu'on veut créditer. Filtrer sur la connexion revenait à
     // confondre « qui travaille ici » et « qui peut se connecter ».
-    supabase.from('collaborateurs').select('id,code,nom_complet,cout_horaire')
-      .eq('actif', true).not('code', 'is', null).order('nom_complet')
-      .then(({ data }) => { if (!annule) setEmployes(data || []) })
+    //
+    // En revanche, un commercial Dynassur n'a rien à faire dans la liste d'un
+    // chantier LODE : le filtre par société est fait plus bas, en gardant le
+    // code déjà enregistré sur le dossier.
+    chargerCollaborateurs('LODE', 'id,code,nom_complet,cout_horaire')
+      .then(d => { if (!annule) setEmployes(d) })
     return () => { annule = true }
   }, [])
+
+  const employesLode = useMemo(
+    () => filtrerSociete(employes, 'LODE', dossier.responsable),
+    [employes, dossier.responsable])
 
   // ⚠️ LE TAUX SE PROPOSE, IL NE SE LIT PAS.
   //
@@ -986,7 +994,7 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
               <label style={lbl}>Commercial</label>
               <select value={commercial} onChange={e => setCommercial(e.target.value)} style={{ ...inp, width: '100%' }}>
                 <option value="">—</option>
-                {employes.filter(e => e.code).map(e => (
+                {employesLode.filter(e => e.code).map(e => (
                   <option key={e.id} value={e.code}>{e.code} — {e.nom_complet}</option>
                 ))}
               </select>
@@ -1063,7 +1071,7 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
                     <label style={lbl}>Qui a presté</label>
                     <select value={qui} onChange={e => choisirQui(e.target.value)} style={{ ...inp, width: '100%' }}>
                       <option value="">—</option>
-                      {employes.map(e => (
+                      {employesLode.map(e => (
                         <option key={e.id} value={e.id}>
                           {e.nom_complet}{e.cout_horaire != null ? ` · ${e.cout_horaire} €/h` : ' · taux non défini'}
                         </option>
