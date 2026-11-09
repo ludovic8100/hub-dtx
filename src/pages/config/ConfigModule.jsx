@@ -10,6 +10,7 @@ import GestionFournisseurs from './GestionFournisseurs'
 import GestionAmbiances from './GestionAmbiances'
 import BceSearch from '../../components/BceSearch'
 import InternalClientSearch from '../../components/InternalClientSearch'
+import { usePetitEcran } from '../../lib/ecran'
 import { COUL } from '../../lib/theme'
 
 // ─── Présentation des sociétés (libellé et couleur de la carte) ─────────────
@@ -39,11 +40,13 @@ const FIELDS_SOC = [
 const TYPES_TRAVAIL = ['Non-Vie', 'Vie', 'Santé', 'Crédit', 'SRDU', 'PJ']
 
 // Champs obligatoires dès qu'un rôle métier (commercial, gestionnaire, sous-agent) est coché.
-const CHAMPS_METIER_REQUIS = [['code', 'Code'], ['numero', 'N° producteur'], ['bce', 'N° BCE'], ['iban', 'IBAN'], ['bic', 'BIC']]
 
 export default function ConfigModule() {
   const { isAdmin, perms } = useAuth()
   const [tab, setTab] = useState('societes')
+  // Téléphone : la liste et la fiche se superposent au lieu de se partager
+  // la largeur. À 390 px, « 280 px puis le reste » laissait 90 px à la fiche.
+  const petitEcran = usePetitEcran()
   const [societes, setSocietes] = useState([])
   const [users, setUsers] = useState([])
   const [taux, setTaux] = useState({})          // collaborateur_id -> { type_travail: valeur }
@@ -82,6 +85,17 @@ export default function ConfigModule() {
   const [catalogue, setCatalogue] = useState([])        // [{ societe, modules: [{code, libelle}] }] — depuis la base
   const [accesAll, setAccesAll] = useState(new Map())   // collaborateur_id -> Set('SOCIETE|module')
   const [accesSel, setAccesSel] = useState(new Set())   // attributions de la fiche ouverte
+  // ── Le rôle appartient au couple (personne, société) ──────────────────
+  // Ces quatre états portent le nouveau modèle : les référentiels, et les
+  // lignes de la fiche ouverte. `socSel` est un objet { SOCIETE: {statut,
+  // fonction, remuneration, …} } — pas un tableau, pour qu'une société ne
+  // puisse pas y figurer deux fois.
+  const [refStatuts, setRefStatuts] = useState([])        // [{code,libelle,ordre}]
+  const [statutsSoc, setStatutsSoc] = useState({})        // SOCIETE -> [code]
+  const [refActivites, setRefActivites] = useState({})    // SOCIETE -> [{code,libelle}]
+  const [portefeuilles, setPortefeuilles] = useState([])  // ref_portefeuilles
+  const [socSel, setSocSel] = useState({})                // lignes de la fiche ouverte
+  const [socInitial, setSocInitial] = useState({})        // pour savoir ce qui a été retiré
 
   useEffect(() => {
     if (!isAdmin) { setLoading(false); return }
@@ -93,6 +107,18 @@ export default function ConfigModule() {
       const { data: mods } = await supabase.from('ref_modules').select('code,libelle,ordre').order('ordre')
       const { data: msoc } = await supabase.from('ref_modules_societes').select('module_code,societe')
       const { data: acc } = await supabase.from('collaborateur_acces').select('collaborateur_id,societe,module_code')
+      const [{ data: rst }, { data: rss }, { data: rac }, { data: rpf }] = await Promise.all([
+        supabase.from('ref_statuts').select('code,libelle,ordre').order('ordre'),
+        supabase.from('ref_statuts_societes').select('statut_code,societe'),
+        supabase.from('ref_activites').select('code,libelle,societe,ordre').eq('actif', true).order('ordre'),
+        supabase.from('ref_portefeuilles').select('id,libelle').eq('actif', true).order('libelle'),
+      ])
+      setRefStatuts(rst || [])
+      const pst = {}; (rss || []).forEach(x => { (pst[x.societe] || (pst[x.societe] = [])).push(x.statut_code) })
+      setStatutsSoc(pst)
+      const pac = {}; (rac || []).forEach(a => { (pac[a.societe] || (pac[a.societe] = [])).push(a) })
+      setRefActivites(pac)
+      setPortefeuilles(rpf || [])
 
       // Catalogue : une carte par société, ses modules dans l'ordre du référentiel
       const parLibelle = new Map((mods || []).map(m => [m.code, m]))
@@ -239,7 +265,42 @@ export default function ConfigModule() {
     setSelTaux({ ...(taux[u.id] || {}) })
     setAccesSel(new Set(accesAll.get(u.id) || []))
     setShowFrais(false)
+    chargerSocietes(u.id)
   }
+
+  // Les lignes « personne × société » de la fiche ouverte. On garde une copie
+  // de l'état initial : sans elle, retirer une société de la fiche ne
+  // supprimerait rien en base — la ligne resterait, invisible.
+  async function chargerSocietes(id) {
+    if (!id) { setSocSel({}); setSocInitial({}); return }
+    const { data } = await supabase.from('collaborateur_societes').select('*').eq('collaborateur_id', id)
+    const m = {}
+    for (const r of data || []) m[r.societe] = { ...r }
+    setSocSel(m); setSocInitial(m)
+  }
+
+  const majSoc = (code, patch) => setSocSel(p => ({ ...p, [code]: { ...(p[code] || {}), ...patch } }))
+
+  // ⚠️ PAS `basculerSociete` : ce nom était DÉJÀ pris par le « tout cocher »
+  // des modules, plus bas. Deux déclarations de même nom dans un composant,
+  // c'est la dernière qui gagne — le bouton des droits appelait alors cette
+  // fonction-ci avec un seul argument et l'écran plantait au premier clic.
+  function basculerAppartenance(code) {
+    setSocSel(p => {
+      const n = { ...p }
+      if (code in n) delete n[code]
+      else n[code] = { societe: code, statut: null, fonction: null, remuneration: null,
+                       mois_payes: 13.92, charges_pct: 25, heures_annuelles: 1530 }
+      return n
+    })
+  }
+
+  // Dans un tableau Postgres lu en JS : ajouter ou retirer une valeur.
+  const basculerDansListe = (code, champ, valeur) => setSocSel(p => {
+    const actuel = (p[code] || {})[champ] || []
+    const a = actuel.includes(valeur) ? actuel.filter(x => x !== valeur) : [...actuel, valeur]
+    return { ...p, [code]: { ...(p[code] || {}), [champ]: a } }
+  })
 
   // Coche / décoche un module pour la fiche ouverte (en mémoire, enregistré au Save)
   function basculerModule(societe, moduleCode) {
@@ -287,10 +348,18 @@ export default function ConfigModule() {
               : ((selUser.nom_complet || '').trim() || email || '(sans nom)')
     setResultatUser(null)
     if (!email && !nom) { const m = 'Le nom ou l\'email est obligatoire'; notify('❌ ' + m); setResultatUser({ ok: false, message: m }); return }
-    if (selUser.est_commercial || selUser.est_gestionnaire || selUser.est_sous_agent) {
-      const manquants = CHAMPS_METIER_REQUIS.filter(([k]) => !String(selUser[k] ?? '').trim()).map(([, l]) => l)
-      if (manquants.length) { const m = `Champs obligatoires (rôle métier) : ${manquants.join(', ')}`; notify('❌ ' + m); setResultatUser({ ok: false, message: m }); return }
-    }
+    // ⚠️ PLUS DE « CHAMPS MÉTIER OBLIGATOIRES ».
+    //
+    // Cocher un rôle exigeait code + n° producteur + BCE + IBAN + BIC. Ces
+    // cinq champs viennent du courtage : un sous-agent FSMA payé en
+    // commissions les a tous. Un commercial salarié de LODE n'en a aucun —
+    // et l'enregistrement était refusé. C'est littéralement la question de
+    // Ludovic : « comment attribuer le rôle de commercial à quelqu'un qui
+    // n'a pas de numéro de producteur ? ». Réponse : en cessant de confondre
+    // « a un rôle » et « est payé en commissions ».
+    //
+    // Seule une commission RÉELLE a besoin de ces champs, et c'est au moment
+    // de payer qu'on s'en apercevra — pas au moment de décrire la personne.
     setSaving(true)
 
     const { id, created_at, updated_at, _nouveau, noms_repris_str, personne_id,
@@ -367,9 +436,52 @@ export default function ConfigModule() {
       if (np) { pid = np.id; await supabase.from('collaborateurs').update({ personne_id: pid }).eq('id', cid) }
     }
 
-    // Taux de commission par type de travail
+    // ── Les lignes « personne × société » ────────────────────────────────
+    // Elles portent le statut, la fonction, la rémunération, le bureau, le
+    // numéro Dynassur, les activités et les portefeuilles. Une société
+    // décochée doit DISPARAÎTRE : sans la suppression, la ligne resterait en
+    // base, invisible, et continuerait de faire apparaître la personne dans
+    // les listes de cette société.
+    const nb = v => (v === '' || v == null) ? null : Number(String(v).replace(',', '.'))
+    const lignesSoc = Object.entries(socSel).map(([societe, r]) => ({
+      collaborateur_id: cid, societe,
+      statut: r.statut || null, fonction: r.fonction || null, remuneration: r.remuneration || null,
+      bureau_id: societe === 'DYNASSUR' ? (r.bureau_id ?? null) : null,
+      numero_sous_agent: societe === 'DYNASSUR' ? nb(r.numero_sous_agent) : null,
+      brut_mensuel: nb(r.brut_mensuel), mois_payes: nb(r.mois_payes), charges_pct: nb(r.charges_pct),
+      vehicule_mensuel: nb(r.vehicule_mensuel), autres_mensuel: nb(r.autres_mensuel),
+      honoraires_mensuels: nb(r.honoraires_mensuels), prime_annuelle: nb(r.prime_annuelle),
+      heures_annuelles: nb(r.heures_annuelles),
+      activites: r.activites?.length ? r.activites : null,
+      portefeuilles: r.portefeuilles?.length ? r.portefeuilles : null,
+      updated_at: new Date().toISOString(),
+    }))
+    if (lignesSoc.length) {
+      const { error: eSoc } = await supabase.from('collaborateur_societes')
+        .upsert(lignesSoc, { onConflict: 'collaborateur_id,societe' })
+      if (eSoc) notify('❌ Sociétés : ' + eSoc.message)
+    }
+    // `est_employe` reste alimenté : ComptabiliteView s'en sert encore pour
+    // la liste des bénéficiaires de notes de frais. Tant que cet écran n'est
+    // pas rebranché sur les statuts, laisser la colonne diverger ferait
+    // disparaître des gens de la liste sans que personne ne comprenne.
+    const estEmploye = Object.values(socSel).some(r => r.statut === 'employe')
+    if (estEmploye !== !!selUser.est_employe) {
+      await supabase.from('collaborateurs').update({ est_employe: estEmploye }).eq('id', cid)
+      setUsers(p => p.map(u => u.id === cid ? { ...u, est_employe: estEmploye } : u))
+    }
+
+    const retirees = Object.keys(socInitial).filter(c => !(c in socSel))
+    for (const c of retirees) {
+      await supabase.from('collaborateur_societes').delete()
+        .eq('collaborateur_id', cid).eq('societe', c)
+    }
+    setSocInitial({ ...socSel })
+
+    // Taux de commission par type de travail — Dynassur uniquement, et la
+    // colonne `societe` le dit enfin au lieu de le laisser supposer.
     const trows = TYPES_TRAVAIL.map(t => ({
-      collaborateur_id: cid, type_travail: t,
+      collaborateur_id: cid, type_travail: t, societe: 'DYNASSUR',
       taux: (selTaux[t] === '' || selTaux[t] == null) ? null : Number(selTaux[t]),
       actif: true,
     }))
@@ -598,11 +710,11 @@ export default function ConfigModule() {
                 <div style={{ fontSize: 11, fontWeight: 800, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 10 }}>
                   Bureaux — adresse complète (devoirs d'information, courriers clients)
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr 60px 70px 90px 1fr 32px', gap: 8, fontSize: 10.5, fontWeight: 800, color: COUL.texteFaible, textTransform: 'uppercase', marginBottom: 6 }}>
+                <div style={{ display: petitEcran ? 'none' : 'grid', gridTemplateColumns: '1fr 1.3fr 60px 70px 90px 1fr 32px', gap: 8, fontSize: 10.5, fontWeight: 800, color: COUL.texteFaible, textTransform: 'uppercase', marginBottom: 6 }}>
                   <span>Nom</span><span>Rue</span><span>N°</span><span>Bte</span><span>CP</span><span>Ville</span><span></span>
                 </div>
                 {bureaux.map(b => (
-                  <div key={b.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr 60px 70px 90px 1fr 32px', gap: 8, marginBottom: 6 }}>
+                  <div key={b.id} style={{ display: 'grid', gridTemplateColumns: petitEcran ? '1fr' : '1fr 1.3fr 60px 70px 90px 1fr 32px', gap: 8, marginBottom: petitEcran ? 16 : 6 }}>
                     <input style={inp} value={b.libelle || ''} onChange={e => majBureauChamp(b.id, 'libelle', e.target.value)} placeholder="Nom du bureau" />
                     <input style={inp} value={b.rue || ''} onChange={e => majBureauChamp(b.id, 'rue', e.target.value)} placeholder="Rue" />
                     <input style={inp} value={b.numero || ''} onChange={e => majBureauChamp(b.id, 'numero', e.target.value)} placeholder="N°" />
@@ -639,7 +751,7 @@ export default function ConfigModule() {
 
         {/* ─────────── SOCIÉTÉS & DOCUMENTS ─────────── */}
         {(tab === 'societes' || tab === 'documents') && !loading && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,220px) 1fr', gap: 18, alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: petitEcran ? '1fr' : 'minmax(0,220px) 1fr', gap: 18, alignItems: 'start' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {[...societes].sort((a, b) => (a.nom || '').localeCompare(b.nom || '', 'fr', { sensitivity: 'base' })).map(s => (
                 <button key={s.id} onClick={() => setSelSoc({ ...s })} style={{
@@ -764,7 +876,7 @@ export default function ConfigModule() {
               <button onClick={assignBulk} disabled={!bulkBureau || !sel.size || saving} style={{ ...btn('#1e293b'), padding: '8px 16px', fontSize: 14, opacity: (!bulkBureau || !sel.size || saving) ? .5 : 1 }}>Attribuer ({sel.size})</button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,280px) 1fr', gap: 18, alignItems: 'start' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: petitEcran ? '1fr' : 'minmax(0,280px) 1fr', gap: 18, alignItems: 'start' }}>
             {/* La recherche est ICI, juste au-dessus de la liste qu'elle
                 filtre. Elle etait melangee aux filtres du haut, a trois
                 rangees de distance de son effet.
@@ -814,7 +926,6 @@ export default function ConfigModule() {
             </div>
 
             {selUser ? (() => {
-              const roleMetier = !!(selUser.est_commercial || selUser.est_gestionnaire || selUser.est_sous_agent)
               const estMorale = (selUser.type || 'physique') === 'morale'
               return (
               <div style={{ background: COUL.surface, border: '1px solid #e2e8f0', borderRadius: 14, padding: 20 }}>
@@ -973,54 +1084,230 @@ export default function ConfigModule() {
                 </Section>
 
                 {/* ── Rôle métier & commissions ── */}
-                <Section titre="Rôle métier & commissions">
-                  {/* Ludovic, 09/11 : « le % de commission, ça ne concerne que
-                      Dynassur, comme le numéro de producteur. Ce n'est pas lié
-                      à LODE, DTX ou Hexagroup ». Tant que les rôles ne sont pas
-                      portés par le couple (personne, société), on le DIT au
-                      moins — le cacher sur `acc_dynassur` referait l'erreur
-                      qu'on vient de corriger ailleurs : confondre le droit de
-                      voir un écran et l'appartenance à une société. */}
-                  <div style={{ marginBottom: 12, padding: '8px 11px', borderRadius: 8, background: COUL.infoFondDoux, border: `1px solid ${COUL.bord}`, fontSize: 12.5, color: COUL.texteDoux }}>
-                    Tout ce bloc — rôles, taux, n° producteur, BCE, IBAN — ne concerne
-                    aujourd'hui que <strong>Dynassur</strong> : il vient du courtage et des
-                    commissions. Un commercial ou un employé de LODE, DTX ou Hexagroup
-                    n'a rien à y saisir.
+                {/* ── Sociétés et rôles ──────────────────────────────────
+                    Le rôle appartient au couple (personne, société), pas à la
+                    personne. Une gestionnaire Dynassur n'est plus commerciale
+                    LODE parce qu'elle a le droit d'ouvrir l'écran LODE. */}
+                <Section titre="Sociétés et rôles">
+                  <div style={{ fontSize: 12.5, color: COUL.texteDoux, marginBottom: 10, lineHeight: 1.5 }}>
+                    Coche les sociétés pour lesquelles cette personne travaille. Le statut dit comment
+                    elle y est liée, la fonction ce qu'elle y fait, la rémunération comment elle y est
+                    payée — et c'est la rémunération qui fait apparaître les champs, pas le statut :
+                    un administrateur peut être salarié ici et facturer ses honoraires là.
                   </div>
-                  <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', margin: '12px 0' }}>
-                    <Chk label="Commercial" on={!!selUser.est_commercial} onClick={() => setSelUser(s => ({ ...s, est_commercial: !s.est_commercial }))} />
-                    <Chk label="Gestionnaire" on={!!selUser.est_gestionnaire} onClick={() => setSelUser(s => ({ ...s, est_gestionnaire: !s.est_gestionnaire }))} />
-                    <Chk label="Sous-agent" on={!!selUser.est_sous_agent} onClick={() => setSelUser(s => ({ ...s, est_sous_agent: !s.est_sous_agent }))} />
-                    <Chk label="Apporteur" on={!!selUser.est_apporteur} onClick={() => setSelUser(s => ({ ...s, est_apporteur: !s.est_apporteur }))} />
-                    <Chk label="Actif (statut métier)" on={selUser.actif !== false} onClick={() => setSelUser(s => ({ ...s, actif: !(s.actif !== false) }))} />
+
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                    {societes.filter(x => x.actif !== false).map(x => {
+                      const coche = x.code in socSel
+                      const c = x.couleur || COUL.bleu
+                      return (
+                        <button key={x.code} type="button" onClick={() => basculerAppartenance(x.code)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 7, padding: '7px 14px', borderRadius: 999,
+                            fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                            border: `1.5px solid ${coche ? c : COUL.bord}`,
+                            background: coche ? c : COUL.surface,
+                            color: coche ? COUL.blanc : COUL.texteDoux,
+                          }}>
+                          <span style={{ width: 9, height: 9, borderRadius: '50%', background: coche ? COUL.blanc : c }} />
+                          {x.nom || x.code}
+                        </button>
+                      )
+                    })}
                   </div>
-                  {!selUser.est_commercial && !selUser.est_gestionnaire && !selUser.est_sous_agent && !selUser.est_apporteur && (
-                    <div style={{ fontSize: 11.5, color: COUL.texteFaible, fontStyle: 'italic', marginBottom: 10 }}>Aucun rôle métier coché — employé sans commission, c'est un état normal.</div>
+
+                  {Object.keys(socSel).length === 0 && (
+                    <div style={{ fontSize: 13, color: COUL.texteFaible, padding: '12px 2px' }}>
+                      Aucune société. Cette personne existe dans le Hub mais ne travaille nulle part.
+                    </div>
                   )}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(120px,1fr))', gap: 10, marginBottom: 12 }}>
-                    {TYPES_TRAVAIL.map(t => (
-                      <div key={t}><Lbl>{t}</Lbl>
-                        <div style={{ position: 'relative' }}>
-                          <input type="number" step="0.01" value={selTaux[t] ?? ''} onChange={e => setSelTaux(m => ({ ...m, [t]: e.target.value }))} style={{ ...inp, paddingRight: 24 }} />
-                          <span style={{ position: 'absolute', right: 9, top: 9, color: COUL.texteFaible, fontSize: 12 }}>%</span>
+
+                  {Object.keys(socSel)
+                    .sort((a, b) => a.localeCompare(b))
+                    .map(code => {
+                      const r = socSel[code] || {}
+                      const soc = societes.find(x => x.code === code) || {}
+                      const c = soc.couleur || COUL.bleu
+                      const dispo = refStatuts.filter(st => (statutsSoc[code] || []).includes(st.code))
+                      const acts = refActivites[code] || []
+                      return (
+                        <div key={code} style={{
+                          border: `1px solid ${COUL.bord}`, borderLeft: `4px solid ${c}`, borderRadius: 10,
+                          padding: 12, marginBottom: 10, background: COUL.fondDoux,
+                        }}>
+                          <div style={{ fontSize: 14.5, fontWeight: 800, color: c, marginBottom: 9 }}>{soc.nom || code}</div>
+
+                          <Grid>
+                            <div>
+                              <Lbl>Statut</Lbl>
+                              <select value={r.statut || ''} onChange={e => majSoc(code, { statut: e.target.value || null })} style={inp}>
+                                <option value="">— à définir —</option>
+                                {dispo.map(st => <option key={st.code} value={st.code}>{st.libelle}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <Lbl>Fonction</Lbl>
+                              <select value={r.fonction || ''} onChange={e => majSoc(code, { fonction: e.target.value || null })} style={inp}>
+                                <option value="">— aucune —</option>
+                                <option value="commercial">Commercial</option>
+                                <option value="gestionnaire">Gestionnaire</option>
+                              </select>
+                            </div>
+                            <div>
+                              <Lbl>Rémunération</Lbl>
+                              <select value={r.remuneration || ''} onChange={e => majSoc(code, { remuneration: e.target.value || null })} style={inp}>
+                                <option value="">— à définir —</option>
+                                <option value="salaire">Salaire fixe</option>
+                                <option value="honoraires">Honoraires facturés</option>
+                                <option value="commissions">Commissions</option>
+                                <option value="aucune">Aucune</option>
+                              </select>
+                            </div>
+                          </Grid>
+
+                          {/* Activités : CUMULABLES — on peut faire les portes de
+                              garage ET la location. */}
+                          {acts.length > 0 && (
+                            <div style={{ marginTop: 11 }}>
+                              <Lbl>Activités — plusieurs possibles</Lbl>
+                              <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginTop: 4 }}>
+                                {acts.map(a => (
+                                  <label key={a.code} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13.5,
+                                    border: `1px solid ${COUL.bord}`, borderRadius: 8, padding: '5px 10px', cursor: 'pointer', background: COUL.surface }}>
+                                    <input type="checkbox" checked={(r.activites || []).includes(a.code)}
+                                      onChange={() => basculerDansListe(code, 'activites', a.code)} />
+                                    {a.libelle}
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Dynassur : le bureau dit d'où la personne travaille,
+                              le portefeuille ce qu'elle gère. Deux axes, et le
+                              numéro vaut pour TOUT LE MONDE, pas seulement pour
+                              les sous-agents. */}
+                          {code === 'DYNASSUR' && (
+                            <div style={{ marginTop: 11, padding: 11, borderRadius: 9, background: COUL.surface, border: `1px dashed ${COUL.bord}` }}>
+                              <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.05em', color: COUL.texteFaible, marginBottom: 8 }}>
+                                Identification Dynassur — pour tout le monde
+                              </div>
+                              <Grid>
+                                <div>
+                                  <Lbl>Bureau</Lbl>
+                                  <select value={r.bureau_id || ''} onChange={e => majSoc(code, { bureau_id: e.target.value ? Number(e.target.value) : null })} style={inp}>
+                                    <option value="">— aucun —</option>
+                                    {bureaux.map(b => <option key={b.id} value={b.id}>{b.libelle}</option>)}
+                                  </select>
+                                </div>
+                                <div>
+                                  <Lbl>N° de sous-agent</Lbl>
+                                  <input type="number" value={r.numero_sous_agent ?? ''} onChange={e => majSoc(code, { numero_sous_agent: e.target.value })} style={inp} />
+                                </div>
+                              </Grid>
+                              <div style={{ marginTop: 9 }}>
+                                <Lbl>Portefeuilles gérés — plusieurs possibles</Lbl>
+                                <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginTop: 4 }}>
+                                  {portefeuilles.map(pf => (
+                                    <label key={pf.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13.5,
+                                      border: `1px solid ${COUL.bord}`, borderRadius: 8, padding: '5px 10px', cursor: 'pointer', background: COUL.surface }}>
+                                      <input type="checkbox" checked={(r.portefeuilles || []).includes(pf.id)}
+                                        onChange={() => basculerDansListe(code, 'portefeuilles', pf.id)} />
+                                      {pf.libelle}
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Salaire ou honoraires : même calcul, le coût horaire
+                              sort de ce qui est RÉELLEMENT versé. */}
+                          {(r.remuneration === 'salaire' || r.remuneration === 'honoraires') && (
+                            <div style={{ marginTop: 11, padding: 11, borderRadius: 9, background: COUL.surface, border: `1px dashed ${COUL.bord}` }}>
+                              <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.05em', color: COUL.texteFaible, marginBottom: 8 }}>
+                                {r.remuneration === 'salaire' ? 'Salaire' : 'Honoraires'} — coût pour {soc.nom || code}
+                              </div>
+                              <Grid>
+                                {r.remuneration === 'salaire' ? (
+                                  <>
+                                    <F label="Brut mensuel (€)" value={r.brut_mensuel} onChange={v => majSoc(code, { brut_mensuel: v })} />
+                                    <F label="Mois payés par an" value={r.mois_payes} onChange={v => majSoc(code, { mois_payes: v })} />
+                                    <F label="Charges patronales (%)" value={r.charges_pct} onChange={v => majSoc(code, { charges_pct: v })} />
+                                  </>
+                                ) : (
+                                  <>
+                                    <F label="Honoraires / mois (€)" value={r.honoraires_mensuels} onChange={v => majSoc(code, { honoraires_mensuels: v })} />
+                                    <F label="Prime annuelle (€)" value={r.prime_annuelle} onChange={v => majSoc(code, { prime_annuelle: v })} />
+                                  </>
+                                )}
+                                <F label="Véhicule / mois (€)" value={r.vehicule_mensuel} onChange={v => majSoc(code, { vehicule_mensuel: v })} />
+                                <F label="Autres / mois (€)" value={r.autres_mensuel} onChange={v => majSoc(code, { autres_mensuel: v })} />
+                                <F label="Heures prestées / an" value={r.heures_annuelles} onChange={v => majSoc(code, { heures_annuelles: v })} />
+                              </Grid>
+                              {r.cout_horaire != null && (
+                                <div style={{ marginTop: 8, fontSize: 13, color: COUL.texteDoux }}>
+                                  Coût horaire enregistré : <strong style={{ color: COUL.bleu, fontSize: 15 }}>
+                                    {Number(r.cout_horaire).toLocaleString('fr-BE', { minimumFractionDigits: 2 })} €/h
+                                  </strong> — recalculé par la base après enregistrement. Un chantier déjà
+                                  facturé garde le sien.
+                                </div>
+                              )}
+                              <div style={{ marginTop: 6, fontSize: 11.5, color: COUL.texteFaible, lineHeight: 1.5 }}>
+                                13,92 mois = 12 + 13ᵉ + 0,92 de double pécule. 1 530 h et non 1 820 :
+                                congés, jours fériés, maladie, formation et trajets ne sont pas des
+                                heures facturables. Diviser par 1 820 donne un taux trop bas d'environ
+                                20 %, et fait paraître les chantiers plus rentables qu'ils ne le sont.
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Commissions : Dynassur, et seulement si c'est ainsi
+                              que la personne est payée. */}
+                          {r.remuneration === 'commissions' && code === 'DYNASSUR' && (
+                            <div style={{ marginTop: 11, padding: 11, borderRadius: 9, background: COUL.surface, border: `1px dashed ${COUL.bord}` }}>
+                              <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.05em', color: COUL.texteFaible, marginBottom: 8 }}>
+                                Commissions — Dynassur
+                              </div>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(110px,1fr))', gap: 10 }}>
+                                {TYPES_TRAVAIL.map(t => (
+                                  <div key={t}><Lbl>{t}</Lbl>
+                                    <div style={{ position: 'relative' }}>
+                                      <input type="number" step="0.01" value={selTaux[t] ?? ''} onChange={e => setSelTaux(m => ({ ...m, [t]: e.target.value }))} style={{ ...inp, paddingRight: 26 }} />
+                                      <span style={{ position: 'absolute', right: 9, top: 9, color: COUL.texteFaible, fontSize: 12 }}>%</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                              <div style={{ marginTop: 10 }}>
+                                <Grid>
+                                  <F label="Nom en donnée SOUS-AGENT (quittances)" value={selUser.nom_sa_data} onChange={v => setSelUser(s => ({ ...s, nom_sa_data: v }))} />
+                                  <F label="Nom en donnée GESTIONNAIRE (quittances)" value={selUser.nom_gestionnaire_data} onChange={v => setSelUser(s => ({ ...s, nom_gestionnaire_data: v }))} />
+                                </Grid>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                  <Grid>
-                    <F label="Code" requis={roleMetier} value={selUser.code} onChange={v => setSelUser(s => ({ ...s, code: (v || '').toUpperCase() }))} />
-                    <F label="N° producteur" requis={roleMetier} type="number" value={selUser.numero} onChange={v => setSelUser(s => ({ ...s, numero: v }))} />
-                    <F label="N° BCE" requis={roleMetier} value={selUser.bce} onChange={v => setSelUser(s => ({ ...s, bce: v }))} />
-                    <F label="IBAN" requis={roleMetier} value={selUser.iban} onChange={v => setSelUser(s => ({ ...s, iban: v }))} />
-                    <F label="BIC" requis={roleMetier} value={selUser.bic} onChange={v => setSelUser(s => ({ ...s, bic: v }))} />
-                  </Grid>
-                  <div style={{ marginTop: 10 }}>
+                      )
+                    })}
+
+                  {/* Identifiants de courtage : ils appartiennent à la personne
+                      (un seul code, un seul IBAN), mais ils ne servent qu'à
+                      Dynassur. Ils ne sont plus exigés pour déclarer un rôle —
+                      c'est ce qui empêchait de déclarer commercial un salarié
+                      de LODE, qui n'a ni BCE ni IBAN professionnel. */}
+                  <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${COUL.bord}` }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.05em', color: COUL.texteFaible, marginBottom: 8 }}>
+                      Identifiants — un seul exemplaire pour la personne
+                    </div>
                     <Grid>
-                      <F label="Nom en donnée SOUS-AGENT (quittances)" value={selUser.nom_sa_data} onChange={v => setSelUser(s => ({ ...s, nom_sa_data: v }))} />
-                      <F label="Nom en donnée GESTIONNAIRE (quittances)" value={selUser.nom_gestionnaire_data} onChange={v => setSelUser(s => ({ ...s, nom_gestionnaire_data: v }))} />
+                      <F label="Code Hub" value={selUser.code} onChange={v => setSelUser(s => ({ ...s, code: (v || '').toUpperCase() }))} />
+                      <F label="IBAN" value={selUser.iban} onChange={v => setSelUser(s => ({ ...s, iban: v }))} />
+                      <F label="BIC" value={selUser.bic} onChange={v => setSelUser(s => ({ ...s, bic: v }))} />
                       <F label="Alias / noms repris (séparés par ,)" value={selUser.noms_repris_str} onChange={v => setSelUser(s => ({ ...s, noms_repris_str: v }))} />
                     </Grid>
                   </div>
+
                   <div style={{ marginTop: 12 }}>
                     {showFrais ? (
                       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
