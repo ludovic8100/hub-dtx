@@ -1,3 +1,4 @@
+import { voile } from '../lib/voile'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { COUL } from '../lib/theme'
@@ -75,7 +76,7 @@ export default function PanneauAttribuer({ facture, dossiers, onClose, onChoisir
   const retirer = () => onChoisir({ destination_type: null, destination_id: null, destination_nom: null })
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, padding: 16 }}>
+    <div {...voile(onClose)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, padding: 16 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 14, width: 'min(560px, 96vw)', maxHeight: '86vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
 
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>

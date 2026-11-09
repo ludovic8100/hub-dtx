@@ -1,3 +1,4 @@
+import { voile } from '../../lib/voile'
 import { n8nWebhook } from '../../config/env'
 import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
@@ -203,7 +204,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
   // Changer de client invalide le chantier déjà choisi : il appartenait à
   // quelqu'un d'autre.
   useEffect(() => {
-    if (!isDevis || !f.dossier_id) return
+    if (!f.dossier_id) return
     if (!dossiersDuClient.some(d => d.id === f.dossier_id)) set('dossier_id', null)
   }, [f.client_id, dossiersDispo])
 
@@ -577,11 +578,13 @@ function Editeur({ type, doc, onClose, onSaved }) {
   const save = async () => {
     if (verrouille) { alert('Cette facture a déjà été émise/envoyée : elle ne peut plus être modifiée. Pour la corriger, créez une note de crédit.'); return }
     if (!f.client_nom.trim()) { alert('Le nom du client est obligatoire'); return }
-    // Un devis sans chantier casse toute la chaîne en aval : il n'apparaît
-    // dans les chiffres d'aucun dossier, la marge l'ignore, et la facture qui
-    // en sortira héritera du vide. On refuse plutôt que de le laisser passer.
-    if (isDevis && !f.dossier_id) {
-      alert("Ce devis doit être rattaché à un chantier.\n\nChoisis-le dans le panneau Détails, ou clique « Créer le chantier » juste en dessous — tout y est déjà pré-rempli.")
+    // Un document sans chantier casse toute la chaîne en aval : il n'apparaît
+    // dans les chiffres d'aucun dossier et la marge l'ignore. La règle vaut
+    // pour la FACTURE autant que pour le devis — Ludovic, 08/11 : « j'ai fait
+    // un devis, il est accepté, je réalise une facture, elle est payée ; tout
+    // ça doit se voir dans le chantier ».
+    if (!f.dossier_id) {
+      alert(`${isDevis ? 'Ce devis' : 'Cette facture'} doit être rattaché${isDevis ? '' : 'e'} à un chantier.\n\nChoisis-le dans le panneau Détails, ou clique « Créer le chantier » juste en dessous — tout y est déjà.`)
       return
     }
     setSaving(true)
@@ -599,7 +602,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
       // Le dossier suit le document. Sans ça, un devis créé DEPUIS un dossier
       // de chantier perdrait son rattachement à l'enregistrement, et l'écran
       // Dossiers afficherait « rien de facturé » sur un chantier devisé.
-      if (f.dossier_id) payload.dossier_id = f.dossier_id
+      payload.dossier_id = f.dossier_id || null
       if (isDevis) { payload.date_devis = f.date_devis; payload.date_validite = f.date_validite }
       else { payload.date_facture = f.date_facture; payload.date_echeance = f.date_echeance; if (f.devis_id) payload.devis_id = f.devis_id }
       // L'acompte DEJA PAYE se deduit APRES la TVA : ce n'est pas une ligne de
@@ -632,6 +635,16 @@ function Editeur({ type, doc, onClose, onSaved }) {
         ...(isDevis ? {} : { bloc: l.bloc || null }),
         total_ht: (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * (1 - (Number(l.remise_pct) || 0) / 100),
       }))
+      // Le commercial choisi sur le devis remonte au CHANTIER, qui le
+      // redescend sur les autres documents. Ludovic : « si j'attribue un
+      // devis à LLO, le chantier doit être attribué aussi ». La propagation
+      // vit en base (synchroniser_commercial) et non ici : deux écrans
+      // peuvent changer le commercial, une seule règle doit décider.
+      if (f.dossier_id) {
+        await supabase.rpc('synchroniser_commercial', {
+          p_dossier_id: f.dossier_id, p_code: f.responsable || null,
+        })
+      }
       if (lignesPayload.length) {
         const { error: errLignes } = await supabase.from(tableLignes).insert(lignesPayload)
         if (errLignes) throw new Error('Enregistrement des lignes : ' + errLignes.message)
@@ -990,7 +1003,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
               </div>
             )}
             <div style={{ display: 'grid', gap: 10 }}>
-              {isDevis && (
+              {(
                 <div>
                   <label style={lbl}>Chantier <span style={{ color: COUL.danger }}>*</span></label>
                   <select style={{ ...inp, borderColor: f.dossier_id ? COUL.bord : COUL.danger }}
@@ -1239,12 +1252,9 @@ function ModalArticle({ l, i, setLigne, delLigne, ajouterPhotos, onClose, mobE, 
   // un clic dehors — et la saisie en cours était perdue.
   //
   // On ne ferme donc que si le bouton a été ENFONCÉ sur l'arrière-plan.
-  const departDehors = useRef(false)
-
   return (
     <div
-      onMouseDown={e => { departDehors.current = e.target === e.currentTarget }}
-      onClick={e => { if (e.target === e.currentTarget && departDehors.current) onClose() }}
+      {...voile(onClose)}
       style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', zIndex: 9500, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '5vh 14px', overflowY: 'auto' }}>
       <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 14, width: '100%', maxWidth: 520, boxShadow: '0 20px 60px rgba(0,0,0,.25)', overflow: 'hidden' }}>
         <div style={{ padding: '15px 20px', borderBottom: `1px solid ${COUL.bord}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1378,7 +1388,7 @@ function ModalClient({ f, set, clientQuery, setClientQuery, clientResults, searc
   const inp2 = { padding: '9px 11px', border: `1px solid ${COUL.bord}`, borderRadius: 9, fontSize: 13.5, fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' }
   const lbl2 = { fontSize: 11.5, fontWeight: 700, color: COUL.texteDoux, marginBottom: 4, display: 'block' }
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', zIndex: 9500, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '5vh 14px', overflowY: 'auto' }}>
+    <div {...voile(onClose)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', zIndex: 9500, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '5vh 14px', overflowY: 'auto' }}>
       <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 14, width: '100%', maxWidth: 620, boxShadow: '0 20px 60px rgba(0,0,0,.25)', overflow: 'hidden' }}>
         <div style={{ padding: '15px 20px', borderBottom: `1px solid ${COUL.bord}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: 16, fontWeight: 800, color: NAVY }}>Client</div>
@@ -2298,7 +2308,7 @@ function SuiviModal({ doc, color, onClose, onChanged, onConvertir, factureLiee }
     : [{ type: 'cree', detail: 'Devis créé', created_at: doc.created_at }]
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: mob ? 0 : 20 }}>
+    <div {...voile(onClose)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: mob ? 0 : 20 }}>
       <div onClick={e => e.stopPropagation()} style={{ width: mob ? '100vw' : 'min(1080px,96vw)', height: mob ? '100vh' : 'min(92vh,900px)', background: COUL.surface, borderRadius: mob ? 0 : 16, overflow: 'hidden', display: 'flex', flexDirection: mob ? 'column' : 'row', boxShadow: '0 20px 60px rgba(0,0,0,.3)' }}>
 
         {/* ── Colonne gauche : aperçu du document ── */}
@@ -2515,7 +2525,7 @@ function EnvoiFactureModal({ doc, b64, fileName, onClose, onSent }) {
   const lbl = { fontSize: 12, fontWeight: 700, color: COUL.texteDoux, marginBottom: 4, display: 'block' }
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.5)', zIndex: 9000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '5vh 16px', overflowY: 'auto' }}>
+    <div {...voile(onClose)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.5)', zIndex: 9000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '5vh 16px', overflowY: 'auto' }}>
       <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 16, width: '100%', maxWidth: 560, boxShadow: '0 20px 60px rgba(0,0,0,.25)', overflow: 'hidden' }}>
         <div style={{ background: C, color: COUL.blanc, padding: '16px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: 17, fontWeight: 800 }}>Envoyer la facture {doc.numero}</div>
@@ -2634,7 +2644,7 @@ function ModalPaiement({ facture, factures, onClose, onLie }) {
   const inp2 = { padding: '9px 11px', border: `1px solid ${COUL.bord}`, borderRadius: 9, fontSize: 13.5, fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' }
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', zIndex: 9500, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '5vh 14px', overflowY: 'auto' }}>
+    <div {...voile(onClose)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', zIndex: 9500, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '5vh 14px', overflowY: 'auto' }}>
       <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 14, width: '100%', maxWidth: 680, boxShadow: '0 20px 60px rgba(0,0,0,.25)', overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '86vh' }}>
         <div style={{ padding: '15px 20px', borderBottom: `1px solid ${COUL.bord}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
           <div style={{ minWidth: 0 }}>
@@ -2721,7 +2731,7 @@ function MenuLigne({ anchor, items, onClose }) {
 
   return (
     <>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1200 }} />
+      <div {...voile(onClose)} style={{ position: 'fixed', inset: 0, zIndex: 1200 }} />
       <div ref={ref} style={{ position: 'fixed', top: pos.top, right: Math.max(8, window.innerWidth - anchor.right), zIndex: 1201, visibility: pos.pret ? 'visible' : 'hidden', background: COUL.surface, border: `1px solid ${COUL.bord}`, borderRadius: 10, boxShadow: '0 10px 30px rgba(15,23,42,.18)', minWidth: 206, overflow: 'hidden', textAlign: 'left' }}>
         {items.filter(Boolean).map((it, k) => it.sep ? (
           <div key={k} style={{ height: 1, background: COUL.bord }} />
@@ -2912,6 +2922,12 @@ export default function LodeDevisFactures() {
     const { data: num } = await supabase.rpc('next_lode_numero', { p_type: 'facture' })
     const { data: fact, error } = await supabase.from('lode_factures').insert({
       numero: num, devis_id: devisDoc.id, statut: 'brouillon', type: 'facture', responsable: devisDoc.responsable || null,
+      // Le chantier et le client suivent le devis. Sans ces deux lignes, la
+      // facture naissait orpheline : mesuré le 08/11, 0 des 23 factures de
+      // vente portait un chantier, alors que la colonne existait. Le devis
+      // était rattaché, la facture qui en sortait ne l'était plus.
+      dossier_id: devisDoc.dossier_id || null,
+      client_id: devisDoc.client_id || null,
       client_nom: devisDoc.client_nom, client_adresse: devisDoc.client_adresse, client_cp: devisDoc.client_cp,
       client_ville: devisDoc.client_ville, client_email: devisDoc.client_email, client_telephone: devisDoc.client_telephone,
       client_tva: devisDoc.client_tva, objet: devisDoc.objet, notes: devisDoc.notes, remise_pct: devisDoc.remise_pct,
@@ -3018,6 +3034,7 @@ export default function LodeDevisFactures() {
       client_cp: ac.client_cp, client_ville: ac.client_ville, client_email: ac.client_email,
       client_telephone: ac.client_telephone, client_tva: ac.client_tva,
       devis_id: ac.devis_id || null, total_projet_ttc: ac.total_projet_ttc,
+      dossier_id: ac.dossier_id || null,
       langue: ac.langue || 'fr', objet: ac.objet || '',
       _preselAcomptes: d.grp.filter(x => x.type === 'acompte').map(x => x.id),
     } })
@@ -3113,7 +3130,7 @@ export default function LodeDevisFactures() {
           subtitle={`LODE SRL — ${LODE.activite}`}
           stats={stats}
           action={<PrimaryButton color={C} onClick={() => setEditing({ type: tab === 'factures' ? 'facture' : 'devis', doc: null })}>
-            <i className="ti ti-plus" /> Nouveau {tab === 'factures' ? 'facture' : 'devis'}
+            <i className="ti ti-plus" /> {tab === 'factures' ? 'Nouvelle facture' : 'Nouveau devis'}
           </PrimaryButton>}
         />
 

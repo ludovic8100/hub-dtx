@@ -1,3 +1,4 @@
+import { voile } from '../../lib/voile'
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
@@ -149,19 +150,19 @@ export default function LodeDossiers() {
     setLoading(true)
     const [d, a, v, dv] = await Promise.all([
       supabase.from('dossiers')
-        .select('id,numero,titre,client_nom,client_type,client_id,statut,montant_a_facturer,date_debut,created_at,mo_heures,mo_visites,mo_collaborateur_id,mo_taux_horaire,responsable')
+        .select('id,numero,titre,client_nom,client_type,client_id,statut,montant_a_facturer,date_debut,created_at,cloture_auto,cloture_motif,cloture_le,mo_heures,mo_visites,mo_collaborateur_id,mo_taux_horaire,responsable')
         .eq('societe', 'LODE').order('created_at', { ascending: false }),
       supabase.from('factures_achat')
         .select('id,fichier_id,nom,fournisseur,montant,date_facture,url,destination_type,destination_id,destination_nom,transaction_id')
         .eq('societe', 'LODE').eq('sens', 'achat').order('date_facture', { ascending: false }),
       supabase.from('lode_factures')
-        .select('id,numero,client_nom,total_ttc,montant_paye,dossier_id,statut'),
+        .select('id,numero,objet,client_id,client_nom,total_ttc,montant_paye,dossier_id,statut,date_facture'),
       // La section s'appelle « Devis et factures » : sans ce chargement elle
       // n'a jamais montré que des factures, et un devis rattaché au chantier
       // restait invisible. Un écran qui annonce deux choses et n'en montre
       // qu'une fait douter de la donnée, pas de l'écran.
       supabase.from('lode_devis')
-        .select('id,numero,client_nom,objet,total_ttc,statut,date_devis,dossier_id'),
+        .select('id,numero,client_id,client_nom,objet,total_ttc,statut,date_devis,dossier_id'),
     ])
     setDossiers(d.data || []); setAchats(a.data || []); setVentes(v.data || []); setDevis(dv.data || [])
     setLoading(false)
@@ -189,6 +190,36 @@ export default function LodeDossiers() {
     }
     return m
   }, [dossiers, achats, ventes])
+
+  // Les devis et factures de vente du MÊME client qui ne sont rattachés à
+  // aucun chantier. Filtrer par client est la même règle que dans l'éditeur :
+  // un devis avait pu être attribué au chantier d'un autre client.
+  const documentsLibres = (d) => {
+    if (!d) return []
+    const memeClient = (x) => String(x.client_id ?? '') === String(d.client_id ?? '')
+    return [
+      ...devis.filter(x => !x.dossier_id && memeClient(x)).map(x => ({ ...x, _doc: 'devis' })),
+      ...ventes.filter(x => !x.dossier_id && memeClient(x)).map(x => ({ ...x, _doc: 'facture' })),
+    ]
+  }
+
+  // Rattacher après coup. On RECHARGE au lieu de patcher l'état local : le
+  // rattachement peut déclencher la clôture automatique du chantier côté
+  // base, et un état local bricolé afficherait encore « ouvert ».
+  const rattacherVente = async (doc) => {
+    const table = doc._doc === 'devis' ? 'lode_devis' : 'lode_factures'
+    const { error } = await supabase.from(table)
+      .update({ dossier_id: ouvert.id }).eq('id', doc.id)
+    if (error) { alert(`Rattachement refusé — ${error.message}`); return false }
+    await charger()
+    // La fiche ouverte garde sa copie : on relit la ligne pour que la clôture
+    // automatique, si elle a eu lieu, s'affiche tout de suite.
+    const { data } = await supabase.from('dossiers')
+      .select('statut,cloture_auto,cloture_motif,cloture_le,date_fin')
+      .eq('id', ouvert.id).single()
+    if (data) setOuvert(o => (o ? { ...o, ...data } : o))
+    return true
+  }
 
   // Les colonnes calculées doivent exister AVANT le tri, sinon on ne peut
   // pas trier sur « Manquant » — qui est précisément la colonne qu'on veut
@@ -462,6 +493,8 @@ export default function LodeDossiers() {
           })}
           ventes={ventes.filter(v => v.dossier_id === ouvert.id)}
           devis={devis.filter(v => v.dossier_id === ouvert.id)}
+          ventesLibres={documentsLibres(ouvert)}
+          onRattacherVente={rattacherVente}
           onClose={() => setOuvert(null)}
           onEnregistre={(patch) => {
             setDossiers(p => p.map(x => x.id === ouvert.id ? { ...x, ...patch } : x))
@@ -596,7 +629,7 @@ function PanneauNouveauDossier({ onClose, onCreer }) {
   )
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, padding: 16 }}>
+    <div {...voile(onClose)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, padding: 16 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 14, width: 'min(620px, 96vw)', maxHeight: '88vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
 
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
@@ -770,14 +803,21 @@ async function devisDepuisDossier(d) {
 // Les deux vont ensemble : un dossier qu'on ne peut pas corriger est un
 // dossier qu'on recrée, et un dossier qui ne débouche sur rien n'a pas de
 // raison d'exister.
-function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], onClose, onEnregistre, onDevis, onRattacher }) {
+function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], ventesLibres = [], onClose, onEnregistre, onDevis, onRattacher, onRattacherVente }) {
   const [titre, setTitre] = useState(dossier.titre || '')
   const [date, setDate] = useState((dossier.date_debut || '').slice(0, 10))
   const [montant, setMontant] = useState(dossier.montant_a_facturer == null ? '' : String(dossier.montant_a_facturer))
   const [statut, setStatut] = useState(dossier.statut || 'ouvert')
   const [occupe, setOccupe] = useState(false)
   const [erreur, setErreur] = useState('')
+  // Le chantier peut se clôturer tout seul pendant que la fiche est ouverte
+  // (facture rattachée puis payée). Sans cette resynchronisation, le sélecteur
+  // d'état afficherait encore « Ouvert » sur un chantier clos en base, et
+  // enregistrer le rouvrirait sans que personne ne l'ait demandé.
+  useEffect(() => { setStatut(dossier.statut || 'ouvert') }, [dossier.statut])
+
   const [rattacher, setRattacher] = useState(false)
+  const [rattacherVente, setRattacherVente] = useState(false)
   const [mo, setMo] = useState(false)
   const [heures, setHeures] = useState(dossier.mo_heures == null ? '' : String(dossier.mo_heures))
   const [numero, setNumero] = useState(dossier.numero || '')
@@ -853,7 +893,6 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
       statut,
       mo_heures: h,
       mo_visites: vi == null ? null : Math.round(vi),
-      responsable: commercial || null,
       mo_collaborateur_id: qui === '' ? null : Number(qui),
       mo_taux_horaire: nb(taux),
       updated_at: new Date().toISOString(),
@@ -870,12 +909,22 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
     // recalage, le prochain dossier créé reprendrait un numéro déjà attribué
     // et l'index unique refuserait l'écriture — des semaines plus tard, chez
     // quelqu'un qui n'aura rien fait de mal.
+    // Le commercial se propage au devis et aux factures de vente du chantier.
+    // Les factures d'ACHAT n'ont pas de colonne : elles sont déjà rattachées
+    // au chantier, donc elles héritent. Une quatrième copie serait une
+    // quatrième occasion de diverger.
+    if (commercial !== (dossier.responsable || '')) {
+      const { error: eSync } = await supabase.rpc('synchroniser_commercial', {
+        p_dossier_id: dossier.id, p_code: commercial || null,
+      })
+      if (eSync) { setErreur(`Commercial non propagé — ${eSync.message}`); return }
+    }
     if (patch.numero && patch.numero !== dossier.numero) {
       await supabase.rpc('caler_numero', {
         p_type: 'dossier', p_societe: dossier.societe || 'LODE', p_numero: patch.numero,
       })
     }
-    onEnregistre(patch)
+    onEnregistre({ ...patch, responsable: commercial || null })
     // Enregistrer ferme la fenêtre.
     //
     // Ludovic : « quand on clique sur clos puis enregistrer, il doit fermer
@@ -890,7 +939,7 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
   const lbl = { display: 'block', fontSize: 10.5, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, padding: 16 }}>
+    <div {...voile(onClose)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, padding: 16 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 14, width: 'min(700px, 96vw)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
 
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -950,6 +999,13 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
               </select>
             </div>
           </div>
+
+          {dossier.cloture_auto && dossier.statut === 'clos' && (
+            <div style={{ margin: '0 20px 14px', padding: '9px 12px', borderRadius: 9, background: COUL.succesFondDoux, border: `1px solid ${COUL.succesBord}`, fontSize: 12.5, color: COUL.texteSombre }}>
+              <strong>Clôturé automatiquement</strong> — {dossier.cloture_motif || 'plus rien en attente'}
+              {dossier.cloture_le ? ` le ${fmtDate(dossier.cloture_le)}` : ''}. Repasse-le en « Ouvert » si c'est une erreur.
+            </div>
+          )}
 
           <div style={{ padding: '0 20px 14px', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {[['Coûté', coute, COUL.texteSombre], ['À facturer', aFact, COUL.texteSombre],
@@ -1053,8 +1109,16 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
             ))}
           </Section>
 
-          <Section titre={`Devis et factures (${devis.length + ventes.length})`}>
-            {devis.length === 0 && ventes.length === 0 && <Vide texte="Rien d'émis pour ce dossier." />}
+          <Section titre={`Devis et factures (${devis.length + ventes.length})`}
+            action={ventesLibres.length > 0 && (
+              <button onClick={() => setRattacherVente(true)} style={{
+                border: `1px solid ${OR}`, background: COUL.surface, color: OR, borderRadius: 7,
+                padding: '4px 9px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: FONT,
+              }}>+ Rattacher</button>
+            )}>
+            {devis.length === 0 && ventes.length === 0 && <Vide texte={ventesLibres.length
+              ? "Rien d'émis pour ce dossier — utilise le bouton ci-dessus."
+              : "Rien d'émis pour ce dossier."} />}
             {devis.map(d => (
               <Ligne2 key={'d' + d.id}
                 gauche={`Devis ${d.numero}${d.objet ? ' — ' + d.objet : ''}`}
@@ -1075,6 +1139,12 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
         </div>
 
         {erreur && <div style={{ padding: '10px 20px', fontSize: 12.5, color: COUL.dangerFonce, background: COUL.dangerFondDoux }}>{erreur}</div>}
+
+        {rattacherVente && (
+          <ChoisirVente documents={ventesLibres} dossier={dossier}
+            onClose={() => setRattacherVente(false)}
+            onChoisir={async (d) => { if (await onRattacherVente?.(d)) setRattacherVente(false) }} />
+        )}
 
         {rattacher && (
           <ChoisirFacture achats={achatsLibres} dossier={dossier}
@@ -1104,6 +1174,48 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
 // Les deux existent parce qu'on n'aborde pas toujours le problème du même
 // côté — « cette facture, c'est pour quoi ? » et « ce chantier, qu'est-ce
 // qu'il m'a coûté ? » sont deux questions, pas deux écrans.
+// Rattacher après coup un devis ou une facture de vente déjà émis.
+// La liste est limitée au client du chantier et aux documents qui ne sont
+// rattachés nulle part : on ne « déplace » pas un document d'un chantier à
+// l'autre d'un clic, ça se fait depuis le document lui-même.
+function ChoisirVente({ documents, dossier, onClose, onChoisir }) {
+  const [enCours, setEnCours] = useState(null)
+  return (
+    <div {...voile(onClose)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2100, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, padding: 16 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 14, width: 'min(560px, 96vw)', maxHeight: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
+          <div style={{ fontSize: 15, fontWeight: 800, color: COUL.texteFort }}>Rattacher un devis ou une facture</div>
+          <div style={{ fontSize: 12.5, color: COUL.texteDoux, marginTop: 3 }}>
+            Documents de {dossier.client_nom || 'ce client'} sans chantier.
+          </div>
+        </div>
+        <div style={{ overflowY: 'auto', padding: '6px 0' }}>
+          {documents.length === 0 && (
+            <div style={{ padding: '22px 20px', fontSize: 13, color: COUL.texteFaible, textAlign: 'center' }}>
+              Aucun document libre pour ce client.
+            </div>
+          )}
+          {documents.map(d => (
+            <div key={d._doc + d.id} onClick={async () => { setEnCours(d.id); await onChoisir(d); setEnCours(null) }}
+              style={{ padding: '10px 20px', cursor: enCours ? 'progress' : 'pointer', borderBottom: '1px solid #f8fafc', display: 'flex', justifyContent: 'space-between', gap: 12, opacity: enCours && enCours !== d.id ? 0.5 : 1 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 700, color: COUL.texteFort, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {d._doc === 'devis' ? 'Devis' : 'Facture'} {d.numero}{d.objet ? ' — ' + d.objet : ''}
+                </div>
+                <div style={{ fontSize: 11.5, color: COUL.texteDoux }}>{d.statut || ''}</div>
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: COUL.texteFort, whiteSpace: 'nowrap' }}>{eur(d.total_ttc)}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9', textAlign: 'right' }}>
+          <button onClick={onClose} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid #e2e8f0', background: COUL.surface, color: COUL.texteDoux, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: FONT }}>Fermer</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ChoisirFacture({ achats, dossier, onClose, onChoisir }) {
   const [q, setQ] = useState('')
   const terme = q.trim().toLowerCase()
@@ -1111,7 +1223,7 @@ function ChoisirFacture({ achats, dossier, onClose, onChoisir }) {
     `${a.fournisseur || ''} ${a.nom || ''} ${a.numero || ''}`.toLowerCase().includes(terme))
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2100, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, padding: 16 }}>
+    <div {...voile(onClose)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2100, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, padding: 16 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 14, width: 'min(560px, 96vw)', maxHeight: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
           <div style={{ fontSize: 15, fontWeight: 800, color: COUL.texteFort }}>Rattacher une facture</div>
@@ -1194,7 +1306,7 @@ function Ligne2({ gauche, sousGauche, droite, sousDroite, tonDroite }) {
 function PanneauNumero({ dossier, onClose }) {
   const [copie, setCopie] = useState(false)
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, padding: 16 }}>
+    <div {...voile(onClose)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, padding: 16 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 14, width: 'min(420px, 94vw)', padding: '26px 24px', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
         <div style={{ fontSize: 13.5, color: COUL.texteDoux, marginBottom: 6 }}>Dossier créé</div>
         <div style={{ fontSize: 15, fontWeight: 700, color: COUL.texteFort, marginBottom: 16 }}>{dossier.titre}</div>
