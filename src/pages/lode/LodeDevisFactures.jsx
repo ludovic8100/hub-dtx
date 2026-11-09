@@ -204,7 +204,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
   // Changer de client invalide le chantier déjà choisi : il appartenait à
   // quelqu'un d'autre.
   useEffect(() => {
-    if (!isDevis || !f.dossier_id) return
+    if (!f.dossier_id) return
     if (!dossiersDuClient.some(d => d.id === f.dossier_id)) set('dossier_id', null)
   }, [f.client_id, dossiersDispo])
 
@@ -578,11 +578,13 @@ function Editeur({ type, doc, onClose, onSaved }) {
   const save = async () => {
     if (verrouille) { alert('Cette facture a déjà été émise/envoyée : elle ne peut plus être modifiée. Pour la corriger, créez une note de crédit.'); return }
     if (!f.client_nom.trim()) { alert('Le nom du client est obligatoire'); return }
-    // Un devis sans chantier casse toute la chaîne en aval : il n'apparaît
-    // dans les chiffres d'aucun dossier, la marge l'ignore, et la facture qui
-    // en sortira héritera du vide. On refuse plutôt que de le laisser passer.
-    if (isDevis && !f.dossier_id) {
-      alert("Ce devis doit être rattaché à un chantier.\n\nChoisis-le dans le panneau Détails, ou clique « Créer le chantier » juste en dessous — tout y est déjà pré-rempli.")
+    // Un document sans chantier casse toute la chaîne en aval : il n'apparaît
+    // dans les chiffres d'aucun dossier et la marge l'ignore. La règle vaut
+    // pour la FACTURE autant que pour le devis — Ludovic, 08/11 : « j'ai fait
+    // un devis, il est accepté, je réalise une facture, elle est payée ; tout
+    // ça doit se voir dans le chantier ».
+    if (!f.dossier_id) {
+      alert(`${isDevis ? 'Ce devis' : 'Cette facture'} doit être rattaché${isDevis ? '' : 'e'} à un chantier.\n\nChoisis-le dans le panneau Détails, ou clique « Créer le chantier » juste en dessous — tout y est déjà.`)
       return
     }
     setSaving(true)
@@ -600,7 +602,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
       // Le dossier suit le document. Sans ça, un devis créé DEPUIS un dossier
       // de chantier perdrait son rattachement à l'enregistrement, et l'écran
       // Dossiers afficherait « rien de facturé » sur un chantier devisé.
-      if (f.dossier_id) payload.dossier_id = f.dossier_id
+      payload.dossier_id = f.dossier_id || null
       if (isDevis) { payload.date_devis = f.date_devis; payload.date_validite = f.date_validite }
       else { payload.date_facture = f.date_facture; payload.date_echeance = f.date_echeance; if (f.devis_id) payload.devis_id = f.devis_id }
       // L'acompte DEJA PAYE se deduit APRES la TVA : ce n'est pas une ligne de
@@ -1001,7 +1003,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
               </div>
             )}
             <div style={{ display: 'grid', gap: 10 }}>
-              {isDevis && (
+              {(
                 <div>
                   <label style={lbl}>Chantier <span style={{ color: COUL.danger }}>*</span></label>
                   <select style={{ ...inp, borderColor: f.dossier_id ? COUL.bord : COUL.danger }}
@@ -2920,6 +2922,12 @@ export default function LodeDevisFactures() {
     const { data: num } = await supabase.rpc('next_lode_numero', { p_type: 'facture' })
     const { data: fact, error } = await supabase.from('lode_factures').insert({
       numero: num, devis_id: devisDoc.id, statut: 'brouillon', type: 'facture', responsable: devisDoc.responsable || null,
+      // Le chantier et le client suivent le devis. Sans ces deux lignes, la
+      // facture naissait orpheline : mesuré le 08/11, 0 des 23 factures de
+      // vente portait un chantier, alors que la colonne existait. Le devis
+      // était rattaché, la facture qui en sortait ne l'était plus.
+      dossier_id: devisDoc.dossier_id || null,
+      client_id: devisDoc.client_id || null,
       client_nom: devisDoc.client_nom, client_adresse: devisDoc.client_adresse, client_cp: devisDoc.client_cp,
       client_ville: devisDoc.client_ville, client_email: devisDoc.client_email, client_telephone: devisDoc.client_telephone,
       client_tva: devisDoc.client_tva, objet: devisDoc.objet, notes: devisDoc.notes, remise_pct: devisDoc.remise_pct,
@@ -3026,6 +3034,7 @@ export default function LodeDevisFactures() {
       client_cp: ac.client_cp, client_ville: ac.client_ville, client_email: ac.client_email,
       client_telephone: ac.client_telephone, client_tva: ac.client_tva,
       devis_id: ac.devis_id || null, total_projet_ttc: ac.total_projet_ttc,
+      dossier_id: ac.dossier_id || null,
       langue: ac.langue || 'fr', objet: ac.objet || '',
       _preselAcomptes: d.grp.filter(x => x.type === 'acompte').map(x => x.id),
     } })
@@ -3121,7 +3130,7 @@ export default function LodeDevisFactures() {
           subtitle={`LODE SRL — ${LODE.activite}`}
           stats={stats}
           action={<PrimaryButton color={C} onClick={() => setEditing({ type: tab === 'factures' ? 'facture' : 'devis', doc: null })}>
-            <i className="ti ti-plus" /> Nouveau {tab === 'factures' ? 'facture' : 'devis'}
+            <i className="ti ti-plus" /> {tab === 'factures' ? 'Nouvelle facture' : 'Nouveau devis'}
           </PrimaryButton>}
         />
 
