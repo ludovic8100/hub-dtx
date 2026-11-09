@@ -889,6 +889,23 @@ export default function ConfigModule() {
                       gsm: u.gsm || c.gsm || c.telephone || '',
                     }))} />
 
+                  {/* L'administrateur est une personne physique, et elle est
+                      souvent déjà encodée quelque part dans le groupe. On la
+                      cherche plutôt que de la retaper. */}
+                  {estMorale && (
+                    <InternalClientSearch
+                      sources={[
+                        { table: 'dyn_clients', label: 'Dynassur', color: COUL.bleu },
+                        { table: 'lode_clients', label: 'LODE', color: '#ea580c' },
+                      ]}
+                      placeholder="Chercher l'administrateur parmi les personnes connues…"
+                      onSelect={(c) => setSelUser(u => ({
+                        ...u,
+                        administrateur_nom: c.nom || c.denomination || u.administrateur_nom,
+                        administrateur_prenom: c.prenom || u.administrateur_prenom,
+                      }))} />
+                  )}
+
                   {estMorale && (
                     <BceSearch onSelect={c => {
                       const a = c.address || {}
@@ -917,7 +934,8 @@ export default function ConfigModule() {
                         qui est une personne physique. Texte libre et non une clé
                         vers collaborateurs — l'administrateur d'une société
                         partenaire n'a pas de compte dans le Hub. */}
-                    {estMorale && <div style={{ minWidth: 220 }}><Lbl>Administrateur</Lbl><input name="collab-ad" autoComplete="off" data-lpignore="true" value={selUser.administrateur || ''} onChange={e => setSelUser(u => ({ ...u, administrateur: e.target.value }))} style={inp} placeholder="Nom de l'administrateur" /></div>}
+                    {estMorale && <div style={{ minWidth: 190 }}><Lbl>Administrateur — prénom</Lbl><input name="collab-ap" autoComplete="off" data-lpignore="true" value={selUser.administrateur_prenom || ''} onChange={e => setSelUser(u => ({ ...u, administrateur_prenom: e.target.value }))} style={inp} /></div>}
+                    {estMorale && <div style={{ minWidth: 190 }}><Lbl>Administrateur — NOM</Lbl><input name="collab-an" autoComplete="off" data-lpignore="true" value={selUser.administrateur_nom || ''} onChange={e => setSelUser(u => ({ ...u, administrateur_nom: e.target.value }))} style={inp} /></div>}
                     {estMorale && <div style={{ minWidth: 170 }}><Lbl>N° BCE</Lbl><input name="collab-bc" autoComplete="off" data-lpignore="true" value={selUser.bce || ''} onChange={e => setSelUser(u => ({ ...u, bce: e.target.value }))} style={inp} /></div>}
                     {!estMorale && <div style={{ minWidth: 170 }}><Lbl>NOM</Lbl><input name="collab-nm" autoComplete="off" data-lpignore="true" value={selUser.nom || ''} onChange={e => setSelUser(u => ({ ...u, nom: e.target.value.toUpperCase() }))} placeholder="(vide pour une société)" style={{ ...inp, fontWeight: 700 }} /></div>}
                     <div style={{ minWidth: 220 }}><Lbl>Email</Lbl><input name="collab-ml" autoComplete="off" data-lpignore="true" value={selUser.email || ''} onChange={e => setSelUser(u => ({ ...u, email: e.target.value }))} placeholder="prenom@dynassur.be" style={inp} /></div>
