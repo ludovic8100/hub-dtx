@@ -11,6 +11,9 @@ import GestionAmbiances from './GestionAmbiances'
 import BceSearch from '../../components/BceSearch'
 import InternalClientSearch from '../../components/InternalClientSearch'
 import { usePetitEcran } from '../../lib/ecran'
+
+const todayISO = () => new Date().toISOString().slice(0, 10)
+const fmtDateFr = d => d ? new Date(d).toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'
 import { COUL } from '../../lib/theme'
 
 // ─── Présentation des sociétés (libellé et couleur de la carte) ─────────────
@@ -96,6 +99,7 @@ export default function ConfigModule() {
   const [portefeuilles, setPortefeuilles] = useState([])  // ref_portefeuilles
   const [socSel, setSocSel] = useState({})                // lignes de la fiche ouverte
   const [socInitial, setSocInitial] = useState({})        // pour savoir ce qui a été retiré
+  const [socHistorique, setSocHistorique] = useState([])  // lignes closes, gardées
 
   useEffect(() => {
     if (!isAdmin) { setLoading(false); return }
@@ -273,10 +277,33 @@ export default function ConfigModule() {
   // supprimerait rien en base — la ligne resterait, invisible.
   async function chargerSocietes(id) {
     if (!id) { setSocSel({}); setSocInitial({}); return }
-    const { data } = await supabase.from('collaborateur_societes').select('*').eq('collaborateur_id', id)
+    const { data } = await supabase.from('collaborateur_societes').select('*')
+      .eq('collaborateur_id', id).order('date_debut', { ascending: false })
     const m = {}
-    for (const r of data || []) m[r.societe] = { ...r }
+    for (const r of data || []) if (!r.date_fin) m[r.societe] = { ...r }
     setSocSel(m); setSocInitial(m)
+    setSocHistorique((data || []).filter(r => r.date_fin))
+  }
+
+  // Changer de statut, ce n'est pas écraser : on ferme la période en cours
+  // et on en ouvre une nouvelle le lendemain. Les commissions déjà payées et
+  // les chantiers déjà facturés restent attachés à l'ancienne.
+  async function nouveauStatut(code) {
+    const courante = socSel[code]
+    if (!courante?.id) return
+    if (!confirm(`Clôturer la période en cours chez ${code} et en ouvrir une nouvelle ?\n\nL'ancienne reste lisible dans l'historique.`)) return
+    const { error } = await supabase.from('collaborateur_societes')
+      .update({ date_fin: todayISO(), updated_at: new Date().toISOString() })
+      .eq('id', courante.id)
+    if (error) { notify('❌ ' + error.message); return }
+    setSocSel(p => ({ ...p, [code]: {
+      societe: code, statut: null, fonction: null, remuneration: null,
+      bureau_id: courante.bureau_id ?? null, numero_sous_agent: courante.numero_sous_agent ?? null,
+      activites: courante.activites || null,
+      mois_payes: 13.92, charges_pct: 25, heures_annuelles: 1530,
+    } }))
+    await chargerSocietes(selUser.id)
+    notify('✅ Période clôturée — renseigne le nouveau statut puis enregistre')
   }
 
   const majSoc = (code, patch) => setSocSel(p => ({ ...p, [code]: { ...(p[code] || {}), ...patch } }))
@@ -456,25 +483,34 @@ export default function ConfigModule() {
       portefeuilles: r.portefeuilles?.length ? r.portefeuilles : null,
       updated_at: new Date().toISOString(),
     }))
-    if (lignesSoc.length) {
-      const { error: eSoc } = await supabase.from('collaborateur_societes')
-        .upsert(lignesSoc, { onConflict: 'collaborateur_id,societe' })
-      if (eSoc) notify('❌ Sociétés : ' + eSoc.message)
+    // `cout_horaire` est une colonne GÉNÉRÉE : Postgres refuse toute écriture
+    // dessus, et les lignes chargées la portent. Même piège que sur la fiche
+    // collaborateur, à un autre endroit.
+    for (const l of lignesSoc) delete l.cout_horaire
+    // ⚠️ PAS D'UPSERT. L'unicité n'est plus une contrainte sur (personne,
+    // société) mais un index PARTIEL « une seule ligne ouverte » — un upsert
+    // ne sait pas viser un index partiel. On met à jour la ligne qu'on a
+    // chargée, et on insère seulement les nouvelles.
+    for (const l of lignesSoc) {
+      const existante = socSel[l.societe]?.id
+      const { error: eSoc } = existante
+        ? await supabase.from('collaborateur_societes').update(l).eq('id', existante)
+        : await supabase.from('collaborateur_societes').insert({ ...l, date_debut: todayISO() })
+      if (eSoc) notify('❌ ' + l.societe + ' : ' + eSoc.message)
     }
     // `est_employe` reste alimenté : ComptabiliteView s'en sert encore pour
     // la liste des bénéficiaires de notes de frais. Tant que cet écran n'est
     // pas rebranché sur les statuts, laisser la colonne diverger ferait
     // disparaître des gens de la liste sans que personne ne comprenne.
-    const estEmploye = Object.values(socSel).some(r => r.statut === 'employe')
-    if (estEmploye !== !!selUser.est_employe) {
-      await supabase.from('collaborateurs').update({ est_employe: estEmploye }).eq('id', cid)
-      setUsers(p => p.map(u => u.id === cid ? { ...u, est_employe: estEmploye } : u))
-    }
 
+    // Décocher une société ne SUPPRIME pas la ligne : elle se clôture. Les
+    // commissions déjà payées et les chantiers déjà facturés sont attachés à
+    // cette période — l'effacer rendrait le passé illisible.
     const retirees = Object.keys(socInitial).filter(c => !(c in socSel))
     for (const c of retirees) {
-      await supabase.from('collaborateur_societes').delete()
-        .eq('collaborateur_id', cid).eq('societe', c)
+      await supabase.from('collaborateur_societes')
+        .update({ date_fin: todayISO(), updated_at: new Date().toISOString() })
+        .eq('id', socInitial[c].id)
     }
     setSocInitial({ ...socSel })
 
@@ -1136,7 +1172,21 @@ export default function ConfigModule() {
                           border: `1px solid ${COUL.bord}`, borderLeft: `4px solid ${c}`, borderRadius: 10,
                           padding: 12, marginBottom: 10, background: COUL.fondDoux,
                         }}>
-                          <div style={{ fontSize: 14.5, fontWeight: 800, color: c, marginBottom: 9 }}>{soc.nom || code}</div>
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginBottom: 9 }}>
+                            <span style={{ fontSize: 14.5, fontWeight: 800, color: c }}>{soc.nom || code}</span>
+                            {r.date_debut && (
+                              <span style={{ fontSize: 11.5, color: COUL.texteFaible }}>depuis le {fmtDateFr(r.date_debut)}</span>
+                            )}
+                            <span style={{ flex: 1 }} />
+                            {r.id && (
+                              <button type="button" onClick={() => nouveauStatut(code)}
+                                style={{ border: `1px solid ${COUL.bord}`, background: COUL.surface, color: COUL.texteDoux,
+                                  borderRadius: 7, padding: '3px 9px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+                                title="Clôture la période en cours et en ouvre une nouvelle. L'ancienne reste lisible.">
+                                ↻ Changement de statut
+                              </button>
+                            )}
+                          </div>
 
                           <Grid>
                             <div>
@@ -1299,6 +1349,29 @@ export default function ConfigModule() {
                       Dynassur. Ils ne sont plus exigés pour déclarer un rôle —
                       c'est ce qui empêchait de déclarer commercial un salarié
                       de LODE, qui n'a ni BCE ni IBAN professionnel. */}
+                  {socHistorique.length > 0 && (
+                    <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${COUL.bord}` }}>
+                      <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.05em', color: COUL.texteFaible, marginBottom: 8 }}>
+                        Périodes passées
+                      </div>
+                      {socHistorique.map(h => (
+                        <div key={h.id} style={{ fontSize: 13, color: COUL.texteDoux, padding: '5px 0', borderBottom: `1px solid ${COUL.bord}` }}>
+                          <strong>{(societes.find(x => x.code === h.societe) || {}).nom || h.societe}</strong>
+                          {' — '}{(refStatuts.find(x => x.code === h.statut) || {}).libelle || h.statut || 'statut non renseigné'}
+                          {h.fonction ? ` · ${h.fonction}` : ''}
+                          {h.remuneration ? ` · ${h.remuneration}` : ''}
+                          <span style={{ color: COUL.texteFaible }}>
+                            {' — du '}{fmtDateFr(h.date_debut)}{' au '}{fmtDateFr(h.date_fin)}
+                          </span>
+                        </div>
+                      ))}
+                      <div style={{ fontSize: 11.5, color: COUL.texteFaible, marginTop: 6, lineHeight: 1.5 }}>
+                        Ces périodes ne se modifient plus. Elles portent ce qui était vrai à l'époque —
+                        les commissions versées et les chantiers facturés s'y rattachent.
+                      </div>
+                    </div>
+                  )}
+
                   <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${COUL.bord}` }}>
                     <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.05em', color: COUL.texteFaible, marginBottom: 8 }}>
                       Correspondance avec Qlik
@@ -1349,12 +1422,12 @@ export default function ConfigModule() {
                         l'enregistrement, pour que la comptabilité continue de
                         fonctionner sans qu'on ait à cocher deux fois la même
                         chose à deux endroits. */}
-                    {!!selUser.est_employe && (
-                      <div style={{ fontSize: 12, color: COUL.texteFaible }}>
-                        Reconnu comme <strong>employé</strong> — déduit du statut dans « Sociétés et rôles ».
-                        Apparaît dans les bénéficiaires de notes de frais.
-                      </div>
-                    )}
+                    {/* Une case explicite plutôt qu'une déduction : un
+                        administrateur ou un indépendant peut rentrer des frais,
+                        et un employé peut n'avoir jamais à en rentrer. */}
+                    <Toggle label="Notes de frais — apparaît dans la liste des bénéficiaires"
+                      on={!!selUser.notes_frais_beneficiaire}
+                      onClick={() => setSelUser(u => ({ ...u, notes_frais_beneficiaire: !u.notes_frais_beneficiaire }))} />
                   </div>
 
                   {/* ── Coût horaire ────────────────────────────────────────

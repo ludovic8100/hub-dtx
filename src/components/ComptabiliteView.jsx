@@ -302,8 +302,10 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
   useEffect(() => {
     let annule = false
     // Bénéficiaires = comptes hub marqués « Employé », cloisonnés par domaine e-mail (dynassur / dtx…)
-    supabase.from('collaborateurs').select('id, nom_complet, email, est_employe')
-      .eq('est_employe', true)
+    // La case « Notes de frais » de la fiche, et non plus le statut d'employé :
+    // un administrateur ou un indépendant rentre aussi des frais.
+    supabase.from('collaborateurs').select('id, nom_complet, email, notes_frais_beneficiaire')
+      .eq('notes_frais_beneficiaire', true)
       .then(({ data }) => {
         if (annule) return
         const tokens = (societeCodes || []).map(c => String(c).toLowerCase())
