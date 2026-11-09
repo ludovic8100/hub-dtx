@@ -74,9 +74,7 @@ export default function ConfigModule() {
   const [uModule, setUModule] = useState('tous')
   const [uRole, setURole] = useState('tous')
   const [uBureau, setUBureau] = useState('tous')
-  const [triBureau, setTriBureau] = useState(false) // trier la liste par bureau au lieu de par nom
   const [bureaux, setBureaux] = useState([])            // ref_bureaux (adresse complète)
-  const [showBureaux, setShowBureaux] = useState(false) // panneau "Gérer les bureaux"
   const [showFrais, setShowFrais] = useState(false)     // coûts internes (confidentiel)
   const [sel, setSel] = useState(() => new Set())       // ids user cochés (attribution groupée)
   const [bulkBureau, setBulkBureau] = useState('')      // bureau cible de l'attribution groupée
@@ -562,11 +560,6 @@ export default function ConfigModule() {
     if (uModule !== 'tous' && !(u.est_admin || sesAcces?.has(uModule))) return false
     return true
   }).sort((a, b) => {
-    if (triBureau) {
-      const blA = bureauLabelOf(a) || 'zzz', blB = bureauLabelOf(b) || 'zzz'
-      const cmp = blA.localeCompare(blB, 'fr', { sensitivity: 'base' })
-      if (cmp) return cmp
-    }
     // Tri sur le NOM DE FAMILLE, pas sur nom_complet.
     //
     // nom_complet melange « NOM Prenom » et « Prenom Nom » : trier dessus
@@ -578,7 +571,7 @@ export default function ConfigModule() {
     return clef(a).localeCompare(clef(b), 'fr', { sensitivity: 'base' })
   })
 
-  const TABS = [['societes', '🏢 Sociétés'], ['documents', '📄 Documents'], ['users', '👥 Utilisateurs & acteurs métier'], ['categories', '🏷️ Catégories compta'], ['fournisseurs', '🚚 Fournisseurs'], ['ambiances', '🎨 Ambiances']]
+  const TABS = [['societes', '🏢 Sociétés'], ['documents', '📄 Documents'], ['users', '👥 Utilisateurs & acteurs métier'], ['categories', '🏷️ Catégories compta'], ['bureaux', '🏢 Bureaux'], ['fournisseurs', '🚚 Fournisseurs'], ['ambiances', '🎨 Ambiances']]
 
   return (
     <Layout currentPage="Configuration">
@@ -594,6 +587,50 @@ export default function ConfigModule() {
 
         {flash && <div style={{ position: 'fixed', top: 16, right: 16, background: COUL.texte, color: COUL.blanc, padding: '10px 16px', borderRadius: 10, zIndex: 50, fontWeight: 600 }}>{flash}</div>}
         {loading && <div style={{ color: COUL.texteFaible, padding: 20 }}>Chargement…</div>}
+
+        {/* Les bureaux sont un RÉFÉRENTIEL, au même titre que les sociétés ou
+            les catégories — pas un réglage caché derrière un bouton de la liste
+            des utilisateurs. Ludovic, 09/11 : « gérer les bureaux, ça doit être
+            au niveau des menus Sociétés, Documents, Utilisateurs… ». */}
+        {tab === 'bureaux' && (
+          <div>
+              <div style={{ background: COUL.surface, border: '1px solid #e2e8f0', borderRadius: 12, padding: 16, marginBottom: 14 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 10 }}>
+                  Bureaux — adresse complète (devoirs d'information, courriers clients)
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr 60px 70px 90px 1fr 32px', gap: 8, fontSize: 10.5, fontWeight: 800, color: COUL.texteFaible, textTransform: 'uppercase', marginBottom: 6 }}>
+                  <span>Nom</span><span>Rue</span><span>N°</span><span>Bte</span><span>CP</span><span>Ville</span><span></span>
+                </div>
+                {bureaux.map(b => (
+                  <div key={b.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr 60px 70px 90px 1fr 32px', gap: 8, marginBottom: 6 }}>
+                    <input style={inp} value={b.libelle || ''} onChange={e => majBureauChamp(b.id, 'libelle', e.target.value)} placeholder="Nom du bureau" />
+                    <input style={inp} value={b.rue || ''} onChange={e => majBureauChamp(b.id, 'rue', e.target.value)} placeholder="Rue" />
+                    <input style={inp} value={b.numero || ''} onChange={e => majBureauChamp(b.id, 'numero', e.target.value)} placeholder="N°" />
+                    <input style={inp} value={b.boite || ''} onChange={e => majBureauChamp(b.id, 'boite', e.target.value)} placeholder="Bte" />
+                    <input style={inp} value={b.code_postal || ''} onChange={e => majBureauChamp(b.id, 'code_postal', e.target.value)} placeholder="CP" />
+                    <input style={inp} value={b.ville || ''} onChange={e => majBureauChamp(b.id, 'ville', e.target.value)} placeholder="Ville" />
+                    <button onClick={() => supprimerBureau(b.id)} title="Retirer" style={{ background: 'none', border: 'none', color: COUL.danger, cursor: 'pointer', fontSize: 16 }}>✕</button>
+                  </div>
+                ))}
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 8, flexWrap: 'wrap' }}>
+                  <button onClick={ajouterBureau} style={{ ...btn('#64748b'), padding: '7px 14px', fontSize: 13 }}>➕ Ajouter un bureau</button>
+                  <button onClick={saveBureaux} disabled={saving || !bureauxModifies.size}
+                    style={{ ...btn('#1e293b'), padding: '7px 16px', fontSize: 13,
+                             opacity: (saving || !bureauxModifies.size) ? .45 : 1 }}>
+                    💾 Enregistrer{bureauxModifies.size ? ` (${bureauxModifies.size})` : ''}
+                  </button>
+                </div>
+                {resultatBureaux && (
+                  <div style={{
+                    marginTop: 9, padding: '8px 12px', borderRadius: 8, fontSize: 12.5, fontWeight: 600,
+                    border: `1px solid ${resultatBureaux.ok ? '#86efac' : COUL.dangerBord}`,
+                    background: resultatBureaux.ok ? '#f0fdf4' : COUL.dangerFondDoux,
+                    color: resultatBureaux.ok ? '#15803d' : COUL.dangerFonce,
+                  }}>{resultatBureaux.ok ? '✓ ' : '✕ '}{resultatBureaux.message}</div>
+                )}
+              </div>
+          </div>
+        )}
 
         {tab === 'categories' && <GestionCategories />}
         {tab === 'fournisseurs' && <GestionFournisseurs />}
@@ -697,48 +734,9 @@ export default function ConfigModule() {
                 <button onClick={() => { setUSearch(''); setURole('tous'); setUStatut('tous'); setUSoc('toutes'); setUBureau('tous'); setUModule('tous') }} style={{ ...btnGhost }}>✕ Réinitialiser</button>
               )}
               <button onClick={() => { setSelUser({ _nouveau: true, nom_complet: '', email: '', est_admin: false, compte_hub_actif: false, actif: true, type: 'physique' }); setSelTaux({}); setAccesSel(new Set()) }} style={{ ...btn('#16a34a'), padding: '8px 14px', fontSize: 13 }}>➕ Nouvel utilisateur</button>
-              <button onClick={() => setShowBureaux(v => !v)} style={{ ...btnGhost }}>🏢 Gérer les bureaux</button>
-              <button onClick={() => setTriBureau(v => !v)} style={{ ...btnGhost, ...(triBureau ? { background: COUL.texte, color: COUL.blanc, borderColor: COUL.texte } : {}) }}>🏢 Trier par bureau</button>
               <span style={{ fontSize: 12, color: COUL.texteFaible, marginLeft: 'auto' }}>{usersFiltres.length} / {users.length}</span>
             </div>
 
-            {showBureaux && (
-              <div style={{ background: COUL.surface, border: '1px solid #e2e8f0', borderRadius: 12, padding: 16, marginBottom: 14 }}>
-                <div style={{ fontSize: 11, fontWeight: 800, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 10 }}>
-                  Bureaux — adresse complète (devoirs d'information, courriers clients)
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr 60px 70px 90px 1fr 32px', gap: 8, fontSize: 10.5, fontWeight: 800, color: COUL.texteFaible, textTransform: 'uppercase', marginBottom: 6 }}>
-                  <span>Nom</span><span>Rue</span><span>N°</span><span>Bte</span><span>CP</span><span>Ville</span><span></span>
-                </div>
-                {bureaux.map(b => (
-                  <div key={b.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr 60px 70px 90px 1fr 32px', gap: 8, marginBottom: 6 }}>
-                    <input style={inp} value={b.libelle || ''} onChange={e => majBureauChamp(b.id, 'libelle', e.target.value)} placeholder="Nom du bureau" />
-                    <input style={inp} value={b.rue || ''} onChange={e => majBureauChamp(b.id, 'rue', e.target.value)} placeholder="Rue" />
-                    <input style={inp} value={b.numero || ''} onChange={e => majBureauChamp(b.id, 'numero', e.target.value)} placeholder="N°" />
-                    <input style={inp} value={b.boite || ''} onChange={e => majBureauChamp(b.id, 'boite', e.target.value)} placeholder="Bte" />
-                    <input style={inp} value={b.code_postal || ''} onChange={e => majBureauChamp(b.id, 'code_postal', e.target.value)} placeholder="CP" />
-                    <input style={inp} value={b.ville || ''} onChange={e => majBureauChamp(b.id, 'ville', e.target.value)} placeholder="Ville" />
-                    <button onClick={() => supprimerBureau(b.id)} title="Retirer" style={{ background: 'none', border: 'none', color: COUL.danger, cursor: 'pointer', fontSize: 16 }}>✕</button>
-                  </div>
-                ))}
-                <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 8, flexWrap: 'wrap' }}>
-                  <button onClick={ajouterBureau} style={{ ...btn('#64748b'), padding: '7px 14px', fontSize: 13 }}>➕ Ajouter un bureau</button>
-                  <button onClick={saveBureaux} disabled={saving || !bureauxModifies.size}
-                    style={{ ...btn('#1e293b'), padding: '7px 16px', fontSize: 13,
-                             opacity: (saving || !bureauxModifies.size) ? .45 : 1 }}>
-                    💾 Enregistrer{bureauxModifies.size ? ` (${bureauxModifies.size})` : ''}
-                  </button>
-                </div>
-                {resultatBureaux && (
-                  <div style={{
-                    marginTop: 9, padding: '8px 12px', borderRadius: 8, fontSize: 12.5, fontWeight: 600,
-                    border: `1px solid ${resultatBureaux.ok ? '#86efac' : COUL.dangerBord}`,
-                    background: resultatBureaux.ok ? '#f0fdf4' : COUL.dangerFondDoux,
-                    color: resultatBureaux.ok ? '#15803d' : COUL.dangerFonce,
-                  }}>{resultatBureaux.ok ? '✓ ' : '✕ '}{resultatBureaux.message}</div>
-                )}
-              </div>
-            )}
 
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 14, alignItems: 'center', background: COUL.infoFondDoux, border: '1px solid #bae6fd', borderRadius: 10, padding: '8px 12px' }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: '#0369a1' }}>Attribution groupée d'un module</span>
@@ -871,7 +869,7 @@ export default function ConfigModule() {
                       souvent déjà client quelque part dans le groupe. */}
                   <InternalClientSearch
                     sources={[
-                      { table: 'dyn_clients', label: 'Dynassur', color: COUL.bleu },
+                      { table: 'dyn_clients', label: 'Dynassur', color: COUL.bleu, cols: 'date_naissance' },
                       { table: 'lode_clients', label: 'LODE', color: '#ea580c' },
                     ]}
                     placeholder="Reprendre une fiche déjà encodée dans les clients…"
@@ -887,6 +885,9 @@ export default function ConfigModule() {
                       ville: c.ville || u.ville,
                       email: u.email || c.email || '',
                       gsm: u.gsm || c.gsm || c.telephone || '',
+                      // La vue `dyn_clients` n'exposait pas la date de naissance
+                      // alors que `clients` la porte : il fallait la retaper.
+                      date_naissance: u.date_naissance || c.date_naissance || null,
                     }))} />
 
                   {/* L'administrateur est une personne physique, et elle est
@@ -895,7 +896,7 @@ export default function ConfigModule() {
                   {estMorale && (
                     <InternalClientSearch
                       sources={[
-                        { table: 'dyn_clients', label: 'Dynassur', color: COUL.bleu },
+                        { table: 'dyn_clients', label: 'Dynassur', color: COUL.bleu, cols: 'date_naissance' },
                         { table: 'lode_clients', label: 'LODE', color: '#ea580c' },
                       ]}
                       placeholder="Chercher l'administrateur parmi les personnes connues…"
@@ -906,11 +907,18 @@ export default function ConfigModule() {
                       }))} />
                   )}
 
-                  {estMorale && (
+                  {/* Visible quelle que soit la forme : un indépendant en nom
+                      propre a un numéro d'entreprise lui aussi. Seul un salarié
+                      n'en a pas. */}
+                  {(
                     <BceSearch onSelect={c => {
                       const a = c.address || {}
                       setSelUser(u => ({
-                        ...u, type: 'morale',
+                        // ⚠️ ON NE TOUCHE PAS À LA FORME. Ludovic, 09/11 :
+                        // « un indépendant en personne physique a un numéro
+                        // d'entreprise, c'est faux de basculer ». La BCE dit
+                        // qu'il y a une entreprise, pas qu'elle est une société.
+                        ...u,
                         nom_complet: c.denomination_with_legal_form || c.denomination || u.nom_complet,
                         bce: c.cbe_number_formatted || c.cbe_number || u.bce,
                         adresse: a.street ? `${a.street} ${a.street_number || ''}`.trim() : u.adresse,
@@ -936,7 +944,7 @@ export default function ConfigModule() {
                         partenaire n'a pas de compte dans le Hub. */}
                     {estMorale && <div style={{ minWidth: 190 }}><Lbl>Administrateur — prénom</Lbl><input name="collab-ap" autoComplete="off" data-lpignore="true" value={selUser.administrateur_prenom || ''} onChange={e => setSelUser(u => ({ ...u, administrateur_prenom: e.target.value }))} style={inp} /></div>}
                     {estMorale && <div style={{ minWidth: 190 }}><Lbl>Administrateur — NOM</Lbl><input name="collab-an" autoComplete="off" data-lpignore="true" value={selUser.administrateur_nom || ''} onChange={e => setSelUser(u => ({ ...u, administrateur_nom: e.target.value }))} style={inp} /></div>}
-                    {estMorale && <div style={{ minWidth: 170 }}><Lbl>N° BCE</Lbl><input name="collab-bc" autoComplete="off" data-lpignore="true" value={selUser.bce || ''} onChange={e => setSelUser(u => ({ ...u, bce: e.target.value }))} style={inp} /></div>}
+                    {<div style={{ minWidth: 170 }}><Lbl>N° BCE</Lbl><input name="collab-bc" autoComplete="off" data-lpignore="true" value={selUser.bce || ''} onChange={e => setSelUser(u => ({ ...u, bce: e.target.value }))} style={inp} /></div>}
                     {!estMorale && <div style={{ minWidth: 170 }}><Lbl>NOM</Lbl><input name="collab-nm" autoComplete="off" data-lpignore="true" value={selUser.nom || ''} onChange={e => setSelUser(u => ({ ...u, nom: e.target.value.toUpperCase() }))} placeholder="(vide pour une société)" style={{ ...inp, fontWeight: 700 }} /></div>}
                     <div style={{ minWidth: 220 }}><Lbl>Email</Lbl><input name="collab-ml" autoComplete="off" data-lpignore="true" value={selUser.email || ''} onChange={e => setSelUser(u => ({ ...u, email: e.target.value }))} placeholder="prenom@dynassur.be" style={inp} /></div>
                     {/* Le bureau decide de quels clients la personne voit —
@@ -966,6 +974,19 @@ export default function ConfigModule() {
 
                 {/* ── Rôle métier & commissions ── */}
                 <Section titre="Rôle métier & commissions">
+                  {/* Ludovic, 09/11 : « le % de commission, ça ne concerne que
+                      Dynassur, comme le numéro de producteur. Ce n'est pas lié
+                      à LODE, DTX ou Hexagroup ». Tant que les rôles ne sont pas
+                      portés par le couple (personne, société), on le DIT au
+                      moins — le cacher sur `acc_dynassur` referait l'erreur
+                      qu'on vient de corriger ailleurs : confondre le droit de
+                      voir un écran et l'appartenance à une société. */}
+                  <div style={{ marginBottom: 12, padding: '8px 11px', borderRadius: 8, background: COUL.infoFondDoux, border: `1px solid ${COUL.bord}`, fontSize: 12.5, color: COUL.texteDoux }}>
+                    Tout ce bloc — rôles, taux, n° producteur, BCE, IBAN — ne concerne
+                    aujourd'hui que <strong>Dynassur</strong> : il vient du courtage et des
+                    commissions. Un commercial ou un employé de LODE, DTX ou Hexagroup
+                    n'a rien à y saisir.
+                  </div>
                   <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', margin: '12px 0' }}>
                     <Chk label="Commercial" on={!!selUser.est_commercial} onClick={() => setSelUser(s => ({ ...s, est_commercial: !s.est_commercial }))} />
                     <Chk label="Gestionnaire" on={!!selUser.est_gestionnaire} onClick={() => setSelUser(s => ({ ...s, est_gestionnaire: !s.est_gestionnaire }))} />
@@ -1037,8 +1058,14 @@ export default function ConfigModule() {
                       le lit jamais au moment de l'affichage : il garde celui
                       qui lui a été appliqué (dossiers.mo_taux_horaire). Sans
                       ça, augmenter un salaire aujourd'hui réécrirait la marge
-                      d'un chantier de 2023. */}
-                  <details style={{ marginBottom: 14, border: `1px solid ${COUL.bord}`, borderRadius: 10, overflow: 'hidden' }}>
+                      d'un chantier de 2023.
+
+                      ⚠️ RÉSERVÉ À L'EMPLOYÉ. Ludovic, 09/11 : « les coûts
+                      horaires, c'est lié à l'employé, pas à l'indépendant.
+                      L'indépendant, il a un % de commission ». Le bloc
+                      s'affichait pour tout le monde — y compris pour un
+                      sous-agent qui n'a pas de salaire. */}
+                  {!!selUser.est_employe && <details style={{ marginBottom: 14, border: `1px solid ${COUL.bord}`, borderRadius: 10, overflow: 'hidden' }}>
                     <summary style={{ padding: '10px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: COUL.texteMoyen, background: COUL.fondDoux, listStyle: 'revert' }}>
                       Coût horaire
                       {selUser.cout_horaire != null && (
@@ -1074,7 +1101,7 @@ export default function ConfigModule() {
                         déjà saisi garde le sien : la main-d'œuvre d'il y a trois ans ne change pas.
                       </div>
                     </div>
-                  </details>
+                  </details>}
 
                   {selUser.id && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
