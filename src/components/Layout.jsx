@@ -8,6 +8,7 @@ import { bootstrapConfigs } from '../lib/bootstrapConfigs'
 import { supabase } from '../lib/supabase'
 import { reglesEcrites, appliquer } from '../lib/themes'
 import { COUL } from '../lib/theme'
+import BandeauSaison from './BandeauSaison'
 
 // Préfixe d'URL → code entité
 const PATH_TO_SOCIETE = [
@@ -122,9 +123,16 @@ export default function Layout({ children, currentPage }) {
           width: '100%',
           minWidth: 0,
           overflowY: 'auto',
-          background: COUL.fondDoux,
+          // ⚠️ `backgroundColor` et NON `background` : la forme raccourcie
+          // remet `background-image` à `none`, et un style en ligne l'emporte
+          // sur une classe. Le motif de saison de `.hub-saison-zone` était
+          // écrasé avant d'être affiché. C'est le même piège que sur le menu
+          // et l'en-tête le 08/11 — il s'est reproduit ici parce que la zone
+          // de travail ne portait pas encore de motif.
+          backgroundColor: COUL.fondDoux,
           padding: isMobile ? '16px 14px' : '28px 32px'
         }}>
+          <BandeauSaison />
           <ErrorBoundary resetKey={currentPage}>
             {children}
           </ErrorBoundary>

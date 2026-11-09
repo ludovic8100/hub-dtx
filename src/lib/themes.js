@@ -102,56 +102,61 @@ const SOMBRE = {
 export const AMBIANCES = {
   standard: {
     couverture: '/ambiances/standard.webp',
+    titre: "", sousTitre: "",
     label: 'Standard', symbole: '✦',
-    clair: { saison: '#5dafff', saisonDoux: 'rgba(74,153,237,.13)', saisonMotif: 'none', saisonLueur: 'rgba(30,128,236,.10)' },
-    sombre: { saison: '#5daffF', saisonDoux: 'rgba(74,153,237,.15)', saisonMotif: 'none', saisonLueur: 'rgba(30,128,236,.22)' },
+    clair: { saison: '#5dafff', saisonBandeauFond: "linear-gradient(100deg,#0d2f5e,#1e5f8f)", saisonDoux: 'rgba(74,153,237,.13)', saisonMotif: 'none', saisonLueur: 'rgba(30,128,236,.10)' },
+    sombre: { saison: '#5daffF', saisonBandeauFond: "linear-gradient(100deg,#0d2f5e,#1e5f8f)", saisonDoux: 'rgba(74,153,237,.15)', saisonMotif: 'none', saisonLueur: 'rgba(30,128,236,.22)' },
   },
   noel: {
     couverture: '/ambiances/noel.webp',
+    titre: "La douceur des fêtes", sousTitre: "Sapin naturel, lumières chaudes et esprit de fin d'année.",
     label: 'Noël', symbole: '❄',
     clair: {
       fond: '#eaf4ef', fondDoux: '#dbeae2', fondAlterne: '#f3faf6',
-      saison: '#b8860b', saisonDoux: 'rgba(245,202,120,.22)', saisonMotif: "url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2796%27%20height%3D%2796%27%20viewBox%3D%270%200%2096%2096%27%3E%3Ctext%20x%3D%2712%27%20y%3D%2730%27%20font-size%3D%2722%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.22%27%3E%E2%9D%84%3C%2Ftext%3E%3Ctext%20x%3D%2760%27%20y%3D%2758%27%20font-size%3D%2715%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%9C%A6%3C%2Ftext%3E%3Ctext%20x%3D%2726%27%20y%3D%2784%27%20font-size%3D%2717%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%9D%85%3C%2Ftext%3E%3C%2Fsvg%3E')", saisonLueur: 'rgba(245,182,84,.14)',
+      saison: '#b8860b', saisonBandeauFond: "linear-gradient(100deg,#0b2d20,#7f1d1d 55%,#b8860b)", saisonDoux: 'rgba(245,202,120,.22)', saisonMotif: "url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2796%27%20height%3D%2796%27%20viewBox%3D%270%200%2096%2096%27%3E%3Ctext%20x%3D%2712%27%20y%3D%2730%27%20font-size%3D%2722%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.22%27%3E%E2%9D%84%3C%2Ftext%3E%3Ctext%20x%3D%2760%27%20y%3D%2758%27%20font-size%3D%2715%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%9C%A6%3C%2Ftext%3E%3Ctext%20x%3D%2726%27%20y%3D%2784%27%20font-size%3D%2717%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%9D%85%3C%2Ftext%3E%3C%2Fsvg%3E')", saisonLueur: 'rgba(245,182,84,.14)',
     },
     sombre: {
       fond: '#071927', fondDoux: '#061d2c', surface: '#102b3c', surfaceHaute: '#16354b',
-      saison: '#f5ca78', saisonDoux: 'rgba(245,202,120,.14)', saisonMotif: "url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2796%27%20height%3D%2796%27%20viewBox%3D%270%200%2096%2096%27%3E%3Ctext%20x%3D%2712%27%20y%3D%2730%27%20font-size%3D%2722%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.22%27%3E%E2%9D%84%3C%2Ftext%3E%3Ctext%20x%3D%2760%27%20y%3D%2758%27%20font-size%3D%2715%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%9C%A6%3C%2Ftext%3E%3Ctext%20x%3D%2726%27%20y%3D%2784%27%20font-size%3D%2717%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%9D%85%3C%2Ftext%3E%3C%2Fsvg%3E')", saisonLueur: 'rgba(245,182,84,.18)',
+      saison: '#f5ca78', saisonBandeauFond: "linear-gradient(100deg,#07241a,#6b1717 55%,#8a6417)", saisonDoux: 'rgba(245,202,120,.14)', saisonMotif: "url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2796%27%20height%3D%2796%27%20viewBox%3D%270%200%2096%2096%27%3E%3Ctext%20x%3D%2712%27%20y%3D%2730%27%20font-size%3D%2722%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.22%27%3E%E2%9D%84%3C%2Ftext%3E%3Ctext%20x%3D%2760%27%20y%3D%2758%27%20font-size%3D%2715%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%9C%A6%3C%2Ftext%3E%3Ctext%20x%3D%2726%27%20y%3D%2784%27%20font-size%3D%2717%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%9D%85%3C%2Ftext%3E%3C%2Fsvg%3E')", saisonLueur: 'rgba(245,182,84,.18)',
     },
   },
   'nouvel-an': {
     couverture: '/ambiances/nouvel-an.webp',
+    titre: "Un nouveau chapitre ensemble", sousTitre: "Une nouvelle année, la même énergie pour vos projets.",
     label: 'Nouvel An', symbole: '✧',
     clair: {
       fond: '#f1eefb', fondDoux: '#e3def4', fondAlterne: '#f8f5ff',
-      saison: '#a16207', saisonDoux: 'rgba(245,197,107,.22)', saisonMotif: "url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2796%27%20height%3D%2796%27%20viewBox%3D%270%200%2096%2096%27%3E%3Ctext%20x%3D%2712%27%20y%3D%2730%27%20font-size%3D%2722%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.22%27%3E%E2%9C%A7%3C%2Ftext%3E%3Ctext%20x%3D%2760%27%20y%3D%2758%27%20font-size%3D%2715%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%98%85%3C%2Ftext%3E%3Ctext%20x%3D%2726%27%20y%3D%2784%27%20font-size%3D%2717%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%9C%A6%3C%2Ftext%3E%3C%2Fsvg%3E')", saisonLueur: 'rgba(255,212,131,.14)',
+      saison: '#a16207', saisonBandeauFond: "linear-gradient(100deg,#14213d,#a16207 60%,#eab308)", saisonDoux: 'rgba(245,197,107,.22)', saisonMotif: "url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2796%27%20height%3D%2796%27%20viewBox%3D%270%200%2096%2096%27%3E%3Ctext%20x%3D%2712%27%20y%3D%2730%27%20font-size%3D%2722%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.22%27%3E%E2%9C%A7%3C%2Ftext%3E%3Ctext%20x%3D%2760%27%20y%3D%2758%27%20font-size%3D%2715%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%98%85%3C%2Ftext%3E%3Ctext%20x%3D%2726%27%20y%3D%2784%27%20font-size%3D%2717%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%9C%A6%3C%2Ftext%3E%3C%2Fsvg%3E')", saisonLueur: 'rgba(255,212,131,.14)',
     },
     sombre: {
       fond: '#0a1127', fondDoux: '#0b1630', surface: '#172541', surfaceHaute: '#1d3051',
-      saison: '#f2c676', saisonDoux: 'rgba(245,197,107,.15)', saisonMotif: "url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2796%27%20height%3D%2796%27%20viewBox%3D%270%200%2096%2096%27%3E%3Ctext%20x%3D%2712%27%20y%3D%2730%27%20font-size%3D%2722%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.22%27%3E%E2%9C%A7%3C%2Ftext%3E%3Ctext%20x%3D%2760%27%20y%3D%2758%27%20font-size%3D%2715%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%98%85%3C%2Ftext%3E%3Ctext%20x%3D%2726%27%20y%3D%2784%27%20font-size%3D%2717%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%9C%A6%3C%2Ftext%3E%3C%2Fsvg%3E')", saisonLueur: 'rgba(255,212,131,.18)',
+      saison: '#f2c676', saisonBandeauFond: "linear-gradient(100deg,#0f192e,#7c4a06 60%,#b88a0c)", saisonDoux: 'rgba(245,197,107,.15)', saisonMotif: "url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2796%27%20height%3D%2796%27%20viewBox%3D%270%200%2096%2096%27%3E%3Ctext%20x%3D%2712%27%20y%3D%2730%27%20font-size%3D%2722%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.22%27%3E%E2%9C%A7%3C%2Ftext%3E%3Ctext%20x%3D%2760%27%20y%3D%2758%27%20font-size%3D%2715%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%98%85%3C%2Ftext%3E%3Ctext%20x%3D%2726%27%20y%3D%2784%27%20font-size%3D%2717%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%9C%A6%3C%2Ftext%3E%3C%2Fsvg%3E')", saisonLueur: 'rgba(255,212,131,.18)',
     },
   },
   halloween: {
     couverture: '/ambiances/halloween.webp',
+    titre: "L'automne s'invite au Hub", sousTitre: "Une lumière chaleureuse pour accompagner vos journées.",
     label: 'Halloween', symbole: '☾',
     clair: {
       fond: '#f4ecf7', fondDoux: '#e7dcee', fondAlterne: '#faf4fc',
-      saison: '#c2410c', saisonDoux: 'rgba(255,128,52,.16)', saisonMotif: "url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2796%27%20height%3D%2796%27%20viewBox%3D%270%200%2096%2096%27%3E%3Ctext%20x%3D%2712%27%20y%3D%2730%27%20font-size%3D%2722%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.22%27%3E%E2%98%BE%3C%2Ftext%3E%3Ctext%20x%3D%2760%27%20y%3D%2758%27%20font-size%3D%2715%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%9C%A6%3C%2Ftext%3E%3Ctext%20x%3D%2726%27%20y%3D%2784%27%20font-size%3D%2717%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%98%85%3C%2Ftext%3E%3C%2Fsvg%3E')", saisonLueur: 'rgba(172,88,201,.12)',
+      saison: '#c2410c', saisonBandeauFond: "linear-gradient(100deg,#1b1024,#6b21a8 45%,#ea580c)", saisonDoux: 'rgba(255,128,52,.16)', saisonMotif: "url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2796%27%20height%3D%2796%27%20viewBox%3D%270%200%2096%2096%27%3E%3Ctext%20x%3D%2712%27%20y%3D%2730%27%20font-size%3D%2722%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.22%27%3E%E2%98%BE%3C%2Ftext%3E%3Ctext%20x%3D%2760%27%20y%3D%2758%27%20font-size%3D%2715%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%9C%A6%3C%2Ftext%3E%3Ctext%20x%3D%2726%27%20y%3D%2784%27%20font-size%3D%2717%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%98%85%3C%2Ftext%3E%3C%2Fsvg%3E')", saisonLueur: 'rgba(172,88,201,.12)',
     },
     sombre: {
       fond: '#120f26', fondDoux: '#151026', surface: '#231c39', surfaceHaute: '#2d2247',
-      saison: '#ff9a51', saisonDoux: 'rgba(255,128,52,.14)', saisonMotif: "url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2796%27%20height%3D%2796%27%20viewBox%3D%270%200%2096%2096%27%3E%3Ctext%20x%3D%2712%27%20y%3D%2730%27%20font-size%3D%2722%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.22%27%3E%E2%98%BE%3C%2Ftext%3E%3Ctext%20x%3D%2760%27%20y%3D%2758%27%20font-size%3D%2715%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%9C%A6%3C%2Ftext%3E%3Ctext%20x%3D%2726%27%20y%3D%2784%27%20font-size%3D%2717%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%98%85%3C%2Ftext%3E%3C%2Fsvg%3E')", saisonLueur: 'rgba(172,88,201,.19)',
+      saison: '#ff9a51', saisonBandeauFond: "linear-gradient(100deg,#140b1b,#53177f 45%,#b8440a)", saisonDoux: 'rgba(255,128,52,.14)', saisonMotif: "url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2796%27%20height%3D%2796%27%20viewBox%3D%270%200%2096%2096%27%3E%3Ctext%20x%3D%2712%27%20y%3D%2730%27%20font-size%3D%2722%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.22%27%3E%E2%98%BE%3C%2Ftext%3E%3Ctext%20x%3D%2760%27%20y%3D%2758%27%20font-size%3D%2715%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%9C%A6%3C%2Ftext%3E%3Ctext%20x%3D%2726%27%20y%3D%2784%27%20font-size%3D%2717%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%98%85%3C%2Ftext%3E%3C%2Fsvg%3E')", saisonLueur: 'rgba(172,88,201,.19)',
     },
   },
   vacances: {
     couverture: '/ambiances/vacances.webp',
+    titre: "Un air de vacances", sousTitre: "Un peu de lumière et de sérénité dans votre quotidien.",
     label: 'Vacances', symbole: '☀',
     clair: {
       fond: '#e6f6f7', fondDoux: '#d2ecee', fondAlterne: '#f2fcfd',
-      saison: '#0f766e', saisonDoux: 'rgba(83,224,203,.20)', saisonMotif: "url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2796%27%20height%3D%2796%27%20viewBox%3D%270%200%2096%2096%27%3E%3Ctext%20x%3D%2712%27%20y%3D%2730%27%20font-size%3D%2722%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.22%27%3E%E2%98%80%3C%2Ftext%3E%3Ctext%20x%3D%2760%27%20y%3D%2758%27%20font-size%3D%2715%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%89%88%3C%2Ftext%3E%3Ctext%20x%3D%2726%27%20y%3D%2784%27%20font-size%3D%2717%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%9C%A6%3C%2Ftext%3E%3C%2Fsvg%3E')", saisonLueur: 'rgba(40,203,210,.12)',
+      saison: '#0f766e', saisonBandeauFond: "linear-gradient(100deg,#083344,#0f766e 50%,#22d3ee)", saisonDoux: 'rgba(83,224,203,.20)', saisonMotif: "url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2796%27%20height%3D%2796%27%20viewBox%3D%270%200%2096%2096%27%3E%3Ctext%20x%3D%2712%27%20y%3D%2730%27%20font-size%3D%2722%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.22%27%3E%E2%98%80%3C%2Ftext%3E%3Ctext%20x%3D%2760%27%20y%3D%2758%27%20font-size%3D%2715%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%89%88%3C%2Ftext%3E%3Ctext%20x%3D%2726%27%20y%3D%2784%27%20font-size%3D%2717%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%9C%A6%3C%2Ftext%3E%3C%2Fsvg%3E')", saisonLueur: 'rgba(40,203,210,.12)',
     },
     sombre: {
       fond: '#071d2b', fondDoux: '#082438', surface: '#0b3243', surfaceHaute: '#144358',
-      saison: '#8ee8d3', saisonDoux: 'rgba(83,224,203,.15)', saisonMotif: "url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2796%27%20height%3D%2796%27%20viewBox%3D%270%200%2096%2096%27%3E%3Ctext%20x%3D%2712%27%20y%3D%2730%27%20font-size%3D%2722%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.22%27%3E%E2%98%80%3C%2Ftext%3E%3Ctext%20x%3D%2760%27%20y%3D%2758%27%20font-size%3D%2715%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%89%88%3C%2Ftext%3E%3Ctext%20x%3D%2726%27%20y%3D%2784%27%20font-size%3D%2717%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%9C%A6%3C%2Ftext%3E%3C%2Fsvg%3E')", saisonLueur: 'rgba(40,203,210,.18)',
+      saison: '#8ee8d3', saisonBandeauFond: "linear-gradient(100deg,#062632,#0b5a54 50%,#1aa3b8)", saisonDoux: 'rgba(83,224,203,.15)', saisonMotif: "url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2796%27%20height%3D%2796%27%20viewBox%3D%270%200%2096%2096%27%3E%3Ctext%20x%3D%2712%27%20y%3D%2730%27%20font-size%3D%2722%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.22%27%3E%E2%98%80%3C%2Ftext%3E%3Ctext%20x%3D%2760%27%20y%3D%2758%27%20font-size%3D%2715%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%89%88%3C%2Ftext%3E%3Ctext%20x%3D%2726%27%20y%3D%2784%27%20font-size%3D%2717%27%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.16%27%3E%E2%9C%A6%3C%2Ftext%3E%3C%2Fsvg%3E')", saisonLueur: 'rgba(40,203,210,.18)',
     },
   },
 }
@@ -195,6 +200,9 @@ export function cssDesAmbiances() {
   for (const amb of CLES_AMBIANCE) {
     regles.push(`html[data-ambiance="${amb}"]{--hub-couverture:url('${AMBIANCES[amb].couverture}')}`)
   }
+  for (const amb of CLES_AMBIANCE) {
+    regles.push(`html[data-ambiance="${amb}"]{--hub-bandeau:url('/ambiances/bandeaux/${amb}.webp')}`)
+  }
   regles.push(`:root{--hub-couverture:url('${AMBIANCES.standard.couverture}')}`)
 
   // `color-scheme` fait suivre les éléments natifs — ascenseurs, cases à
@@ -229,6 +237,41 @@ export function cssDesAmbiances() {
     // `saisonMotif` — trois symboles décalés pour que la répétition ne se
     // voie pas. En Standard il vaut `none` : pas d'ambiance, pas de motif.
     `.hub-saison-volet{position:relative;background-image:var(${VAR('saisonMotif')});background-repeat:repeat;background-size:96px 96px}`,
+  )
+  // ── LE BANDEAU DE SAISON ET LE FOND DE PAGE ──────────────────────────
+  // Ludovic, 09/11, maquette à l'appui : une photo dit « Noël » en un
+  // dixième de seconde, un flocon dessiné demande qu'on le regarde. La
+  // saison reçoit donc une bande à elle sous l'en-tête, et le fond de page
+  // porte la même photo très assombrie.
+  //
+  // `--hub-couverture` existait déjà pour la page de garde : on la réutilise
+  // plutôt que d'ajouter douze fichiers. La bande montre le HAUT de l'image,
+  // parce que le logo DTX y est incrusté au centre — le cadrer serait le
+  // montrer deux fois.
+  // ⚠️ LE BANDEAU NE PEUT PAS RÉUTILISER LA COUVERTURE.
+  // Le logo DTX est incrusté AU CENTRE des images de garde : quel que soit le
+  // cadrage, une bande de 118 px en attrape un morceau — vérifié sur capture.
+  // Le bandeau attend donc sa propre photo dans /ambiances/bandeaux/<code>.webp.
+  //
+  // Deux couches : la photo d'abord, le dégradé de saison dessous. Une couche
+  // dont le fichier manque ne peint rien et laisse voir la suivante — le
+  // bandeau reste donc présentable avant même que les photos existent, au lieu
+  // d'afficher un carré vide.
+  regles.push(
+    `.hub-saison-bandeau{background-image:var(--hub-bandeau),var(${VAR('saisonBandeauFond')});` +
+      `background-size:cover,cover;background-position:center,center;background-repeat:no-repeat,no-repeat}`,
+    `html[data-ambiance="standard"] .hub-saison-bandeau{display:none}`,
+    // Un voile qui part du bas à gauche : le titre doit rester lisible quelle
+    // que soit la photo, et une photo claire sous du texte blanc ne pardonne
+    // pas. Le dégradé est opaque là où le texte se pose.
+    `.hub-saison-bandeau::after{content:"";position:absolute;inset:0;` +
+      `background:linear-gradient(100deg,rgba(8,20,36,.88) 0%,rgba(8,20,36,.62) 42%,rgba(8,20,36,.12) 78%,transparent 100%)}`,
+    // Le fond de page. 8 % d'opacité : on doit sentir la saison sans jamais
+    // gêner la lecture d'un tableau de chiffres.
+    `.hub-saison-zone::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;` +
+      `background-image:var(--hub-couverture);background-size:cover;background-position:center;opacity:.08}`,
+    `html[data-ambiance="standard"] .hub-saison-zone::before{display:none}`,
+    `.hub-saison-zone > *{position:relative;z-index:1}`,
   )
   regles.push('html[data-mode="sombre"]{color-scheme:dark}')
   regles.push('html[data-mode="clair"]{color-scheme:light}')
