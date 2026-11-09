@@ -3,6 +3,8 @@ import { supabase } from '../lib/supabase'
 import { COUL } from '../lib/theme'
 
 // Champs communs à dyn_clients / lode_clients / dtx_clients (mappables 1:1 sur les formulaires)
+// `date_naissance` n'existe que dans dyn_clients : on la demande à part pour
+// ne pas faire échouer la requête sur les tables qui ne l'ont pas.
 const COLS = 'type,denomination,nom,prenom,adresse,cp,ville,pays,tva,numero_bce,email,telephone,gsm,langue'
 
 // Recherche un client DÉJÀ encodé dans d'autres BD clients internes, pour éviter le multi-encodage.
@@ -23,7 +25,8 @@ export default function InternalClientSearch({ sources = [], onSelect, placehold
       const filter = `denomination.ilike.%${safe}%,nom.ilike.%${safe}%,numero_bce.ilike.%${safe}%`
       try {
         const all = await Promise.all(sources.map(async s => {
-          const { data } = await supabase.from(s.table).select(COLS).or(filter).limit(6)
+          const cols = s.cols ? `${COLS},${s.cols}` : COLS
+          const { data } = await supabase.from(s.table).select(cols).or(filter).limit(6)
           return (data || []).map(r => ({ ...r, _src: s.label, _color: s.color }))
         }))
         if (!cancelled) setResults(all.flat().slice(0, 12))
