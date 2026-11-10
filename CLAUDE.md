@@ -166,6 +166,70 @@ daté jusqu'à ~2 mois en avant est attendu. Ne pas poser de garde-fou
 « pas de date future » sans distinguer les deux types — il rejetterait des
 bordereaux parfaitement valides.
 
+### RCP et BQT ne disent pas la même chose, et les confondre fausse tout
+
+Règle métier donnée par Ludovic le 10/11/2026, mot pour mot : **« le RCP, c'est
+ce qu'on reçoit. Le BQT, il relève ce que le client doit payer à cette
+période-là. C'est ce que le client doit payer, ce n'est pas pour ça qu'il l'a
+payé. On ne touche une commission que lorsque le client a payé. »**
+
+| | Ce que c'est | Ce qu'on en fait |
+|---|---|---|
+| **RCP** relevé de compte producteur | **Ce que Dynassur reçoit.** Il prouve que le client a payé | **Seul document rapproché du virement.** La commission devient acquise ici |
+| **BQT** bordereau de quittancement à terme | **Ce que le client doit** pour la période. Une attente, pas un encaissement | Pose la prime et sa période sur le **contrat du client**. Jamais un paiement |
+
+La chaîne, dans cet ordre :
+
+1. le **BQT** dit la prime attendue par police et par période ;
+2. le **RCP** arrive après et prouve que le client a payé ;
+3. le solde du RCP se rapproche du **virement bancaire** ;
+4. les paiements constatés se consolident avec les BQT, et alimentent les
+   **primes et commissions du contrat**.
+
+⚠️ **Une commission lue sur un BQT n'est pas une commission acquise.** Compter
+les BQT comme du revenu gonflerait les chiffres de tout ce qui n'a jamais été
+encaissé. C'est l'erreur qui ne se voit pas, parce que le total a l'air juste.
+
+#### Ce qu'un RCP contient vraiment (lu le 10/11, VIVIUM 05-2026)
+
+En-tête compte producteur, puis un report de solde, des lignes par preneur et
+par police (TERME, COMPTANT, COMMISSION) en débit/crédit, et un pied :
+
+```
+TOTAUX HORS REPORT      11.739,67   12.250,51
+S O L D E   En notre faveur 0,00   En votre faveur 10.845,19
+Référence pour vos paiements   ***410/1065/61088***
+Cumul commissions du mois 11.592,12   annuelles 62.771,73
+```
+
+**« Notre » désigne la compagnie qui édite, « votre » le courtier.** Donc
+« en votre faveur » = Dynassur reçoit. Le solde est stocké **signé** dans
+`bordereaux.net` : positif = reçu, négatif = payé. C'est le seul endroit où un
+lecteur doit raisonner plutôt que recopier, et c'est donc le seul endroit où
+une erreur de sens est possible.
+
+#### La communication structurée est la clé de rapprochement, pas le montant
+
+Le relevé imprime une communication structurée, et **462 transactions
+bancaires en portent une**. Elle va dans `bordereaux.communication` et se
+rapproche de `transactions.information_paiement`.
+
+Un montant peut coïncider par hasard — deux compagnies qui versent la même
+somme le même mois, et le rapprochement se trompe **sans rien dire**. Une
+communication structurée porte son **modulo 97** : une faute de lecture d'un
+seul chiffre est détectée à la lecture. Le lecteur rejette toute communication
+dont le modulo ne tombe pas.
+
+#### Le compte producteur se solde en NET — un virement, pas un par document
+
+Mesuré le 10/11 : **59 virements sortants identifiables vers des compagnies en
+deux ans, face à 507 bordereaux BQT**. Ce n'est pas un trou de données. Le
+compte producteur est un compte courant : primes dues d'un côté, commissions de
+l'autre, et **un seul règlement par compagnie et par période**.
+
+Donc : ne jamais chercher un paiement par bordereau. Chercher le règlement du
+**solde** du RCP.
+
 ### Attribution de la production : la base fait foi, pas le bordereau
 
 Les lignes de bordereau portent un code sous-agent ou commercial (ex. `BLA` chez AG), **qui ne
