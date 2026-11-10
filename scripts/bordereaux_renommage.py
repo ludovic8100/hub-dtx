@@ -396,7 +396,20 @@ def a_traiter(jeton: str, sid: str):
     while a_visiter:
         chemin = a_visiter.pop()
         try:
-            for e in enfants(jeton, sid, chemin):
+            # LA LISTE EST MATÉRIALISÉE AVANT D'ÊTRE PARCOURUE, et ce `list()`
+            # n'est pas un détail de style.
+            #
+            # Graph rend un dossier par pages de 200, suivies par jeton. Ce
+            # jeton désigne une POSITION, pas un élément : si on sort des
+            # fichiers du dossier pendant qu'on le pagine, tout ce qui suit se
+            # décale et la page suivante saute autant d'entrées qu'on en a
+            # retirées. Mesuré le 10/11 : 31 des 674 fichiers de la racine
+            # n'ont jamais été vus, sans la moindre erreur — une page tournée
+            # dans le vide ne lève rien.
+            #
+            # `bordereaux_sharepoint.py` fait déjà `list(enfants(...))`, mais
+            # lui ne déplace rien ; ici l'omission se paie.
+            for e in list(enfants(jeton, sid, chemin)):
                 if e.get("folder"):
                     a_visiter.append(f"{chemin}/{e['name']}")
                     continue
