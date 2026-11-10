@@ -927,13 +927,28 @@ const normAdr = (...parts) => parts.map(x => x==null?'':String(x)).join(' ')
 
 // ── Modal détail contrat (garanties, objets couverts, primes/mensualités, sinistres) ──
 function ContratModal({ contrat, dossier, objets, onClose, preview, cies }) {
+  // LA PART SOUS-AGENT N'EST PAS POUR TOUT LE MONDE. C'est ce qu'on reverse,
+  // donc ce qui reste à Dynassur une fois déduite — une information de patron,
+  // pas une information de gestionnaire.
+  const { isAdmin:isAdminFiche }=useAuth()
   const [quit,setQuit]=useState([]); const [ld,setLd]=useState(true)
   useEffect(()=>{
     setLd(true)
-    supabase.from('quittances').select('prime_totale,periodicite,date_comptable,type_quittance,commission,compagnie,compte_producteur,gestionnaire,etat')
+    supabase.from('quittances')
+      .select('id,prime_totale,periodicite,date_comptable,type_quittance,commission,commission_sa,compagnie,compte_producteur,gestionnaire,sous_agent,etat,bordereau_id,bordereaux(id,nom_fichier,url_sharepoint,type,mois,annee)')
       .eq('dossier',dossier).eq('police',contrat.police).order('date_comptable',{ascending:false})
       .then(({data})=>{ setQuit(data||[]); setLd(false) })
   },[dossier,contrat.police])
+
+  // FILTRE PAR ANNÉE. Un contrat de cinq ans affiche soixante lignes
+  // mensuelles : sans filtre, le tableau devient une archive qu'on ne lit
+  // plus. L'année en cours par défaut, « toutes » à un clic.
+  const [anneeQ,setAnneeQ]=useState('toutes')
+  const anneesQ = [...new Set(quit.map(q=>String(q.date_comptable||'').slice(0,4)).filter(Boolean))].sort().reverse()
+  const quitVues = anneeQ==='toutes' ? quit : quit.filter(q=>String(q.date_comptable||'').startsWith(anneeQ))
+  const totPrimes = quitVues.reduce((s,q)=>s+(Number(q.prime_totale)||0),0)
+  const totComm   = quitVues.reduce((s,q)=>s+(Number(q.commission)||0),0)
+  const totCommSA = quitVues.reduce((s,q)=>s+(Number(q.commission_sa)||0),0)
 
   const obj=objets.filter(o=>o.police===contrat.police)
   const parObjet={}
@@ -1029,18 +1044,70 @@ function ContratModal({ contrat, dossier, objets, onClose, preview, cies }) {
                     <div style={{fontSize:15,fontWeight:800,color:'#1d4ed8'}}>{derniere.periodicite}</div>
                   </div>}
                 </div>}
-                <div style={{maxHeight:180,overflowY:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
+                <div style={{display:'flex',gap:7,flexWrap:'wrap',alignItems:'center',marginBottom:8}}>
+                  {['toutes',...anneesQ].map(a=>(
+                    <button key={a} onClick={()=>setAnneeQ(a)} style={{padding:'4px 11px',borderRadius:14,cursor:'pointer',
+                      fontFamily:'inherit',fontSize:12,fontWeight:700,
+                      border:anneeQ===a?'none':'1px solid #e2e8f0',
+                      background:anneeQ===a?NAVY:COUL.surface, color:anneeQ===a?COUL.blanc:COUL.texteDoux}}>
+                      {a==='toutes'?'Toutes':a}
+                    </button>
+                  ))}
+                  <span style={{marginLeft:'auto',fontSize:11.5,color:COUL.texteFaible}}>{quitVues.length} quittance(s)</span>
+                </div>
+
+                {/* LES TROIS TOTAUX, et ils ne disent pas la même chose :
+                    la prime est ce que le client paie, la commission ce que la
+                    compagnie nous verse, la part sous-agent ce qu'on reverse.
+                    Confondre les deux dernières fait croire qu'on gagne la
+                    somme entière. La part SA n'est montrée qu'à l'administrateur. */}
+                <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:9}}>
+                  {[['Primes',totPrimes,NAVY],
+                    ['Commission compagnie',totComm,COUL.succes],
+                    ...(isAdminFiche&&totCommSA>0?[['Dont part sous-agent',totCommSA,COUL.alerte]]:[])
+                   ].map(([l,v,c])=>(
+                    <div key={l} style={{background:COUL.fondDoux,border:'1px solid #e2e8f0',borderRadius:8,padding:'7px 12px'}}>
+                      <div style={{fontSize:10,fontWeight:700,color:COUL.texteFaible,textTransform:'uppercase'}}>{l}</div>
+                      <div style={{fontSize:15,fontWeight:800,color:c}}>{fmt(v)}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{maxHeight:220,overflowY:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
                   <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
-                    <thead style={{position:'sticky',top:0,background:COUL.fond}}><tr>{['Période','Prime','Périodicité','Type'].map(h=><th key={h} style={{padding:'6px 12px',textAlign:'left',fontWeight:700,color:COUL.texteFaible,fontSize:10,textTransform:'uppercase',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
+                    <thead style={{position:'sticky',top:0,background:COUL.fond}}><tr>{['Période','Prime','Commission','Type','État','Bordereau'].map(h=><th key={h} style={{padding:'6px 12px',textAlign:'left',fontWeight:700,color:COUL.texteFaible,fontSize:10,textTransform:'uppercase',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
                     <tbody>
-                      {quit.map((r,i)=>(
-                        <tr key={i} style={{background:i%2===0?'#fff':COUL.fondAlterne}}>
+                      {quitVues.map((r,i)=>{
+                        const impaye = (r.etat||'').toLowerCase()==='impayée'
+                        return (
+                        <tr key={r.id||i} style={{background:i%2===0?'#fff':COUL.fondAlterne}}>
                           <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',color:COUL.texteDoux,whiteSpace:'nowrap'}}>{fmtMois(r.date_comptable)}</td>
                           <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',fontWeight:600,color:NAVY}}>{fmt(r.prime_totale)}</td>
-                          <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',color:COUL.texteDoux}}>{r.periodicite||'—'}</td>
+                          <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',color:COUL.succes,fontWeight:600}}>
+                            {fmt(r.commission)}
+                            {isAdminFiche&&Number(r.commission_sa)>0&&
+                              <div style={{fontSize:10.5,color:COUL.alerte,fontWeight:600}}>SA {fmt(r.commission_sa)}</div>}
+                          </td>
                           <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',color:COUL.texteDoux}}>{r.type_quittance||'—'}</td>
+                          <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9'}}>
+                            <span style={{fontSize:10.5,fontWeight:700,padding:'1px 7px',borderRadius:9,
+                              background:impaye?COUL.dangerFond:COUL.succesFondDoux,
+                              color:impaye?COUL.danger:COUL.succes}}>{r.etat||'—'}</span>
+                          </td>
+                          <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9'}}>
+                            {r.bordereaux
+                              ? <a href={r.bordereaux.url_sharepoint||'#'} target="_blank" rel="noreferrer"
+                                  onClick={e=>{ if(!r.bordereaux.url_sharepoint) e.preventDefault() }}
+                                  title={r.bordereaux.nom_fichier}
+                                  style={{color:'#1d4ed8',fontWeight:700,textDecoration:'none',whiteSpace:'nowrap'}}>
+                                  <i className="ti ti-file-description"/> {r.bordereaux.type} {r.bordereaux.mois}/{r.bordereaux.annee}
+                                </a>
+                              : <span title="Aucun bordereau rattaché" style={{color:COUL.alerte,fontWeight:700,whiteSpace:'nowrap'}}>
+                                  <i className="ti ti-file-alert"/> aucun
+                                </span>}
+                          </td>
                         </tr>
-                      ))}
+                      )})}
                     </tbody>
                   </table>
                 </div>
