@@ -26,14 +26,21 @@ que les totaux ne tombent pas juste.
 
 CE QU'IL EXTRAIT, et où ça va :
 
-  report de solde            → paiement_precedent
-  totaux hors report, débit  → total_debit     (primes dues à la compagnie)
-  totaux hors report, crédit → total_credit    (commissions et encaissements)
-  solde final SIGNÉ          → net   (+ = reçu par Dynassur, − = payé)
-  cumul commissions          → commission
-  communication structurée   → communication   ← la clé de rapprochement
-  date du document           → date_cloture
-  nombre de lignes           → nb_polices
+  Sur un RELEVÉ (RCP) :
+    report de solde            → paiement_precedent
+    totaux hors report, débit  → total_debit   ET montant
+    totaux hors report, crédit → total_credit
+    solde final SIGNÉ          → net   (+ = reçu par Dynassur, − = payé)
+
+  Sur un BORDEREAU (BQT) :
+    total des primes           → montant
+    (ni report, ni solde : un bordereau ne règle rien)
+
+  Dans les deux cas :
+    cumul commissions          → commission
+    communication structurée   → communication
+    date du document           → date_cloture
+    nombre de lignes           → nb_polices
 
 LA COMMUNICATION STRUCTURÉE EST LE VRAI GAIN. Un montant peut coïncider par
 hasard — deux compagnies qui versent 1 240,00 € le même mois, et le
@@ -100,116 +107,144 @@ TYPE = os.environ.get("TYPE", "").strip().upper()
 TAILLE_MAX = int(os.environ.get("TAILLE_MAX", str(20 * 1024 * 1024)))
 
 
-SCHEMA = {
+# ══════════════════════════════════════════════════════════════════════════
+# DEUX GENRES DE DOCUMENT, DEUX EXTRACTIONS. Ne pas les mélanger.
+#
+# C'est l'erreur du 10/11, et elle est instructive : j'avais écrit UNE consigne
+# pour les deux, avec le repère « une commission vaut 5 à 25 % des primes ».
+# C'est vrai sur un bordereau de quittancement. C'est FAUX sur un relevé de
+# compte : sur le relevé VIVIUM 05-2026, les totaux hors report valent 11 739,67
+# au débit et le cumul des commissions 11 592,12 — soit 98,7 %. Le débit d'un
+# relevé n'est pas « les primes », ce sont les mouvements du mois.
+#
+# Résultat mesuré : les RCP sont passés de lisibles à 4 lus sur 12, instables
+# d'un passage à l'autre, et mon garde-fou de taux criait au loup sur des
+# documents parfaitement normaux. Un repère juste appliqué hors de son domaine
+# fait plus de dégâts qu'une absence de repère.
+# ══════════════════════════════════════════════════════════════════════════
+
+_COMMUN = {
+    "periode": {"type": ["string", "null"],
+                "description": "Période du document au format AAAA-MM, ex. 2026-05"},
+    "date_document": {"type": ["string", "null"], "description": "Date d'édition, AAAA-MM-JJ"},
+    "compte_producteur": {"type": ["string", "null"],
+                          "description": "Numéro de compte producteur / d'agent du courtier"},
+    "commissions_periode": {"type": ["number", "null"],
+                            "description": "Cumul des commissions de la PÉRIODE (du mois), tel "
+                                           "qu'imprimé. Pas le cumul annuel."},
+    "communication_structuree": {
+        "type": ["string", "null"],
+        "description": "Communication structurée de paiement, forme 000/0000/00000, souvent "
+                       "entre +++ ou ***. Beaucoup de compagnies n'en impriment aucune : "
+                       "null dans ce cas, ne la déduis jamais d'un autre numéro.",
+    },
+    "nb_lignes": {"type": ["integer", "null"],
+                  "description": "Nombre de lignes de détail"},
+    "lisible": {"type": "boolean",
+                "description": "false si le document est illisible ou n'est pas un bordereau"},
+}
+
+SCHEMA_RCP = {
     "type": "object",
     "properties": {
-        # ⚠️ PAS `{"type": ["string","null"], "enum": [...]}` : l'API refuse
-        # (« Enum value 'RCP' does not match declared type »), le script bascule
-        # alors sur la consigne libre — et le modèle répond « Bordereau Quittance
-        # à terme » au lieu de « BQT ». Mesuré le 10/11 : les cinq écarts
-        # « type lu ≠ nom du fichier » du premier essai venaient de là, pas des
-        # documents. `anyOf` exprime la même chose et passe.
+        **_COMMUN,
         "type_document": {
             "anyOf": [{"type": "string", "enum": ["RCP", "BQT"]}, {"type": "null"}],
-            "description": "RCP = relevé de compte producteur (ce que le courtier reçoit). "
-                           "BQT = bordereau de quittancement à terme (ce que les clients doivent).",
+            "description": "RCP si c'est bien un relevé de compte ; BQT si le document est en "
+                           "réalité un bordereau de quittancement malgré ce qu'on t'a annoncé.",
         },
-        "periode": {"type": ["string", "null"],
-                    "description": "Période du document au format AAAA-MM, ex. 2026-05"},
-        "date_document": {"type": ["string", "null"], "description": "Date d'édition, AAAA-MM-JJ"},
-        "compte_producteur": {"type": ["string", "null"],
-                              "description": "Numéro de compte producteur du courtier, ex. 065610"},
         "report_solde": {"type": ["number", "null"],
-                         "description": "Report de solde de la période précédente, en euros"},
-        "total_primes": {
-            "type": ["number", "null"],
-            "description": "TOTAL DES PRIMES de la période, c'est-à-dire ce que les clients "
-                           "doivent payer. Sur un bordereau de quittancement, c'est le total "
-                           "de la colonne des primes (libellés vus : « Prime Totale », "
-                           "« TOTAL »). Sur un relevé de compte, c'est la colonne DÉBIT de la "
-                           "ligne de totaux. C'est le PLUS GRAND des totaux du document : la "
-                           "commission en est une fraction. null si le document n'en présente "
-                           "aucun.",
-        },
+                         "description": "Report du solde de la période précédente. Libellés vus : "
+                                        "« Report solde », « REPORT DU MOIS PRECEDENT »."},
         "total_debit": {"type": ["number", "null"],
-                        "description": "Ligne de totaux, colonne DÉBIT, si le document en a une. "
-                                       "⚠️ Cette ligne n'est PAS toujours étiquetée : chez "
-                                       "certaines compagnies ce sont deux montants nus, placés "
-                                       "juste avant le bloc du solde."},
+                        "description": "Ligne de totaux, colonne DÉBIT, HORS report. "
+                                       "⚠️ Cette ligne n'est pas toujours étiquetée : chez "
+                                       "certaines compagnies ce sont deux montants nus juste "
+                                       "avant le bloc du solde."},
         "total_credit": {"type": ["number", "null"],
-                         "description": "Ligne de totaux, colonne CRÉDIT, même remarque."},
+                         "description": "Ligne de totaux, colonne CRÉDIT, hors report."},
         "solde_net": {
             "type": ["number", "null"],
-            "description": "Solde final, SIGNÉ du point de vue du COURTIER : positif si le solde "
-                           "est en faveur du COURTIER (la compagnie lui verse), négatif s'il "
-                           "est en faveur de la COMPAGNIE (le courtier doit payer). "
-                           "LES LIBELLÉS CHANGENT D'UNE COMPAGNIE À L'AUTRE, et même d'un "
-                           "document à l'autre chez la même : « En notre faveur / En votre "
-                           "faveur » (où « notre » = la compagnie qui édite), « en faveur de la "
-                           "compagnie / du producteur », « En faveur de la Cie / En votre "
-                           "faveur ». Ne te fie pas au mot : raisonne sur QUI doit payer QUI. "
-                           "null si le document ne présente AUCUN solde — c'est le cas d'un "
-                           "bordereau de quittancement, qui liste des primes dues et ne règle "
-                           "rien.",
+            "description": "Solde final du relevé, SIGNÉ du point de vue du COURTIER : positif "
+                           "si la compagnie verse au courtier, négatif si le courtier doit "
+                           "payer la compagnie. Les libellés changent d'une compagnie à "
+                           "l'autre : « En notre faveur / En votre faveur » (où « notre » est "
+                           "la compagnie qui édite), « en faveur de la compagnie / du "
+                           "producteur », « En faveur de la Cie / En votre faveur ». Ne te fie "
+                           "pas au mot : raisonne sur QUI doit payer QUI.",
         },
-        "commissions_periode": {
-            "type": ["number", "null"],
-            "description": "Cumul des commissions de la période, c'est-à-dire la RÉMUNÉRATION "
-                           "DU COURTIER. Elle est toujours NETTEMENT INFÉRIEURE au total des "
-                           "primes — de l'ordre de 5 à 25 %. Si le nombre que tu t'apprêtes à "
-                           "donner ici est proche du total des primes, tu as confondu deux "
-                           "colonnes : reprends.",
-        },
-        "communication_structuree": {
-            "type": ["string", "null"],
-            "description": "Communication structurée de paiement, chiffres et barres obliques "
-                           "uniquement, ex. 410/1065/61088. null si absente.",
-        },
-        "nb_lignes": {"type": ["integer", "null"],
-                      "description": "Nombre de lignes de détail (polices / opérations)"},
-        "lisible": {"type": "boolean",
-                    "description": "false si le document est illisible ou n'est pas un bordereau"},
     },
     "required": ["type_document", "periode", "date_document", "compte_producteur",
-                 "report_solde", "total_primes", "total_debit", "total_credit", "solde_net",
+                 "report_solde", "total_debit", "total_credit", "solde_net",
                  "commissions_periode", "communication_structuree", "nb_lignes", "lisible"],
     "additionalProperties": False,
 }
 
-CONSIGNE = """Ce PDF est un document de compte d'un courtier d'assurance belge.
+SCHEMA_BQT = {
+    "type": "object",
+    "properties": {
+        **_COMMUN,
+        "type_document": {
+            "anyOf": [{"type": "string", "enum": ["RCP", "BQT"]}, {"type": "null"}],
+            "description": "BQT si c'est bien un bordereau de quittancement ; RCP si le "
+                           "document est en réalité un relevé de compte malgré ce qu'on t'a "
+                           "annoncé.",
+        },
+        "total_primes": {
+            "type": ["number", "null"],
+            "description": "TOTAL DES PRIMES de la période : ce que les clients doivent payer, "
+                           "taxes comprises. Libellés vus : « Prime Totale », « TOTAL ». "
+                           "La commission en est une fraction, de l'ordre de 5 à 25 % : si le "
+                           "nombre que tu donnes ici est proche de la commission, tu as "
+                           "confondu deux colonnes.",
+        },
+    },
+    "required": ["type_document", "periode", "date_document", "compte_producteur",
+                 "total_primes", "commissions_periode", "communication_structuree",
+                 "nb_lignes", "lisible"],
+    "additionalProperties": False,
+}
 
-Il est d'un de ces deux genres, et c'est la première chose à déterminer :
-
-  RCP — un RELEVÉ DE COMPTE : la compagnie récapitule le mois écoulé et solde le
-        compte du courtier. Il porte un report de solde, des écritures en débit
-        et crédit, et un solde final.
-  BQT — un BORDEREAU DE QUITTANCEMENT : la liste de ce que les clients DOIVENT
-        payer pour la période à venir. Vu aussi sous les titres « bordereau de
-        commissions » ou « état récapitulatif des invitations à payer ». Il ne
-        règle rien et n'a donc normalement pas de solde.
+_PREAMBULE = """Ce PDF est un document de compte d'un courtier d'assurance belge.
 
 Relève UNIQUEMENT les totaux et l'en-tête. N'additionne rien toi-même : reprends
 les nombres tels qu'ils sont IMPRIMÉS.
 
 ⚠️ LES LIBELLÉS VARIENT D'UNE COMPAGNIE À L'AUTRE, et parfois d'un document à
 l'autre chez la même compagnie. Certains documents posent leur ligne de totaux
-SANS AUCUN LIBELLÉ — deux montants nus avant le bloc du solde. Ne cherche donc
-pas un mot précis : cherche ce que chaque nombre SIGNIFIE à sa place dans le
-document.
+SANS AUCUN LIBELLÉ — deux montants nus. Ne cherche donc pas un mot précis :
+cherche ce que chaque nombre SIGNIFIE à sa place dans le document.
 
-Attention au signe du solde, c'est le seul endroit où tu dois raisonner plutôt
-que recopier. Un relevé est écrit du point de vue de la compagnie qui l'édite :
-ce qui est « en sa faveur » est à payer PAR le courtier (donc négatif), ce qui
-est en faveur « du producteur », « de l'agent » ou « vôtre » est versé AU
-courtier (donc positif).
-
-Beaucoup de documents sont des images scannées sans texte : lis-les comme une
-image, le résultat attendu est le même.
+Beaucoup de documents sont des images scannées sans couche de texte : lis-les
+comme une image, le résultat attendu est le même.
 
 Les montants belges s'écrivent « 10.845,19 » : point pour les milliers, virgule
 pour les décimales. Rends 10845.19.
 
-Si une valeur n'est pas imprimée, mets null. N'invente jamais un nombre."""
+Si une valeur n'est pas imprimée, mets null — JAMAIS zéro. Un zéro se lit comme
+une mesure ; il n'est juste que s'il est réellement imprimé. N'invente aucun
+nombre."""
+
+CONSIGNE_RCP = _PREAMBULE + """
+
+Ce document devrait être un RELEVÉ DE COMPTE PRODUCTEUR : la compagnie
+récapitule le mois écoulé et solde le compte du courtier. Il porte un report de
+solde, des écritures en débit et crédit, et un solde final.
+
+⚠️ Sur ce genre de document, le total au débit n'est PAS « le total des
+primes » : ce sont les mouvements du mois. Il peut être très proche du cumul des
+commissions, et c'est normal — ne corrige rien pour les écarter l'un de l'autre.
+
+Le signe du solde est le seul endroit où tu dois raisonner plutôt que recopier."""
+
+CONSIGNE_BQT = _PREAMBULE + """
+
+Ce document devrait être un BORDEREAU DE QUITTANCEMENT : la liste de ce que les
+clients DOIVENT payer pour la période. Vu aussi sous les titres « bordereau de
+commissions » ou « état récapitulatif des invitations à payer ».
+
+Il ne règle rien : il n'a donc normalement ni report de solde, ni solde final.
+Ce qu'on en attend, c'est le total des primes et le total des commissions."""
 
 _schema_accepte = True
 
@@ -292,8 +327,16 @@ def a_lire() -> list[dict]:
 
 # ── Lecture ───────────────────────────────────────────────────────────────
 
-def lire_bordereau(client, pdf: bytes) -> dict | None:
+def lire_bordereau(client, pdf: bytes, genre: str) -> dict | None:
+    """`genre` vient du NOM du fichier, qui suit la convention et dit RCP ou BQT.
+    Le modèle peut contredire cette annonce — c'est même utile, c'est comme ça
+    qu'on a trouvé un BQT qui contenait un relevé — mais la consigne part de ce
+    que le document est censé être."""
     global _schema_accepte
+
+    schema = SCHEMA_BQT if genre == "BQT" else SCHEMA_RCP
+    base = CONSIGNE_BQT if genre == "BQT" else CONSIGNE_RCP
+    cles = ", ".join(schema["required"])
 
     document = {"type": "document", "source": {
         "type": "base64", "media_type": "application/pdf",
@@ -301,11 +344,9 @@ def lire_bordereau(client, pdf: bytes) -> dict | None:
     }}
 
     def appeler(avec_schema: bool):
-        consigne = CONSIGNE if avec_schema else (
-            CONSIGNE + "\n\nRéponds uniquement par un objet JSON, sans texte autour, avec les"
-            " clés : type_document, periode, date_document, compte_producteur, report_solde,"
-            " total_primes, total_debit, total_credit, solde_net, commissions_periode,"
-            " communication_structuree, nb_lignes, lisible."
+        consigne = base if avec_schema else (
+            base + "\n\nRéponds uniquement par un objet JSON, sans texte autour, avec les"
+            f" clés : {cles}."
         )
         # EFFORT « medium », PAS « low ». Mesuré le 10/11 : à « low », le même
         # bordereau BALOISE lu deux fois donnait 40 742,74 de primes la
@@ -314,7 +355,7 @@ def lire_bordereau(client, pdf: bytes) -> dict | None:
         # fois la même chose, sinon aucune des deux lectures ne vaut rien.
         options = {"effort": "medium"}
         if avec_schema:
-            options["format"] = {"type": "json_schema", "schema": SCHEMA}
+            options["format"] = {"type": "json_schema", "schema": schema}
         return client.messages.create(
             model=MODELE, max_tokens=1024, output_config=options,
             messages=[{"role": "user", "content": [document, {"type": "text", "text": consigne}]}],
@@ -448,13 +489,20 @@ def coherence(lu: dict, ligne: dict) -> list[str]:
     if ligne.get("type") == "RCP" and isinstance(net, (int, float)) and net < 0:
         ecarts.append(f"RCP au solde négatif ({net:.2f}) — un relevé est normalement reçu")
 
-    # LE TAUX DE COMMISSION EST LE MEILLEUR DÉTECTEUR DE COLONNE DÉCALÉE.
+    # LE TAUX DE COMMISSION DÉTECTE UNE COLONNE DÉCALÉE — SUR UN BQT SEULEMENT.
     #
-    # En courtage, une commission va de quelques pour cent à un quart des
-    # primes. Au-delà de 40 %, ce n'est pas une commission élevée : c'est deux
-    # colonnes confondues. C'est exactement ce qui s'est produit le 10/11 sur
-    # un bordereau BALOISE — 89 % — et rien ne l'aurait signalé.
-    primes = lu.get("total_primes") or lu.get("total_debit")
+    # Sur un bordereau de quittancement, la commission est une fraction des
+    # primes ; au-delà de 40 %, ce sont deux colonnes confondues (vu le 10/11
+    # sur un bordereau BALOISE : 89 %).
+    #
+    # ⚠️ Sur un RELEVÉ, ce contrôle est FAUX et crie au loup : le total au
+    # débit n'est pas « les primes » mais les mouvements du mois, et il peut
+    # être quasi égal au cumul des commissions. Sur le relevé VIVIUM 05-2026 :
+    # 11 592,12 de commissions pour 11 739,67 au débit, soit 98,7 % — et le
+    # document est parfaitement normal.
+    if (ligne.get("type") or "").upper() != "BQT":
+        return ecarts
+    primes = lu.get("total_primes")
     comm = lu.get("commissions_periode")
     if isinstance(primes, (int, float)) and isinstance(comm, (int, float)) and primes > 0:
         taux = comm / primes
@@ -500,7 +548,7 @@ def main() -> int:
                   flush=True)
             continue
 
-        lu = lire_bordereau(client, pdf)
+        lu = lire_bordereau(client, pdf, (ligne.get("type") or "").upper())
         if not lu:
             illisibles += 1
             continue
