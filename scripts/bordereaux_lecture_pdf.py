@@ -118,7 +118,9 @@ SCHEMA = {
                            "doivent payer. Sur un bordereau de quittancement, c'est le total "
                            "de la colonne des primes (libellés vus : « Prime Totale », "
                            "« TOTAL »). Sur un relevé de compte, c'est la colonne DÉBIT de la "
-                           "ligne de totaux. null si le document n'en présente aucun.",
+                           "ligne de totaux. C'est le PLUS GRAND des totaux du document : la "
+                           "commission en est une fraction. null si le document n'en présente "
+                           "aucun.",
         },
         "total_debit": {"type": ["number", "null"],
                         "description": "Ligne de totaux, colonne DÉBIT, si le document en a une. "
@@ -141,8 +143,14 @@ SCHEMA = {
                            "bordereau de quittancement, qui liste des primes dues et ne règle "
                            "rien.",
         },
-        "commissions_periode": {"type": ["number", "null"],
-                                "description": "Cumul des commissions de la période (du mois)"},
+        "commissions_periode": {
+            "type": ["number", "null"],
+            "description": "Cumul des commissions de la période, c'est-à-dire la RÉMUNÉRATION "
+                           "DU COURTIER. Elle est toujours NETTEMENT INFÉRIEURE au total des "
+                           "primes — de l'ordre de 5 à 25 %. Si le nombre que tu t'apprêtes à "
+                           "donner ici est proche du total des primes, tu as confondu deux "
+                           "colonnes : reprends.",
+        },
         "communication_structuree": {
             "type": ["string", "null"],
             "description": "Communication structurée de paiement, chiffres et barres obliques "
@@ -288,7 +296,12 @@ def lire_bordereau(client, pdf: bytes) -> dict | None:
             " total_primes, total_debit, total_credit, solde_net, commissions_periode,"
             " communication_structuree, nb_lignes, lisible."
         )
-        options = {"effort": "low"}
+        # EFFORT « medium », PAS « low ». Mesuré le 10/11 : à « low », le même
+        # bordereau BALOISE lu deux fois donnait 40 742,74 de primes la
+        # première fois et 7 314,95 la seconde — la valeur de la commission,
+        # décalée d'une colonne. Un document lu deux fois doit donner deux
+        # fois la même chose, sinon aucune des deux lectures ne vaut rien.
+        options = {"effort": "medium"}
         if avec_schema:
             options["format"] = {"type": "json_schema", "schema": SCHEMA}
         return client.messages.create(
@@ -423,6 +436,20 @@ def coherence(lu: dict, ligne: dict) -> list[str]:
     net = lu.get("solde_net")
     if ligne.get("type") == "RCP" and isinstance(net, (int, float)) and net < 0:
         ecarts.append(f"RCP au solde négatif ({net:.2f}) — un relevé est normalement reçu")
+
+    # LE TAUX DE COMMISSION EST LE MEILLEUR DÉTECTEUR DE COLONNE DÉCALÉE.
+    #
+    # En courtage, une commission va de quelques pour cent à un quart des
+    # primes. Au-delà de 40 %, ce n'est pas une commission élevée : c'est deux
+    # colonnes confondues. C'est exactement ce qui s'est produit le 10/11 sur
+    # un bordereau BALOISE — 89 % — et rien ne l'aurait signalé.
+    primes = lu.get("total_primes") or lu.get("total_debit")
+    comm = lu.get("commissions_periode")
+    if isinstance(primes, (int, float)) and isinstance(comm, (int, float)) and primes > 0:
+        taux = comm / primes
+        if taux > 0.40:
+            ecarts.append(f"taux de commission invraisemblable : {comm:.2f} sur {primes:.2f} "
+                          f"= {taux:.0%} — colonnes probablement confondues")
     return ecarts
 
 
