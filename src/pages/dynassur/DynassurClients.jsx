@@ -1488,6 +1488,13 @@ export default function DynassurClients() {
   const [kpis,setKpis]       = useState(null)
   const [counts,setCounts]   = useState({mine:0,bureau:0,total:0})
   const [scope,setScope]     = useState('all')
+  // VOIR TOUS LES CLIENTS, sans avoir à taper quelque chose.
+  // La vue par défaut est « derniers clients consultés » : dans une base
+  // neuve, ou pour quelqu'un qui n'a encore ouvert aucune fiche, elle est
+  // VIDE — et il n'existait aucun moyen d'atteindre la liste complète
+  // autrement qu'en devinant un nom. Un écran qui n'offre aucune porte
+  // d'entrée à qui arrive pour la première fois est un écran cassé.
+  const [toutVoir,setToutVoir] = useState(false)
   const [q,setQ]             = useState('')
   const [clients,setClients] = useState([])
   const [total,setTotal]     = useState(0)
@@ -1693,7 +1700,7 @@ export default function DynassurClients() {
   if(relanceActif) relanceView = relanceView.filter(c=>c.tranche===contactFilter)
   if(q.length>=2){ const s=q.toLowerCase(); relanceView = relanceView.filter(c=>`${c.nom} ${c.prenom} ${c.dossier}`.toLowerCase().includes(s)) }
   const relanceShow = trierLignes(relanceView,COLS_RELANCE,triRelance,parNom).slice(0,500)
-  const modeRecents = q.length<2 && contactFilter==='tous'   // vue par défaut = derniers clients consultés du bureau
+  const modeRecents = !toutVoir && q.length<2 && contactFilter==='tous'   // vue par défaut = derniers clients consultés du bureau
 
   return(
     <Layout currentPage="Clients">
@@ -1722,8 +1729,8 @@ export default function DynassurClients() {
               <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',padding:'12px 16px',borderBottom:'1px solid #f1f5f9'}}>
                 <div style={{display:'flex',alignItems:'center',gap:8}}>
                   <i className={modeRecents?"ti ti-history":"ti ti-calendar-heart"} style={{fontSize:18,color:COUL.teal}}/>
-                  <span style={{fontSize:15,fontWeight:800,color:NAVY}}>{modeRecents?'Derniers clients consultés':'Relance clients'}</span>
-                  <span style={{fontSize:12,color:COUL.texteFaible}}>{modeRecents?'· vos dernières fiches et celles de votre bureau':'· trie les clients par ancienneté du dernier contact'}</span>
+                  <span style={{fontSize:15,fontWeight:800,color:NAVY}}>{modeRecents?'Derniers clients consultés':toutVoir?'Tous les clients':'Relance clients'}</span>
+                  <span style={{fontSize:12,color:COUL.texteFaible}}>{modeRecents?'· vos dernières fiches et celles de votre bureau':toutVoir?'· la liste complète, triable et filtrable':'· trie les clients par ancienneté du dernier contact'}</span>
                 </div>
                 <div style={{display:'flex',gap:8,marginLeft:'auto',flexWrap:'wrap'}}>
                   <select value={scope} onChange={e=>setScope(e.target.value)} style={{padding:'7px 10px',borderRadius:8,border:'1px solid #e2e8f0',fontSize:13,fontFamily:'inherit',color:NAVY,background:COUL.surface}}>
@@ -1739,6 +1746,13 @@ export default function DynassurClients() {
                     <i className="ti ti-filter" style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:COUL.texteFaible,fontSize:14}}/>
                     <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Filtrer…" style={{padding:'7px 10px 7px 30px',borderRadius:8,border:`1px solid ${q?'#0d9488':COUL.bord}`,fontSize:13,fontFamily:'inherit',outline:'none',width:150,boxSizing:'border-box'}}/>
                   </div>
+                  <button onClick={()=>setToutVoir(v=>!v)}
+                    title={toutVoir?'Revenir aux derniers clients consultés':'Afficher la liste complète des clients'}
+                    style={{padding:'7px 12px',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',
+                      border:`1px solid ${toutVoir?'#0d9488':COUL.bord}`,
+                      background:toutVoir?'#0d9488':COUL.surface, color:toutVoir?COUL.blanc:NAVY}}>
+                    <i className="ti ti-list" style={{marginRight:5}}/>{toutVoir?'Liste complète':'Voir tous'}
+                  </button>
                 </div>
               </div>
 
@@ -1746,6 +1760,17 @@ export default function DynassurClients() {
                 <div style={{padding:'6px 0 4px'}}>
                   <RecentsBlock title="Vos derniers clients consultés" icon="ti-user" rows={recentsPerso} onOpen={openDossier} showWho={false} empty="Vous n'avez pas encore consulté de fiche — ouvrez un client via la recherche."/>
                   <RecentsBlock title={`Votre bureau${myBureauLib?` — ${myBureauLib}`:''}`} icon="ti-building" rows={recentsBureau} onOpen={openDossier} showWho={true} empty="Aucune fiche consultée récemment par vos collègues."/>
+                  {!recentsPerso.length && !recentsBureau.length && (
+                    <div style={{padding:'14px 18px 18px',textAlign:'center'}}>
+                      <p style={{margin:'0 0 10px',fontSize:13.5,color:COUL.texteFaible}}>
+                        Aucun historique de consultation — c'est normal sur un compte neuf.
+                      </p>
+                      <button onClick={()=>setToutVoir(true)} style={{padding:'9px 18px',borderRadius:9,border:'none',
+                        background:'#0d9488',color:COUL.blanc,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+                        Voir tous les clients
+                      </button>
+                    </div>
+                  )}
                 </div>
               ):relance===null?(
                 <p style={{padding:30,textAlign:'center',color:COUL.texteFaible}}>Chargement de la relance…</p>
