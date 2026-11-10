@@ -1,0 +1,113 @@
+name: Bordereaux — lecture des montants
+
+# Lit les TOTAUX dans les PDF de bordereaux et les écrit dans `bordereaux`.
+#
+# Pourquoi un workflow à part du scan : ce sont deux rythmes. Le scan voit tout
+# l'arbre en quelques minutes et tourne chaque jour. La lecture envoie chaque
+# PDF au modèle — quelques secondes par document, donc des heures pour un
+# arriéré. Les mélanger ferait d'un scan quotidien un scan de six heures.
+#
+# Priorité donnée par Ludovic le 10/11/2026 : 2026 d'abord, puis 2025. Les
+# relevés bancaires commencent au 01/01/2025 ; avant, il n'y a rien à
+# rapprocher, donc rien à débloquer.
+
+permissions:
+  contents: read
+
+on:
+  schedule:
+    # 06:12 UTC, après le scan de 05:52 : on ne lit que des lignes qui existent.
+    - cron: '12 6 * * *'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Environnement cible (base Supabase)"
+        type: choice
+        options: [test, production]
+        default: test
+      dry_run:
+        description: "Test sans écriture (lit et affiche seulement)"
+        type: boolean
+        default: true
+      annees:
+        description: "Années à traiter, séparées par des virgules"
+        type: string
+        default: "2026"
+      echantillon:
+        description: "Nombre de bordereaux par passage (0 = tous)"
+        type: string
+        default: "25"
+      relire:
+        description: "Reprendre aussi ceux qui portent déjà un montant"
+        type: boolean
+        default: false
+
+concurrency:
+  group: bordereaux-lecture
+  cancel-in-progress: false
+
+jobs:
+  lecture:
+    runs-on: ubuntu-latest
+    # Six heures : un passage sur tout 2026 fait 664 documents.
+    timeout-minutes: 350
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'production' }}
+    env:
+      APP_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'production' }}
+      SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      GRAPH_TENANT_ID: ${{ secrets.GRAPH_TENANT_ID }}
+      GRAPH_CLIENT_ID: ${{ secrets.GRAPH_CLIENT_ID }}
+      GRAPH_CLIENT_SECRET: ${{ secrets.GRAPH_CLIENT_SECRET }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      DRY_RUN: ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '1' || '' }}
+      ANNEES: ${{ github.event_name == 'workflow_dispatch' && inputs.annees || '2026' }}
+      ECHANTILLON: ${{ github.event_name == 'workflow_dispatch' && inputs.echantillon || '25' }}
+      RELIRE: ${{ (github.event_name == 'workflow_dispatch' && inputs.relire) && '1' || '' }}
+    steps:
+      # Même garde-fou que les autres workflows : la production ne se lance que
+      # depuis main. Un ralentisseur, pas une serrure — la serrure est dans
+      # Settings > Environments > production > Deployment branches.
+      - name: Refuser la production depuis une branche
+        if: ${{ github.ref != 'refs/heads/main' && (inputs.target == 'production' || inputs.target == '') }}
+        run: |
+          echo "::error::Ce workflow vise la PRODUCTION mais tourne sur ${{ github.ref }}."
+          echo "::error::Fusionne dans main, ou relance avec target=test."
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verifier les secrets
+        run: |
+          for s in GRAPH_TENANT_ID GRAPH_CLIENT_ID GRAPH_CLIENT_SECRET ANTHROPIC_API_KEY; do
+            if [ -z "${!s}" ]; then echo "::error::Secret $s manquant"; exit 1; fi
+          done
+          if [ -z "$SUPABASE_SERVICE_KEY" ]; then
+            echo "::error::Secret SUPABASE_SERVICE_KEY manquant"; exit 1
+          fi
+          echo "Cible: $APP_ENV — Années: $ANNEES — Échantillon: $ECHANTILLON — Mode: ${DRY_RUN:+ESSAI}${DRY_RUN:-ECRITURE REELLE}"
+
+      - name: Journal - debut
+        id: journal
+        if: ${{ env.DRY_RUN == '' }}
+        run: echo "id=$(python scripts/job_journal.py debut bordereaux-lecture ${{ github.event_name == 'schedule' && 'cron' || 'manuel' }})" >> "$GITHUB_OUTPUT"
+
+      - name: Lire les montants
+        id: lecture
+        shell: bash
+        run: |
+          pip install -q -r scripts/requirements.txt
+          python scripts/bordereaux_lecture_pdf.py | tee /tmp/lecture.log
+          echo "lues=$(grep -oP 'LIGNES_LUES=\K\d+' /tmp/lecture.log | tail -1)" >> "$GITHUB_OUTPUT"
+
+      - name: Journal - fin
+        if: ${{ always() && env.DRY_RUN == '' }}
+        run: |
+          LUES=$(grep -oP 'LIGNES_LUES=\K[0-9]+' /tmp/lecture.log | tail -1 || true)
+          python scripts/job_journal.py fin "${{ steps.journal.outputs.id }}" \
+            "${{ job.status == 'success' && 'succes' || 'echec' }}" "$LUES" \
+            "GitHub Action bordereaux-lecture — ${{ job.status }}"
