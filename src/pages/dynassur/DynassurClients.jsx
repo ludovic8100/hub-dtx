@@ -1827,7 +1827,13 @@ export default function DynassurClients() {
                 <div style={{padding:'6px 0 4px'}}>
                   <RecentsBlock title="Vos derniers clients consultés" icon="ti-user" rows={recentsPerso} onOpen={openDossier} showWho={false} empty="Vous n'avez pas encore consulté de fiche — ouvrez un client via la recherche."/>
                   <RecentsBlock title={`Votre bureau${myBureauLib?` — ${myBureauLib}`:''}`} icon="ti-building" rows={recentsBureau} onOpen={openDossier} showWho={true} empty="Aucune fiche consultée récemment par vos collègues."/>
-                  {!recentsPerso.length && !recentsBureau.length && (
+                  {/* ⚠️ `recentsPerso` et `recentsBureau` valent NULL tant que la
+                      requête n'a pas répondu, pas []. Écrire `.length` dessus
+                      plante toute la page au premier rendu — et c'est ce qui
+                      s'est produit. Le `?.` n'est pas une précaution de style
+                      ici : c'est la différence entre « pas encore chargé » et
+                      « chargé et vide », que seul `null` distingue. */}
+                  {!recentsPerso?.length && !recentsBureau?.length && (
                     <div style={{padding:'14px 18px 18px',textAlign:'center'}}>
                       <p style={{margin:'0 0 10px',fontSize:13.5,color:COUL.texteFaible}}>
                         Aucun historique de consultation — c'est normal sur un compte neuf.
