@@ -33,6 +33,10 @@ on:
         description: "Test sans écriture (parcourt et affiche seulement)"
         type: boolean
         default: true
+      lot_renommage:
+        description: "Nombre maximum de bordereaux à renommer (0 = tous)"
+        type: string
+        default: "0"
       purge:
         description: "Supprimer les lignes dont le fichier a disparu"
         type: boolean
@@ -53,11 +57,13 @@ jobs:
       GRAPH_TENANT_ID: ${{ secrets.GRAPH_TENANT_ID }}
       GRAPH_CLIENT_ID: ${{ secrets.GRAPH_CLIENT_ID }}
       GRAPH_CLIENT_SECRET: ${{ secrets.GRAPH_CLIENT_SECRET }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       DRY_RUN: ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '1' || '' }}
       # La purge est désactivée par défaut, à l'inverse des factures : un
       # bordereau porte un montant extrait et un lien vers un virement, et un
       # fichier déplacé dans SharePoint n'est pas un fichier disparu.
       PURGE: ${{ (github.event_name == 'workflow_dispatch' && inputs.purge) && '1' || '0' }}
+      LOT: ${{ github.event_name == 'workflow_dispatch' && inputs.lot_renommage || '0' }}
     steps:
       # GARDE-FOU : la production ne se lance que depuis main.
       #
@@ -99,6 +105,24 @@ jobs:
 
       # `shell: bash` impose -o pipefail : sans lui le code de sortie serait
       # celui de `tee`, et un scan mort remonterait en succes.
+      # LE RENOMMAGE PASSE AVANT LE SCAN, et l'ordre n'est pas un détail.
+      #
+      # `bordereaux_sharepoint.py` ne lit QUE le nom du fichier : un bordereau
+      # mal nommé n'entre jamais en base. Renommer après le scan le laisserait
+      # dehors un jour de plus à chaque passage.
+      #
+      # L'étape ne fait jamais échouer le workflow : un modèle indisponible ou
+      # une clé absente ne doit pas empêcher d'indexer les fichiers DÉJÀ bien
+      # nommés — c'est le travail utile, et il n'a pas besoin de Claude.
+      - name: Renommer les bordereaux hors convention
+        id: renommage
+        if: ${{ env.ANTHROPIC_API_KEY != '' }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          pip install -q -r scripts/requirements.txt
+          python scripts/bordereaux_renommage.py | tee /tmp/renommage.log
+
       - name: Scan SharePoint
         id: scan
         shell: bash
