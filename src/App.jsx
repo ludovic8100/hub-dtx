@@ -29,6 +29,7 @@ const DynassurSinistres   = lazy(() => import('./pages/dynassur/DynassurSinistre
 const DynassurBanque      = lazy(() => import('./pages/dynassur/DynassurBanque'))
 const DynassurComptabilite= lazy(() => import('./pages/dynassur/DynassurComptabilite'))
 const DynassurCredits     = lazy(() => import('./pages/dynassur/DynassurCredits'))
+const DynassurEncaissements = lazy(() => import('./pages/dynassur/DynassurEncaissements'))
 const DynassurAppels      = lazy(() => import('./pages/dynassur/DynassurAppels'))
 
 const DashboardDtx        = lazy(() => import('./pages/dtx/DashboardDtx'))
@@ -151,6 +152,7 @@ export default function App() {
           <Route path="/groupe/notes-frais"    element={<P need="grp_notesfrais"><GroupeNotesFrais /></P>} />
           <Route path="/groupe/comptabilite"   element={<P need="acc_holding"><GroupeComptabilite /></P>} />
           <Route path="/dynassur/clients"      element={<P need="dyn_clients"><DynassurClients /></P>} />
+          <Route path="/dynassur/encaissements" element={<P need="dyn_encaissements"><DynassurEncaissements /></P>} />
           <Route path="/dynassur/production"   element={<P need={["dyn_production","dyn_chiffres","dyn_rentabilite","dyn_objectifs"]}><DynassurPerformance /></P>} />
           <Route path="/dynassur/chiffres"     element={<Navigate to="/dynassur/production" replace />} />
           <Route path="/dynassur/rentabilite"  element={<Navigate to="/dynassur/production" replace />} />
