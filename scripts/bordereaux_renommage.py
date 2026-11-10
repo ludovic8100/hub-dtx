@@ -484,11 +484,20 @@ def main() -> int:
             renommer_fichier(jeton, sid, e["id"], nouveau)
             renommes += 1
             print(f"    -> {nouveau}", flush=True)
-            # Renommé ET rangé dans la foulée : c'est le même geste pour
-            # l'utilisateur, il dépose et il n'y pense plus.
+            # ON NE RANGE QUE CE QUI VIENT DE LA RACINE.
+            #
+            # La racine est la boîte de dépôt : « je place les documents dans
+            # la racine, tu les renommes et tu les places au bon endroit ».
+            # Un fichier trouvé AILLEURS est déjà rangé — souvent par compte
+            # producteur (BORDEREAUX/281.50/2025/…). Le tirer vers
+            # BORDEREAUX/<année> détruirait un classement que personne n'a
+            # demandé de défaire. On le renomme sur place : il devient
+            # indexable, et il reste où son propriétaire l'a mis.
+            if chemin != RACINE:
+                continue
             annee = nouveau[:4]
             cible = dossier_annee(jeton, sid, annee, cache)
-            if cible and chemin != f"{RACINE}/{annee}":
+            if cible:
                 deplacer(jeton, sid, e["id"], cible)
                 ranges += 1
                 print(f"    -> {RACINE}/{annee}", flush=True)
