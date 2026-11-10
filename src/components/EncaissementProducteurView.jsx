@@ -101,7 +101,8 @@ export default function EncaissementProducteurView({ societeCodes = ['DYNASSUR']
     setSaisie(null); setARelier(null); setMessageErreur(null)
     const [q, v] = await Promise.all([
       supabase.from('quittances')
-        .select('id,police,type_quittance,prime_totale,commission,date_comptable,etat')
+        .select('id,police,type_quittance,prime_totale,commission,date_comptable,etat,bordereau_id,' +
+                'bordereaux(id,nom_fichier,url_sharepoint,type,mois,annee)')
         .eq('client_id', ligne.client_id).order('date_comptable'),
       supabase.from('encaissement_versements')
         .select('id,date_versement,montant,mode,quittance_numero,transaction_id,recu_par,notes')
@@ -117,7 +118,8 @@ export default function EncaissementProducteurView({ societeCodes = ['DYNASSUR']
     const [vue, q, v] = await Promise.all([
       supabase.from('v_encaissement_solde').select('*').in('societe', societeCodes),
       supabase.from('quittances')
-        .select('id,police,type_quittance,prime_totale,commission,date_comptable,etat')
+        .select('id,police,type_quittance,prime_totale,commission,date_comptable,etat,bordereau_id,' +
+                'bordereaux(id,nom_fichier,url_sharepoint,type,mois,annee)')
         .eq('client_id', compte.client_id).order('date_comptable'),
       supabase.from('encaissement_versements')
         .select('id,date_versement,montant,mode,quittance_numero,transaction_id,recu_par,notes')
@@ -360,18 +362,41 @@ export default function EncaissementProducteurView({ societeCodes = ['DYNASSUR']
                   <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em',
                     color: COUL.texteDoux, marginBottom: 8 }}>Ce qu'il doit — quittances</div>
                   {detail.quittances.length === 0 && <div style={{ fontSize: 13.5, color: COUL.texteDoux }}>Aucune quittance.</div>}
-                  {detail.quittances.map(q => (
-                    <div key={q.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10,
-                      padding: '7px 0', borderBottom: `1px solid ${COUL.bord}` }}>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 13.5, color: COUL.texte }}>{fmtDate(q.date_comptable)}</div>
-                        <div style={{ fontSize: 11.5, color: COUL.texteDoux }}>{q.police} · {q.type_quittance}</div>
+                  {detail.quittances.map(q => {
+                    // UNE QUITTANCE VIENT D'UN BORDEREAU, et c'est le document qui
+                    // fait foi. Pouvoir l'ouvrir depuis la ligne évite d'aller le
+                    // chercher dans SharePoint à la main — et c'est la seule façon
+                    // de vérifier un montant qu'un client conteste.
+                    const bord = q.bordereaux
+                    return (
+                      <div key={q.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10,
+                        padding: '7px 0', borderBottom: `1px solid ${COUL.bord}` }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 13.5, color: COUL.texte }}>{fmtDate(q.date_comptable)}</div>
+                          <div style={{ fontSize: 11.5, color: COUL.texteDoux }}>{q.police} · {q.type_quittance}</div>
+                          {bord ? (
+                            <a href={bord.url_sharepoint || '#'} target="_blank" rel="noreferrer"
+                              onClick={e => { if (!bord.url_sharepoint) e.preventDefault() }}
+                              title={bord.nom_fichier}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 3,
+                                fontSize: 11.5, fontWeight: 700, color: COUL.info, textDecoration: 'none' }}>
+                              <i className="ti ti-file-description" />
+                              {bord.type} {bord.mois}/{bord.annee}
+                            </a>
+                          ) : (
+                            <span title="Aucun bordereau rattaché à cette quittance"
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 3,
+                                fontSize: 11.5, fontWeight: 700, color: COUL.alerte }}>
+                              <i className="ti ti-file-alert" /> sans bordereau
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                          {fmt(q.prime_totale)}
+                        </div>
                       </div>
-                      <div style={{ fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
-                        {fmt(q.prime_totale)}
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                   <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 9, fontWeight: 800 }}>
                     <span>Total</span><span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt(ouvert.total_du)}</span>
                   </div>
