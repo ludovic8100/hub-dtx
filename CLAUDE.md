@@ -203,7 +203,28 @@ Cumul commissions du mois 11.592,12   annuelles 62.771,73
 ```
 
 **« Notre » désigne la compagnie qui édite, « votre » le courtier.** Donc
-« en votre faveur » = Dynassur reçoit. Le solde est stocké **signé** dans
+« en votre faveur » = Dynassur reçoit.
+
+⚠️ **Ce libellé n'est pas universel, et c'est le piège de l'extraction.**
+Trois formulations relevées le 10/11 pour la même notion :
+
+| Document | Libellé du solde |
+|---|---|
+| VIVIUM, relevé | `En notre faveur` / `En votre faveur` |
+| AXA, relevé compte 00157650 | `Solde de votre compte en faveur de la compagnie / du producteur` |
+| AXA Assistance, bordereau 3145235 | `En faveur de la Cie` / `En votre faveur` |
+
+**Deux libellés différents chez le même assureur, selon le modèle de
+document.** Et chez AXA, la ligne de totaux n'a **aucun libellé** — deux
+montants nus avant le bloc du solde. Une extraction ancrée sur un mot échoue ;
+la consigne demande donc de raisonner sur **qui doit payer qui**, jamais de
+chercher une étiquette.
+
+⚠️ **Et beaucoup de bordereaux sont des images.** Les BQT AXA IARD (comptes
+0157650, 0197216, 3001989, 2042197) sont des scans de 0,5 à 4,5 Mo **sans
+aucune couche de texte** : `pdftotext` et `pypdf` n'en tireront jamais rien.
+Seule la voie image fonctionne — c'est ce que fait le lecteur, qui envoie le
+PDF tel quel. Ne jamais écrire d'outil qui suppose du texte extractible. Le solde est stocké **signé** dans
 `bordereaux.net` : positif = reçu, négatif = payé. C'est le seul endroit où un
 lecteur doit raisonner plutôt que recopier, et c'est donc le seul endroit où
 une erreur de sens est possible.
@@ -213,6 +234,12 @@ une erreur de sens est possible.
 Le relevé imprime une communication structurée, et **462 transactions
 bancaires en portent une**. Elle va dans `bordereaux.communication` et se
 rapproche de `transactions.information_paiement`.
+
+⚠️ **Mais toutes les compagnies n'en impriment pas.** Vérifié le 10/11 :
+**aucun document AXA n'en porte** — ni le relevé du compte 00157650, ni le
+bordereau du compte 3145235. La communication est la meilleure clé **quand elle
+existe** ; sinon il faut retomber sur compagnie + période + montant, qui est
+plus faible. Ne pas construire un rapprochement qui la suppose présente.
 
 Un montant peut coïncider par hasard — deux compagnies qui versent la même
 somme le même mois, et le rapprochement se trompe **sans rien dire**. Une

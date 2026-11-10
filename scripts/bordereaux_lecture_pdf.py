@@ -112,20 +112,34 @@ SCHEMA = {
                               "description": "Numéro de compte producteur du courtier, ex. 065610"},
         "report_solde": {"type": ["number", "null"],
                          "description": "Report de solde de la période précédente, en euros"},
+        "total_primes": {
+            "type": ["number", "null"],
+            "description": "TOTAL DES PRIMES de la période, c'est-à-dire ce que les clients "
+                           "doivent payer. Sur un bordereau de quittancement, c'est le total "
+                           "de la colonne des primes (libellés vus : « Prime Totale », "
+                           "« TOTAL »). Sur un relevé de compte, c'est la colonne DÉBIT de la "
+                           "ligne de totaux. null si le document n'en présente aucun.",
+        },
         "total_debit": {"type": ["number", "null"],
-                        "description": "Totaux hors report, colonne DÉBIT"},
+                        "description": "Ligne de totaux, colonne DÉBIT, si le document en a une. "
+                                       "⚠️ Cette ligne n'est PAS toujours étiquetée : chez "
+                                       "certaines compagnies ce sont deux montants nus, placés "
+                                       "juste avant le bloc du solde."},
         "total_credit": {"type": ["number", "null"],
-                         "description": "Totaux hors report, colonne CRÉDIT"},
+                         "description": "Ligne de totaux, colonne CRÉDIT, même remarque."},
         "solde_net": {
             "type": ["number", "null"],
             "description": "Solde final, SIGNÉ du point de vue du COURTIER : positif si le solde "
-                           "est en faveur du courtier (la compagnie lui verse), négatif s'il est "
-                           "en faveur de la compagnie (le courtier doit payer). Sur un relevé qui "
-                           "affiche deux colonnes « En notre faveur » / « En votre faveur », "
-                           "« notre » désigne la COMPAGNIE qui édite le document et « votre » le "
-                           "courtier destinataire. null si le document ne présente AUCUN solde : "
-                           "c'est le cas d'un bordereau de quittancement, qui liste des primes "
-                           "dues et ne règle rien.",
+                           "est en faveur du COURTIER (la compagnie lui verse), négatif s'il "
+                           "est en faveur de la COMPAGNIE (le courtier doit payer). "
+                           "LES LIBELLÉS CHANGENT D'UNE COMPAGNIE À L'AUTRE, et même d'un "
+                           "document à l'autre chez la même : « En notre faveur / En votre "
+                           "faveur » (où « notre » = la compagnie qui édite), « en faveur de la "
+                           "compagnie / du producteur », « En faveur de la Cie / En votre "
+                           "faveur ». Ne te fie pas au mot : raisonne sur QUI doit payer QUI. "
+                           "null si le document ne présente AUCUN solde — c'est le cas d'un "
+                           "bordereau de quittancement, qui liste des primes dues et ne règle "
+                           "rien.",
         },
         "commissions_periode": {"type": ["number", "null"],
                                 "description": "Cumul des commissions de la période (du mois)"},
@@ -140,20 +154,40 @@ SCHEMA = {
                     "description": "false si le document est illisible ou n'est pas un bordereau"},
     },
     "required": ["type_document", "periode", "date_document", "compte_producteur",
-                 "report_solde", "total_debit", "total_credit", "solde_net",
+                 "report_solde", "total_primes", "total_debit", "total_credit", "solde_net",
                  "commissions_periode", "communication_structuree", "nb_lignes", "lisible"],
     "additionalProperties": False,
 }
 
 CONSIGNE = """Ce PDF est un document de compte d'un courtier d'assurance belge.
 
-Relève UNIQUEMENT les totaux et l'en-tête. N'additionne rien toi-même : reprends
-les nombres tels qu'ils sont IMPRIMÉS dans le document.
+Il est d'un de ces deux genres, et c'est la première chose à déterminer :
 
-Attention au signe du solde. Les relevés sont écrits du point de vue de la
-compagnie qui les édite : « En notre faveur » = la compagnie doit être payée
-(négatif pour le courtier), « En votre faveur » = la compagnie verse au courtier
-(positif). C'est le seul endroit où tu dois raisonner.
+  RCP — un RELEVÉ DE COMPTE : la compagnie récapitule le mois écoulé et solde le
+        compte du courtier. Il porte un report de solde, des écritures en débit
+        et crédit, et un solde final.
+  BQT — un BORDEREAU DE QUITTANCEMENT : la liste de ce que les clients DOIVENT
+        payer pour la période à venir. Vu aussi sous les titres « bordereau de
+        commissions » ou « état récapitulatif des invitations à payer ». Il ne
+        règle rien et n'a donc normalement pas de solde.
+
+Relève UNIQUEMENT les totaux et l'en-tête. N'additionne rien toi-même : reprends
+les nombres tels qu'ils sont IMPRIMÉS.
+
+⚠️ LES LIBELLÉS VARIENT D'UNE COMPAGNIE À L'AUTRE, et parfois d'un document à
+l'autre chez la même compagnie. Certains documents posent leur ligne de totaux
+SANS AUCUN LIBELLÉ — deux montants nus avant le bloc du solde. Ne cherche donc
+pas un mot précis : cherche ce que chaque nombre SIGNIFIE à sa place dans le
+document.
+
+Attention au signe du solde, c'est le seul endroit où tu dois raisonner plutôt
+que recopier. Un relevé est écrit du point de vue de la compagnie qui l'édite :
+ce qui est « en sa faveur » est à payer PAR le courtier (donc négatif), ce qui
+est en faveur « du producteur », « de l'agent » ou « vôtre » est versé AU
+courtier (donc positif).
+
+Beaucoup de documents sont des images scannées sans texte : lis-les comme une
+image, le résultat attendu est le même.
 
 Les montants belges s'écrivent « 10.845,19 » : point pour les milliers, virgule
 pour les décimales. Rends 10845.19.
@@ -251,7 +285,7 @@ def lire_bordereau(client, pdf: bytes) -> dict | None:
         consigne = CONSIGNE if avec_schema else (
             CONSIGNE + "\n\nRéponds uniquement par un objet JSON, sans texte autour, avec les"
             " clés : type_document, periode, date_document, compte_producteur, report_solde,"
-            " total_debit, total_credit, solde_net, commissions_periode,"
+            " total_primes, total_debit, total_credit, solde_net, commissions_periode,"
             " communication_structuree, nb_lignes, lisible."
         )
         options = {"effort": "low"}
@@ -331,6 +365,7 @@ def charge_utile(lu: dict, ligne: dict) -> dict | None:
 
     for cle_lue, colonne in (("report_solde", "paiement_precedent"),
                              ("total_debit", "total_debit"),
+                             ("total_primes", "montant"),
                              ("total_credit", "total_credit"),
                              ("solde_net", "net"),
                              ("commissions_periode", "commission"),
@@ -340,9 +375,12 @@ def charge_utile(lu: dict, ligne: dict) -> dict | None:
             charge[colonne] = valeur
 
     # `montant` garde le sens qu'il a déjà en base sur la seule ligne remplie :
-    # le total des primes. C'est la colonne débit.
-    if isinstance(lu.get("total_debit"), (int, float)):
-        charge["montant"] = lu["total_debit"]
+    # le total des primes. Un relevé de compte le porte dans sa colonne débit,
+    # un bordereau de quittancement dans son total de primes — d'où le repli.
+    for cle in ("total_primes", "total_debit"):
+        if isinstance(lu.get(cle), (int, float)):
+            charge["montant"] = lu[cle]
+            break
 
     comm = communication_propre(lu.get("communication_structuree"))
     if comm:
