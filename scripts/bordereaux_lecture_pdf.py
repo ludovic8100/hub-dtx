@@ -85,10 +85,19 @@ MODELE = os.environ.get("MODELE_CLAUDE", "claude-haiku-5-5")
 ECHANTILLON = int(os.environ.get("ECHANTILLON", "50") or 0)
 RELIRE = os.environ.get("RELIRE", "") == "1"
 ANNEES = [a.strip() for a in os.environ.get("ANNEES", "2026").split(",") if a.strip()]
+# TYPE=RCP ou BQT restreint le lot. Sert à éprouver un genre de document à
+# part : l'ordre naturel (année puis mois décroissants) a donné douze BQT
+# d'affilée au premier essai, et le solde — qui n'existe que sur un relevé —
+# n'avait donc jamais été lu une seule fois.
+TYPE = os.environ.get("TYPE", "").strip().upper()
 
-# Un relevé de compte producteur dépasse rarement quelques mégaoctets. Au-delà,
-# c'est une liasse scannée : on ne l'envoie pas, on la signale.
-TAILLE_MAX = int(os.environ.get("TAILLE_MAX", str(12 * 1024 * 1024)))
+# 20 Mo, et la borne vient de l'API, pas d'une intuition : une requête est
+# plafonnée à 32 Mo et le base64 gonfle le fichier d'un tiers. 20 Mo de PDF
+# font environ 26,7 Mo encodés — ça passe, 25 Mo ne passeraient pas.
+#
+# La limite précédente (12 Mo) écartait un scan DKV de 17,7 Mo, qui était
+# retéléchargé à chaque passage pour être rejeté à chaque fois.
+TAILLE_MAX = int(os.environ.get("TAILLE_MAX", str(20 * 1024 * 1024)))
 
 
 SCHEMA = {
@@ -270,6 +279,8 @@ def a_lire() -> list[dict]:
     # bordereaux de quittancement à chaque passage, indéfiniment, sans que rien
     # ne le signale.
     filtre = "" if RELIRE else "&extrait_le=is.null"
+    if TYPE in ("RCP", "BQT"):
+        filtre += f"&type=eq.{TYPE}"
     chemin = (f"bordereaux?select=id,nom_fichier,type,annee,mois,compagnie,"
               f"sharepoint_item_id,net&annee=in.({annees}){filtre}"
               f"&sharepoint_item_id=not.is.null"
@@ -466,6 +477,7 @@ def main() -> int:
 
     lignes = a_lire()
     print(f"{len(lignes)} bordereau(x) à lire — années {', '.join(ANNEES)}"
+          f"{' · type ' + TYPE if TYPE else ''}"
           f"{' (relecture)' if RELIRE else ''}", flush=True)
     if not lignes:
         print("LIGNES_LUES=0", flush=True)

@@ -41,6 +41,11 @@ on:
         description: "Reprendre aussi ceux qui portent déjà un montant"
         type: boolean
         default: false
+      type_document:
+        description: "Restreindre à un genre de document"
+        type: choice
+        options: ["", "RCP", "BQT"]
+        default: ""
 
 concurrency:
   group: bordereaux-lecture
@@ -64,6 +69,7 @@ jobs:
       ANNEES: ${{ github.event_name == 'workflow_dispatch' && inputs.annees || '2026' }}
       ECHANTILLON: ${{ github.event_name == 'workflow_dispatch' && inputs.echantillon || '25' }}
       RELIRE: ${{ (github.event_name == 'workflow_dispatch' && inputs.relire) && '1' || '' }}
+      TYPE: ${{ github.event_name == 'workflow_dispatch' && inputs.type_document || '' }}
     steps:
       # Même garde-fou que les autres workflows : la production ne se lance que
       # depuis main. Un ralentisseur, pas une serrure — la serrure est dans
