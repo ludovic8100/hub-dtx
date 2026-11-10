@@ -403,9 +403,18 @@ def a_traiter(jeton: str, sid: str):
             # jeton désigne une POSITION, pas un élément : si on sort des
             # fichiers du dossier pendant qu'on le pagine, tout ce qui suit se
             # décale et la page suivante saute autant d'entrées qu'on en a
-            # retirées. Mesuré le 10/11 : 31 des 674 fichiers de la racine
-            # n'ont jamais été vus, sans la moindre erreur — une page tournée
-            # dans le vide ne lève rien.
+            # retirées — sans la moindre erreur, car une page tournée dans le
+            # vide ne lève rien.
+            #
+            # ⚠️ RECTIFICATION. J'ai d'abord attribué à ce défaut les 31 lignes
+            # qui pointaient encore vers la racine après le passage du 10/11.
+            # C'ÉTAIT FAUX : le passage suivant n'a trouvé que 4 fichiers à la
+            # racine, tous refusés pour conflit de nom. Les 31 autres sont des
+            # lignes ORPHELINES — leur fichier n'existe plus, et la purge est
+            # désactivée pour les bordereaux. Le danger de pagination est réel
+            # et ce `list()` reste juste, mais il n'a pas causé ce qu'on lui a
+            # imputé. Une correction posée sur un diagnostic non vérifié
+            # rassure sans rien réparer.
             #
             # `bordereaux_sharepoint.py` fait déjà `list(enfants(...))`, mais
             # lui ne déplace rien ; ici l'omission se paie.
