@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Renommage des bordereaux BQT/RCP dans SharePoint, depuis le contenu du PDF.
+Renommage ET rangement des bordereaux BQT/RCP dans SharePoint.
 
 L'ÉQUIVALENT DE CE QUI EXISTE POUR LES FACTURES. Demandé par Ludovic le
 10/11/2026 : « tu dois faire un équivalent pour BORDEREAUX. Je les place dans
@@ -116,6 +116,12 @@ def site_id(jeton: str) -> str:
         return json.loads(r.read().decode())["id"]
 
 
+def _get(jeton: str, url: str):
+    req = urllib.request.Request(url, headers={"Authorization": f"Bearer {jeton}"})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        return json.loads(r.read().decode())
+
+
 def enfants(jeton: str, sid: str, chemin: str):
     """Les enfants d'un dossier, en suivant la pagination. Graph rend 200
     entrées par page et personne ne s'en aperçoit tant que le dossier est
@@ -141,6 +147,64 @@ def telecharger(jeton: str, sid: str, item_id: str) -> bytes | None:
     except urllib.error.HTTPError as e:
         print(f"    téléchargement refusé ({e.code})", flush=True)
         return None
+
+
+def dossier_id(jeton: str, sid: str, chemin: str) -> str | None:
+    try:
+        return _get(jeton, f"{GRAPH}/sites/{sid}/drive/root:/"
+                           f"{urllib.parse.quote(chemin)}")["id"]
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return None
+        raise
+
+
+def creer_dossier(jeton: str, sid: str, parent_id: str, nom: str) -> str:
+    corps = json.dumps({"name": nom, "folder": {},
+                        "@microsoft.graph.conflictBehavior": "return"}).encode()
+    req = urllib.request.Request(
+        f"{GRAPH}/sites/{sid}/drive/items/{parent_id}/children",
+        data=corps, method="POST",
+        headers={"Authorization": f"Bearer {jeton}",
+                 "Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        return json.loads(r.read().decode())["id"]
+
+
+def dossier_annee(jeton: str, sid: str, annee: str, cache: dict) -> str | None:
+    """L'identifiant de BORDEREAUX/<annee>, créé au besoin.
+
+    Ludovic, 10/11 : « tu dois encore les placer dans 2026, sinon en 2027 ça
+    va être le cafouillage. Tu t'imagines en 2035 ? ». Il a raison, et j'avais
+    tort d'appeler ça cosmétique : la racine porte déjà 665 entrées à plat.
+    Dix ans de plus au même endroit et plus personne n'y retrouve rien."""
+    if annee in cache:
+        return cache[annee]
+    chemin = f"{RACINE}/{annee}"
+    trouve = dossier_id(jeton, sid, chemin)
+    if trouve:
+        cache[annee] = trouve
+        return trouve
+    if refuser_ecriture_sharepoint(f"créer {chemin}"):
+        cache[annee] = None
+        return None
+    parent = dossier_id(jeton, sid, RACINE)
+    cache[annee] = creer_dossier(jeton, sid, parent, annee)
+    return cache[annee]
+
+
+def deplacer(jeton: str, sid: str, item_id: str, parent_id: str):
+    """Changement de dossier parent. Jamais de suppression."""
+    if refuser_ecriture_sharepoint(f"déplacer {item_id} -> {parent_id}"):
+        return {"ignore_en_test": True}
+    corps = json.dumps({"parentReference": {"id": parent_id}}).encode()
+    req = urllib.request.Request(
+        f"{GRAPH}/sites/{sid}/drive/items/{item_id}",
+        data=corps, method="PATCH",
+        headers={"Authorization": f"Bearer {jeton}",
+                 "Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        return json.loads(r.read().decode())
 
 
 def renommer_fichier(jeton: str, sid: str, item_id: str, nouveau: str):
@@ -313,8 +377,12 @@ def nom_propre(lu: dict, noms: list[str]) -> str | None:
 # ── Parcours ──────────────────────────────────────────────────────────────
 
 def a_traiter(jeton: str, sid: str):
-    """Tous les PDF de l'arbre BORDEREAUX dont le nom NE SUIT PAS la
-    convention. Ceux qui la suivent déjà ne sont pas touchés."""
+    """Rend (chemin, entrée, annee_du_nom).
+
+    `annee_du_nom` est renseignée quand le nom suit DÉJÀ la convention : ce
+    fichier n'a pas besoin d'être lu, il a juste besoin d'être rangé. C'est
+    gratuit, et c'est le cas de la quasi-totalité des 665 entrées posées à
+    plat dans la racine."""
     a_visiter = [RACINE]
     while a_visiter:
         chemin = a_visiter.pop()
@@ -326,9 +394,13 @@ def a_traiter(jeton: str, sid: str):
                 nom = e.get("name", "")
                 if not nom.lower().endswith(".pdf"):
                     continue
-                if RE_NOM.match(nom[:-4]):
+                m = RE_NOM.match(nom[:-4])
+                if m:
+                    # Déjà bien nommé : on ne le range que s'il traîne à la racine.
+                    if chemin == RACINE:
+                        yield chemin, e, m.group("annee")
                     continue
-                yield chemin, e
+                yield chemin, e, None
         except urllib.error.HTTPError as e:
             print(f"::warning::dossier « {chemin} » illisible ({e.code})", flush=True)
 
@@ -352,14 +424,28 @@ def main() -> int:
     print(f"Site ADMINISTRATION résolu, dossier « {RACINE} »", flush=True)
 
     client = anthropic.Anthropic()
-    vus = renommes = illisibles = trop_gros = 0
+    cache: dict[str, str] = {}
+    vus = renommes = ranges = illisibles = trop_gros = 0
 
-    for chemin, e in a_traiter(jeton, sid):
+    for chemin, e, annee_connue in a_traiter(jeton, sid):
+        nom = e["name"]
+
+        # ── Cas gratuit : le nom est bon, il ne manque que le rangement.
+        if annee_connue:
+            cible = dossier_annee(jeton, sid, annee_connue, cache)
+            print(f"  {nom}  ->  {RACINE}/{annee_connue}", flush=True)
+            ranges += 1
+            if not DRY_RUN and cible:
+                try:
+                    deplacer(jeton, sid, e["id"], cible)
+                except urllib.error.HTTPError as err:
+                    print(f"::warning::déplacement refusé ({err.code})", flush=True)
+            continue
+
         if LOT and vus >= LOT:
             print(f"Lot de {LOT} atteint — le reste sera pris au passage suivant", flush=True)
             break
         vus += 1
-        nom = e["name"]
         print(f"  {chemin}/{nom}", flush=True)
 
         if (e.get("size") or 0) > TAILLE_MAX:
@@ -389,13 +475,22 @@ def main() -> int:
             renommer_fichier(jeton, sid, e["id"], nouveau)
             renommes += 1
             print(f"    -> {nouveau}", flush=True)
+            # Renommé ET rangé dans la foulée : c'est le même geste pour
+            # l'utilisateur, il dépose et il n'y pense plus.
+            annee = nouveau[:4]
+            cible = dossier_annee(jeton, sid, annee, cache)
+            if cible and chemin != f"{RACINE}/{annee}":
+                deplacer(jeton, sid, e["id"], cible)
+                ranges += 1
+                print(f"    -> {RACINE}/{annee}", flush=True)
         except urllib.error.HTTPError as err:
             illisibles += 1
             print(f"::warning::renommage refusé ({err.code}) : {err.read().decode()[:200]}",
                   flush=True)
 
     print(f"\n{vus} fichier(s) hors convention — {renommes} renommé(s), "
-          f"{illisibles} laissé(s) tel(s) quel(s), {trop_gros} trop volumineux "
+          f"{illisibles} laissé(s) tel(s) quel(s), {trop_gros} trop volumineux ; "
+          f"{ranges} rangé(s) par année "
           f"[{APP_ENV}{' · essai' if DRY_RUN else ''}]", flush=True)
     return 0
 
