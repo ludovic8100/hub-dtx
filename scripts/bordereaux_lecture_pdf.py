@@ -101,7 +101,11 @@ SECRET = os.environ.get("GRAPH_CLIENT_SECRET", "").strip()
 # souvent un scan. Un document lu deux fois doit donner deux fois la même
 # chose ; tant que ce n'est pas le cas, rien ne doit être écrit.
 MODELE_BQT = os.environ.get("MODELE_BQT", "claude-haiku-5-5")
-MODELE_RCP = os.environ.get("MODELE_RCP", "claude-haiku-5-5")
+# Sonnet sur les relevés, et c'est MESURÉ sur deux passages du même lot de
+# douze : Haiku en lisait 6 puis 7 avec des valeurs différentes, Sonnet en lit
+# 10 et les deux passages sont strictement identiques. La stabilité était la
+# condition pour écrire quoi que ce soit.
+MODELE_RCP = os.environ.get("MODELE_RCP", "claude-sonnet-5-5")
 ECHANTILLON = int(os.environ.get("ECHANTILLON", "50") or 0)
 RELIRE = os.environ.get("RELIRE", "") == "1"
 ANNEES = [a.strip() for a in os.environ.get("ANNEES", "2026").split(",") if a.strip()]
@@ -524,6 +528,26 @@ def coherence(lu: dict, ligne: dict) -> list[str]:
     # être quasi égal au cumul des commissions. Sur le relevé VIVIUM 05-2026 :
     # 11 592,12 de commissions pour 11 739,67 au débit, soit 98,7 % — et le
     # document est parfaitement normal.
+    # TROIS VALEURS QUI NE PEUVENT PAS EXISTER, et que Sonnet a pourtant
+    # rendues le 10/11 : une commission négative (−2 901,17 chez TVM), des
+    # primes négatives (−56,86 chez VANDER HAEGHEN), et des primes et
+    # commissions à zéro sur un relevé qui affiche pourtant un solde.
+    #
+    # Une commission est une rémunération : elle ne descend pas sous zéro. Des
+    # primes non plus. Et un solde ne sort pas de nulle part. Ces trois-là ne
+    # bloquent pas l'écriture — c'est une lecture, pas un jugement — mais elles
+    # doivent se voir, sinon elles passent pour des mesures.
+    comm_brute = lu.get("commissions_periode")
+    if isinstance(comm_brute, (int, float)) and comm_brute < 0:
+        ecarts.append(f"commission négative ({comm_brute:.2f}) — une rémunération ne l'est pas")
+    primes_brutes = lu.get("total_primes") or lu.get("total_debit")
+    if isinstance(primes_brutes, (int, float)) and primes_brutes < 0:
+        ecarts.append(f"primes négatives ({primes_brutes:.2f})")
+    if (not primes_brutes and not comm_brute
+            and isinstance(net, (int, float)) and net):
+        ecarts.append(f"solde {net:.2f} alors que primes et commission sont nulles — "
+                      "le solde ne sort pas de nulle part")
+
     if (ligne.get("type") or "").upper() != "BQT":
         return ecarts
     primes = lu.get("total_primes")
