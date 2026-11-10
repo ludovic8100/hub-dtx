@@ -128,7 +128,7 @@ from encaissement_comptes ec
 join clients c           on c.id = ec.client_id
 left join producteurs p  on p.id = ec.producteur_id
 left join compagnies cie on cie.id = ec.compagnie_id
-left join du             on du.client_id = ec.client_id
+left join du d           on d.client_id = ec.client_id
 left join verse v        on v.compte_id = ec.id;
 
 comment on view v_encaissement_solde is
