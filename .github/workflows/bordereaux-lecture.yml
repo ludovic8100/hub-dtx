@@ -46,6 +46,11 @@ on:
         type: choice
         options: ["", "RCP", "BQT"]
         default: ""
+      modele_rcp:
+        description: "Modèle pour les relevés (RCP)"
+        type: choice
+        options: ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"]
+        default: "claude-haiku-5-5"
 
 concurrency:
   group: bordereaux-lecture
@@ -70,6 +75,7 @@ jobs:
       ECHANTILLON: ${{ github.event_name == 'workflow_dispatch' && inputs.echantillon || '25' }}
       RELIRE: ${{ (github.event_name == 'workflow_dispatch' && inputs.relire) && '1' || '' }}
       TYPE: ${{ github.event_name == 'workflow_dispatch' && inputs.type_document || '' }}
+      MODELE_RCP: ${{ github.event_name == 'workflow_dispatch' && inputs.modele_rcp || 'claude-haiku-5-5' }}
     steps:
       # Même garde-fou que les autres workflows : la production ne se lance que
       # depuis main. Un ralentisseur, pas une serrure — la serrure est dans

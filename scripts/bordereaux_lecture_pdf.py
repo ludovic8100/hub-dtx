@@ -88,7 +88,20 @@ TENANT = os.environ.get("GRAPH_TENANT_ID", "").strip()
 CLIENT = os.environ.get("GRAPH_CLIENT_ID", "").strip()
 SECRET = os.environ.get("GRAPH_CLIENT_SECRET", "").strip()
 
-MODELE = os.environ.get("MODELE_CLAUDE", "claude-haiku-5-5")
+# UN MODÈLE PAR GENRE DE DOCUMENT, parce qu'ils n'ont pas la même difficulté.
+#
+# Mesuré le 10/11 sur deux passages du même lot de douze :
+#   BQT — 9 lus sur 12, deux passages STRICTEMENT identiques.
+#   RCP — 6 puis 7 lus sur 12, avec des valeurs différentes d'un passage à
+#         l'autre sur les mêmes documents.
+#
+# Ce n'est pas la consigne : elle a été séparée par genre et les BQT tiennent.
+# Un relevé est simplement plus dur — plusieurs pages, un tableau débit/crédit,
+# une ligne de totaux parfois sans libellé, un bloc de solde à interpréter, et
+# souvent un scan. Un document lu deux fois doit donner deux fois la même
+# chose ; tant que ce n'est pas le cas, rien ne doit être écrit.
+MODELE_BQT = os.environ.get("MODELE_BQT", "claude-haiku-5-5")
+MODELE_RCP = os.environ.get("MODELE_RCP", "claude-haiku-5-5")
 ECHANTILLON = int(os.environ.get("ECHANTILLON", "50") or 0)
 RELIRE = os.environ.get("RELIRE", "") == "1"
 ANNEES = [a.strip() for a in os.environ.get("ANNEES", "2026").split(",") if a.strip()]
@@ -336,6 +349,7 @@ def lire_bordereau(client, pdf: bytes, genre: str) -> dict | None:
 
     schema = SCHEMA_BQT if genre == "BQT" else SCHEMA_RCP
     base = CONSIGNE_BQT if genre == "BQT" else CONSIGNE_RCP
+    modele = MODELE_BQT if genre == "BQT" else MODELE_RCP
     cles = ", ".join(schema["required"])
 
     document = {"type": "document", "source": {
@@ -357,7 +371,7 @@ def lire_bordereau(client, pdf: bytes, genre: str) -> dict | None:
         if avec_schema:
             options["format"] = {"type": "json_schema", "schema": schema}
         return client.messages.create(
-            model=MODELE, max_tokens=1024, output_config=options,
+            model=modele, max_tokens=1024, output_config=options,
             messages=[{"role": "user", "content": [document, {"type": "text", "text": consigne}]}],
         )
 
@@ -460,6 +474,16 @@ def charge_utile(lu: dict, ligne: dict) -> dict | None:
 
     if not charge:
         return None
+
+    # UN DOCUMENT TOUT À ZÉRO N'EST PAS UNE LECTURE, c'est un silence déguisé
+    # en mesure. Constaté le 10/11 : « primes 0.0 · commission 0.0 · solde 0.0 »
+    # sur des relevés qui portent de vrais montants. Trois zéros qui entrent en
+    # base deviennent trois faits, et plus personne ne sait qu'ils sont faux.
+    nombres = [v for k, v in charge.items()
+               if isinstance(v, (int, float)) and k != "nb_polices"]
+    if nombres and not any(v for v in nombres):
+        print("    tout à zéro — lecture rejetée", flush=True)
+        return None
     # PostgREST n'évalue pas `now()` : une chaîne « now() » partirait telle
     # quelle et serait refusée. L'horodatage est donc posé ici.
     charge["extrait_le"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
@@ -524,6 +548,7 @@ def main() -> int:
         return 1
 
     lignes = a_lire()
+    print(f"modèles : BQT → {MODELE_BQT} · RCP → {MODELE_RCP}", flush=True)
     print(f"{len(lignes)} bordereau(x) à lire — années {', '.join(ANNEES)}"
           f"{' · type ' + TYPE if TYPE else ''}"
           f"{' (relecture)' if RELIRE else ''}", flush=True)
