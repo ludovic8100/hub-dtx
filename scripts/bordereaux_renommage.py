@@ -185,6 +185,14 @@ def dossier_annee(jeton: str, sid: str, annee: str, cache: dict) -> str | None:
     if trouve:
         cache[annee] = trouve
         return trouve
+    # UN ESSAI NE DOIT RIEN ÉCRIRE, PAS MÊME UN DOSSIER VIDE. Sans cette
+    # ligne, un DRY_RUN en production créerait les dix dossiers d'année avant
+    # de n'y déplacer aucun fichier — et laisserait derrière lui des dossiers
+    # vides que personne n'a demandés.
+    if DRY_RUN:
+        print(f"    [essai] créerait {chemin}", flush=True)
+        cache[annee] = None
+        return None
     if refuser_ecriture_sharepoint(f"créer {chemin}"):
         cache[annee] = None
         return None
@@ -208,8 +216,9 @@ def deplacer(jeton: str, sid: str, item_id: str, parent_id: str):
 
 
 def renommer_fichier(jeton: str, sid: str, item_id: str, nouveau: str):
-    """PATCH Graph. C'est la SEULE écriture de ce script dans SharePoint :
-    un changement de nom. Jamais de déplacement, jamais de suppression.
+    """PATCH Graph. Avec `deplacer`, l'une des deux seules écritures de ce
+    script dans SharePoint : renommer et changer de dossier parent. Jamais de
+    suppression, jamais d'écrasement.
 
     En TEST elle ne part pas — `APP_ENV=test` n'isole que la base de données,
     pas SharePoint, et renommer de vrais documents depuis un environnement de
