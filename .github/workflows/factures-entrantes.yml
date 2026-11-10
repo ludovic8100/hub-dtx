@@ -120,6 +120,24 @@ jobs:
       # 1. Le fichier devient une ligne. Pas de purge ici : un passage horaire
       #    qui supprime est un passage horaire qui peut supprimer a tort.
       #    La purge reste au scan quotidien de 5h37, qui voit tout l'arbre.
+      # ÉTAPE 0 : RANGER CE QUI A ÉTÉ DÉPOSÉ À LA RACINE.
+      #
+      # Ludovic, 10/11 : « je place les documents dans la racine, tu les
+      # renommes et tu les places au bon endroit ». Cette étape déplace ; le
+      # renommage reste l'étape 3, depuis la base.
+      #
+      # Elle passe AVANT le scan : un document rangé au même passage est
+      # indexé dans la foulée, au lieu d'attendre le lendemain.
+      #
+      # `continue-on-error` : si la lecture échoue, les documents restent à la
+      # racine et la chaîne continue sur tout ce qui est déjà classé. Rien ne
+      # doit dépendre de cette étape pour que le reste fonctionne.
+      - name: 0. Classer ce qui est à la racine
+        id: classement
+        continue-on-error: true
+        shell: bash
+        run: python scripts/factures_classement.py
+
       - name: 1. Scan SharePoint
         env:
           PURGE: '0'
