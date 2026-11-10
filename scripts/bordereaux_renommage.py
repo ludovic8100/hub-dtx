@@ -71,6 +71,15 @@ GRAPH = "https://graph.microsoft.com/v1.0"
 SITE = "dynassur.sharepoint.com:/sites/ADMINISTRATION"
 RACINE = os.environ.get("BORDEREAUX_RACINE", "BORDEREAUX").strip("/")
 LOT = int(os.environ.get("LOT", "0") or 0)
+
+# INVENTAIRE=1 : compter ce qu'il y a, dossier par dossier, et s'arrêter là.
+# Aucun appel au modèle, aucune écriture, aucun déplacement.
+#
+# Ajouté le 10/11 parce qu'on ne pouvait pas répondre à une question simple —
+# « combien de fichiers dans la racine ? ». Le traitement s'arrête au lot, donc
+# il ne compte jamais ce qu'il n'a pas atteint, et la base ne connaît que les
+# fichiers BIEN nommés. Entre les deux, un angle mort.
+INVENTAIRE = os.environ.get("INVENTAIRE", "") == "1"
 MODELE = os.environ.get("MODELE_CLAUDE", "claude-haiku-5-5")
 
 TENANT = os.environ.get("GRAPH_TENANT_ID", "").strip()
@@ -436,6 +445,41 @@ def a_traiter(jeton: str, sid: str):
             print(f"::warning::dossier « {chemin} » illisible ({e.code})", flush=True)
 
 
+def inventaire(jeton: str, sid: str) -> int:
+    """Compte les PDF par dossier, en distinguant ceux qui suivent la
+    convention de ceux qui ne la suivent pas. Ne lit aucun contenu, n'écrit
+    rien, ne déplace rien — c'est une photographie."""
+    par_dossier: dict[str, list[int]] = {}
+    a_visiter = [RACINE]
+    while a_visiter:
+        chemin = a_visiter.pop()
+        try:
+            elements = list(enfants(jeton, sid, chemin))
+        except urllib.error.HTTPError as e:
+            print(f"::warning::{chemin} illisible ({e.code})", flush=True)
+            continue
+        for e in elements:
+            nom = e.get("name", "")
+            if e.get("folder"):
+                a_visiter.append(f"{chemin}/{nom}")
+                continue
+            if not nom.lower().endswith(".pdf"):
+                par_dossier.setdefault(chemin, [0, 0, 0])[2] += 1
+                continue
+            case = 0 if RE_NOM.match(nom[:-4]) else 1
+            par_dossier.setdefault(chemin, [0, 0, 0])[case] += 1
+
+    total = [0, 0, 0]
+    print(f"\n{'dossier':<52} {'conv.':>7} {'hors':>7} {'non-pdf':>8}", flush=True)
+    for chemin in sorted(par_dossier):
+        c, h, n = par_dossier[chemin]
+        total = [total[0] + c, total[1] + h, total[2] + n]
+        print(f"  {chemin:<50} {c:>7} {h:>7} {n:>8}", flush=True)
+    print(f"\n  {'TOTAL':<50} {total[0]:>7} {total[1]:>7} {total[2]:>8}", flush=True)
+    print(f"\n{len(par_dossier)} dossier(s) contenant au moins un fichier.", flush=True)
+    return 0
+
+
 def main() -> int:
     banniere("bordereaux_renommage")
     manquants = [n for n, v in (("ANTHROPIC_API_KEY", os.environ.get("ANTHROPIC_API_KEY")),
@@ -453,6 +497,9 @@ def main() -> int:
     jeton = jeton_graph()
     sid = site_id(jeton)
     print(f"Site ADMINISTRATION résolu, dossier « {RACINE} »", flush=True)
+
+    if INVENTAIRE:
+        return inventaire(jeton, sid)
 
     client = anthropic.Anthropic()
     cache: dict[str, str] = {}

@@ -37,6 +37,10 @@ on:
         description: "Nombre maximum de bordereaux à renommer (0 = tous)"
         type: string
         default: "0"
+      inventaire:
+        description: "Inventaire seul : compter par dossier, ne rien modifier"
+        type: boolean
+        default: false
       purge:
         description: "Supprimer les lignes dont le fichier a disparu"
         type: boolean
@@ -64,6 +68,7 @@ jobs:
       # fichier déplacé dans SharePoint n'est pas un fichier disparu.
       PURGE: ${{ (github.event_name == 'workflow_dispatch' && inputs.purge) && '1' || '0' }}
       LOT: ${{ github.event_name == 'workflow_dispatch' && inputs.lot_renommage || '0' }}
+      INVENTAIRE: ${{ (github.event_name == 'workflow_dispatch' && inputs.inventaire) && '1' || '' }}
     steps:
       # GARDE-FOU : la production ne se lance que depuis main.
       #
@@ -130,6 +135,7 @@ jobs:
 
       - name: Scan SharePoint
         id: scan
+        if: ${{ env.INVENTAIRE != '1' }}
         shell: bash
         run: python scripts/bordereaux_sharepoint.py | tee /tmp/scan.log
 
