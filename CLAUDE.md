@@ -144,6 +144,28 @@ PSD2, exigent l'adresse IP réelle du client et sont limitées à une par compte
 30 minutes. C'est le rôle du bouton **Synchroniser**, déclenché par un humain — jamais d'un
 traitement automatique.
 
+### Un bordereau de terme est daté DEUX MOIS À L'AVANCE — ce n'est pas un bug
+
+Règle donnée par Ludovic le 10/11/2026 : **« les bordereaux de quittancement à
+terme arrivent 2 mois à l'avance environ : 2026.12 arrive en octobre 2026 »**.
+
+C'est écrit ici parce que c'est exactement le genre de chose qu'un futur
+lecteur « corrige » en croyant à une erreur de lecture. Je m'y suis laissé
+prendre le jour même : voyant `2026.12 - BQT` proposé le 10 novembre, j'ai
+d'abord conclu que le modèle lisait la mauvaise date.
+
+Mesuré ensuite, et l'asymétrie est nette :
+
+| | Daté dans le futur |
+|---|---|
+| **BQT** (quittancement à terme, émis à l'avance) | 1,4 % — **normal** |
+| **RCP** (relevé de compte producteur, période écoulée) | **0 sur 4 373** |
+
+Donc : un **RCP** daté dans le futur est une anomalie à signaler. Un **BQT**
+daté jusqu'à ~2 mois en avant est attendu. Ne pas poser de garde-fou
+« pas de date future » sans distinguer les deux types — il rejetterait des
+bordereaux parfaitement valides.
+
 ### Attribution de la production : la base fait foi, pas le bordereau
 
 Les lignes de bordereau portent un code sous-agent ou commercial (ex. `BLA` chez AG), **qui ne
