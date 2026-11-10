@@ -94,9 +94,14 @@ TAILLE_MAX = int(os.environ.get("TAILLE_MAX", str(12 * 1024 * 1024)))
 SCHEMA = {
     "type": "object",
     "properties": {
+        # ⚠️ PAS `{"type": ["string","null"], "enum": [...]}` : l'API refuse
+        # (« Enum value 'RCP' does not match declared type »), le script bascule
+        # alors sur la consigne libre — et le modèle répond « Bordereau Quittance
+        # à terme » au lieu de « BQT ». Mesuré le 10/11 : les cinq écarts
+        # « type lu ≠ nom du fichier » du premier essai venaient de là, pas des
+        # documents. `anyOf` exprime la même chose et passe.
         "type_document": {
-            "type": ["string", "null"],
-            "enum": ["RCP", "BQT", None],
+            "anyOf": [{"type": "string", "enum": ["RCP", "BQT"]}, {"type": "null"}],
             "description": "RCP = relevé de compte producteur (ce que le courtier reçoit). "
                            "BQT = bordereau de quittancement à terme (ce que les clients doivent).",
         },
@@ -118,7 +123,9 @@ SCHEMA = {
                            "en faveur de la compagnie (le courtier doit payer). Sur un relevé qui "
                            "affiche deux colonnes « En notre faveur » / « En votre faveur », "
                            "« notre » désigne la COMPAGNIE qui édite le document et « votre » le "
-                           "courtier destinataire.",
+                           "courtier destinataire. null si le document ne présente AUCUN solde : "
+                           "c'est le cas d'un bordereau de quittancement, qui liste des primes "
+                           "dues et ne règle rien.",
         },
         "commissions_periode": {"type": ["number", "null"],
                                 "description": "Cumul des commissions de la période (du mois)"},
@@ -214,7 +221,13 @@ def a_lire() -> list[dict]:
     sert — le rapprochement bancaire ne remonte pas avant 2025.
     """
     annees = ",".join(ANNEES)
-    filtre = "" if RELIRE else "&net=is.null"
+    # CE QUI MARQUE « DÉJÀ LU », C'EST `extrait_le`, PAS `net`.
+    #
+    # Un BQT n'a pas de solde : il liste des primes dues et ne règle rien, donc
+    # `net` y reste nul légitimement. Filtrer sur `net` ferait relire les mêmes
+    # bordereaux de quittancement à chaque passage, indéfiniment, sans que rien
+    # ne le signale.
+    filtre = "" if RELIRE else "&extrait_le=is.null"
     chemin = (f"bordereaux?select=id,nom_fichier,type,annee,mois,compagnie,"
               f"sharepoint_item_id,net&annee=in.({annees}){filtre}"
               f"&sharepoint_item_id=not.is.null"
@@ -422,12 +435,26 @@ def main() -> int:
 
         charge = charge_utile(lu, ligne)
         if not charge:
+            # Horodater quand même, sinon ce document repasse à chaque fois et
+            # consomme le lot au détriment de ceux qui n'ont jamais été vus.
+            # Il est signalé, pas oublié : `extrait_le` rempli et tout le reste
+            # nul, c'est précisément la signature d'un document illisible.
             illisibles += 1
-            print("    aucun montant exploitable — ligne laissée vide", flush=True)
+            print("    ::warning::aucun montant exploitable — document à regarder", flush=True)
+            if not DRY_RUN:
+                try:
+                    supabase("PATCH", f"bordereaux?id=eq.{ligne['id']}",
+                             {"extrait_le": datetime.datetime.now(
+                                 datetime.timezone.utc).isoformat()})
+                except urllib.error.HTTPError:
+                    pass
             continue
 
-        apercu = (f"net {charge.get('net', '—')}, commission {charge.get('commission', '—')}"
-                  f", comm. {charge.get('communication', '—')}")
+        apercu = (f"{lu.get('type_document') or '?'} {lu.get('periode') or '?'} · "
+                  f"primes {charge.get('montant', '—')} · "
+                  f"commission {charge.get('commission', '—')} · "
+                  f"solde {charge.get('net', '—')} · "
+                  f"comm. {charge.get('communication', '—')}")
         if DRY_RUN:
             print(f"    [essai] {apercu}", flush=True)
             ecrits += 1
