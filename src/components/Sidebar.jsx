@@ -99,6 +99,10 @@ function ClientSearch({ accentLight }) {
   // tout ressortait identique a un nom mal orthographie. On ne pouvait ni le
   // voir ni le diagnostiquer.
   const [erreur, setErreur] = useState(null)
+  // LE CURSEUR CLAVIER. Chercher un client au clavier puis devoir attraper la
+  // souris pour choisir, c'est un geste de trop à chaque appel téléphonique.
+  // -1 = aucun choix en cours : la flèche bas prend le premier.
+  const [curseur, setCurseur] = useState(-1)
 
   useEffect(() => {
     const term = q.trim()
@@ -108,7 +112,7 @@ function ClientSearch({ accentLight }) {
       try {
         const { data, error } = await supabase.rpc('search_clients_dynassur', { q: term, lim: 8 })
         if (error) throw error
-        setRes(data || []); setErreur(null)
+        setRes(data || []); setErreur(null); setCurseur(-1)
       } catch (e) {
         setRes([]); setErreur(e?.message || String(e))
       } finally { setSearching(false) }
@@ -116,7 +120,17 @@ function ClientSearch({ accentLight }) {
     return () => clearTimeout(t)
   }, [q])
 
-  const go = d => { if (!d) return; navigate(`/dynassur/clients?dossier=${encodeURIComponent(d)}`); setQ(''); setRes([]); setErreur(null) }
+  const go = d => { if (!d) return; navigate(`/dynassur/clients?dossier=${encodeURIComponent(d)}`); setQ(''); setRes([]); setErreur(null); setCurseur(-1) }
+
+  // Entrée sans sélection ouvre le PREMIER résultat : c'est ce qu'on attend
+  // quand on a tapé un nom et qu'il n'y a qu'une évidence à l'écran.
+  const auClavier = e => {
+    if (!res.length) return
+    if (e.key === 'ArrowDown')      { e.preventDefault(); setCurseur(i => (i + 1) % res.length) }
+    else if (e.key === 'ArrowUp')   { e.preventDefault(); setCurseur(i => (i <= 0 ? res.length : i) - 1) }
+    else if (e.key === 'Enter')     { e.preventDefault(); go(res[curseur < 0 ? 0 : curseur]?.dossier) }
+    else if (e.key === 'Escape')    { setQ(''); setRes([]); setCurseur(-1) }
+  }
 
   return (
     <div style={{ margin: '12px 4px 4px', padding: '11px 11px 12px', borderRadius: 10,
@@ -127,7 +141,8 @@ function ClientSearch({ accentLight }) {
         <span style={{ fontSize: 12.5, fontWeight: 700, color: COUL.blanc, letterSpacing: '0.02em' }}>Recherche client</span>
       </div>
       <div style={{ position: 'relative' }}>
-        <input className="dyn-cs-input" value={q} onChange={e => setQ(e.target.value)} placeholder="Nom, plaque, n°, localité…"
+        <input className="dyn-cs-input" value={q} onChange={e => setQ(e.target.value)} onKeyDown={auClavier}
+          placeholder="Nom, plaque, n°, localité…"
           style={{ width: '100%', boxSizing: 'border-box', padding: '8px 26px 8px 11px', borderRadius: 7,
             border: '1.5px solid rgba(255,255,255,0.7)', background: 'rgba(255,255,255,0.14)',
             color: COUL.blanc, fontSize: 13, fontFamily: "'Source Sans Pro', sans-serif", outline: 'none', fontWeight: 500 }} />
@@ -143,9 +158,12 @@ function ClientSearch({ accentLight }) {
               </div>
             : !res.length ? <div style={{ padding: '8px 4px', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Aucun résultat</div>
               : res.map((c, i) => (
-                <div key={c.dossier || i} onClick={() => go(c.dossier)} style={{ padding: '7px 9px', borderRadius: 7, cursor: 'pointer', marginBottom: 3, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.16)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}>
+                <div key={c.dossier || i} onClick={() => go(c.dossier)}
+                  ref={el => { if (el && i === curseur) el.scrollIntoView({ block: 'nearest' }) }}
+                  onMouseEnter={() => setCurseur(i)}
+                  style={{ padding: '7px 9px', borderRadius: 7, cursor: 'pointer', marginBottom: 3,
+                    background: i === curseur ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.06)',
+                    border: i === curseur ? '1px solid rgba(255,255,255,0.55)' : '1px solid rgba(255,255,255,0.12)' }}>
                   <div style={{ fontSize: 13, color: COUL.blanc, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.nom} {c.prenom}</div>
                   <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>#{c.dossier}{c.localite ? ` · ${c.localite}` : ''}</div>
                   {c.match_info && <div style={{ fontSize: 11, color: accentLight, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.match_info}</div>}

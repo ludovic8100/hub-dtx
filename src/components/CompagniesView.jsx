@@ -28,7 +28,7 @@ const STATUT_PROD = {
   cloture: { label:"Clôturé",  couleur:"#8A9BBE" },
 }
 
-function CieFormModal({ cie, comptes = [], logos = [], onClose, onSave, onDelete, onAddProd, onSetStatut, onSetDescriptif, onDelProd }) {
+function CieFormModal({ cie, comptes = [], logos = [], onClose, onSave, onDelete, onAddProd, onSetNumero, onSetStatut, onSetDescriptif, onDelProd }) {
   const isNew = !cie.id
   const [form, setForm] = useState({ ...cie })
   const [saving, setSaving] = useState(false)
@@ -111,7 +111,9 @@ function CieFormModal({ cie, comptes = [], logos = [], onClose, onSave, onDelete
                     const st = STATUT_PROD[p.statut] || STATUT_PROD.actif
                     return (
                     <div key={p.id} style={{ display:"flex", alignItems:"center", gap:8, background:COUL.surface, border:`1px solid ${C.border}`, borderRadius:6, padding:"6px 8px" }}>
-                      <span style={{ fontSize:12, fontWeight:700, color:C.navy, fontFamily:"monospace" }}>{p.numero_producteur}</span>
+                      <input defaultValue={p.numero_producteur} title="Numéro de compte producteur — corrigeable"
+                        onBlur={e => { const v = e.target.value.trim(); if (v && v !== p.numero_producteur) onSetNumero(p.id, v) }}
+                        style={{ ...D.input, width:110, fontSize:12, fontWeight:700, fontFamily:"monospace", color:C.navy, padding:"4px 8px" }} />
                       {p.fsma && <span style={{ fontSize:10, color:C.textL }}>FSMA {p.fsma}</span>}
                       {/* À quoi sert ce compte : AG en a cinq, Record un PAT et un PH. */}
                       <input defaultValue={p.descriptif || ""} placeholder="À quoi sert ce compte ? (PH, PAT, portefeuille…)"
@@ -267,6 +269,16 @@ export default function CompagniesView() {
   }
   const setProdStatut = async (id, statut) => {
     await supabase.from("producteurs").update({ statut, updated_at:new Date().toISOString() }).eq("id", id)
+    await reloadProd()
+  }
+  // LE NUMÉRO LUI-MÊME DOIT ÊTRE CORRIGEABLE. On pouvait ajouter et
+  // supprimer, pas corriger : une faute de frappe obligeait à supprimer la
+  // ligne et à la recréer, ce qui perd son descriptif et son statut — et
+  // personne ne le fait, donc le mauvais numéro reste.
+  const setProdNumero = async (id, numero) => {
+    const v = (numero || '').trim()
+    if (!v) return
+    await supabase.from("producteurs").update({ numero_producteur: v, updated_at: new Date().toISOString() }).eq("id", id)
     await reloadProd()
   }
   const setProdDescriptif = async (id, descriptif) => {
@@ -470,7 +482,7 @@ export default function CompagniesView() {
         </div>
       )}
 
-      {modal && <CieFormModal cie={modal} comptes={comptesDe(modal)} logos={logos} onClose={() => setModal(null)} onSave={handleSave} onDelete={delCie} onAddProd={addProd} onSetStatut={setProdStatut} onSetDescriptif={setProdDescriptif} onDelProd={delProd} />}
+      {modal && <CieFormModal cie={modal} comptes={comptesDe(modal)} logos={logos} onClose={() => setModal(null)} onSave={handleSave} onDelete={delCie} onAddProd={addProd} onSetNumero={setProdNumero} onSetStatut={setProdStatut} onSetDescriptif={setProdDescriptif} onDelProd={delProd} />}
     </div>
   )
 }

@@ -77,6 +77,7 @@ export default function EncaissementProducteurView({ societeCodes = ['DYNASSUR']
   const [enregistre, setEnregistre] = useState(false)
   const [aRelier, setARelier] = useState(null)      // le versement qu'on relie
   const [candidats, setCandidats] = useState([])
+  const [candidatsGlobaux, setCandidatsGlobaux] = useState([])
   const [messageErreur, setMessageErreur] = useState(null)
 
   useEffect(() => {
@@ -109,6 +110,10 @@ export default function EncaissementProducteurView({ societeCodes = ['DYNASSUR']
         .eq('compte_id', ligne.compte_id).order('date_versement'),
     ])
     setDetail({ quittances: q.data || [], versements: v.data || [] })
+    const { data: tx } = await supabase.from('transactions')
+      .select('id,date_valeur,montant,contrepartie_nom,information_paiement')
+      .gt('montant', 0).order('date_valeur', { ascending: false }).limit(200)
+    setCandidatsGlobaux(tx || [])
   }
 
   // Après chaque écriture on relit LES DEUX : le détail et la ligne de solde.
@@ -131,6 +136,10 @@ export default function EncaissementProducteurView({ societeCodes = ['DYNASSUR']
       if (frais) setOuvert(frais)
     }
     setDetail({ quittances: q.data || [], versements: v.data || [] })
+    const { data: tx } = await supabase.from('transactions')
+      .select('id,date_valeur,montant,contrepartie_nom,information_paiement')
+      .gt('montant', 0).order('date_valeur', { ascending: false }).limit(200)
+    setCandidatsGlobaux(tx || [])
   }
 
   const nouveauVersement = () => {
@@ -189,6 +198,26 @@ export default function EncaissementProducteurView({ societeCodes = ['DYNASSUR']
       return dx - dy
     })
     setCandidats(tri)
+  }
+
+  /** L'ÉVIDENCE EST PROPOSÉE D'EMBLÉE, et elle seule.
+   *
+   *  Ludovic, le 10/11 : « je vois bien le paiement dans la banque, mais
+   *  qu'est-ce que je fais de ça ». Rien ne disait quoi faire d'un virement
+   *  non relié alors que le mouvement était là, à deux lignes.
+   *
+   *  La règle est stricte : MÊME MONTANT AU CENTIME, à sept jours près, et UN
+   *  SEUL candidat. Deux candidats au même montant, et on ne propose rien —
+   *  c'est exactement le cas où un rapprochement automatique se trompe sans
+   *  rien dire. La suggestion reste un bouton : c'est l'humain qui valide. */
+  const evidence = (versement) => {
+    if (!versement || versement.mode !== 'virement' || versement.transaction_id) return null
+    const m = Number(versement.montant)
+    const d = new Date(versement.date_versement)
+    const proches = candidatsGlobaux.filter(t =>
+      Math.abs(Number(t.montant) - m) < 0.005 &&
+      Math.abs((new Date(t.date_valeur) - d) / 86400000) <= 7)
+    return proches.length === 1 ? proches[0] : null
   }
 
   const relier = async (versementId, transactionId) => {
@@ -498,8 +527,20 @@ export default function EncaissementProducteurView({ societeCodes = ['DYNASSUR']
                             v.transaction_id
                               ? <button onClick={() => delier(v.id)} title="Détacher le mouvement bancaire"
                                   style={petitBouton(COUL.succes)}><i className="ti ti-link" /></button>
-                              : <button onClick={() => ouvrirLiaison(v)} title="Relier à un mouvement bancaire"
-                                  style={petitBouton(COUL.alerte)}><i className="ti ti-link-off" /></button>
+                              : (() => {
+                                  const sug = evidence(v)
+                                  return sug ? (
+                                    <button onClick={() => relier(v.id, sug.id)}
+                                      title={`Un seul mouvement correspond : ${fmtDate(sug.date_valeur)} — ${fmt(sug.montant)}\nCliquer pour le relier`}
+                                      style={{ ...petitBouton(COUL.succes), width: 'auto', padding: '0 8px',
+                                        fontSize: 11.5, fontWeight: 700, gap: 4 }}>
+                                      <i className="ti ti-link" /> relier
+                                    </button>
+                                  ) : (
+                                    <button onClick={() => ouvrirLiaison(v)} title="Choisir le mouvement bancaire"
+                                      style={petitBouton(COUL.alerte)}><i className="ti ti-link-off" /></button>
+                                  )
+                                })()
                           )}
                           <button onClick={() => supprimerVersement(v.id)} title="Supprimer ce versement"
                             style={petitBouton(COUL.danger)}><i className="ti ti-trash" /></button>
