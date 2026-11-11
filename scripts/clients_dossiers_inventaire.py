@@ -262,9 +262,26 @@ def main() -> int:
     orphelins = {}     # emplacement → [noms sans client correspondant]
     sites = {}
 
+    indisponibles = []
+
     for libelle, site, racine in EMPLACEMENTS:
-        sid = sites[libelle] = site_id(jeton, site)
-        enfants = dossiers_enfants(jeton, sid, racine)
+        # UNE ARBORESCENCE INJOIGNABLE NE DOIT PAS EMPORTER L'AUTRE.
+        # L'application Graph est autorisee site par site (Sites.Selected).
+        # Mesure du 11/11/2026 : ADMINISTRATION repond, DYNASSUR rend 403.
+        # L'ancien code abandonnait alors TOUT, y compris les 5 577 dossiers
+        # d'ADMINISTRATION qu'il venait de lire — un inventaire qui a la
+        # moitie de la reponse doit rendre cette moitie, pas rien.
+        try:
+            sid = sites[libelle] = site_id(jeton, site)
+            enfants = dossiers_enfants(jeton, sid, racine)
+        except (urllib.error.HTTPError, SystemExit) as e:
+            code = getattr(e, "code", "?")
+            print(f"\n::warning::{libelle}/{racine} INJOIGNABLE ({code}) — "
+                  f"l'inventaire continue sans cette arborescence.")
+            indisponibles.append(libelle)
+            sites.pop(libelle, None)
+            trouves[libelle], orphelins[libelle] = {}, []
+            continue
         print(f"\n{libelle}/{racine} : {len(enfants)} dossiers")
         trouves[libelle], orphelins[libelle] = {}, []
         for item in enfants:
@@ -278,11 +295,14 @@ def main() -> int:
         print(f"  sans client correspondant : {len(orphelins[libelle])}")
 
     a, b = EMPLACEMENTS[0][0], EMPLACEMENTS[1][0]
-    sid_a, sid_b = sites[a], sites[b]
+    sid_a, sid_b = sites.get(a), sites.get(b)
     communs = set(trouves[a]) & set(trouves[b])
-    print(f"\nPresents aux DEUX endroits : {len(communs)}")
-    print(f"Seulement dans {a} : {len(set(trouves[a]) - set(trouves[b]))}")
-    print(f"Seulement dans {b} : {len(set(trouves[b]) - set(trouves[a]))}")
+    if indisponibles:
+        print(f"\nComparaison impossible : {', '.join(indisponibles)} injoignable(s).")
+    else:
+        print(f"\nPresents aux DEUX endroits : {len(communs)}")
+        print(f"Seulement dans {a} : {len(set(trouves[a]) - set(trouves[b]))}")
+        print(f"Seulement dans {b} : {len(set(trouves[b]) - set(trouves[a]))}")
 
     # ── Ce que la fusion ecraserait reellement ───────────────────────────
     conflits = {}          # prefixe → (ecrases, apportes, conserves)
@@ -307,6 +327,34 @@ def main() -> int:
         print(f"  Fichiers CONSERVES (seulement dans {a}, perdus si on ecrasait")
         print(f"    au niveau du dossier au lieu du fichier) : {tot_conserves}")
 
+    # ── Combien de fichiers chaque dossier contient-il reellement ───────
+    # L'extraction depuis Qlik est en cours : la plupart des dossiers sont
+    # crees mais encore VIDES. Compter dit ou en est le versement, et quels
+    # clients ont deja de la matiere a lire. Un dossier vide n'est pas une
+    # anomalie aujourd'hui, c'est une attente — l'ecart se mesure, il ne se
+    # devine pas.
+    nb_fichiers = {}
+    if FICHIERS and sid_a:
+        print(f"\nComptage des fichiers dans {len(trouves[a])} dossiers de {a}…")
+        vides = 0
+        for i, (prefixe, item) in enumerate(sorted(trouves[a].items()), 1):
+            try:
+                n = len(arbre_fichiers(jeton, sid_a, item["id"]))
+            except Exception:
+                n = -1          # illisible : distingue de « vide »
+            nb_fichiers[prefixe] = n
+            if n == 0:
+                vides += 1
+            if i % 500 == 0:
+                print(f"  {i}/{len(trouves[a])}…", flush=True)
+        total = sum(n for n in nb_fichiers.values() if n > 0)
+        avec = sum(1 for n in nb_fichiers.values() if n > 0)
+        illisibles = sum(1 for n in nb_fichiers.values() if n < 0)
+        print(f"\n  Dossiers AVEC au moins un fichier : {avec}")
+        print(f"  Dossiers VIDES : {vides}")
+        print(f"  Dossiers illisibles : {illisibles}")
+        print(f"  FICHIERS AU TOTAL : {total}")
+
     sans_dossier = [c for c in clients
                     if nom_sharepoint_actuel(c["dossier"]) not in trouves[a]
                     and nom_sharepoint_actuel(c["dossier"]) not in trouves[b]]
@@ -317,7 +365,8 @@ def main() -> int:
         w.writerow(["dossier", "nom", "prenom", "nouveau_nom",
                     f"dans_{a}", f"dans_{b}", "modifie_" + a, "modifie_" + b,
                     "present_aux_deux", "suffixe_conserve",
-                    "fichiers_ecrases", "fichiers_apportes", "fichiers_conserves"])
+                    "fichiers_ecrases", "fichiers_apportes", "fichiers_conserves",
+                    f"nb_fichiers_{a}"])
         for c in sorted(clients, key=lambda x: cles[x["dossier"]]):
             p = nom_sharepoint_actuel(c["dossier"])
             ia, ib = trouves[a].get(p), trouves[b].get(p)
@@ -332,12 +381,13 @@ def main() -> int:
                 len(conflits.get(p, ([], [], []))[0]),
                 len(conflits.get(p, ([], [], []))[1]),
                 len(conflits.get(p, ([], [], []))[2]),
+                nb_fichiers.get(p, ""),
             ])
         for libelle in (a, b):
             for nom in sorted(orphelins[libelle]):
                 w.writerow(["", "", "", "", nom if libelle == a else "",
                             nom if libelle == b else "", "", "", "", "ORPHELIN",
-                            "", "", ""])
+                            "", "", "", ""])
 
     print(f"\nCSV ecrit : {SORTIE}")
     print("Rien n'a ete modifie dans SharePoint.")
