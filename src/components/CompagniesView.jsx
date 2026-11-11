@@ -28,18 +28,35 @@ const STATUT_PROD = {
   cloture: { label:"Clôturé",  couleur:"#8A9BBE" },
 }
 
-function CieFormModal({ cie, comptes = [], logos = [], onClose, onSave, onDelete, onAddProd, onSetStatut, onSetDescriptif, onDelProd }) {
+function CieFormModal({ cie, comptes = [], logos = [], onClose, onSave, onDelete, onAddProd, onSetNumero, onSetStatut, onSetDescriptif, onDelProd }) {
   const isNew = !cie.id
   const [form, setForm] = useState({ ...cie })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
-  const [newProd, setNewProd] = useState({ numero:"", fsma:"", descriptif:"" })
+  // LA FSMA N'EST PAS SAISIE : elle appartient à la compagnie.
+  // Règle donnée par Ludovic le 11/11/2026 — un numéro FSMA pour un nom de
+  // compagnie, c'est un numéro unique. La retaper sur chaque compte producteur
+  // ouvre la porte à deux valeurs différentes pour la même compagnie, et c'est
+  // alors l'écran qui décide laquelle est vraie. Elle vient de `form.numero`.
+  const [newProd, setNewProd] = useState({ numero:"", descriptif:"" })
+  const [prodMsg, setProdMsg] = useState("")
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
+  // UN BOUTON QUI NE DIT RIEN PASSE POUR UN BOUTON CASSÉ.
+  // C'est exactement ce qui s'est produit : l'insertion était lancée sans
+  // jamais regarder l'erreur, donc un refus de la base ressemblait à un clic
+  // sans effet. Chaque cas a maintenant sa phrase.
   const ajouterProd = async () => {
-    if (!newProd.numero.trim()) return
-    await onAddProd({ id: form.id, nom: form.nom }, newProd.numero.trim(), newProd.fsma.trim(), newProd.descriptif.trim())
-    setNewProd({ numero:"", fsma:"", descriptif:"" })
+    const num = newProd.numero.trim()
+    if (!num) { setProdMsg("Il faut un numéro de producteur."); return }
+    if (!form.id) { setProdMsg("Enregistre d'abord la compagnie : un compte producteur doit s'y rattacher."); return }
+    if (comptes.some(p => (p.numero_producteur || "").trim() === num)) {
+      setProdMsg("Ce numéro existe déjà pour cette compagnie."); return
+    }
+    setProdMsg("")
+    const err = await onAddProd({ id: form.id, nom: form.nom }, num, (form.numero || "").trim(), newProd.descriptif.trim())
+    if (err) { setProdMsg(err); return }
+    setNewProd({ numero:"", descriptif:"" })
   }
   const supprimerCie = async () => {
     if (comptes.length > 0) { setError("Cette compagnie a des numéros de producteur : désactive-la plutôt que la supprimer."); return }
@@ -111,7 +128,9 @@ function CieFormModal({ cie, comptes = [], logos = [], onClose, onSave, onDelete
                     const st = STATUT_PROD[p.statut] || STATUT_PROD.actif
                     return (
                     <div key={p.id} style={{ display:"flex", alignItems:"center", gap:8, background:COUL.surface, border:`1px solid ${C.border}`, borderRadius:6, padding:"6px 8px" }}>
-                      <span style={{ fontSize:12, fontWeight:700, color:C.navy, fontFamily:"monospace" }}>{p.numero_producteur}</span>
+                      <input defaultValue={p.numero_producteur} title="Numéro de compte producteur — corrigeable"
+                        onBlur={e => { const v = e.target.value.trim(); if (v && v !== p.numero_producteur) onSetNumero(p.id, v) }}
+                        style={{ ...D.input, width:110, fontSize:12, fontWeight:700, fontFamily:"monospace", color:C.navy, padding:"4px 8px" }} />
                       {p.fsma && <span style={{ fontSize:10, color:C.textL }}>FSMA {p.fsma}</span>}
                       {/* À quoi sert ce compte : AG en a cinq, Record un PAT et un PH. */}
                       <input defaultValue={p.descriptif || ""} placeholder="À quoi sert ce compte ? (PH, PAT, portefeuille…)"
@@ -128,12 +147,22 @@ function CieFormModal({ cie, comptes = [], logos = [], onClose, onSave, onDelete
                     </div>
                   )})}
                 </div>
-                <div style={{ display:"flex", gap:6, marginTop:8, flexWrap:"wrap" }}>
-                  <input style={{ ...D.input, width:150 }} placeholder="Nouveau n° producteur" value={newProd.numero} onChange={e => setNewProd(n => ({ ...n, numero:e.target.value }))} />
-                  <input style={{ ...D.input, width:90 }} placeholder="FSMA" value={newProd.fsma} onChange={e => setNewProd(n => ({ ...n, fsma:e.target.value }))} />
+                <div style={{ display:"flex", gap:6, marginTop:8, flexWrap:"wrap", alignItems:"center" }}>
+                  <input style={{ ...D.input, width:150 }} placeholder="Nouveau n° producteur" value={newProd.numero}
+                    onChange={e => { setNewProd(n => ({ ...n, numero:e.target.value })); setProdMsg("") }}
+                    onKeyDown={e => e.key === "Enter" && ajouterProd()} />
+                  <span style={{ fontSize:11.5, color:C.textL, whiteSpace:"nowrap" }}>
+                    FSMA <b style={{ color:C.textD }}>{form.numero || "—"}</b>
+                  </span>
                   <input style={{ ...D.input, flex:1, minWidth:140 }} placeholder="Descriptif (PH, PAT, portefeuille…)" value={newProd.descriptif} onChange={e => setNewProd(n => ({ ...n, descriptif:e.target.value }))} />
                   <button style={D.btn("ghost")} onClick={ajouterProd}>➕ Ajouter</button>
                 </div>
+                {prodMsg && <div style={{ marginTop:6, fontSize:12.5, color:C.danger }}>{prodMsg}</div>}
+                {!form.numero && (
+                  <div style={{ marginTop:6, fontSize:11.5, color:C.textL }}>
+                    Cette compagnie n'a pas de numéro FSMA : renseigne-le ci-dessous, il sera repris sur tous ses comptes producteur.
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -261,12 +290,25 @@ export default function CompagniesView() {
     const { data } = await supabase.from("producteurs").select("*").order("compagnie_nom")
     setProducteurs(Array.isArray(data) ? data : [])
   }
+  // RENVOIE L'ERREUR au lieu de l'avaler : c'est l'appelant qui l'affiche.
   const addProd = async (cie, numero, fsma, descriptif) => {
-    await supabase.from("producteurs").insert({ numero_producteur:numero, fsma:fsma||null, descriptif:descriptif||null, compagnie_id:cie.id, compagnie_nom:cie.nom, statut:"actif" })
+    const { error } = await supabase.from("producteurs").insert({ numero_producteur:numero, fsma:fsma||null, descriptif:descriptif||null, compagnie_id:cie.id, compagnie_nom:cie.nom, statut:"actif" })
+    if (error) return error.message
     await reloadProd()
+    return null
   }
   const setProdStatut = async (id, statut) => {
     await supabase.from("producteurs").update({ statut, updated_at:new Date().toISOString() }).eq("id", id)
+    await reloadProd()
+  }
+  // LE NUMÉRO LUI-MÊME DOIT ÊTRE CORRIGEABLE. On pouvait ajouter et
+  // supprimer, pas corriger : une faute de frappe obligeait à supprimer la
+  // ligne et à la recréer, ce qui perd son descriptif et son statut — et
+  // personne ne le fait, donc le mauvais numéro reste.
+  const setProdNumero = async (id, numero) => {
+    const v = (numero || '').trim()
+    if (!v) return
+    await supabase.from("producteurs").update({ numero_producteur: v, updated_at: new Date().toISOString() }).eq("id", id)
     await reloadProd()
   }
   const setProdDescriptif = async (id, descriptif) => {
@@ -470,7 +512,7 @@ export default function CompagniesView() {
         </div>
       )}
 
-      {modal && <CieFormModal cie={modal} comptes={comptesDe(modal)} logos={logos} onClose={() => setModal(null)} onSave={handleSave} onDelete={delCie} onAddProd={addProd} onSetStatut={setProdStatut} onSetDescriptif={setProdDescriptif} onDelProd={delProd} />}
+      {modal && <CieFormModal cie={modal} comptes={comptesDe(modal)} logos={logos} onClose={() => setModal(null)} onSave={handleSave} onDelete={delCie} onAddProd={addProd} onSetNumero={setProdNumero} onSetStatut={setProdStatut} onSetDescriptif={setProdDescriptif} onDelProd={delProd} />}
     </div>
   )
 }

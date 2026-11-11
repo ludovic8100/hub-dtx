@@ -122,12 +122,40 @@ function ActsModal({ titre, rows, onClose }) {
   const [contratNum, setContratNum] = useState(null)
   const COLS = [
     { key:'mois',        label:'Mois',       get:d=>(d.annee||0)*100+parseInt(d.mois||0), render:d=>`${moisNum(d.mois)}/${d.annee}` },
-    { key:'type_prod',   label:'Type',       get:d=>d.type_prod||'', render:d=>{ const cfg=TYPES_PROD[d.type_prod]||{col:COUL.texteFaible}; return <Badge label={d.type_prod} col={cfg.col} /> } },
+    // LE BADGE MONTRAIT LA VALEUR BRUTE DE LA BASE, pas son libellé. « Renon »
+    // s'affichait tel quel alors que la table des types dit « Résiliation ».
+    // Ludovic : « une résiliation : comment tu sais que c'en est une ? c'est
+    // noté nulle part ». C'était noté — en jargon de la source.
+    // La valeur d'origine reste au survol : c'est elle qu'on cherche quand on
+    // remonte à la donnée.
+    { key:'type_prod',   label:'Type',       get:d=>d.type_prod||'', render:d=>{ const cfg=TYPES_PROD[d.type_prod]||{col:COUL.texteFaible}; return <span title={`Valeur en base : ${d.type_prod||'—'}`}><Badge label={cfg.label ? cfg.label.replace(/s$/,'') : (d.type_prod||'—')} col={cfg.col} /></span> } },
     { key:'agent_code',  label:'Agent',      get:d=>AGENT_NOMS[d.agent_code]||d.agent_code||'', render:d=>AGENT_NOMS[d.agent_code]||d.agent_code||'—' },
-    { key:'client_nom',  label:'Client',     get:d=>d.client_nom||'', render:d=><span style={{ fontWeight:600, color:NAVY }}>{d.client_nom||'—'}</span> },
+    // UN VRAI <a href>, PAS UN onClick. Ctrl+clic, clic du milieu et « ouvrir
+    // dans un nouvel onglet » sont des comportements du navigateur : ils ne
+    // marchent que sur un lien. Un <span onClick> les supprime tous les trois
+    // sans rien dire, et c'est ce que Ludovic a constaté.
+    { key:'client_nom',  label:'Client',     get:d=>d.client_nom||'',
+      render:d=> d.client_nom ? (
+        <a href={d.dossier ? `/dynassur/clients?dossier=${encodeURIComponent(d.dossier)}` : undefined}
+           onClick={e=>e.stopPropagation()}
+           title={d.dossier ? 'Ouvrir la fiche client — Ctrl+clic pour un nouvel onglet' : 'Dossier inconnu pour cette ligne'}
+           style={{ fontWeight:600, color:d.dossier?BLUE:NAVY, textDecoration:d.dossier?'underline':'none',
+                    textUnderlineOffset:2, cursor:d.dossier?'pointer':'default' }}>
+          {d.client_nom}
+        </a>
+      ) : '—' },
     { key:'branche',     label:'Branche',    get:d=>d.branche||'', render:d=>d.branche||'—' },
     { key:'compagnie',   label:'Compagnie',  get:d=>d.compagnie||'', render:d=>d.compagnie||'—' },
-    { key:'num_contrat', label:'N° contrat', get:d=>d.num_contrat||'', render:d=>d.num_contrat ? <span onClick={e=>{ e.stopPropagation(); setContratNum(d.num_contrat) }} style={{ color:BLUE, fontWeight:700, cursor:'pointer', textDecoration:'underline', textUnderlineOffset:2 }} title="Voir le contrat">{d.num_contrat}</span> : '—' },
+    { key:'num_contrat', label:'N° contrat', get:d=>d.num_contrat||'',
+      render:d=>d.num_contrat ? (
+        // Clic simple : le panneau, sans quitter la liste. Ctrl+clic : la
+        // fiche du client dans un onglet, parce que c'est là que vit le
+        // contrat. Le lien porte donc une vraie adresse ET un gestionnaire.
+        <a href={d.dossier ? `/dynassur/clients?dossier=${encodeURIComponent(d.dossier)}` : undefined}
+           onClick={e=>{ if (e.ctrlKey||e.metaKey||e.button===1) return; e.preventDefault(); e.stopPropagation(); setContratNum(d.num_contrat) }}
+           style={{ color:BLUE, fontWeight:700, cursor:'pointer', textDecoration:'underline', textUnderlineOffset:2 }}
+           title="Voir le contrat — Ctrl+clic pour ouvrir la fiche client dans un onglet">{d.num_contrat}</a>
+      ) : '—' },
   ]
   const [sort, setSort] = useState({ key:'mois', dir:'desc' })
   const sorted = [...rows].sort((a,b) => {
@@ -310,12 +338,27 @@ function OngletGlobal({ onDetail }) {
         if (error || !data || !data.length) break
         all.push(...data); if (data.length < 1000) break; from += 1000
       }
+      // LE DOSSIER CLIENT N'EST PAS DANS `mouvements_production` — la table
+      // porte un nom de client et une police, pas de clé vers `clients`. Sans
+      // lui, un lien « ouvrir la fiche » n'aurait aucune adresse. On le
+      // résout par la POLICE, qui est la seule donnée fiable des deux côtés :
+      // un nom se tape de dix façons, un numéro de police non.
+      const polices = [...new Set(all.map(d => d.num_contrat).filter(Boolean))]
+      const parPolice = {}
+      for (let i = 0; i < polices.length; i += 300) {
+        const { data } = await supabase.from('contrats')
+          .select('police,dossier').in('police', polices.slice(i, i + 300))
+        ;(data || []).forEach(c => { if (c.police && c.dossier) parPolice[c.police] = c.dossier })
+      }
+
       const Y = new Date().getFullYear()
       const mapped = all
         .filter(d => d.annee >= 2020 && d.annee <= Y)
         .map(d => {
           const code = nameToCode[(d.agent_code || '').trim()] || null
-          return { ...d, mois:String(d.mois).padStart(2,'0'), _code:code, _cat: code ? (base[code] || 'SA') : 'SA' }
+          return { ...d, mois:String(d.mois).padStart(2,'0'), _code:code,
+                   dossier: parPolice[d.num_contrat] || null,
+                   _cat: code ? (base[code] || 'SA') : 'SA' }
         })
       setMeta({ commercial, base })
       setRows(mapped)

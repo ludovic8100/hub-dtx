@@ -927,13 +927,28 @@ const normAdr = (...parts) => parts.map(x => x==null?'':String(x)).join(' ')
 
 // ── Modal détail contrat (garanties, objets couverts, primes/mensualités, sinistres) ──
 function ContratModal({ contrat, dossier, objets, onClose, preview, cies }) {
+  // LA PART SOUS-AGENT N'EST PAS POUR TOUT LE MONDE. C'est ce qu'on reverse,
+  // donc ce qui reste à Dynassur une fois déduite — une information de patron,
+  // pas une information de gestionnaire.
+  const { isAdmin:isAdminFiche }=useAuth()
   const [quit,setQuit]=useState([]); const [ld,setLd]=useState(true)
   useEffect(()=>{
     setLd(true)
-    supabase.from('quittances').select('prime_totale,periodicite,date_comptable,type_quittance,commission,compagnie,compte_producteur,gestionnaire,etat')
+    supabase.from('quittances')
+      .select('id,prime_totale,periodicite,date_comptable,type_quittance,commission,commission_sa,compagnie,compte_producteur,gestionnaire,sous_agent,etat,bordereau_id,bordereaux(id,nom_fichier,url_sharepoint,type,mois,annee)')
       .eq('dossier',dossier).eq('police',contrat.police).order('date_comptable',{ascending:false})
       .then(({data})=>{ setQuit(data||[]); setLd(false) })
   },[dossier,contrat.police])
+
+  // FILTRE PAR ANNÉE. Un contrat de cinq ans affiche soixante lignes
+  // mensuelles : sans filtre, le tableau devient une archive qu'on ne lit
+  // plus. L'année en cours par défaut, « toutes » à un clic.
+  const [anneeQ,setAnneeQ]=useState('toutes')
+  const anneesQ = [...new Set(quit.map(q=>String(q.date_comptable||'').slice(0,4)).filter(Boolean))].sort().reverse()
+  const quitVues = anneeQ==='toutes' ? quit : quit.filter(q=>String(q.date_comptable||'').startsWith(anneeQ))
+  const totPrimes = quitVues.reduce((s,q)=>s+(Number(q.prime_totale)||0),0)
+  const totComm   = quitVues.reduce((s,q)=>s+(Number(q.commission)||0),0)
+  const totCommSA = quitVues.reduce((s,q)=>s+(Number(q.commission_sa)||0),0)
 
   const obj=objets.filter(o=>o.police===contrat.police)
   const parObjet={}
@@ -1029,18 +1044,70 @@ function ContratModal({ contrat, dossier, objets, onClose, preview, cies }) {
                     <div style={{fontSize:15,fontWeight:800,color:'#1d4ed8'}}>{derniere.periodicite}</div>
                   </div>}
                 </div>}
-                <div style={{maxHeight:180,overflowY:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
+                <div style={{display:'flex',gap:7,flexWrap:'wrap',alignItems:'center',marginBottom:8}}>
+                  {['toutes',...anneesQ].map(a=>(
+                    <button key={a} onClick={()=>setAnneeQ(a)} style={{padding:'4px 11px',borderRadius:14,cursor:'pointer',
+                      fontFamily:'inherit',fontSize:12,fontWeight:700,
+                      border:anneeQ===a?'none':'1px solid #e2e8f0',
+                      background:anneeQ===a?NAVY:COUL.surface, color:anneeQ===a?COUL.blanc:COUL.texteDoux}}>
+                      {a==='toutes'?'Toutes':a}
+                    </button>
+                  ))}
+                  <span style={{marginLeft:'auto',fontSize:11.5,color:COUL.texteFaible}}>{quitVues.length} quittance(s)</span>
+                </div>
+
+                {/* LES TROIS TOTAUX, et ils ne disent pas la même chose :
+                    la prime est ce que le client paie, la commission ce que la
+                    compagnie nous verse, la part sous-agent ce qu'on reverse.
+                    Confondre les deux dernières fait croire qu'on gagne la
+                    somme entière. La part SA n'est montrée qu'à l'administrateur. */}
+                <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:9}}>
+                  {[['Primes',totPrimes,NAVY],
+                    ['Commission compagnie',totComm,COUL.succes],
+                    ...(isAdminFiche&&totCommSA>0?[['Dont part sous-agent',totCommSA,COUL.alerte]]:[])
+                   ].map(([l,v,c])=>(
+                    <div key={l} style={{background:COUL.fondDoux,border:'1px solid #e2e8f0',borderRadius:8,padding:'7px 12px'}}>
+                      <div style={{fontSize:10,fontWeight:700,color:COUL.texteFaible,textTransform:'uppercase'}}>{l}</div>
+                      <div style={{fontSize:15,fontWeight:800,color:c}}>{fmt(v)}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{maxHeight:220,overflowY:'auto',border:'1px solid #f1f5f9',borderRadius:7}}>
                   <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
-                    <thead style={{position:'sticky',top:0,background:COUL.fond}}><tr>{['Période','Prime','Périodicité','Type'].map(h=><th key={h} style={{padding:'6px 12px',textAlign:'left',fontWeight:700,color:COUL.texteFaible,fontSize:10,textTransform:'uppercase',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
+                    <thead style={{position:'sticky',top:0,background:COUL.fond}}><tr>{['Période','Prime','Commission','Type','État','Bordereau'].map(h=><th key={h} style={{padding:'6px 12px',textAlign:'left',fontWeight:700,color:COUL.texteFaible,fontSize:10,textTransform:'uppercase',borderBottom:'1px solid #e2e8f0',whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
                     <tbody>
-                      {quit.map((r,i)=>(
-                        <tr key={i} style={{background:i%2===0?'#fff':COUL.fondAlterne}}>
+                      {quitVues.map((r,i)=>{
+                        const impaye = (r.etat||'').toLowerCase()==='impayée'
+                        return (
+                        <tr key={r.id||i} style={{background:i%2===0?'#fff':COUL.fondAlterne}}>
                           <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',color:COUL.texteDoux,whiteSpace:'nowrap'}}>{fmtMois(r.date_comptable)}</td>
                           <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',fontWeight:600,color:NAVY}}>{fmt(r.prime_totale)}</td>
-                          <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',color:COUL.texteDoux}}>{r.periodicite||'—'}</td>
+                          <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',color:COUL.succes,fontWeight:600}}>
+                            {fmt(r.commission)}
+                            {isAdminFiche&&Number(r.commission_sa)>0&&
+                              <div style={{fontSize:10.5,color:COUL.alerte,fontWeight:600}}>SA {fmt(r.commission_sa)}</div>}
+                          </td>
                           <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9',color:COUL.texteDoux}}>{r.type_quittance||'—'}</td>
+                          <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9'}}>
+                            <span style={{fontSize:10.5,fontWeight:700,padding:'1px 7px',borderRadius:9,
+                              background:impaye?COUL.dangerFond:COUL.succesFondDoux,
+                              color:impaye?COUL.danger:COUL.succes}}>{r.etat||'—'}</span>
+                          </td>
+                          <td style={{padding:'6px 12px',borderBottom:'1px solid #f1f5f9'}}>
+                            {r.bordereaux
+                              ? <a href={r.bordereaux.url_sharepoint||'#'} target="_blank" rel="noreferrer"
+                                  onClick={e=>{ if(!r.bordereaux.url_sharepoint) e.preventDefault() }}
+                                  title={r.bordereaux.nom_fichier}
+                                  style={{color:'#1d4ed8',fontWeight:700,textDecoration:'none',whiteSpace:'nowrap'}}>
+                                  <i className="ti ti-file-description"/> {r.bordereaux.type} {r.bordereaux.mois}/{r.bordereaux.annee}
+                                </a>
+                              : <span title="Aucun bordereau rattaché" style={{color:COUL.alerte,fontWeight:700,whiteSpace:'nowrap'}}>
+                                  <i className="ti ti-file-alert"/> aucun
+                                </span>}
+                          </td>
                         </tr>
-                      ))}
+                      )})}
                     </tbody>
                   </table>
                 </div>
@@ -1488,6 +1555,13 @@ export default function DynassurClients() {
   const [kpis,setKpis]       = useState(null)
   const [counts,setCounts]   = useState({mine:0,bureau:0,total:0})
   const [scope,setScope]     = useState('all')
+  // VOIR TOUS LES CLIENTS, sans avoir à taper quelque chose.
+  // La vue par défaut est « derniers clients consultés » : dans une base
+  // neuve, ou pour quelqu'un qui n'a encore ouvert aucune fiche, elle est
+  // VIDE — et il n'existait aucun moyen d'atteindre la liste complète
+  // autrement qu'en devinant un nom. Un écran qui n'offre aucune porte
+  // d'entrée à qui arrive pour la première fois est un écran cassé.
+  const [toutVoir,setToutVoir] = useState(false)
   const [q,setQ]             = useState('')
   const [clients,setClients] = useState([])
   const [total,setTotal]     = useState(0)
@@ -1693,7 +1767,7 @@ export default function DynassurClients() {
   if(relanceActif) relanceView = relanceView.filter(c=>c.tranche===contactFilter)
   if(q.length>=2){ const s=q.toLowerCase(); relanceView = relanceView.filter(c=>`${c.nom} ${c.prenom} ${c.dossier}`.toLowerCase().includes(s)) }
   const relanceShow = trierLignes(relanceView,COLS_RELANCE,triRelance,parNom).slice(0,500)
-  const modeRecents = q.length<2 && contactFilter==='tous'   // vue par défaut = derniers clients consultés du bureau
+  const modeRecents = !toutVoir && q.length<2 && contactFilter==='tous'   // vue par défaut = derniers clients consultés du bureau
 
   return(
     <Layout currentPage="Clients">
@@ -1722,8 +1796,8 @@ export default function DynassurClients() {
               <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',padding:'12px 16px',borderBottom:'1px solid #f1f5f9'}}>
                 <div style={{display:'flex',alignItems:'center',gap:8}}>
                   <i className={modeRecents?"ti ti-history":"ti ti-calendar-heart"} style={{fontSize:18,color:COUL.teal}}/>
-                  <span style={{fontSize:15,fontWeight:800,color:NAVY}}>{modeRecents?'Derniers clients consultés':'Relance clients'}</span>
-                  <span style={{fontSize:12,color:COUL.texteFaible}}>{modeRecents?'· vos dernières fiches et celles de votre bureau':'· trie les clients par ancienneté du dernier contact'}</span>
+                  <span style={{fontSize:15,fontWeight:800,color:NAVY}}>{modeRecents?'Derniers clients consultés':toutVoir?'Tous les clients':'Relance clients'}</span>
+                  <span style={{fontSize:12,color:COUL.texteFaible}}>{modeRecents?'· vos dernières fiches et celles de votre bureau':toutVoir?'· la liste complète, triable et filtrable':'· trie les clients par ancienneté du dernier contact'}</span>
                 </div>
                 <div style={{display:'flex',gap:8,marginLeft:'auto',flexWrap:'wrap'}}>
                   <select value={scope} onChange={e=>setScope(e.target.value)} style={{padding:'7px 10px',borderRadius:8,border:'1px solid #e2e8f0',fontSize:13,fontFamily:'inherit',color:NAVY,background:COUL.surface}}>
@@ -1739,6 +1813,13 @@ export default function DynassurClients() {
                     <i className="ti ti-filter" style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:COUL.texteFaible,fontSize:14}}/>
                     <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Filtrer…" style={{padding:'7px 10px 7px 30px',borderRadius:8,border:`1px solid ${q?'#0d9488':COUL.bord}`,fontSize:13,fontFamily:'inherit',outline:'none',width:150,boxSizing:'border-box'}}/>
                   </div>
+                  <button onClick={()=>setToutVoir(v=>!v)}
+                    title={toutVoir?'Revenir aux derniers clients consultés':'Afficher la liste complète des clients'}
+                    style={{padding:'7px 12px',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',
+                      border:`1px solid ${toutVoir?'#0d9488':COUL.bord}`,
+                      background:toutVoir?'#0d9488':COUL.surface, color:toutVoir?COUL.blanc:NAVY}}>
+                    <i className="ti ti-list" style={{marginRight:5}}/>{toutVoir?'Liste complète':'Voir tous'}
+                  </button>
                 </div>
               </div>
 
@@ -1746,6 +1827,23 @@ export default function DynassurClients() {
                 <div style={{padding:'6px 0 4px'}}>
                   <RecentsBlock title="Vos derniers clients consultés" icon="ti-user" rows={recentsPerso} onOpen={openDossier} showWho={false} empty="Vous n'avez pas encore consulté de fiche — ouvrez un client via la recherche."/>
                   <RecentsBlock title={`Votre bureau${myBureauLib?` — ${myBureauLib}`:''}`} icon="ti-building" rows={recentsBureau} onOpen={openDossier} showWho={true} empty="Aucune fiche consultée récemment par vos collègues."/>
+                  {/* ⚠️ `recentsPerso` et `recentsBureau` valent NULL tant que la
+                      requête n'a pas répondu, pas []. Écrire `.length` dessus
+                      plante toute la page au premier rendu — et c'est ce qui
+                      s'est produit. Le `?.` n'est pas une précaution de style
+                      ici : c'est la différence entre « pas encore chargé » et
+                      « chargé et vide », que seul `null` distingue. */}
+                  {!recentsPerso?.length && !recentsBureau?.length && (
+                    <div style={{padding:'14px 18px 18px',textAlign:'center'}}>
+                      <p style={{margin:'0 0 10px',fontSize:13.5,color:COUL.texteFaible}}>
+                        Aucun historique de consultation — c'est normal sur un compte neuf.
+                      </p>
+                      <button onClick={()=>setToutVoir(true)} style={{padding:'9px 18px',borderRadius:9,border:'none',
+                        background:'#0d9488',color:COUL.blanc,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+                        Voir tous les clients
+                      </button>
+                    </div>
+                  )}
                 </div>
               ):relance===null?(
                 <p style={{padding:30,textAlign:'center',color:COUL.texteFaible}}>Chargement de la relance…</p>
