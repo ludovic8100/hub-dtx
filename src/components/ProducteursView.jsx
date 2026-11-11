@@ -17,14 +17,14 @@ export default function ProducteursView() {
   const [search, setSearch] = useState('')
   const [filtreComp, setFiltreComp] = useState('')
   const [loading, setLoading] = useState(true)
-  const [nouveau, setNouveau] = useState({ numero: '', fsma: '', compagnie_id: '' })
+  const [nouveau, setNouveau] = useState({ numero: '', compagnie_id: '' })
   const [msg, setMsg] = useState(null)
 
   const load = async () => {
     setLoading(true)
     const [p, c] = await Promise.all([
       supabase.from('producteurs').select('id,numero_producteur,fsma,compagnie_id,compagnie_nom,statut').order('compagnie_nom'),
-      supabase.from('compagnies').select('id,nom').order('nom'),
+      supabase.from('compagnies').select('id,nom,numero').order('nom'),
     ])
     setProds(Array.isArray(p.data) ? p.data : [])
     setCies(Array.isArray(c.data) ? c.data : [])
@@ -33,6 +33,8 @@ export default function ProducteursView() {
   useEffect(() => { load() }, [])
 
   const cieNom = useMemo(() => { const m = {}; cies.forEach(c => m[c.id] = c.nom); return m }, [cies])
+  // La FSMA vient de la compagnie, jamais de la saisie.
+  const cieFsma = useMemo(() => { const m = {}; cies.forEach(c => m[c.id] = c.numero); return m }, [cies])
 
   const setStatut = async (id, statut) => {
     setProds(ps => ps.map(p => p.id === id ? { ...p, statut } : p))
@@ -67,13 +69,13 @@ export default function ProducteursView() {
     setMsg(null)
     const { error } = await supabase.from('producteurs').insert({
       numero_producteur: num,
-      fsma: (nouveau.fsma || '').trim() || null,
+      fsma: cieFsma[nouveau.compagnie_id] || null,
       compagnie_id: nouveau.compagnie_id,
       compagnie_nom: cieNom[nouveau.compagnie_id] || null,
       statut: 'actif',
     })
     if (error) { setMsg(error.message); return }
-    setNouveau({ numero: '', fsma: '', compagnie_id: '' })
+    setNouveau({ numero: '', compagnie_id: '' })
     await load()
   }
 
@@ -157,9 +159,12 @@ export default function ProducteursView() {
             placeholder="N° producteur"
             style={{ padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13,
               width: 150, fontFamily: 'monospace', fontWeight: 700 }} />
-          <input value={nouveau.fsma} onChange={e => setNouveau(n => ({ ...n, fsma: e.target.value }))}
-            placeholder="FSMA (facultatif)"
-            style={{ padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, width: 140 }} />
+          {/* LA FSMA NE SE TAPE PAS : elle appartient à la compagnie.
+              Un numéro FSMA pour un nom de compagnie — la retaper par compte
+              producteur permettrait deux valeurs pour la même compagnie. */}
+          <span style={{ fontSize: 12.5, color: COUL.texteDoux, whiteSpace: 'nowrap' }}>
+            FSMA <b style={{ color: COUL.texte }}>{cieFsma[nouveau.compagnie_id] || '—'}</b>
+          </span>
           <select value={nouveau.compagnie_id} onChange={e => setNouveau(n => ({ ...n, compagnie_id: e.target.value }))}
             style={{ padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, minWidth: 200 }}>
             <option value="">— choisir la compagnie —</option>
