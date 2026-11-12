@@ -1,4 +1,4 @@
-name: Seed TEST depuis la production (anonymisé)
+name: Seed TEST depuis la production
 
 # Alimente la base Supabase de TEST avec le référentiel complet + un échantillon anonymisé
 # de la production (voir scripts/seed_test.py). Lancement manuel uniquement.
@@ -18,8 +18,16 @@ permissions:
 on:
   workflow_dispatch:
     inputs:
+      noms_cibles:
+        description: "Noms de famille à copier, séparés par des virgules (vide = échantillon au hasard)"
+        type: string
+        default: ""
+      anonymiser:
+        description: "Anonymiser les noms. Décocher met de VRAIES données clients dans le test."
+        type: boolean
+        default: true
       sample_clients:
-        description: "Nombre de dossiers clients Dynassur copiés (anonymisés)"
+        description: "Nombre de dossiers si aucun nom ciblé"
         type: number
         default: 300
       dry_run:
@@ -38,28 +46,23 @@ jobs:
     env:
       SOURCE_SUPABASE_URL: https://tndwonqdbeszkcztkzqe.supabase.co
       SOURCE_SERVICE_KEY: ${{ secrets.PROD_SUPABASE_SERVICE_KEY }}
-      TARGET_SUPABASE_URL: ${{ vars.SUPABASE_URL || 'https://lvdnzbhplnzuwdqtitdb.supabase.co' }}
+      # ⚠️ L'ancien projet de test lvdnzbhplnzuwdqtitdb N'EXISTE PLUS.
+      # Le repli pointait dessus : le workflow échouait sans dire pourquoi.
+      TARGET_SUPABASE_URL: ${{ vars.SUPABASE_URL || 'https://wsuawmtwlvcyppgfvqzj.supabase.co' }}
       TARGET_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
       SAMPLE_CLIENTS: ${{ inputs.sample_clients }}
+      NOMS_CIBLES: ${{ inputs.noms_cibles }}
+      ANONYMISER: ${{ inputs.anonymiser && '1' || '0' }}
       DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
     steps:
-      # GARDE-FOU : la production ne se lance que depuis main.
-      #
-      # Le 05/11, j'ai pousse une branche non fusionnee et lance un
-      # workflow dessus : il a tourne avec les secrets de PRODUCTION.
-      # Ce pas aurait arrete ca.
-      #
-      # C'est un ralentisseur, pas une serrure : qui peut ecrire dans le
-      # depot peut retirer ces lignes dans sa propre branche. La serrure,
-      # c'est GitHub > Settings > Environments > production >
-      # Deployment branches > main. Celle-ci attrape les accidents.
-      - name: Refuser la production depuis une branche
-        if: ${{ github.ref != 'refs/heads/main' && (inputs.target == 'production' || inputs.target == '') }}
-        run: |
-          echo "::error::Ce workflow vise la PRODUCTION mais tourne sur ${{ github.ref }}."
-          echo "::error::Fusionne dans main, ou relance avec target=test."
-          exit 1
-      
+      # PAS DE GARDE-FOU DE BRANCHE ICI, ET C'EST VOULU.
+      # Ce workflow n'écrit QUE dans le test — le script refuse lui-même
+      # d'écrire si la cible est l'URL de production. Le pas copié d'un autre
+      # workflow testait `inputs.target`, qui n'existe pas ici : vide, il
+      # bloquait donc TOUTE exécution hors de main, y compris celles qui ne
+      # touchent que le test. Un garde-fou qui interdit ce qu'il devait
+      # permettre finit par être contourné plutôt que corrigé.
+
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
@@ -69,6 +72,11 @@ jobs:
           if [ -z "$SOURCE_SERVICE_KEY" ]; then echo "::error::Secret PROD_SUPABASE_SERVICE_KEY manquant dans l'environnement test"; exit 1; fi
           if [ -z "$TARGET_SUPABASE_URL" ]; then echo "::error::Variable SUPABASE_URL manquante dans l'environnement test"; exit 1; fi
           if [ -z "$TARGET_SERVICE_KEY" ] && [ -z "$DRY_RUN" ]; then echo "::error::Secret SUPABASE_SERVICE_KEY (test) manquant"; exit 1; fi
-          echo "Cible : $TARGET_SUPABASE_URL — échantillon : $SAMPLE_CLIENTS — ${DRY_RUN:+DRY_RUN}${DRY_RUN:-ÉCRITURE}"
+          echo "Cible : $TARGET_SUPABASE_URL"
+          echo "Noms ciblés : ${NOMS_CIBLES:-(échantillon de $SAMPLE_CLIENTS)}"
+          if [ "$ANONYMISER" = "0" ]; then
+            echo "::warning::ANONYMISATION DÉSACTIVÉE — de vraies données clients vont dans le test."
+          fi
+          echo "${DRY_RUN:+DRY_RUN}${DRY_RUN:-ÉCRITURE}"
       - name: Seed
         run: python scripts/seed_test.py

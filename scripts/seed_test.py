@@ -10,7 +10,24 @@ Variables d'environnement :
   SOURCE_SUPABASE_URL   (def: production)        SOURCE_SERVICE_KEY   service_role PROD  [requis]
   TARGET_SUPABASE_URL   URL du projet TEST        TARGET_SERVICE_KEY   service_role TEST  [requis]
   SAMPLE_CLIENTS        nb de dossiers clients copiés (def: 300)
+  NOMS_CIBLES           noms de famille séparés par des virgules — copie CES clients-là au
+                        lieu d'un échantillon au hasard. Ex: "DETILLOUX,LORANGE,LUYKS"
+  ANONYMISER            "0" => garde les vrais noms. Voir l'avertissement ci-dessous.
   DRY_RUN               "1" => lit la prod, anonymise, affiche, n'écrit rien dans TEST
+
+⚠️ ANONYMISER=0 — POURQUOI CETTE PORTE EXISTE, ET CE QU'ELLE COÛTE.
+
+Demandé par Ludovic le 11/11/2026 : « je voudrais qu'on utilise de vraies données dans la
+base test. Il m'est plus facile de travailler sur de vraies données que je connais plutôt
+que sur des données imaginaires. » C'est un argument réel : sur un pseudonyme, une
+incohérence ne saute pas aux yeux ; sur un client qu'on connaît, si.
+
+Mais alors la base de TEST contient de VRAIES DONNÉES CLIENTS, et tout ce qui la protège
+d'habitude doit l'être autant que la production :
+  • `anon` y est fermé sur toutes les relations (migration du 11/11) ;
+  • les préversions Vercel sont derrière le SSO ;
+  • et ⚠️ RIEN de ce qui sort de là ne doit entrer dans le dépôt, qui est PUBLIC.
+Ce script est versionnable, ses données ne le sont pas.
 
 Garde-fous : refuse d'écrire si TARGET_SUPABASE_URL est l'URL de production ou égale à la source.
 
@@ -33,6 +50,8 @@ SRC_KEY = os.environ.get("SOURCE_SERVICE_KEY", "")
 DST_URL = (os.environ.get("TARGET_SUPABASE_URL") or "").rstrip("/")
 DST_KEY = os.environ.get("TARGET_SERVICE_KEY", "")
 N_CLIENTS = int(os.environ.get("SAMPLE_CLIENTS", "300"))
+NOMS_CIBLES = [n.strip().upper() for n in os.environ.get("NOMS_CIBLES", "").split(",") if n.strip()]
+ANONYMISER = os.environ.get("ANONYMISER", "1") != "0"
 DRY_RUN = os.environ.get("DRY_RUN") == "1"
 
 if not SRC_KEY:
@@ -124,6 +143,7 @@ def pseudo_email(cle):  return f"test-{h(cle, 8).lower()}@example.invalid"
 def pseudo_tel(cle):    return "+3247" + str(int(h(cle, 7), 16) % 10_000_000).zfill(7)
 
 def anonymiser_client(c):
+    if not ANONYMISER: return c
     k = c.get("dossier") or c.get("id")
     c.update(nom=pseudo_nom(k), prenom=pseudo_prenom(k), email=pseudo_email(k), gsm=pseudo_tel(k),
              tel_fixe=None, rue="Rue de Test", num_maison=str(int(h(k, 3), 16) % 200 + 1), boite=None,
@@ -131,20 +151,24 @@ def anonymiser_client(c):
     return c
 
 def anonymiser_contrat(c):
+    if not ANONYMISER: return c
     k = c.get("dossier") or c.get("id")
     c.update(nom_client=pseudo_nom(k), prenom_client=pseudo_prenom(k), date_naissance=None)
     return c
 
 def anonymiser_quittance(q):
+    if not ANONYMISER: return q
     k = q.get("dossier") or q.get("id")
     q.update(client_nom=pseudo_nom(k), client_prenom=pseudo_prenom(k))
     return q
 
 def anonymiser_sinistre(s):
+    if not ANONYMISER: return s
     s.update(sinistre_nom=pseudo_nom(s.get("pointeur_sinistre")), description="Sinistre de test")
     return s
 
 def anonymiser_objet(o):
+    if not ANONYMISER: return o
     if o.get("type_risque") and "personne" in o["type_risque"].lower():
         o["description"] = pseudo_nom(o.get("dossier")) + " " + pseudo_prenom(o.get("dossier"))
     return o
@@ -162,7 +186,8 @@ def anonymiser_doc_lode(d):
 
 
 def main():
-    print(f"Source : {SRC_URL}  →  Cible : {DST_URL or '(DRY_RUN)'}  — échantillon : {N_CLIENTS} dossiers")
+    print(f"Source : {SRC_URL}  →  Cible : {DST_URL or '(DRY_RUN)'}")
+    print(f"Anonymisation : {'OUI' if ANONYMISER else '*** NON — VRAIES DONNÉES CLIENTS ***'}")
 
     # 1) Référentiel
     for t in ["societes", "ref_bureaux", "ref_portefeuilles", "ref_gestionnaires", "ref_sous_agents", "ref_apporteurs",
@@ -188,10 +213,22 @@ def main():
         ecrire(t, lire(t))
 
     # 3) Échantillon Dynassur : dossiers tirés de façon reproductible
-    tous = [c["dossier"] for c in lire("clients", "select=dossier&dossier=not.is.null") if c.get("dossier")]
-    random.Random(42).shuffle(tous)
-    dossiers = sorted(tous[:N_CLIENTS])
+    if NOMS_CIBLES:
+        # LES CAS QU'ON CONNAÎT, PAS UN TIRAGE. Un échantillon au hasard ne
+        # contient presque jamais la famille dont on veut vérifier les liens.
+        tous = []
+        for nom in NOMS_CIBLES:
+            q = f"select=dossier,nom&nom=ilike.{urllib.parse.quote(nom, safe='')}"
+            tous += [c["dossier"] for c in lire("clients", q) if c.get("dossier")]
+        dossiers = sorted(set(tous))
+        print(f"  noms ciblés : {', '.join(NOMS_CIBLES)}")
+    else:
+        tous = [c["dossier"] for c in lire("clients", "select=dossier&dossier=not.is.null") if c.get("dossier")]
+        random.Random(42).shuffle(tous)
+        dossiers = sorted(tous[:N_CLIENTS])
     print(f"  dossiers retenus : {len(dossiers)}")
+    if not dossiers:
+        sys.exit("::error::Aucun dossier retenu — vérifie NOMS_CIBLES.")
 
     def par_dossiers(table, col="dossier", extra=""):
         rows = []
