@@ -1,6 +1,9 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { COUL } from '../lib/theme'
+import { useAuth } from '../lib/auth'
+import { trierLignes } from '../lib/tri'
+import EnTetesTriables from './EnTetesTriables'
 
 const BLEU = COUL.bleu
 const STATUTS = {
@@ -18,6 +21,12 @@ export default function ProducteursView() {
   const [filtreComp, setFiltreComp] = useState('')
   const [loading, setLoading] = useState(true)
   const [nouveau, setNouveau] = useState({ numero: '', compagnie_id: '' })
+  // ÉDITABLE PAR LES ADMINS SEULEMENT. Règle donnée par Ludovic le 11/11.
+  // Un compte producteur est la clé de rattachement de toutes les commissions
+  // d'une compagnie : le corriger par erreur déplace des montants sans que
+  // rien ne le signale. Les autres le lisent, c'est tout.
+  const { isAdmin } = useAuth()
+  const [tri, setTri] = useState({ col: 'compagnie', sens: 1 })
   const [msg, setMsg] = useState(null)
 
   const load = async () => {
@@ -92,6 +101,20 @@ export default function ProducteursView() {
     return true
   }), [prods, filtreComp, search])
 
+  // Les colonnes servent d'en-tête ET de clé de tri : impossible de trier sur
+  // l'une en affichant l'autre. Le numéro se compare en NOMBRE — en texte,
+  // « 0157650 » passerait avant « 25393 » à cause du zéro de tête.
+  const COLS = useMemo(() => [
+    { cle: 'numero',    titre: 'N° producteur', val: p => p.numero_producteur, type: 'nombre' },
+    { cle: 'fsma',      titre: 'FSMA',          val: p => p.fsma || '', type: 'nombre' },
+    { cle: 'compagnie', titre: 'Compagnie',     val: p => p.compagnie_nom || '' },
+    { cle: 'statut',    titre: 'Statut',        val: p => p.statut || 'actif' },
+    ...(isAdmin ? [{ cle: 'actions', titre: 'Actions', val: () => '', triable: false, align: 'right' }] : []),
+  ], [isAdmin])
+  // À compagnie égale, on range par numéro : sans ce secours l'ordre change
+  // d'un affichage à l'autre selon l'ordre d'arrivée des lignes.
+  const lignes = useMemo(() => trierLignes(rows, COLS, tri, p => p.numero_producteur || ''), [rows, COLS, tri])
+
   const nonRatt = prods.filter(p => !p.compagnie_id).length
 
   return (
@@ -110,47 +133,69 @@ export default function ProducteursView() {
 
       <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden', background: COUL.surface }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr>
-            <th style={th}>N° producteur</th><th style={th}>FSMA</th><th style={th}>Compagnie</th><th style={th}>Statut</th><th style={{ ...th, textAlign: 'right' }}>Actions</th>
-          </tr></thead>
+          <thead><EnTetesTriables cols={COLS} tri={tri} onTri={setTri} couleur={COUL.marine} /></thead>
           <tbody>
-            {loading && <tr><td style={td} colSpan={5}>Chargement…</td></tr>}
-            {!loading && rows.length === 0 && <tr><td style={td} colSpan={5}>Aucun producteur.</td></tr>}
-            {rows.map(p => {
+            {loading && <tr><td style={td} colSpan={COLS.length}>Chargement…</td></tr>}
+            {!loading && lignes.length === 0 && <tr><td style={td} colSpan={COLS.length}>Aucun producteur.</td></tr>}
+            {lignes.map(p => {
               const st = STATUTS[p.statut] || STATUTS.actif
               return (
                 <tr key={p.id} style={p.statut === 'cloture' ? { opacity: .55 } : undefined}>
                   <td style={td}>
-                    <input defaultValue={p.numero_producteur} title="Corrigeable"
-                      onBlur={e => { const v = e.target.value.trim(); if (v && v !== p.numero_producteur) setNumero(p.id, v) }}
-                      style={{ fontFamily: 'monospace', fontWeight: 700, color: COUL.marine, width: 120,
-                        border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 7px', fontSize: 13 }} />
+                    {isAdmin ? (
+                      <input defaultValue={p.numero_producteur} title="Corrigeable"
+                        onBlur={e => { const v = e.target.value.trim(); if (v && v !== p.numero_producteur) setNumero(p.id, v) }}
+                        style={{ fontFamily: 'monospace', fontWeight: 700, color: COUL.marine, width: 120,
+                          border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 7px', fontSize: 13 }} />
+                    ) : (
+                      <span style={{ fontFamily: 'monospace', fontWeight: 700, color: COUL.marine }}>{p.numero_producteur}</span>
+                    )}
                   </td>
                   <td style={{ ...td, color: COUL.texteFaible }}>{p.fsma || '—'}</td>
                   <td style={td}>
-                    <select value={p.compagnie_id || ''} onChange={e => setCompagnie(p.id, e.target.value)}
-                      style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 6px', fontSize: 12, maxWidth: 220 }}>
-                      <option value="">— non rattaché —</option>
-                      {cies.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
-                    </select>
+                    {isAdmin ? (
+                      <select value={p.compagnie_id || ''} onChange={e => setCompagnie(p.id, e.target.value)}
+                        style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 6px', fontSize: 12, maxWidth: 220 }}>
+                        <option value="">— non rattaché —</option>
+                        {cies.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
+                      </select>
+                    ) : (
+                      <span>{p.compagnie_nom || <span style={{ color: COUL.texteDoux }}>— non rattaché —</span>}</span>
+                    )}
                   </td>
                   <td style={td}>
-                    <select value={p.statut || 'actif'} onChange={e => setStatut(p.id, e.target.value)}
-                      style={{ border: 'none', borderRadius: 5, padding: '3px 8px', fontSize: 12, fontWeight: 600, color: COUL.blanc, background: st.couleur, cursor: 'pointer' }}>
-                      <option value="actif" style={{ color: '#000', background: COUL.surface }}>Actif</option>
-                      <option value="runoff" style={{ color: '#000', background: COUL.surface }}>Run-off</option>
-                      <option value="cloture" style={{ color: '#000', background: COUL.surface }}>Clôturé</option>
-                    </select>
+                    {isAdmin ? (
+                      <select value={p.statut || 'actif'} onChange={e => setStatut(p.id, e.target.value)}
+                        style={{ border: 'none', borderRadius: 5, padding: '3px 8px', fontSize: 12, fontWeight: 600, color: COUL.blanc, background: st.couleur, cursor: 'pointer' }}>
+                        <option value="actif" style={{ color: '#000', background: COUL.surface }}>Actif</option>
+                        <option value="runoff" style={{ color: '#000', background: COUL.surface }}>Run-off</option>
+                        <option value="cloture" style={{ color: '#000', background: COUL.surface }}>Clôturé</option>
+                      </select>
+                    ) : (
+                      <span style={{ borderRadius: 5, padding: '3px 8px', fontSize: 12, fontWeight: 600,
+                        color: COUL.blanc, background: st.couleur }}>{st.label}</span>
+                    )}
                   </td>
-                  <td style={{ ...td, textAlign: 'right' }}>
-                    <button onClick={() => del(p.id)} style={{ border: 'none', background: 'none', color: COUL.danger, cursor: 'pointer', fontSize: 14 }} title="Supprimer">🗑</button>
-                  </td>
+                  {isAdmin && (
+                    <td style={{ ...td, textAlign: 'right' }}>
+                      <button onClick={() => del(p.id)} style={{ border: 'none', background: 'none', color: COUL.danger, cursor: 'pointer', fontSize: 14 }} title="Supprimer">🗑</button>
+                    </td>
+                  )}
                 </tr>
               )
             })}
           </tbody>
         </table>
       </div>
+      {/* LE FORMULAIRE D'AJOUT N'EXISTE QUE POUR UN ADMIN.
+          Le masquer plutôt que le désactiver : un champ grisé invite à
+          chercher pourquoi il ne marche pas, alors qu'il n'y a rien à
+          chercher — ce n'est simplement pas son écran. */}
+      {!isAdmin ? (
+        <p style={{ marginTop: 12, fontSize: 12.5, color: COUL.texteDoux }}>
+          Lecture seule. Les comptes producteur se modifient dans Paramètres, par un administrateur.
+        </p>
+      ) : (
       <div style={{ marginTop: 12, padding: '12px 14px', border: '1px solid #e2e8f0', borderRadius: 10, background: COUL.surface }}>
         <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em',
           color: COUL.texteDoux, marginBottom: 8 }}>Ajouter un compte producteur</div>
@@ -182,6 +227,7 @@ export default function ProducteursView() {
           Le numéro se corrige directement dans la colonne de gauche.
         </p>
       </div>
+      )}
     </div>
   )
 }

@@ -3,7 +3,10 @@ import { supabase } from '../lib/supabase'
 import { COUL } from '../lib/theme'
 
 const FONT = "'Source Sans Pro', sans-serif"
-const eur = (v) => Math.round(v).toLocaleString('fr-BE') + ' €'
+// DEUX DÉCIMALES. `Math.round` faisait disparaître les centimes, et une
+// somme de montants arrondis ne tombe jamais sur le total réel : l'écart
+// s'accumule ligne après ligne et finit par se voir dans le résultat.
+const eur = (v) => (Number(v) || 0).toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
 const MOIS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc']
 
 export default function RentabiliteView({ transactions = [], categories = [], activitesSoc = [], color = COUL.bleu, ventilations = {}, facturesParTx = {} }) {

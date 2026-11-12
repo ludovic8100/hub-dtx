@@ -3,6 +3,8 @@ import { supabase } from '../lib/supabase'
 import { COUL } from '../lib/theme'
 import { usePetitEcran } from '../lib/ecran'
 import { voile } from '../lib/voile'
+import { trierLignes, basculerTri } from '../lib/tri'
+import EnTetesTriables from './EnTetesTriables'
 
 /**
  * BORDEREAUX ET QUITTANCES — ce que la compagnie nous a envoyé, et ce qu'il y a dedans.
@@ -47,6 +49,8 @@ function Pastille({ texte, fond, trait, titre }) {
 
 export default function BordereauxView({ societeCodes = ['DYNASSUR'], color }) {
   const petit = usePetitEcran()
+  const [tri, setTri] = useState({ col: 'periode', sens: -1 })        // le plus recent d'abord
+  const [triImp, setTriImp] = useState({ col: 'echeance', sens: 1 })
   const [onglet, setOnglet] = useState('bordereaux')   // 'bordereaux' | 'impayees'
   const [bordereaux, setBordereaux] = useState([])
   const [impayees, setImpayees] = useState([])
@@ -98,6 +102,39 @@ export default function BordereauxView({ societeCodes = ['DYNASSUR'], color }) {
     // Un BQT ne se règle pas : il ne peut donc pas être « sans paiement ».
     (!sansPaiement || (b.type === 'RCP' && !b.transaction_id))
   ), [bordereaux, annee, type, compagnie, sansPaiement])
+
+  // Les colonnes servent À LA FOIS d'en-tête et de clé de tri — c'est ce qui
+  // empêche le défaut classique d'un tableau qui trie sur une colonne et en
+  // affiche une autre. Le type compte : « 1 240 » comparé en texte passerait
+  // avant « 892 ».
+  const COLS = useMemo(() => [
+    { cle: 'periode',    titre: 'Période',    val: b => `${b.annee}-${String(b.mois).padStart(2, '0')}` },
+    { cle: 'type',       titre: 'Type',       val: b => b.type },
+    { cle: 'compagnie',  titre: 'Compagnie',  val: b => b.compagnie || '' },
+    { cle: 'compte',     titre: 'Compte',     val: b => b.compte_producteur || '', type: 'nombre' },
+    { cle: 'primes',     titre: 'Primes',     val: b => b.montant,    type: 'nombre', align: 'right' },
+    { cle: 'commission', titre: 'Commission', val: b => b.commission, type: 'nombre', align: 'right' },
+    // Un BQT n'a pas de solde. Le laisser à zéro le ferait remonter en tête
+    // d'un tri croissant, au milieu de vrais soldes nuls ; null l'envoie à la
+    // fin, ce qui est sa place.
+    { cle: 'solde',      titre: 'Solde',      val: b => b.type === 'RCP' ? b.net : null, type: 'nombre', align: 'right' },
+    { cle: 'paiement',   titre: 'Paiement',   val: b => b.type === 'RCP' ? (b.transaction_id ? 1 : 0) : null, type: 'nombre' },
+    { cle: 'doc',        titre: '',           val: () => '', triable: false },
+  ], [])
+  // Secours : à période égale, on range par compagnie, sinon l'ordre change
+  // d'un affichage à l'autre selon l'ordre d'arrivée des lignes.
+  const vusTries = useMemo(() => trierLignes(vus, COLS, tri, b => b.compagnie || ''), [vus, COLS, tri])
+
+  const COLS_IMP = useMemo(() => [
+    { cle: 'echeance',  titre: 'Échéance',  val: q => q.date_comptable, type: 'date' },
+    { cle: 'client',    titre: 'Client',    val: q => `${q.client_nom || ''} ${q.client_prenom || ''}`.trim() },
+    { cle: 'police',    titre: 'Police',    val: q => q.police || '' },
+    { cle: 'compagnie', titre: 'Compagnie', val: q => q.compagnie || '' },
+    { cle: 'prime',     titre: 'Prime',     val: q => q.prime_totale, type: 'nombre', align: 'right' },
+    { cle: 'etat',      titre: 'État',      val: q => q.etat || '' },
+    { cle: 'bord',      titre: 'Bordereau', val: () => '', triable: false },
+  ], [])
+  const impayeesTriees = useMemo(() => trierLignes(impayees, COLS_IMP, triImp), [impayees, COLS_IMP, triImp])
 
   const ouvrir = async (b) => {
     setOuvert(b); setLignes(null)
@@ -166,15 +203,9 @@ export default function BordereauxView({ societeCodes = ['DYNASSUR'], color }) {
         ) : (
           <div style={{ background: COUL.surface, border: `1px solid ${COUL.bord}`, borderRadius: 10, overflow: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5, minWidth: petit ? 720 : 0 }}>
-              <thead>
-                <tr style={{ background: COUL.fondDoux }}>
-                  {['Période', 'Type', 'Compagnie', 'Compte', 'Primes', 'Commission', 'Solde', 'Paiement', ''].map((h, i) => (
-                    <th key={h + i} style={{ ...thStyle, textAlign: i >= 4 && i <= 6 ? 'right' : 'left' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
+              <thead><EnTetesTriables cols={COLS} tri={tri} onTri={setTri} couleur={COUL.info} /></thead>
               <tbody>
-                {vus.map(b => (
+                {vusTries.map(b => (
                   <tr key={b.id} onClick={() => ouvrir(b)} style={{ cursor: 'pointer', borderBottom: `1px solid ${COUL.bord}` }}
                     onMouseEnter={e => e.currentTarget.style.background = COUL.fondDoux}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
@@ -230,15 +261,9 @@ export default function BordereauxView({ societeCodes = ['DYNASSUR'], color }) {
         ) : (
           <div style={{ background: COUL.surface, border: `1px solid ${COUL.bord}`, borderRadius: 10, overflow: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5, minWidth: petit ? 700 : 0 }}>
-              <thead>
-                <tr style={{ background: COUL.fondDoux }}>
-                  {['Échéance', 'Client', 'Police', 'Compagnie', 'Prime', 'État', 'Bordereau'].map((h, i) => (
-                    <th key={h} style={{ ...thStyle, textAlign: i === 4 ? 'right' : 'left' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
+              <thead><EnTetesTriables cols={COLS_IMP} tri={triImp} onTri={setTriImp} couleur={COUL.info} /></thead>
               <tbody>
-                {impayees.map(q => {
+                {impayeesTriees.map(q => {
                   const e = etatDe(q.etat)
                   return (
                     <tr key={q.id} style={{ borderBottom: `1px solid ${COUL.bord}` }}>

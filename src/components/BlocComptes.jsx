@@ -8,7 +8,11 @@ import { COUL } from '../lib/theme'
 // synchro à la demande, via la fonction `lancer_sync_ponto()` : le secret reste en base,
 // jamais dans le navigateur. Une synchro toutes les 5 minutes au plus.
 
-const fmt = v => v==null?'—':new Intl.NumberFormat('fr-BE',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(v)
+// DEUX DÉCIMALES, TOUJOURS, EN COMPTABILITÉ.
+// Un solde arrondi à l'euro ne se rapproche d'aucun relevé : 1 240 € peut
+// être 1 239,51 comme 1 240,49. Celui qui pointe un extrait cherche le
+// centime, et un écart d'un euro lui coûte une recherche pour rien.
+const fmt = v => v==null?'—':new Intl.NumberFormat('fr-BE',{style:'currency',currency:'EUR',minimumFractionDigits:2,maximumFractionDigits:2}).format(v)
 const fmtDate = v => v ? new Date(v).toLocaleDateString('fr-BE',{day:'2-digit',month:'2-digit',year:'2-digit'}) : '—'
 
 // Logos banques connues
