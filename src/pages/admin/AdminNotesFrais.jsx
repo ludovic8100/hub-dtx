@@ -1,4 +1,3 @@
-import { n8nWebhook } from '../../config/env'
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
@@ -83,7 +82,7 @@ export default function AdminNotesFrais() {
         }
       } catch (e) { console.error('Pièce PDF :', e) }
       try {
-        fetch(n8nWebhook('nf-notify'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: 'validee', societe: sel.societe, numero: v?.numero, titre: sel.titre, periode: sel.periode, total: v?.total ?? totTTC, auteur_nom: sel.auteur_nom, auteur_email: sel.auteur_email, pdf_url: pdfUrl, pdf_path: pdfPath }) }).catch(() => {})
+        fetch('/api/nf-notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: 'validee', societe: sel.societe, numero: v?.numero, titre: sel.titre, periode: sel.periode, total: v?.total ?? totTTC, auteur_nom: sel.auteur_nom, auteur_email: sel.auteur_email, pdf_url: pdfUrl, pdf_path: pdfPath }) }).catch(() => {})
       } catch { /* notification best-effort */ }
       notify(true, `Note ${v?.numero || ''} approuvée — pièce et dépense générées.`)
       setSel(null); setLignes([]); load()

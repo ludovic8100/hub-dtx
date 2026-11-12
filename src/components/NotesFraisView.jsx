@@ -1,4 +1,3 @@
-import { n8nWebhook } from '../config/env'
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import Layout from './Layout'
@@ -251,7 +250,10 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
       if (es) { setBusy(false); alert('Soumission échouée : ' + es.message); return }
       try {
         const { data: nn } = await supabase.from('notes_frais').select('numero').eq('id', noteId).single()
-        fetch(n8nWebhook('nf-notify'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: 'soumise', societe: head.societe, numero: nn?.numero, titre: head.titre, periode: head.periode, total: totTTC, auteur_nom: head.auteur_nom, auteur_email: head.auteur_email, admin_email: 'lde@dynassur.be' }) }).catch(() => {})
+        // L'ADRESSE DE L'ADMINISTRATEUR N'EST PLUS ENVOYÉE D'ICI : elle vient
+        // de NF_ADMIN_EMAIL, côté serveur. Une adresse écrite dans la page est
+        // une adresse publiée dans ce dépôt, et remplaçable par n'importe qui.
+        fetch('/api/nf-notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: 'soumise', societe: head.societe, numero: nn?.numero, titre: head.titre, periode: head.periode, total: totTTC, auteur_nom: head.auteur_nom, auteur_email: head.auteur_email }) }).catch(() => {})
       } catch { /* notification best-effort */ }
     }
     setBusy(false); setShowSig(false); setSigImage(''); setSel(null); setLignes([]); loadNotes()
