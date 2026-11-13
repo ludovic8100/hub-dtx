@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import { COUL } from '../lib/theme'
 import { trierLignes } from '../lib/tri'
+import { preparerLeads } from '../lib/leadsImport'
 
 /**
  * PROSPECTION — les leads à appeler, et ce qu'il en est sorti.
@@ -65,6 +66,9 @@ export default function ProspectionView() {
   const [ouvert, setOuvert] = useState(null)
   const [brouillon, setBrouillon] = useState({ issue: '', remarques: '' })
   const [enregistre, setEnregistre] = useState(false)
+  const [imp, setImp] = useState(null)      // { lignes, rapport, nom } avant écriture
+  const [impEnCours, setImpEnCours] = useState(false)
+  const [impFait, setImpFait] = useState('')
 
   const charger = useCallback(async () => {
     const [l, i] = await Promise.all([
@@ -111,6 +115,62 @@ export default function ProspectionView() {
     }
   }, [lignes, qui, monCode])
 
+  // ── Import du fichier ──────────────────────────────────────────────────
+  // ⚠️ ON MONTRE AVANT D'ÉCRIRE. Le fichier vient d'un prestataire extérieur
+  // et changera de forme sans prévenir ; un import qui écrit d'abord et
+  // explique ensuite ne laisse aucune occasion de dire non.
+  const lireFichier = async (file) => {
+    setImp(null); setImpFait(''); setErreur('')
+    if (!file) return
+    try {
+      // Chargée à la demande : la bibliothèque ne pèse sur personne tant que
+      // le panneau d'import n'est pas ouvert.
+      const XLSX = await import('xlsx')
+      const buf = await file.arrayBuffer()
+      const wb = XLSX.read(buf, { type: 'array', cellDates: true })
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      const matrice = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null })
+      const codes = new Set((await supabase.from('collaborateurs').select('code').eq('actif', true))
+        .data?.map(c => (c.code || '').toUpperCase()).filter(Boolean) || [])
+      const r = preparerLeads(matrice, codes, file.name.replace(/\.[^.]+$/, ''))
+      if (!r.ok) { setErreur(r.message); return }
+      setImp({ ...r, nom: file.name })
+    } catch (e) {
+      setErreur('Lecture impossible : ' + (e?.message || e))
+    }
+  }
+
+  const ecrireImport = async () => {
+    if (!imp?.lignes?.length) return
+    setImpEnCours(true); setErreur('')
+    try {
+      // UN RÉIMPORT NE TOUCHE JAMAIS CE QUE LE HUB POSSÈDE. Les colonnes
+      // issue, issue_le, issue_par et remarques ne sont pas dans la charge
+      // utile, donc le « on conflict do update » ne les écrase pas. C'est
+      // la seule chose qui rend un réimport sans danger.
+      for (let i = 0; i < imp.lignes.length; i += 200) {
+        const { error } = await supabase.from('leads')
+          .upsert(imp.lignes.slice(i, i + 200), { onConflict: 'cle_import,date_prevue' })
+        if (error) throw error
+      }
+      // Les codes se rattachent après coup : un code inconnu laisse
+      // attribue_id à null, et le lead apparaît dans « À vérifier » plutôt
+      // que de disparaître de la file de tout le monde.
+      const { data: cols } = await supabase.from('collaborateurs').select('id,code').eq('actif', true)
+      for (const c of cols || []) {
+        if (!c.code) continue
+        await supabase.from('leads').update({ attribue_id: c.id })
+          .eq('attribue_code', c.code.toUpperCase()).is('attribue_id', null)
+      }
+      setImpFait(`${imp.lignes.length} lead(s) importés.`)
+      setImp(null)
+      await charger()
+    } catch (e) {
+      setErreur('Écriture impossible : ' + (e?.message || e))
+    }
+    setImpEnCours(false)
+  }
+
   const ouvrir = (l) => {
     setOuvert(l)
     setBrouillon({ issue: l.issue || '', remarques: l.remarques || '' })
@@ -138,12 +198,18 @@ export default function ProspectionView() {
 
   if (lignes === null) return <div style={{ padding: 40, color: COUL.texteDoux }}>Chargement…</div>
 
-  if (!lignes.length) {
+  if (!lignes.length && !imp) {
     return (
       <div style={{ padding: 40, textAlign: 'center', color: COUL.texteDoux, background: COUL.surface,
         border: `1px dashed ${COUL.bord}`, borderRadius: 10 }}>
         <div style={{ fontWeight: 700, color: COUL.texte, marginBottom: 6 }}>Aucun lead pour le moment</div>
         Le fichier de prospection n'a pas encore été importé.
+        {isAdmin && (
+          <div style={{ marginTop: 14 }}>
+            <input type="file" accept=".xlsx,.xls" onChange={e => lireFichier(e.target.files?.[0])} />
+          </div>
+        )}
+        {erreur && <div style={{ marginTop: 10, color: '#b91c1c', fontSize: 13.5 }}>{erreur}</div>}
       </div>
     )
   }
@@ -152,6 +218,68 @@ export default function ProspectionView() {
     <div style={{ fontFamily: "'Source Sans Pro', sans-serif" }}>
       {erreur && <div style={{ background: '#fee2e2', color: '#b91c1c', padding: '9px 12px',
         borderRadius: 8, marginBottom: 12, fontSize: 13.5 }}>{erreur}</div>}
+
+      {isAdmin && (
+        <div style={{ background: COUL.surface, border: `1px solid ${COUL.bord}`, borderRadius: 10,
+          padding: '12px 14px', marginBottom: 14 }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase',
+              letterSpacing: '.04em', color: COUL.texteDoux }}>Importer le fichier reçu</span>
+            <input type="file" accept=".xlsx,.xls" onChange={e => lireFichier(e.target.files?.[0])}
+              style={{ fontSize: 13 }} />
+            {impFait && <span style={{ color: COUL.succes, fontSize: 13.5, fontWeight: 600 }}>{impFait}</span>}
+          </div>
+
+          {imp && (
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${COUL.bord}` }}>
+              <div style={{ fontSize: 14.5, fontWeight: 700, color: COUL.texteFort, marginBottom: 8 }}>
+                {imp.nom} — {imp.rapport.retenues} lead(s) prêts sur {imp.rapport.lues} lignes lues
+              </div>
+              <div style={{ display: 'grid', gap: 5, fontSize: 13.5, color: COUL.texteMoyen }}>
+                <div>Répartition : {Object.entries(imp.rapport.parCode).map(([c, n]) => `${c} ${n}`).join(' · ')}</div>
+                {imp.rapport.sansTelephone > 0 && (
+                  <div style={{ color: '#b45309' }}>
+                    <b>{imp.rapport.sansTelephone}</b> sans téléphone exploitable — ils ne pourront pas être appelés.
+                  </div>
+                )}
+                {imp.rapport.attributionInconnue > 0 && (
+                  <div style={{ color: '#b91c1c' }}>
+                    <b>{imp.rapport.attributionInconnue}</b> avec une attribution inconnue
+                    {imp.rapport.codesInconnus.length ? ` (${imp.rapport.codesInconnus.join(', ')})` : ''} —
+                    importés, mais dans la file de personne tant que le code n'existe pas.
+                  </div>
+                )}
+                {imp.rapport.sansDate > 0 && (
+                  <div style={{ color: '#b91c1c' }}>
+                    <b>{imp.rapport.sansDate}</b> sans date d'appel — écartés : un lead sans date
+                    n'est dans aucune file et se perdrait en silence.
+                  </div>
+                )}
+                {imp.rapport.clesEnDouble > 0 && (
+                  <div style={{ color: '#b45309' }}>
+                    <b>{imp.rapport.clesEnDouble}</b> doublon(s) dans le fichier lui-même, ignorés.
+                  </div>
+                )}
+              </div>
+              <div style={{ fontSize: 12.5, color: COUL.texteDoux, marginTop: 9, lineHeight: 1.5 }}>
+                Un lead déjà présent à la même date est mis à jour.
+                <b> Les issues et les remarques déjà saisies ne sont jamais écrasées.</b>
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 11 }}>
+                <button onClick={ecrireImport} disabled={impEnCours} style={{ padding: '8px 16px',
+                  borderRadius: 8, border: 'none', background: COUL.succes, color: COUL.blanc,
+                  fontSize: 14, fontWeight: 700, cursor: impEnCours ? 'default' : 'pointer',
+                  opacity: impEnCours ? .6 : 1 }}>
+                  {impEnCours ? 'Import…' : `Importer ${imp.rapport.retenues} lead(s)`}
+                </button>
+                <button onClick={() => setImp(null)} style={{ padding: '8px 14px', borderRadius: 8,
+                  border: `1px solid ${COUL.bord}`, background: COUL.surface, color: COUL.texteMoyen,
+                  fontSize: 14, cursor: 'pointer' }}>Annuler</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Les compteurs. Le retard en rouge, et seulement lui : si tout est
           rouge, plus rien ne l'est. */}
