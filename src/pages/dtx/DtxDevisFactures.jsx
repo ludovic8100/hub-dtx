@@ -261,7 +261,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
   const lbl = { fontSize: 11, fontWeight: 700, color: COUL.texteDoux, marginBottom: 3, display: 'block' }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: mobE ? 8 : 20, overflowY: 'auto' }}>
+    <div {...voile()} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: mobE ? 8 : 20, overflowY: 'auto' }}>
       <div style={{ background: COUL.surface, borderRadius: 14, maxWidth: 880, width: '100%', padding: mobE ? 16 : 24, fontFamily: "'Source Sans Pro', sans-serif" }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
           <h2 style={{ fontSize: 18, fontWeight: 800, color: NAVY, margin: 0 }}>

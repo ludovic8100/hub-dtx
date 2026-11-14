@@ -695,6 +695,23 @@ Ludovic : « *tu peux fusionner tous les PR existants, ne me demande plus et pr�
 **Ne plus demander l'autorisation de fusionner.** Ouvrir la PR, la vérifier, la fusionner,
 et dire ce qui a été fait.
 
+### Et jusqu'en production, systématiquement (14/11/2026)
+
+Ludovic : « *pousse en prod — et fais ça tout le temps* ». Le travail n'est pas
+fini quand il est fusionné, il est fini quand il est **en ligne**. Donc : PR,
+fusion, **déploiement vérifié**, et on annonce.
+
+⚠️ **Et la base d'abord, l'écran ensuite.** Un module dont les tables n'existent
+qu'en test plante à l'ouverture en production. C'est arrivé le 12/11 avec
+l'encaissement producteur : les tables étaient en test, la PR partait vers `main`,
+et l'écran serait tombé au premier clic. Avant toute fusion qui amène un écran
+neuf, vérifier que ce dont il a besoin existe **des deux côtés**.
+
+Et le piège de ce jour-là, à ne pas refaire : interroger une relation **qui
+n'existe pas** lève la même erreur qu'un **refus de droit**. Un test qui ne
+distingue pas les deux rend « refusé » pour une table absente, et on croit avoir
+vérifié une sécurité alors qu'on a constaté un vide.
+
 Autonome ne veut pas dire les yeux fermés. Avant chaque fusion :
 
 1. `npm run build` passe ;

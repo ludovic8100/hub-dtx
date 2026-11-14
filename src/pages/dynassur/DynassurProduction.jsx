@@ -4,6 +4,7 @@ import { ENTITES } from '../../lib/entites'
 import { StatBanner } from '../../components/ui/AccountableUI'
 import { useAuth } from '../../lib/auth'
 import { COUL } from '../../lib/theme'
+import { voile } from '../../lib/voile'
 
 // ── Constantes ──
 const BLUE = COUL.bleu
@@ -76,7 +77,7 @@ function ContratModal({ police, onClose }) {
   const SITC = { 'En cours':{bg:COUL.succesFond,c:COUL.succes}, 'Résilié':{bg:COUL.dangerFond,c:COUL.danger}, 'Terminé':{bg:COUL.dangerFond,c:COUL.danger}, 'Suspendu':{bg:COUL.alerteFond,c:COUL.alerteFonce} }
   const main = rows && rows[0]
   return (
-    <div onClick={e => { e.stopPropagation(); onClose() }} style={{ position:'fixed', inset:0, background:'rgba(15,23,42,.6)', zIndex:1100, display:'flex', alignItems:'flex-start', justifyContent:'center', padding:'8vh 16px' }}>
+    <div {...voile()} onClick={e => { e.stopPropagation(); onClose() }} style={{ position:'fixed', inset:0, background:'rgba(15,23,42,.6)', zIndex:1100, display:'flex', alignItems:'flex-start', justifyContent:'center', padding:'8vh 16px' }}>
       <div onClick={e => e.stopPropagation()} style={{ background:COUL.surface, borderRadius:14, width:'100%', maxWidth:560, maxHeight:'80vh', overflow:'auto', boxShadow:'0 20px 60px rgba(0,0,0,.3)' }}>
         <div style={{ background:`linear-gradient(135deg,${NAVY},${BLUE})`, color:COUL.blanc, padding:'16px 20px', display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
           <div>
@@ -167,7 +168,7 @@ function ActsModal({ titre, rows, onClose }) {
   const show = sorted.slice(0,1000)
   const click = k => setSort(s => s.key === k ? { key:k, dir:s.dir === 'asc' ? 'desc' : 'asc' } : { key:k, dir:'asc' })
   return (
-    <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(15,23,42,.55)', zIndex:1000, display:'flex', justifyContent:'flex-end' }}>
+    <div {...voile()} onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(15,23,42,.55)', zIndex:1000, display:'flex', justifyContent:'flex-end' }}>
       <div onClick={e=>e.stopPropagation()} style={{ width:'min(880px,96vw)', height:'100%', background:COUL.surface, display:'flex', flexDirection:'column', boxShadow:'-8px 0 30px rgba(0,0,0,.2)' }}>
         <div style={{ background:NAVY, padding:'14px 20px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
           <div>

@@ -625,7 +625,29 @@ function Editeur({ type, doc, onClose, onSaved }) {
       if (!isDevis) { payload.type = f.type || 'facture'; if (f.total_projet_ttc !== undefined && f.total_projet_ttc !== null && f.total_projet_ttc !== '') payload.total_projet_ttc = Number(f.total_projet_ttc); if (f.type === 'solde' && acomptesSel[0]) payload.facture_origine_id = acomptesSel[0]; else if (f.facture_origine_id) payload.facture_origine_id = f.facture_origine_id }
 
       if (docId) {
-        await supabase.from(table).update(payload).eq('id', docId)
+        // Un numéro corrigé part dans la mise à jour — mais seulement pour un
+        // devis, et seulement s'il a changé. L'index unique de la base refuse
+        // un numéro déjà pris : on laisse l'erreur remonter plutôt que de
+        // tenter un numéro de repli, parce qu'un numéro choisi par le système
+        // à la place de celui qu'on a tapé est un numéro qu'on ne retrouve pas.
+        // On renvoie le numéro à chaque enregistrement d'un devis plutôt que
+        // de comparer à l'original : écrire la même valeur ne coûte rien, et
+        // le recalage de séquence ne recule jamais. Comparer aurait demandé de
+        // garder le document d'origine en mémoire — un état de plus à tenir à
+        // jour, pour éviter une écriture qui ne change rien.
+        const numCorrige = isDevis && !!(f.numero || '').trim()
+        if (numCorrige) payload.numero = (f.numero || '').trim()
+        const { error: eMaj } = await supabase.from(table).update(payload).eq('id', docId)
+        if (eMaj) {
+          throw new Error(eMaj.code === '23505'
+            ? `Le numéro « ${payload.numero} » est déjà pris par un autre document.`
+            : eMaj.message)
+        }
+        // La séquence ne recule jamais : elle est poussée au-delà du numéro
+        // saisi, pour que le prochain devis créé ne retombe pas dessus.
+        if (numCorrige) {
+          await supabase.rpc('caler_sequence_lode', { p_type: 'devis', p_numero: payload.numero })
+        }
         await supabase.from(tableLignes).delete().eq(fk, docId)
       } else {
         const pType = (!isDevis && f.type === 'note_credit') ? 'note_credit' : type
@@ -872,7 +894,24 @@ function Editeur({ type, doc, onClose, onSaved }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 20, flexWrap: 'wrap', marginBottom: 26 }}>
               <div style={{ fontSize: mobE ? 22 : 27, fontWeight: 800, color: ORANGE, letterSpacing: -.5 }}>
                 {isDevis ? 'DEVIS' : (f.type === 'note_credit' ? 'NOTE DE CRÉDIT' : 'FACTURE')}
-                <span style={{ marginLeft: 10, color: f.numero ? NAVY : COUL.texteFaible, fontWeight: 700 }}>{f.numero || 'n° à l’enregistrement'}</span>
+                {/* LE NUMÉRO DE DEVIS EST CORRIGEABLE, celui d'une facture ne l'est pas.
+                    Demandé par Ludovic le 13/11 : « le temps que je puisse mettre à jour
+                    toutes les données ».
+                    ⚠️ ET SEULEMENT POUR UN DEVIS. Un numéro de facture belge doit être
+                    séquentiel, continu et jamais modifié après émission : le rendre
+                    corrigeable ouvrirait un trou dans la numérotation légale, et on ne
+                    s'en aperçoit qu'au contrôle. Une facture mal numérotée se corrige par
+                    une note de crédit, pas par un champ de saisie. */}
+                {isDevis && docId ? (
+                  <input value={f.numero || ''} onChange={e => set('numero', e.target.value)}
+                    placeholder="n° du devis" title="Corrigeable"
+                    style={{ marginLeft: 10, color: NAVY, fontWeight: 700, fontSize: 'inherit',
+                      fontFamily: 'inherit', width: Math.max(9, String(f.numero || '').length + 1) + 'ch',
+                      border: 'none', borderBottom: `1px dashed ${COUL.bord}`, background: 'transparent',
+                      padding: '0 2px', outline: 'none' }} />
+                ) : (
+                  <span style={{ marginLeft: 10, color: f.numero ? NAVY : COUL.texteFaible, fontWeight: 700 }}>{f.numero || 'n° à l’enregistrement'}</span>
+                )}
               </div>
               <div style={{ minWidth: 212, display: 'flex', flexDirection: 'column', gap: 5 }}>
                 {(isDevis

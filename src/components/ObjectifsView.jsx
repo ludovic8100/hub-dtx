@@ -85,7 +85,7 @@ class DetailBoundary extends Component {
   componentDidCatch(err) { console.error('DetailModal crash:', err) }
   render() {
     if (this.state.err) return (
-      <div onClick={this.props.onClose} style={{ position:'fixed', inset:0, background:'rgba(15,23,42,.55)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+      <div {...voile()} onClick={this.props.onClose} style={{ position:'fixed', inset:0, background:'rgba(15,23,42,.55)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
         <div onClick={e=>e.stopPropagation()} style={{ background:COUL.surface, padding:24, borderRadius:12, maxWidth:600, width:'100%' }}>
           <div style={{ fontWeight:800, color:COUL.danger, marginBottom:8, fontSize:15 }}>Erreur d'affichage du détail</div>
           <pre style={{ fontSize:12, whiteSpace:'pre-wrap', wordBreak:'break-word', color:COUL.texteMoyen, background:COUL.fond, padding:12, borderRadius:8, maxHeight:300, overflow:'auto' }}>{String(this.state.err?.stack || this.state.err?.message || this.state.err)}</pre>

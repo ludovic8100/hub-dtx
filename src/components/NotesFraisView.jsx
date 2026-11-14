@@ -8,6 +8,7 @@ import { ibanEspace } from '../lib/epc'
 import QRCode from 'qrcode'
 import SignaturePad from './ui/SignaturePad'
 import { COUL } from '../lib/theme'
+import { voile } from '../lib/voile'
 
 const NAVY = COUL.marine
 const KM_TAUX_DEFAUT = 0.4761 // barème belge secteur privé 01/07/2026–30/06/2027 (circ. 767) — ajustable par ligne
@@ -548,7 +549,7 @@ export default function NotesFraisView({ entiteKey = 'dynassur' }) {
             </div>
 
             {showSig && (
-              <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 1000 }}>
+              <div {...voile()} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 1000 }}>
                 <div style={{ background: COUL.surface, borderRadius: 14, padding: 22, width: 'min(520px,100%)', boxShadow: '0 10px 40px rgba(0,0,0,.25)' }}>
                   <div style={{ fontSize: 16, fontWeight: 800, color: NAVY, marginBottom: 6 }}>Signature — soumission de la note</div>
                   <div style={{ fontSize: 13, color: COUL.texteMoyen, marginBottom: 14, lineHeight: 1.5 }}>En signant, vous certifiez que les frais déclarés sont exacts et réellement engagés. Cette signature sera apposée sur la pièce justificative.</div>

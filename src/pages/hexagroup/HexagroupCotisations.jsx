@@ -5,6 +5,7 @@ import { ENTITES } from '../../lib/entites'
 import { StatBanner, useMobile } from '../../components/ui/AccountableUI'
 import HexMembreForm from '../../components/HexMembreForm'
 import { COUL } from '../../lib/theme'
+import { voile } from '../../lib/voile'
 
 // ── Coordonnées émetteur Hexagroup (pied de facture) ──
 const HEX = {
@@ -528,7 +529,7 @@ export default function HexagroupCotisations() {
 
       {/* ── Panneau d'édition ── */}
       {edit && form && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 60, overflowY: 'auto', padding: '40px 16px' }}>
+        <div {...voile()} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 60, overflowY: 'auto', padding: '40px 16px' }}>
           <div style={{ background: COUL.surface, borderRadius: 14, width: 'min(680px,100%)', padding: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div style={{ fontSize: 18, fontWeight: 700 }}>Cotisation {edit.numero} — {edit.membre?.societe || edit.membre?.contact}</div>

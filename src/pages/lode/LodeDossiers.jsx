@@ -265,18 +265,30 @@ export default function LodeDossiers() {
   // rien dire quand les champs étaient vides, et n'affichait aucune trace
   // quand la base refusait : vu de l'écran, le bouton « ne marchait pas ».
   // Un échec muet est pire qu'un message laid.
+  //
+  // ⚠️ ET LE MESSAGE DOIT REMONTER À L'APPELANT, pas seulement s'afficher ici.
+  // Corrigé le 14/11 : cette fonction écrivait la vraie raison dans la
+  // bannière de la PAGE, que la fenêtre de création recouvre entièrement. La
+  // fenêtre, elle, affichait « voir le message sur l'écran » — un message qui
+  // renvoie à un message invisible. Vu de l'utilisateur, le refus n'avait
+  // aucune cause. Elle rend donc la raison, et c'est la fenêtre qui l'affiche,
+  // là où on regarde.
+  // La raison part DES DEUX CÔTÉS : la bannière de la page pour qui a fermé
+  // la fenêtre, et la valeur de retour pour la fenêtre elle-même.
+  const echec = (message) => { setErreur(message); return { ok: false, message } }
+
   async function creerDossier(titre, client, montant) {   // client = { id, nom } | null
     setErreur('')
     try {
       const { data: numero, error: e1 } = await supabase.rpc('prochain_numero', {
         p_type: 'dossier', p_societe: 'LODE', p_prefixe: 'DOS',
       })
-      if (e1) { setErreur(`Numérotation refusée — ${e1.message}`); return false }
-      if (!numero) { setErreur('Numérotation : aucun numéro rendu.'); return false }
+      if (e1) return echec(`Numérotation refusée — ${e1.message}`)
+      if (!numero) return echec('Numérotation : aucun numéro rendu.')
 
       const montantNum = montant === '' || montant == null ? null : Number(String(montant).replace(',', '.'))
       if (montantNum != null && Number.isNaN(montantNum)) {
-        setErreur('Le prix annoncé doit être un nombre (ex. 2841.96).'); return false
+        return echec(`« ${String(montant).trim()} » n'est pas un montant. Attendu : un nombre, par exemple 2841,96.`)
       }
 
       const { data, error } = await supabase.from('dossiers').insert({
@@ -292,15 +304,14 @@ export default function LodeDossiers() {
         date_debut: new Date().toISOString().slice(0, 10),
       }).select('id,numero,titre,client_nom,client_type,client_id,statut,montant_a_facturer,date_debut,created_at,mo_heures,mo_visites,mo_collaborateur_id,mo_taux_horaire,responsable').single()
 
-      if (error) { setErreur(`Création refusée — ${error.message}`); return false }
+      if (error) return echec(`Création refusée — ${error.message}`)
       setDossiers(p => [data, ...p])
       setNouveau(data)
-      return true
+      return { ok: true, message: '' }
     } catch (e) {
       // Une exception inattendue (réseau coupé, session expirée) ne doit pas
       // laisser le bouton tourner dans le vide.
-      setErreur(`Erreur inattendue — ${e?.message || e}`)
-      return false
+      return echec(`Erreur inattendue — ${e?.message || e}`)
     }
   }
 
@@ -477,9 +488,9 @@ export default function LodeDossiers() {
         <PanneauNouveauDossier
           onClose={() => setCreation(false)}
           onCreer={async (titre, client, montant) => {
-            const ok = await creerDossier(titre, client, montant)
-            if (ok) setCreation(false)
-            return ok
+            const r = await creerDossier(titre, client, montant)
+            if (r.ok) setCreation(false)
+            return r
           }} />
       )}
       {ouvert && (
@@ -595,9 +606,10 @@ function PanneauNouveauDossier({ onClose, onCreer }) {
   async function valider() {
     if (!titre.trim()) { setErreur("Donne un intitulé à l'intervention."); return }
     setOccupe(true); setErreur('')
-    const ok = await onCreer(titre.trim(), client, montant)
+    const r = await onCreer(titre.trim(), client, montant)
     setOccupe(false)
-    if (!ok) setErreur("La création du dossier a échoué — voir le message sur l'écran.")
+    // On affiche LA RAISON, jamais un renvoi vers un message qu'on ne voit pas.
+    if (!r?.ok) setErreur(r?.message || 'La création du dossier a échoué.')
   }
 
   // Le téléphone a son propre champ : il se met en forme pendant la frappe
@@ -719,6 +731,15 @@ function PanneauNouveauDossier({ onClose, onCreer }) {
               <input value={montant} onChange={e => setMontant(e.target.value)} inputMode="decimal"
                 onKeyDown={e => e.key === 'Enter' && valider()}
                 placeholder="facultatif — sert à repérer un oubli de facturation" style={{ ...inp, width: '100%' }} />
+              {/* LE CHAMP DIT LUI-MÊME CE QUI CLOCHE, pendant la frappe.
+                  Découvrir au moment de valider que « fe » n'est pas un prix,
+                  c'est l'apprendre trop tard — et sur un formulaire qu'on
+                  croyait fini. */}
+              {montant.trim() && Number.isNaN(Number(montant.replace(',', '.'))) && (
+                <div style={{ fontSize: 12.5, color: '#b45309', marginTop: 4 }}>
+                  « {montant.trim()} » n'est pas un montant — un nombre est attendu, par exemple 2841,96.
+                </div>
+              )}
             </div>
           </div>
         )}

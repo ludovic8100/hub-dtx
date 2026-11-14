@@ -5,6 +5,7 @@ import { ProductionContent } from './DynassurProduction'
 import { ChiffresContent } from './DynassurChiffres'
 import { RentabiliteContent } from './DynassurRentabilite'
 import ObjectifsView from '../../components/ObjectifsView'
+import ProspectionView from '../../components/ProspectionView'
 import { COUL } from '../../lib/theme'
 
 // Fusion du 01/11/2026 : Production, Chiffres et Rentabilité étaient trois entrées
@@ -16,6 +17,10 @@ const ONGLETS = [
   ['chiffres', 'Chiffres', 'ti-report-analytics', 'dyn_chiffres'],
   ['rentabilite', 'Rentabilité', 'ti-coin', 'dyn_rentabilite'],
   ['objectifs', 'Objectifs', 'ti-target', 'dyn_objectifs'],
+  // Prospection : ouvert aux commerciaux. Le droit dyn_production sert de
+  // porte en attendant le chantier des droits — un onglet de plus ne
+  // justifie pas une colonne de permission de plus aujourd'hui.
+  ['prospection', 'Prospection', 'ti-phone-outgoing', 'dyn_production'],
 ]
 
 export default function DynassurPerformance() {
@@ -42,6 +47,7 @@ export default function DynassurPerformance() {
         {actif === 'chiffres' && <ChiffresContent />}
         {actif === 'rentabilite' && <RentabiliteContent />}
         {actif === 'objectifs' && <ObjectifsView />}
+        {actif === 'prospection' && <ProspectionView />}
         {!actif && <div style={{ padding: 40, textAlign: 'center', color: COUL.texteFaible }}>Aucun accès à ces écrans.</div>}
       </div>
     </Layout>

@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 
 import { LOGOS_URL as STORAGE_BASE } from '../config/env'
 import { COUL } from '../lib/theme'
+import { voile } from '../lib/voile'
 
 // Liste des fichiers présents dans le bucket logos (fallback si le listing Storage est bloqué)
 const LOGOS_CONNUS = [
@@ -84,7 +85,7 @@ function CieFormModal({ cie, comptes = [], logos = [], onClose, onSave, onDelete
   }
 
   return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.55)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:16, fontFamily:"'Source Sans Pro', sans-serif" }}>
+    <div {...voile()} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.55)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:16, fontFamily:"'Source Sans Pro', sans-serif" }}>
       <div style={{ background:COUL.surface, borderRadius:16, width:"100%", maxWidth:520, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,0.3)" }}>
         <div style={{ padding:"20px 24px 16px", borderBottom:`1px solid ${C.border}`, display:"flex", alignItems:"center", justifyContent:"space-between", position:"sticky", top:0, background:COUL.surface, borderRadius:"16px 16px 0 0" }}>
           <div style={{ fontSize:16, fontWeight:700, color:C.navy }}>{isNew ? "➕ Nouvelle compagnie" : `✏️ ${cie.nom}`}</div>
