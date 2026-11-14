@@ -165,7 +165,12 @@ export default function PanneauAttribuer({ facture, dossiers, onClose, onChoisir
                     <span style={{ fontFamily: 'ui-monospace, Menlo, Consolas, monospace', fontSize: 12, color: OR, marginRight: 8 }}>{d.numero}</span>
                     {d.titre}
                   </div>
-                  <div style={{ fontSize: 11.5, color: COUL.texteFaible }}>{d.client_nom || 'sans client'}</div>
+                  <div style={{ fontSize: 11.5, color: COUL.texteFaible }}>
+                    {d.client_nom || 'sans client'}
+                    {d.societe && d.societe !== facture.societe && (
+                      <strong style={{ color: OR, marginLeft: 6 }}>· chantier {d.societe}</strong>
+                    )}
+                  </div>
                 </div>
               ))}
               {type === 'dossier' && listeDossiers.length === 0 && (

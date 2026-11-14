@@ -4,6 +4,7 @@ import { sansExtraits } from '../lib/factures'
 import { COUL } from '../lib/theme'
 import PanneauAttribuer from './PanneauAttribuer'
 import { voile } from '../lib/voile'
+import { useAuth } from '../lib/auth'
 
 const FONT = "'Source Sans Pro', sans-serif"
 const fmt = (v) => v === null || v === undefined ? '—'
@@ -44,6 +45,7 @@ export default function VueFactures({ societeCodes, color, sens = 'achat', tousC
 
 /* ─────────────── ACHATS (factures fournisseurs, dossier SharePoint) ─────────────── */
 function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, statutDefaut = 'toutes', masquerMontant = false }) {
+  const { isAdmin } = useAuth() || {}
   const vente = sens === 'vente'
   const [factures, setFactures] = useState([])
   const [loading, setLoading] = useState(true)
@@ -107,11 +109,27 @@ function VueAchats({ societeCodes, color, sens = 'achat', tousComptes = false, s
   useEffect(() => {
     if (vente) return
     let annule = false
-    supabase.from('dossiers').select('id,numero,titre,client_nom,statut')
-      .in('societe', societeCodes).order('created_at', { ascending: false })
+    // ⚠️ UN ADMINISTRATEUR VOIT LES CHANTIERS DES AUTRES SOCIÉTÉS (14/11/2026).
+    //
+    // Ludovic : « LODE réalise un chantier de rénovation pour DTX, donc des
+    // factures sont payées par LODE et par DTX, mais je suis le seul
+    // gestionnaire et le seul à pouvoir voir ce genre de chose. »
+    //
+    // Sans ça, une facture DTX ne pourrait jamais être rattachée au chantier
+    // LODE qu'elle finance : la liste ne proposait que les chantiers de la
+    // société de la facture. Le coût réel du chantier restait donc
+    // incalculable.
+    //
+    // ⚠️ Pour tout le monde d'autre, RIEN NE CHANGE — chacun ne voit que les
+    // chantiers de sa société. Et la société du chantier est affichée dans la
+    // liste : rattacher au mauvais chantier serait pire que ne pas pouvoir le
+    // faire.
+    const req = supabase.from('dossiers').select('id,numero,titre,client_nom,statut,societe')
+      .order('created_at', { ascending: false })
+    ;(isAdmin ? req : req.in('societe', societeCodes))
       .then(({ data }) => { if (!annule) setDossiers(data || []) })
     return () => { annule = true }
-  }, [societeCodes.join(','), vente])
+  }, [societeCodes.join(','), vente, isAdmin])
 
   useEffect(() => {
     setLoading(true)

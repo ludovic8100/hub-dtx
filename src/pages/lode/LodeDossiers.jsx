@@ -9,6 +9,7 @@ import PanneauAttribuer from '../../components/PanneauAttribuer'
 import DocumentsChantier from '../../components/DocumentsChantier'
 import InterventionsChantier from '../../components/InterventionsChantier'
 import { analyserTelephone, telephonePourBase, telephoneEnFrappe } from '../../lib/telephone'
+import { useAuth } from '../../lib/auth'
 
 // Les dossiers LODE — un par intervention.
 //
@@ -148,6 +149,7 @@ export default function LodeDossiers() {
   // montrer ce qui reste à faire. Il reste consultable d'une case à cocher —
   // masqué n'est pas supprimé.
   const [voirClos, setVoirClos] = useState(false)
+  const { isAdmin } = useAuth() || {}
 
   async function charger() {
     setLoading(true)
@@ -155,8 +157,12 @@ export default function LodeDossiers() {
       supabase.from('dossiers')
         .select('id,numero,titre,client_nom,client_type,client_id,statut,montant_a_facturer,date_debut,created_at,cloture_auto,cloture_motif,cloture_le,mo_heures,mo_visites,mo_collaborateur_id,mo_taux_horaire,responsable,materiel_commande_le,materiel_livraison_prevue,materiel_note')
         .eq('societe', 'LODE').order('created_at', { ascending: false }),
+      // ⚠️ `societe` DANS LE SELECT : un chantier peut être payé par plusieurs
+      // sociétés du groupe (LODE rénove pour DTX, chacun règle une partie).
+      // Sans cette colonne, la fiche ne saurait pas dire qui a avancé quoi —
+      // et c'est précisément ce que Ludovic veut voir.
       supabase.from('factures_achat')
-        .select('id,fichier_id,nom,fournisseur,montant,date_facture,url,destination_type,destination_id,destination_nom,transaction_id')
+        .select('id,fichier_id,nom,societe,fournisseur,montant,date_facture,url,destination_type,destination_id,destination_nom,transaction_id')
         .eq('societe', 'LODE').eq('sens', 'achat').order('date_facture', { ascending: false }),
       supabase.from('lode_factures')
         .select('id,numero,objet,client_id,client_nom,total_ttc,montant_paye,dossier_id,statut,date_facture'),
@@ -167,10 +173,37 @@ export default function LodeDossiers() {
       supabase.from('lode_devis')
         .select('id,numero,client_id,client_nom,objet,total_ttc,statut,date_devis,dossier_id'),
     ])
-    setDossiers(d.data || []); setAchats(a.data || []); setVentes(v.data || []); setDevis(dv.data || [])
+    const chantiers = d.data || []
+    let achatsTous = a.data || []
+
+    // ⚠️ LES ACHATS DES AUTRES SOCIÉTÉS AFFECTÉS À CES CHANTIERS (14/11/2026).
+    //
+    // Demande de Ludovic : « LODE réalise un chantier de rénovation pour DTX,
+    // donc des factures sont payées par LODE et par DTX, mais je suis le seul
+    // gestionnaire et le seul à pouvoir voir ce genre de chose. C'est pour
+    // calculer le coût de ce travail. »
+    //
+    // Sans cette seconde lecture, une facture DTX rattachée à un chantier LODE
+    // serait INVISIBLE ici, et le coût affiché serait faux sans le dire — le
+    // pire des cas : un chiffre crédible et incomplet.
+    //
+    // ⚠️ RÉSERVÉ AUX ADMINISTRATEURS, comme Ludovic l'a demandé. Pour tout le
+    // monde, rien ne change : chacun ne voit que les achats de sa société. La
+    // RLS reste la dernière barrière — ce filtre est du confort d'affichage,
+    // pas une protection.
+    if (isAdmin && chantiers.length) {
+      const { data: croises } = await supabase.from('factures_achat')
+        .select('id,fichier_id,nom,societe,fournisseur,montant,date_facture,url,destination_type,destination_id,destination_nom,transaction_id')
+        .eq('sens', 'achat').eq('destination_type', 'dossier')
+        .in('destination_id', chantiers.map(x => x.id))
+        .neq('societe', 'LODE')
+      if (croises?.length) achatsTous = [...achatsTous, ...croises]
+    }
+
+    setDossiers(chantiers); setAchats(achatsTous); setVentes(v.data || []); setDevis(dv.data || [])
     setLoading(false)
   }
-  useEffect(() => { charger() }, [])
+  useEffect(() => { charger() }, [isAdmin])
 
   // Les quatre chiffres d'un dossier. « coûté » ne compte que les achats
   // RÉELLEMENT affectés : un dossier sans achat affecté affiche 0, pas une
@@ -986,6 +1019,22 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
   // ne le signale. Qui a presté se saisit, il ne se devine pas.
 
   const coute    = achats.reduce((s, a) => s + (Number(a.montant) || 0), 0)
+
+  // QUI A PAYÉ QUOI (14/11/2026).
+  //
+  // Ludovic : « des factures sont payées par LODE et par DTX […] c'est pour
+  // calculer le coût de ce travail ». Le total seul ne le dit pas : il faut
+  // la part de chacun, c'est-à-dire ce que chaque société a avancé.
+  //
+  // Affiché seulement quand il y a VRAIMENT plusieurs sociétés. Sur un
+  // chantier ordinaire — l'immense majorité — une ligne « dont LODE 100 % »
+  // n'apprendrait rien et ferait du bruit.
+  const parSociete = (() => {
+    const m = {}
+    for (const a of achats) m[a.societe || '—'] = (m[a.societe || '—'] || 0) + (Number(a.montant) || 0)
+    const entrees = Object.entries(m).sort((x, y) => y[1] - x[1])
+    return entrees.length > 1 ? entrees : null
+  })()
   const facture  = ventes.reduce((s, v) => s + (Number(v.total_ttc) || 0), 0)
   const encaisse = ventes.reduce((s, v) => s + (Number(v.montant_paye) || 0), 0)
   const aFact    = montant === '' ? null : Number(String(montant).replace(',', '.'))
@@ -1127,14 +1176,24 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
           )}
 
           <div style={{ padding: '0 20px 14px', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            {[['Coûté', coute, COUL.texteSombre], ['À facturer', aFact, COUL.texteSombre],
+            {[['Coûté', coute, COUL.texteSombre, parSociete], ['À facturer', aFact, COUL.texteSombre],
               ['Facturé', facture, COUL.texteSombre], ['Encaissé', encaisse, COUL.succes],
-              ['Manquant', manque, manque > 0 ? COUL.danger : COUL.texteFaible]].map(([l, v, c]) => (
+              ['Manquant', manque, manque > 0 ? COUL.danger : COUL.texteFaible]].map(([l, v, c, detail]) => (
               <div key={l} style={{ flex: '1 1 110px', background: COUL.fond, borderRadius: 9, padding: '9px 11px' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.04em' }}>{l}</div>
                 <div style={{ fontSize: 15, fontWeight: 800, color: c, fontVariantNumeric: 'tabular-nums' }}>
                   {v == null ? '—' : eur(v)}
                 </div>
+                {detail && (
+                  <div style={{ fontSize: 11, color: COUL.texteDoux, marginTop: 3, lineHeight: 1.45 }}>
+                    {detail.map(([soc, mt]) => (
+                      <div key={soc} style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                        <span>{soc}</span>
+                        <strong style={{ fontVariantNumeric: 'tabular-nums' }}>{eur(mt)}</strong>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -1196,7 +1255,12 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
             {achats.map(a => (
               <Ligne2 key={a.id}
                 gauche={a.fournisseur || 'fournisseur inconnu'}
-                sousGauche={`${fmtDate(a.date_facture)}${a.numero ? ' · n°' + a.numero : ''}`}
+                sousGauche={`${fmtDate(a.date_facture)}${a.numero ? ' · n°' + a.numero : ''}`
+                  // Qui a payé — affiché UNIQUEMENT quand ce n'est pas la
+                  // société du chantier. Répéter « LODE » sur chaque ligne
+                  // d'un chantier LODE n'apprendrait rien et noierait la
+                  // seule ligne qui compte : celle payée par l'autre société.
+                  + (a.societe && a.societe !== (dossier.societe || 'LODE') ? ` · payée par ${a.societe}` : '')}
                 droite={eur(a.montant)}
                 sousDroite={a.transaction_id ? 'payée' : 'non payée'}
                 tonDroite={a.transaction_id ? COUL.succes : COUL.danger} />
