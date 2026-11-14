@@ -2,7 +2,7 @@ import { voile } from '../../lib/voile'
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { chargerParSociete, chargerCommerciaux } from '../../lib/collaborateurs'
+import { chargerCommerciaux, chargerIntervenants } from '../../lib/collaborateurs'
 import Layout from '../../components/Layout'
 import { COUL } from '../../lib/theme'
 import PanneauAttribuer from '../../components/PanneauAttribuer'
@@ -949,7 +949,7 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
     // le poseur n'est pas commercial et doit pouvoir encoder ses heures.
     Promise.all([
       chargerCommerciaux('LODE', dossier.responsable),
-      chargerParSociete('LODE', null),
+      chargerIntervenants('LODE'),
     ]).then(([c, t]) => { if (!annule) { setCommerciaux(c); setEmployes(t) } })
     return () => { annule = true }
   }, [dossier.responsable])
