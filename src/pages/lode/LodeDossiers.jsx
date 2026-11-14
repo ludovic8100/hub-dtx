@@ -420,8 +420,10 @@ export default function LodeDossiers() {
               <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 760 }}>
                 <thead><tr>
                   <ThTri label="N°"          col="numero"     tri={tri} setTri={setTri} />
-                  <ThTri label="Intervention" col="titre"      tri={tri} setTri={setTri} />
+                  {/* Le client avant l'intervention : on cherche un chantier
+                      en pensant « chez qui », pas « quoi ». */}
                   <ThTri label="Client"       col="client_nom" tri={tri} setTri={setTri} />
+                  <ThTri label="Intervention" col="titre"      tri={tri} setTri={setTri} />
                   <ThTri label="Comm."        col="responsable" tri={tri} setTri={setTri} />
                   <ThTri label="Coûté"        col="coute"      tri={tri} setTri={setTri} droite />
                   <ThTri label="À facturer"   col="aFact"      tri={tri} setTri={setTri} droite />
@@ -441,8 +443,8 @@ export default function LodeDossiers() {
                         onMouseEnter={e => { e.currentTarget.style.background = COUL.fond }}
                         onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
                         <td style={{ ...td, fontWeight: 700, fontFamily: 'ui-monospace, Menlo, Consolas, monospace', fontSize: 12 }}>{d.numero || '—'}</td>
-                        <td style={td}>{d.titre}{d.nbAchats > 0 && <span style={{ fontSize: 11, color: COUL.texteFaible, marginLeft: 6 }}>· {d.nbAchats} achat{d.nbAchats > 1 ? 's' : ''}</span>}</td>
                         <td style={{ ...td, color: COUL.texteDoux }}>{d.client_nom || '—'}</td>
+                        <td style={td}>{d.titre}{d.nbAchats > 0 && <span style={{ fontSize: 11, color: COUL.texteFaible, marginLeft: 6 }}>· {d.nbAchats} achat{d.nbAchats > 1 ? 's' : ''}</span>}</td>
                         <td style={{ ...td, fontSize: 12, fontWeight: 700, color: d.responsable ? OR : '#cbd5e1' }}>{d.responsable || '—'}</td>
                         <td style={tdR}>{d.coute == null ? vide : eur(d.coute)}</td>
                         <td style={tdR}>{d.aFact == null ? vide : eur(d.aFact)}</td>
