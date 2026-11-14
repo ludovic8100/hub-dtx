@@ -2,11 +2,12 @@ import { voile } from '../../lib/voile'
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { chargerCommerciaux, chargerIntervenants } from '../../lib/collaborateurs'
+import { chargerCommerciaux } from '../../lib/collaborateurs'
 import Layout from '../../components/Layout'
 import { COUL } from '../../lib/theme'
 import PanneauAttribuer from '../../components/PanneauAttribuer'
 import DocumentsChantier from '../../components/DocumentsChantier'
+import InterventionsChantier from '../../components/InterventionsChantier'
 import { analyserTelephone, telephonePourBase, telephoneEnFrappe } from '../../lib/telephone'
 
 // Les dossiers LODE — un par intervention.
@@ -152,7 +153,7 @@ export default function LodeDossiers() {
     setLoading(true)
     const [d, a, v, dv] = await Promise.all([
       supabase.from('dossiers')
-        .select('id,numero,titre,client_nom,client_type,client_id,statut,montant_a_facturer,date_debut,created_at,cloture_auto,cloture_motif,cloture_le,mo_heures,mo_visites,mo_collaborateur_id,mo_taux_horaire,responsable')
+        .select('id,numero,titre,client_nom,client_type,client_id,statut,montant_a_facturer,date_debut,created_at,cloture_auto,cloture_motif,cloture_le,mo_heures,mo_visites,mo_collaborateur_id,mo_taux_horaire,responsable,materiel_commande_le,materiel_livraison_prevue,materiel_note')
         .eq('societe', 'LODE').order('created_at', { ascending: false }),
       supabase.from('factures_achat')
         .select('id,fichier_id,nom,fournisseur,montant,date_facture,url,destination_type,destination_id,destination_nom,transaction_id')
@@ -342,7 +343,7 @@ export default function LodeDossiers() {
         type: 'intervention',
         montant_a_facturer: montantNum,
         date_debut: new Date().toISOString().slice(0, 10),
-      }).select('id,numero,titre,client_nom,client_type,client_id,statut,montant_a_facturer,date_debut,created_at,mo_heures,mo_visites,mo_collaborateur_id,mo_taux_horaire,responsable').single()
+      }).select('id,numero,titre,client_nom,client_type,client_id,statut,montant_a_facturer,date_debut,created_at,mo_heures,mo_visites,mo_collaborateur_id,mo_taux_horaire,responsable,materiel_commande_le,materiel_livraison_prevue,materiel_note').single()
 
       if (error) {
         // 23505 = violation d'unicité. Le message brut de Postgres nomme la
@@ -566,6 +567,7 @@ export default function LodeDossiers() {
           devis={devis.filter(v => v.dossier_id === ouvert.id)}
           ventesLibres={documentsLibres(ouvert)}
           onRattacherVente={rattacherVente}
+          onRecharger={charger}
           onClose={() => setOuvert(null)}
           onEnregistre={(patch) => {
             setDossiers(p => p.map(x => x.id === ouvert.id ? { ...x, ...patch } : x))
@@ -923,7 +925,7 @@ async function devisDepuisDossier(d) {
 // Les deux vont ensemble : un dossier qu'on ne peut pas corriger est un
 // dossier qu'on recrée, et un dossier qui ne débouche sur rien n'a pas de
 // raison d'exister.
-function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], ventesLibres = [], onClose, onEnregistre, onDevis, onRattacher, onRattacherVente }) {
+function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], ventesLibres = [], onClose, onEnregistre, onDevis, onRattacher, onRattacherVente, onRecharger }) {
   const [titre, setTitre] = useState(dossier.titre || '')
   const [date, setDate] = useState((dossier.date_debut || '').slice(0, 10))
   const [montant, setMontant] = useState(dossier.montant_a_facturer == null ? '' : String(dossier.montant_a_facturer))
@@ -938,14 +940,14 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
 
   const [rattacher, setRattacher] = useState(false)
   const [rattacherVente, setRattacherVente] = useState(false)
-  const [mo, setMo] = useState(false)
-  const [heures, setHeures] = useState(dossier.mo_heures == null ? '' : String(dossier.mo_heures))
   const [numero, setNumero] = useState(dossier.numero || '')
   const [commercial, setCommercial] = useState(dossier.responsable || '')
-  const [qui, setQui] = useState(dossier.mo_collaborateur_id || '')
-  const [taux, setTaux] = useState(dossier.mo_taux_horaire == null ? '' : String(dossier.mo_taux_horaire))
-  const [employes, setEmployes] = useState([])
   const [commerciaux, setCommerciaux] = useState([])
+  // La commande de matériel : deux dates corrigées à la main quand le
+  // fournisseur décale, et une remarque libre.
+  const [cmdLe,   setCmdLe]   = useState((dossier.materiel_commande_le      || '').slice(0, 10))
+  const [cmdLiv,  setCmdLiv]  = useState((dossier.materiel_livraison_prevue || '').slice(0, 10))
+  const [cmdNote, setCmdNote] = useState(dossier.materiel_note || '')
   useEffect(() => {
     let annule = false
     // ⚠️ PAS de filtre sur `compte_hub_actif`.
@@ -963,30 +965,14 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
     // 31 possèdent — et pas les commerciaux LODE. Ludovic ne voyait donc plus
     // qu'une seule personne, et seulement sur les chantiers où elle était déjà
     // inscrite. On lit maintenant `collaborateur_societes` par sa vue.
-    // DEUX LISTES, DEUX SENS. « Qui a vendu » n'est pas « qui a posé » :
-    // l'attribution va aux commerciaux (règle de Ludovic : c'est la fonction
-    // qui attribue, pas le statut), la saisie des heures à tout le monde —
-    // le poseur n'est pas commercial et doit pouvoir encoder ses heures.
-    Promise.all([
-      chargerCommerciaux('LODE', dossier.responsable),
-      chargerIntervenants('LODE'),
-    ]).then(([c, t]) => { if (!annule) { setCommerciaux(c); setEmployes(t) } })
+    // « Qui a vendu » n'est pas « qui a posé » : la fiche ne charge donc que
+    // les COMMERCIAUX, pour l'attribution. La liste des intervenants vit dans
+    // `InterventionsChantier`, son seul utilisateur — une liste chargée là où
+    // personne ne s'en sert est une requête payée pour rien.
+    chargerCommerciaux('LODE', dossier.responsable)
+      .then(c => { if (!annule) setCommerciaux(c) })
     return () => { annule = true }
   }, [dossier.responsable])
-
-  // ⚠️ LE TAUX SE PROPOSE, IL NE SE LIT PAS.
-  //
-  // Choisir une personne PRÉ-REMPLIT son coût horaire courant — mais une fois
-  // enregistré, c'est le dossier qui le porte. Relire la fiche employé à
-  // l'affichage ferait bouger la marge d'un chantier de 2023 le jour où on
-  // augmente un salaire. Ludovic : « la M.O. d'il y a trois ans, c'était la
-  // M.O. d'il y a trois ans ».
-  const choisirQui = (id) => {
-    setQui(id)
-    if (!id) return
-    const e = employes.find(x => String(x.id) === String(id))
-    if (e?.cout_horaire != null && !taux) setTaux(String(e.cout_horaire))
-  }
 
   // ⚠️ LE PRESTATAIRE NE SE PRÉ-REMPLIT PAS AVEC LE COMMERCIAL, et c'est une
   // décision, pas un oubli (14/11/2026).
@@ -998,12 +984,6 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
   //
   // Une heure inscrite au mauvais nom fausse le coût de revient sans que rien
   // ne le signale. Qui a presté se saisit, il ne se devine pas.
-  const coutMo = (() => {
-    const h = Number(String(heures).replace(',', '.'))
-    const t = Number(String(taux).replace(',', '.'))
-    return Number.isFinite(h) && Number.isFinite(t) && h > 0 && t > 0 ? h * t : null
-  })()
-  const [visites, setVisites] = useState(dossier.mo_visites == null ? '' : String(dossier.mo_visites))
 
   const coute    = achats.reduce((s, a) => s + (Number(a.montant) || 0), 0)
   const facture  = ventes.reduce((s, v) => s + (Number(v.total_ttc) || 0), 0)
@@ -1015,32 +995,25 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
     || date !== (dossier.date_debut || '').slice(0, 10)
     || montant !== (dossier.montant_a_facturer == null ? '' : String(dossier.montant_a_facturer))
     || statut !== (dossier.statut || 'ouvert')
-    || heures !== (dossier.mo_heures == null ? '' : String(dossier.mo_heures))
-    || visites !== (dossier.mo_visites == null ? '' : String(dossier.mo_visites))
     || numero !== (dossier.numero || '')
     || commercial !== (dossier.responsable || '')
-    || String(qui) !== String(dossier.mo_collaborateur_id || '')
-    || taux !== (dossier.mo_taux_horaire == null ? '' : String(dossier.mo_taux_horaire))
+    || cmdLe   !== (dossier.materiel_commande_le      || '').slice(0, 10)
+    || cmdLiv  !== (dossier.materiel_livraison_prevue || '').slice(0, 10)
+    || cmdNote !== (dossier.materiel_note || '')
 
   async function enregistrer() {
     if (!titre.trim()) { setErreur("L'intervention ne peut pas être vide."); return }
     if (aFact != null && Number.isNaN(aFact)) { setErreur('Le prix annoncé doit être un nombre.'); return }
     setOccupe(true); setErreur('')
-    const nb = (v) => v === '' ? null : Number(String(v).replace(',', '.'))
-    const h = nb(heures), vi = nb(visites)
-    if ((h != null && (Number.isNaN(h) || h < 0)) || (vi != null && (Number.isNaN(vi) || vi < 0))) {
-      setErreur('Les heures et les visites doivent être des nombres positifs.'); setOccupe(false); return
-    }
     const patch = {
       numero: numero.trim() || null,
       titre: titre.trim(),
       date_debut: date || null,
       montant_a_facturer: aFact,
       statut,
-      mo_heures: h,
-      mo_visites: vi == null ? null : Math.round(vi),
-      mo_collaborateur_id: qui === '' ? null : Number(qui),
-      mo_taux_horaire: nb(taux),
+      materiel_commande_le:      cmdLe  || null,
+      materiel_livraison_prevue: cmdLiv || null,
+      materiel_note:             cmdNote.trim() || null,
       updated_at: new Date().toISOString(),
     }
     const { error } = await supabase.from('dossiers').update(patch).eq('id', dossier.id)
@@ -1166,73 +1139,40 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
             ))}
           </div>
 
-          <Section titre="Main-d'œuvre réelle"
-            action={(
-              <button onClick={() => setMo(m => !m)} style={{
-                border: `1px solid ${OR}`, background: mo ? '#fff7ed' : COUL.surface, color: OR, borderRadius: 7,
-                padding: '4px 9px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: FONT,
-              }}>{mo ? 'Replier' : 'Saisir heures et visites'}</button>
-            )}>
-            {!mo && (
-              <div style={{ padding: '2px 20px 12px', fontSize: 12.5, color: COUL.texteDoux }}>
-                {dossier.mo_heures != null || dossier.mo_visites != null
-                  ? <>
-                      <strong>{dossier.mo_heures ?? '—'} h</strong> · {dossier.mo_visites ?? '—'} visite{(dossier.mo_visites || 0) > 1 ? 's' : ''}
-                      {dossier.mo_taux_horaire != null && dossier.mo_heures != null
-                        ? <> · <strong style={{ color: COUL.texteFort }}>{eur(dossier.mo_heures * dossier.mo_taux_horaire)}</strong>
-                            <span style={{ color: COUL.texteFaible }}> ({eur(dossier.mo_taux_horaire)}/h)</span></>
-                        : <span style={{ color: COUL.texteFaible }}> · coût — </span>}
-                    </>
-                  : <span style={{ color: COUL.texteFaible }}>Non renseignée.</span>}
+          {/* LES PASSAGES, ET NON PLUS UNE SAISIE UNIQUE.
+              « 4 h le mardi, il manque une pièce, 4 h le vendredi » : le
+              vendredi écrasait le mardi, deux personnes étaient impossibles, et
+              la raison du retour n'avait nulle part où aller. Une ligne par
+              personne et par déplacement règle les trois — et compte les
+              trajets, qui sont le vrai coût d'un retour. */}
+          <Section titre="Passages sur le chantier">
+            <InterventionsChantier dossier={dossier} onChange={onRecharger} />
+          </Section>
+
+          {/* Entre le devis accepté et la pose : la commande et le délai.
+              Les dates se corrigent à la main quand le fournisseur décale —
+              choix explicite de Ludovic plutôt qu'une alerte automatique. */}
+          <Section titre="Matériel">
+            <div style={{ padding: '2px 20px 14px', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <div style={{ flex: '1 1 150px' }}>
+                <label style={lbl}>Commandé le</label>
+                <input type="date" value={cmdLe} onChange={e => setCmdLe(e.target.value)} style={{ ...inp, width: '100%' }} />
               </div>
-            )}
-            {mo && (
-              <div style={{ padding: '2px 20px 14px' }}>
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                  <div style={{ flex: '1 1 130px' }}>
-                    <label style={lbl}>Heures prestées</label>
-                    <input value={heures} onChange={e => setHeures(e.target.value)} inputMode="decimal" placeholder="ex. 6,5" style={{ ...inp, width: '100%' }} />
-                  </div>
-                  <div style={{ flex: '1 1 130px' }}>
-                    <label style={lbl}>Visites chez le client</label>
-                    <input value={visites} onChange={e => setVisites(e.target.value)} inputMode="numeric" placeholder="ex. 2" style={{ ...inp, width: '100%' }} />
-                  </div>
-                  <div style={{ flex: '1 1 130px' }}>
-                    <label style={lbl}>Coût main-d'œuvre</label>
-                    <input value={coutMo == null ? '—' : eur(coutMo)} readOnly
-                      style={{ ...inp, width: '100%', background: COUL.fond, fontWeight: 700,
-                               color: coutMo == null ? COUL.texteFaible : COUL.texteFort }} />
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
-                  <div style={{ flex: '2 1 200px' }}>
-                    <label style={lbl}>Qui a presté</label>
-                    <select value={qui} onChange={e => choisirQui(e.target.value)} style={{ ...inp, width: '100%' }}>
-                      <option value="">—</option>
-                      {employes.filter(e => e.id != null).map(e => (
-                        <option key={e.id} value={e.id}>
-                          {e.nom_complet}{e.cout_horaire != null ? ` · ${e.cout_horaire} €/h` : ' · taux non défini'}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div style={{ flex: '1 1 150px' }}>
-                    <label style={lbl}>Taux horaire appliqué (€)</label>
-                    <input value={taux} onChange={e => setTaux(e.target.value)} inputMode="decimal"
-                      placeholder="pré-rempli depuis la fiche" style={{ ...inp, width: '100%' }} />
-                  </div>
-                </div>
-                {/* Le coût reste grisé tant qu'aucun taux horaire n'existe en
-                    base. Afficher un montant calculé sur un taux inventé serait
-                    pire que de n'afficher rien : un chiffre faux se propage. */}
-                <div style={{ fontSize: 11.5, color: COUL.texteFaible, marginTop: 8, lineHeight: 1.5, background: COUL.fondDoux, borderRadius: 8, padding: '8px 10px' }}>
-                  Le taux est <strong>pré-rempli</strong> depuis la fiche de la personne, puis <strong>figé sur
-                  ce chantier</strong> : il ne bougera plus si le salaire augmente. La main-d'œuvre d'il y a
-                  trois ans reste celle d'il y a trois ans. Le taux de chacun se règle dans
-                  <strong> Paramètres → Collaborateurs → Coût horaire</strong>.
-                </div>
+              <div style={{ flex: '1 1 150px' }}>
+                <label style={lbl}>Livraison annoncée</label>
+                <input type="date" value={cmdLiv} onChange={e => setCmdLiv(e.target.value)} style={{ ...inp, width: '100%' }} />
               </div>
-            )}
+              <div style={{ flex: '2 1 220px' }}>
+                <label style={lbl}>Remarque</label>
+                <input value={cmdNote} onChange={e => setCmdNote(e.target.value)}
+                  placeholder="ex. réf. fournisseur, délai annoncé par téléphone" style={{ ...inp, width: '100%' }} />
+              </div>
+              {cmdLe && cmdLiv && cmdLiv < new Date().toISOString().slice(0, 10) && (
+                <div style={{ flex: '1 1 100%', fontSize: 12.5, color: '#b45309', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '8px 10px' }}>
+                  La livraison était annoncée pour le {new Date(cmdLiv).toLocaleDateString('fr-BE')} — corrige la date si le fournisseur a décalé.
+                </div>
+              )}
+            </div>
           </Section>
 
           {/* Les pièces libres du chantier : bon de commande fournisseur, devis
