@@ -64,20 +64,41 @@ export async function chargerParSociete(societe, codeAGarder = null) {
     .order('nom_complet')
   const liste = data || []
 
-  // ⚠️ ON NE FILTRE PAS SUR `fonction = 'commercial'`, et c'est délibéré.
-  // Ce serait reproduire exactement le piège qu'on corrige : quelqu'un
-  // disparaîtrait de la liste sans que rien ne dise pourquoi, cette fois
-  // parce qu'une fonction n'aurait pas été renseignée. La fonction sert donc
-  // à l'ORDRE — commerciaux en tête — jamais à exclure.
-  liste.sort((a, b) => (a.fonction === 'commercial' ? 0 : 1) - (b.fonction === 'commercial' ? 0 : 1)
-                    || String(a.nom_complet).localeCompare(String(b.nom_complet)))
-
   // Le code déjà posé sur le document reste toujours proposable : un chantier
   // attribué ne doit pas afficher un commercial absent de sa propre liste.
   // Ça couvre aussi la base de test, où `collaborateur_societes` est vide :
   // la liste y sera réduite au code enregistré, mais rien ne plante.
-  if (codeAGarder && !liste.some(c => c.code === codeAGarder)) {
-    liste.push({ id: null, code: codeAGarder, nom_complet: codeAGarder, fonction: null })
-  }
-  return liste
+  return avecCodeGarde(liste, codeAGarder)
+}
+
+const avecCodeGarde = (liste, code) =>
+  !code || liste.some(c => c.code === code)
+    ? liste
+    : [...liste, { id: null, code, nom_complet: code, fonction: null }]
+
+// LA FONCTION ATTRIBUE, PAS LE STATUT — règle donnée par Ludovic le
+// 14/11/2026 : « pour attribuer tu ne dois te baser que sur la fonction ».
+//
+// Les deux colonnes de `collaborateur_societes` ne disent pas la même chose :
+//
+//   `statut`   le lien contractuel  — administrateur, employé
+//   `fonction` le métier exercé     — commercial, gestionnaire
+//
+// Un administrateur peut parfaitement être commercial, et deux des trois
+// commerciaux LODE le sont. Filtrer sur le statut écarterait les patrons de
+// leur propre portefeuille.
+//
+// ⚠️ Et c'est une liste DIFFÉRENTE de celle de la main-d'œuvre. « Qui a posé
+// la pergola » n'est pas « qui a vendu le chantier » : le poseur n'est pas
+// commercial, et l'exclure de la saisie des heures rendrait celle-ci
+// impossible. `chargerParSociete` sert la seconde, celle-ci la première.
+//
+// Le repli est volontaire : si personne n'a la fonction renseignée, on rend
+// tout le monde plutôt qu'une liste vide. Un champ vide sans explication est
+// exactement le défaut qu'on corrige ici — il serait absurde d'en créer un
+// nouveau en le corrigeant.
+export async function chargerCommerciaux(societe, codeAGarder = null) {
+  const tous = await chargerParSociete(societe)
+  const commerciaux = tous.filter(c => c.fonction === 'commercial')
+  return avecCodeGarde(commerciaux.length ? commerciaux : tous, codeAGarder)
 }

@@ -2,7 +2,7 @@ import { voile } from '../../lib/voile'
 import { n8nWebhook } from '../../config/env'
 import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
-import { chargerParSociete } from '../../lib/collaborateurs'
+import { chargerCommerciaux } from '../../lib/collaborateurs'
 import { PEPPOL_ACTIF } from '../../lib/peppol'
 import Layout from '../../components/Layout'
 import { LODE, TVA_TAUX, CGV, DELAI_PAIEMENT_JOURS } from '../../lib/lodeConfig'
@@ -174,7 +174,7 @@ function Editeur({ type, doc, onClose, onSaved }) {
     // commerciaux LODE n'ont pas `acc_lode`, et cette liste ne montrait donc
     // qu'eux-mêmes quand ils étaient déjà inscrits. Voir `collaborateurs.js`.
     // Le code déjà enregistré reste toujours proposable.
-    chargerParSociete('LODE', f.responsable).then(d => { if (!annule) setTousCollabs(d) })
+    chargerCommerciaux('LODE', f.responsable).then(d => { if (!annule) setTousCollabs(d) })
     return () => { annule = true }
   }, [f.responsable])
   const responsables = tousCollabs
