@@ -184,8 +184,24 @@ function Editeur({ type, doc, onClose, onSaved }) {
   useEffect(() => {
     if (!isDevis) return
     let annule = false
-    supabase.from('dossiers').select('id,numero,titre,client_nom,client_id,statut')
-      .eq('societe', 'LODE').neq('statut', 'clos').order('created_at', { ascending: false })
+    // ⚠️ LES CHANTIERS CLOS SONT PROPOSÉS AUSSI (14/11/2026).
+    //
+    // Ludovic : « le chantier est déjà créé… il ne le trouve pas ». Son devis
+    // visait DOS-2026-002, fermé AUTOMATIQUEMENT le matin même parce que ses
+    // deux factures étaient payées. Le filtre `neq statut clos` le rendait
+    // introuvable — et comme la fenêtre de création des chantiers masque elle
+    // aussi les clos, il n'avait aucun moyen de le voir nulle part.
+    //
+    // C'est sans danger, et vérifié plutôt que supposé : un trigger sur
+    // `lode_devis` appelle `dossier_cloture_si_termine`, qui ROUVRE un
+    // chantier fermé automatiquement dès qu'un devis vivant s'y rattache.
+    // DOS-2026-002 porte `cloture_auto = true` : il se rouvrira seul.
+    //
+    // Un chantier fermé À LA MAIN, lui, restera fermé — c'est la règle de la
+    // fonction, et elle est juste : une décision humaine ne se défait pas
+    // toute seule. Le devis y sera quand même rattaché, rien n'est perdu.
+    supabase.from('dossiers').select('id,numero,titre,client_nom,client_id,statut,cloture_auto')
+      .eq('societe', 'LODE').order('created_at', { ascending: false })
       .then(({ data }) => { if (!annule) setDossiersDispo(data || []) })
     return () => { annule = true }
   }, [isDevis])
@@ -213,7 +229,11 @@ function Editeur({ type, doc, onClose, onSaved }) {
   // sélectionner c'est lui demander de confirmer qu'il n'avait pas le choix.
   useEffect(() => {
     if (!f.dossier_id) {
-      if (dossiersDuClient.length === 1) set('dossier_id', dossiersDuClient[0].id)
+      // ⚠️ L'auto-sélection ne porte que sur les chantiers OUVERTS. Depuis
+      // que les clos sont proposés, choisir d'office un chantier fermé
+      // reviendrait à décider à la place de l'utilisateur de le rouvrir.
+      const ouverts = dossiersDuClient.filter(d => d.statut !== 'clos')
+      if (ouverts.length === 1) set('dossier_id', ouverts[0].id)
       return
     }
     if (!dossiersDuClient.some(d => d.id === f.dossier_id)) set('dossier_id', null)
@@ -1081,6 +1101,10 @@ function Editeur({ type, doc, onClose, onSaved }) {
                     {dossiersDuClient.map(d => (
                       <option key={d.id} value={d.id}>
                         {d.numero} · {d.titre}
+                        {/* Un chantier clos reste choisissable, mais on le DIT :
+                            le rattacher rouvrira celui qui s'est fermé tout
+                            seul, pas celui qu'on a fermé à la main. */}
+                        {d.statut === 'clos' ? (d.cloture_auto ? '  (clos — se rouvrira)' : '  (clos à la main)') : ''}
                       </option>
                     ))}
                   </select>
