@@ -180,6 +180,8 @@ function Editeur({ type, doc, onClose, onSaved }) {
   const responsables = tousCollabs
 
   const [dossiersDispo, setDossiersDispo] = useState([])
+  // Un seul avertissement par enregistrement : le second clic confirme.
+  const [verifieSansChantier, setVerifieSansChantier] = useState(false)
   const [creationDossier, setCreationDossier] = useState(false)
   useEffect(() => {
     if (!isDevis) return
@@ -618,13 +620,27 @@ function Editeur({ type, doc, onClose, onSaved }) {
   const save = async () => {
     if (verrouille) { alert('Cette facture a déjà été émise/envoyée : elle ne peut plus être modifiée. Pour la corriger, créez une note de crédit.'); return }
     if (!f.client_nom.trim()) { alert('Le nom du client est obligatoire'); return }
-    // Un document sans chantier casse toute la chaîne en aval : il n'apparaît
-    // dans les chiffres d'aucun dossier et la marge l'ignore. La règle vaut
-    // pour la FACTURE autant que pour le devis — Ludovic, 08/11 : « j'ai fait
-    // un devis, il est accepté, je réalise une facture, elle est payée ; tout
-    // ça doit se voir dans le chantier ».
-    if (!f.dossier_id) {
-      alert(`${isDevis ? 'Ce devis' : 'Cette facture'} doit être rattaché${isDevis ? '' : 'e'} à un chantier.\n\nChoisis-le dans le panneau Détails, ou clique « Créer le chantier » juste en dessous — tout y est déjà.`)
+    // ⚠️ LE CHANTIER N'EST PLUS EXIGÉ — TEMPORAIREMENT (14/11/2026).
+    //
+    // Ludovic : « tu dois ne plus obliger le chantier dans un premier temps,
+    // pour que je puisse mettre de l'ordre ». Les chantiers viennent d'être
+    // ramenés à deux ; exiger un rattachement alors qu'il n'y a presque rien
+    // à quoi rattacher bloquerait justement la remise en ordre.
+    //
+    // La raison de l'obligation reste entière, et elle est de lui (08/11) :
+    // « j'ai fait un devis, il est accepté, je réalise une facture, elle est
+    // payée ; tout ça doit se voir dans le chantier ». Un document sans
+    // chantier n'apparaît dans les chiffres d'aucun dossier et la marge
+    // l'ignore. À REMETTRE une fois la reprise terminée, en même temps que le
+    // verrouillage des numéros.
+    //
+    // D'ici là on AVERTIT au lieu de refuser : refuser bloque, se taire laisse
+    // la dette grossir sans qu'on la voie.
+    if (!f.dossier_id && !verifieSansChantier) {
+      setVerifieSansChantier(true)
+      alert(`${isDevis ? 'Ce devis' : 'Cette facture'} n'est rattaché${isDevis ? '' : 'e'} à aucun chantier.\n\n`
+        + `Il n'apparaîtra donc dans les chiffres d'aucun dossier. C'est accepté le temps de la remise en ordre.\n\n`
+        + `Clique à nouveau sur Enregistrer pour confirmer.`)
       return
     }
     setSaving(true)
@@ -940,14 +956,29 @@ function Editeur({ type, doc, onClose, onSaved }) {
                     de la portée est une erreur d'EXÉCUTION, pas de compilation, et Vite
                     ne la voit pas. Ce qui l'aurait vue, c'est ESLint (`no-undef`) ou
                     simplement l'ouverture de la page après le déploiement. */}
-                {/* ⚠️ Le numéro n'est plus modifiable depuis le 14/11 : la
-                    reprise est terminée. Même raison que pour les chantiers —
-                    un numéro métier qui bouge finit porté deux fois, ou troue
-                    la séquence. Pour une FACTURE il ne l'a jamais été, et ne
-                    doit jamais l'être : la numérotation est une obligation
-                    légale, une facture mal numérotée se corrige par une note
-                    de crédit. */}
+                {/* ⚠️ MODIFIABLE À NOUVEAU, et c'est encore temporaire.
+                    Je l'avais rebloqué le 14/11 à midi ; Ludovic l'a redemandé
+                    dans la foulée : « tu dois me permettre de modifier les
+                    numéros de devis […] pour que je puisse mettre de l'ordre ».
+                    À refermer quand la reprise sera finie — un numéro métier
+                    qui bouge finit porté deux fois, ou troue la séquence.
+
+                    ⚠️ ET SEULEMENT POUR UN DEVIS. Un numéro de facture belge
+                    doit être séquentiel, continu et jamais modifié après
+                    émission : le rendre corrigeable ouvrirait un trou dans la
+                    numérotation légale, et on ne s'en aperçoit qu'au contrôle.
+                    Une facture mal numérotée se corrige par une note de
+                    crédit, pas par un champ de saisie. */}
+                {isDevis && doc?.id ? (
+                  <input value={f.numero || ''} onChange={e => set('numero', e.target.value)}
+                    placeholder="n° du devis" title="Corrigeable — le temps de la reprise"
+                    style={{ marginLeft: 10, color: NAVY, fontWeight: 700, fontSize: 'inherit',
+                      fontFamily: 'inherit', width: Math.max(9, String(f.numero || '').length + 1) + 'ch',
+                      border: 'none', borderBottom: `1px dashed ${COUL.bord}`, background: 'transparent',
+                      padding: '0 2px', outline: 'none' }} />
+                ) : (
                   <span style={{ marginLeft: 10, color: f.numero ? NAVY : COUL.texteFaible, fontWeight: 700 }}>{f.numero || 'n° à l’enregistrement'}</span>
+                )}
 
               </div>
               <div style={{ minWidth: 212, display: 'flex', flexDirection: 'column', gap: 5 }}>
@@ -1093,10 +1124,13 @@ function Editeur({ type, doc, onClose, onSaved }) {
             <div style={{ display: 'grid', gap: 10 }}>
               {(
                 <div>
-                  <label style={lbl}>Chantier <span style={{ color: COUL.danger }}>*</span></label>
-                  <select style={{ ...inp, borderColor: f.dossier_id ? COUL.bord : COUL.danger }}
+                  {/* Plus d'étoile rouge : le champ n'est plus obligatoire le
+                      temps de la reprise. L'avertissement à l'enregistrement
+                      suffit à ce qu'on sache ce qu'on laisse derrière soi. */}
+                  <label style={lbl}>Chantier</label>
+                  <select style={{ ...inp, borderColor: f.dossier_id ? COUL.bord : '#fbbf24' }}
                     value={f.dossier_id || ''} onChange={e => set('dossier_id', e.target.value || null)}>
-                    <option value="">— aucun (obligatoire)</option>
+                    <option value="">— aucun (à rattacher plus tard)</option>
                     {dossiersDuClient.map(d => (
                       <option key={d.id} value={d.id}>
                         {d.numero} · {d.titre}
