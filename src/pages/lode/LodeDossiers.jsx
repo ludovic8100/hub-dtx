@@ -6,6 +6,7 @@ import { chargerCommerciaux, chargerIntervenants } from '../../lib/collaborateur
 import Layout from '../../components/Layout'
 import { COUL } from '../../lib/theme'
 import PanneauAttribuer from '../../components/PanneauAttribuer'
+import DocumentsChantier from '../../components/DocumentsChantier'
 import { analyserTelephone, telephonePourBase, telephoneEnFrappe } from '../../lib/telephone'
 
 // Les dossiers LODE — un par intervention.
@@ -1232,6 +1233,14 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
                 </div>
               </div>
             )}
+          </Section>
+
+          {/* Les pièces libres du chantier : bon de commande fournisseur, devis
+              fournisseur, fiches techniques, QR du moteur… Elles vivent dans
+              SharePoint (ADMINISTRATION/LODE_CHANTIERS), le Hub n'en garde que
+              l'adresse et une vignette. */}
+          <Section titre="Documents">
+            <DocumentsChantier dossier={dossier} />
           </Section>
 
           <Section titre={`Achats rattachés (${achats.length})`}
