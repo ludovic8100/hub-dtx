@@ -2,7 +2,7 @@ import { voile } from '../../lib/voile'
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { chargerCollaborateurs, filtrerSociete } from '../../lib/collaborateurs'
+import { chargerParSociete } from '../../lib/collaborateurs'
 import Layout from '../../components/Layout'
 import { COUL } from '../../lib/theme'
 import PanneauAttribuer from '../../components/PanneauAttribuer'
@@ -935,16 +935,20 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
     // confondre « qui travaille ici » et « qui peut se connecter ».
     //
     // En revanche, un commercial Dynassur n'a rien à faire dans la liste d'un
-    // chantier LODE : le filtre par société est fait plus bas, en gardant le
-    // code déjà enregistré sur le dossier.
-    chargerCollaborateurs('LODE', 'id,code,nom_complet,cout_horaire')
+    // chantier LODE.
+    //
+    // ⚠️ LE RATTACHEMENT À LA SOCIÉTÉ, PAS LE DROIT D'ACCÈS (14/11/2026).
+    // Cette liste s'appuyait sur `acc_lode`, que 2 collaborateurs actifs sur
+    // 31 possèdent — et pas les commerciaux LODE. Ludovic ne voyait donc plus
+    // qu'une seule personne, et seulement sur les chantiers où elle était déjà
+    // inscrite. On lit maintenant `collaborateur_societes` par sa vue.
+    chargerParSociete('LODE', dossier.responsable)
       .then(d => { if (!annule) setEmployes(d) })
     return () => { annule = true }
-  }, [])
+  }, [dossier.responsable])
 
-  const employesLode = useMemo(
-    () => filtrerSociete(employes, 'LODE', dossier.responsable),
-    [employes, dossier.responsable])
+  // Le filtre par société est désormais fait par la requête elle-même.
+  const employesLode = employes
 
   // ⚠️ LE TAUX SE PROPOSE, IL NE SE LIT PAS.
   //
