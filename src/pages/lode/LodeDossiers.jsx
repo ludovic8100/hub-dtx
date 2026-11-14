@@ -250,7 +250,11 @@ export default function LodeDossiers() {
   // qui range et prévient.
   const documentsLibres = (d) => {
     if (!d) return []
-    const memeClient = (x) => String(x.client_id ?? '') === String(d.client_id ?? '')
+    // ⚠️ Deux absences de client ne font pas un même client. Sans ce
+    // `Boolean(...)`, un chantier sans client verrait tous les devis sans
+    // client marqués « du même client » — et ils seraient proposés en tête,
+    // ce qui est exactement l'inverse de la prudence voulue.
+    const memeClient = (x) => Boolean(d.client_id) && String(x.client_id ?? '') === String(d.client_id)
     const marquer = (x, type) => ({ ...x, _doc: type, _memeClient: memeClient(x) })
     return [
       ...devis.filter(x => !x.dossier_id).map(x => marquer(x, 'devis')),
@@ -1354,19 +1358,33 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
 // l'autre d'un clic, ça se fait depuis le document lui-même.
 function ChoisirVente({ documents, dossier, onClose, onChoisir }) {
   const [enCours, setEnCours] = useState(null)
+  const nbDuClient = documents.filter(d => d._memeClient).length
+  const nbAutres   = documents.length - nbDuClient
   return (
     <div {...voile(onClose)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2100, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, padding: 16 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 14, width: 'min(560px, 96vw)', maxHeight: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
           <div style={{ fontSize: 15, fontWeight: 800, color: COUL.texteFort }}>Rattacher un devis ou une facture</div>
           <div style={{ fontSize: 12.5, color: COUL.texteDoux, marginTop: 3 }}>
-            Documents de {dossier.client_nom || 'ce client'} sans chantier.
+            {/* ⚠️ DIRE CE QU'ON MONTRE VRAIMENT (14/11/2026).
+                Ce sous-titre annonçait « Documents de <client> sans chantier »
+                alors que j'avais ouvert la liste à TOUS les documents libres
+                le matin même, pour pouvoir rattacher au-delà du client. Le
+                texte est resté : Ludovic a lu une promesse que la liste ne
+                tenait pas, et l'a pris pour un bug. Il avait raison — un
+                écran qui annonce autre chose que ce qu'il montre est un
+                bug. */}
+            {nbDuClient > 0
+              ? <>{nbDuClient} document{nbDuClient > 1 ? 's' : ''} de <strong>{dossier.client_nom || 'ce client'}</strong> sans chantier
+                  {nbAutres > 0 && <>, puis {nbAutres} d’autres clients</>}.</>
+              : <>Aucun document libre pour {dossier.client_nom || 'ce client'}
+                  {nbAutres > 0 && <> — voici les {nbAutres} autres</>}.</>}
           </div>
         </div>
         <div style={{ overflowY: 'auto', padding: '6px 0' }}>
           {documents.length === 0 && (
             <div style={{ padding: '22px 20px', fontSize: 13, color: COUL.texteFaible, textAlign: 'center' }}>
-              Aucun document libre pour ce client.
+              Aucun devis ni facture sans chantier, chez ce client comme ailleurs.
             </div>
           )}
           {documents.map(d => (
@@ -1376,7 +1394,17 @@ function ChoisirVente({ documents, dossier, onClose, onChoisir }) {
                 <div style={{ fontSize: 13.5, fontWeight: 700, color: COUL.texteFort, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {d._doc === 'devis' ? 'Devis' : 'Facture'} {d.numero}{d.objet ? ' — ' + d.objet : ''}
                 </div>
-                <div style={{ fontSize: 11.5, color: COUL.texteDoux }}>{d.statut || ''}</div>
+                <div style={{ fontSize: 11.5, color: COUL.texteDoux }}>
+                  {d.statut || ''}
+                  {/* Le client n'est nommé que quand ce n'est PAS celui du
+                      chantier. Le répéter partout noierait la seule ligne où
+                      il faut regarder à deux fois avant de cliquer. */}
+                  {!d._memeClient && (
+                    <strong style={{ color: COUL.danger, marginLeft: 6 }}>
+                      · {d.client_nom || 'autre client'}
+                    </strong>
+                  )}
+                </div>
               </div>
               <div style={{ fontSize: 13, fontWeight: 700, color: COUL.texteFort, whiteSpace: 'nowrap' }}>{eur(d.total_ttc)}</div>
             </div>
