@@ -614,7 +614,26 @@ function Editeur({ type, doc, onClose, onSaved }) {
     }
     if (imgs.length) setLignes(p => p.map((l, j) => j === i ? { ...l, photos: [...(l.photos || []), ...imgs] } : l))
   }
-  const addLigne = () => setLignes(p => [...p, { titre: '', descriptif: '', description: '', quantite: 1, prix_unitaire: 0, remise_pct: 0, tva_pct: 21, tva_categorie: 'S', photos: [] }])
+  // ⚠️ AJOUTER UN ARTICLE OUVRE SA FICHE (14/11/2026).
+  //
+  // Ludovic : « lorsque j'ajoute un article au devis, je dois pouvoir ajouter
+  // une remise ». La remise existe pourtant — mais elle vit dans la FICHE de
+  // l'article, et « + Ajouter un article » ne faisait qu'empiler une ligne
+  // vide dans le tableau. Il fallait deviner qu'un second clic, sur la ligne,
+  // ouvrait l'endroit où tout se règle : quantité, prix, remise, photos.
+  //
+  // Un bouton qui crée quelque chose doit mener là où on le remplit. C'est
+  // aussi ce qui laissait des « Article sans nom » dans les devis : une ligne
+  // créée que rien n'invitait à compléter.
+  // ⚠️ L'index se calcule AVANT, pas dans l'updater. Un `setArticleOuvert`
+  // glissé dans `setLignes(p => …)` serait un effet de bord dans une fonction
+  // que React s'autorise à exécuter deux fois (mode strict) — et la seconde
+  // ouvrirait une fiche décalée d'un cran.
+  const addLigne = () => {
+    const indexNouveau = lignes.length
+    setLignes(p => [...p, { titre: '', descriptif: '', description: '', quantite: 1, prix_unitaire: 0, remise_pct: 0, tva_pct: 21, tva_categorie: 'S', photos: [] }])
+    setArticleOuvert(indexNouveau)
+  }
   const delLigne = i => setLignes(p => p.filter((_, j) => j !== i))
 
   const save = async () => {
