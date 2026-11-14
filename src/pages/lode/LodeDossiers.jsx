@@ -666,6 +666,8 @@ function PanneauNouveauDossier({ onClose, onCreer }) {
   const [clients, setClients] = useState([])
   const [cherche, setCherche] = useState(false)
   const [client, setClient] = useState(null)     // { id, nom }
+  // Les chantiers que ce client a DÉJÀ — y compris les clos.
+  const [dejaLa, setDejaLa] = useState([])
   const [titre, setTitre] = useState('')
   const [montant, setMontant] = useState('')
   const [numero, setNumero] = useState('')
@@ -676,6 +678,31 @@ function PanneauNouveauDossier({ onClose, onCreer }) {
                                        email: '', gsm: '', adresse: '', cp: '', ville: '', tva: '' })
 
   const nomClient = (c) => c.denomination || [c.prenom, c.nom].filter(Boolean).join(' ') || '(sans nom)'
+
+  // ⚠️ MONTRER CE QUI EXISTE DÉJÀ, AVANT DE CRÉER (14/11/2026).
+  //
+  // Ludovic était à un clic de recréer un chantier qui existait : même client
+  // (HENNEAUX), même intitulé « Remplacement Panneaux de Porte de garage
+  // Winsol ». Rien ne le lui a dit. Seul le hasard du numéro l'a arrêté — s'il
+  // avait accepté celui qu'on lui proposait, il aurait aujourd'hui deux
+  // chantiers identiques, dont un avec les factures et un vide.
+  //
+  // ⚠️ ON INCLUT LES CLOS, et c'est tout l'intérêt : celui qu'il allait
+  // doubler était justement clos, donc invisible partout ailleurs. Une liste
+  // qui masque ce qu'elle doit signaler ne sert à rien.
+  //
+  // Ça ne bloque RIEN : un client peut parfaitement avoir deux chantiers. On
+  // montre, on ne décide pas — un garde-fou qui interdit se contourne, un
+  // garde-fou qui informe se lit.
+  useEffect(() => {
+    if (!client?.id) { setDejaLa([]); return }
+    let annule = false
+    supabase.from('dossiers').select('id,numero,titre,statut')
+      .eq('societe', 'LODE').eq('client_id', String(client.id))
+      .order('created_at', { ascending: false })
+      .then(({ data }) => { if (!annule) setDejaLa(data || []) })
+    return () => { annule = true }
+  }, [client?.id])
 
   // Le prochain numéro libre, dès l'ouverture de la fenêtre. Lecture seule :
   // il n'est consommé qu'à la création, sinon annuler coûterait un numéro.
@@ -855,22 +882,36 @@ function PanneauNouveauDossier({ onClose, onCreer }) {
 
         {etape === 'dossier' && (
           <div style={{ padding: '14px 20px', overflowY: 'auto', flex: 1 }}>
+            {dejaLa.length > 0 && (
+              <div style={{ marginBottom: 12, background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 9, padding: '9px 11px' }}>
+                <div style={{ fontSize: 12.5, color: '#92400e', fontWeight: 700, marginBottom: 5 }}>
+                  {client?.nom} a déjà {dejaLa.length} chantier{dejaLa.length > 1 ? 's' : ''}
+                </div>
+                {dejaLa.map(d => (
+                  <div key={d.id} style={{ fontSize: 12, color: '#92400e', lineHeight: 1.5 }}>
+                    <span style={{ fontFamily: 'ui-monospace, Menlo, Consolas, monospace' }}>{d.numero}</span>
+                    {' · '}{d.titre}
+                    {d.statut === 'clos' && <strong> (clos)</strong>}
+                  </div>
+                ))}
+                <div style={{ fontSize: 11.5, color: '#b45309', marginTop: 5 }}>
+                  Vérifie que ce n&apos;est pas l&apos;un d&apos;eux avant d&apos;en créer un nouveau.
+                </div>
+              </div>
+            )}
             <div style={{ marginBottom: 12 }}>
               <label style={{ display: 'block', fontSize: 10.5, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Numéro de dossier</label>
-              <input value={numero} onChange={e => setNumero(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && valider()}
-                placeholder={numeroPropose || 'DOS-2026-…'}
-                style={{ ...inp, width: '100%', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }} />
+              {/* ⚠️ ATTRIBUÉ, PLUS SAISI (14/11/2026). Le champ était ouvert
+                  depuis le 13/11, le temps de la reprise : « puis on rebloquera
+                  le système ». C'est fait. Le numéro reste AFFICHÉ — savoir
+                  lequel on va créer est utile ; pouvoir le changer ne l'est
+                  plus, et c'est ce qui avait mené le compteur à 1007. */}
+              <div style={{ ...inp, width: '100%', fontVariantNumeric: 'tabular-nums',
+                            fontWeight: 700, background: COUL.fond, color: COUL.texteFort }}>
+                {numero || numeroPropose || '…'}
+              </div>
               <div style={{ fontSize: 11.5, color: COUL.texteFaible, marginTop: 4 }}>
-                {numeroPropose && numero.trim() === numeroPropose
-                  ? 'Prochain numéro libre — modifiable.'
-                  : numeroPropose
-                    ? <>Le prochain libre est <strong>{numeroPropose}</strong>.{' '}
-                        <button type="button" onClick={() => setNumero(numeroPropose)}
-                          style={{ border: 'none', background: 'none', padding: 0, color: OR, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: FONT, textDecoration: 'underline' }}>
-                          le reprendre
-                        </button></>
-                    : 'Numéro modifiable.'}
+                Attribué automatiquement.
               </div>
             </div>
             <div style={{ marginBottom: 12 }}>
@@ -1139,13 +1180,17 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
                 après ». Le temps de la reprise, donc — à retirer ensuite,
                 sinon deux dossiers finiront par porter le même numéro malgré
                 l'index unique, ou par trouer la séquence. */}
-            <input value={numero} onChange={e => setNumero(e.target.value)}
-              title="Numéro modifiable — mesure temporaire, le temps de la reprise"
-              style={{
-                fontFamily: 'ui-monospace, Menlo, Consolas, monospace', fontSize: 12, fontWeight: 700,
-                color: OR, border: `1px dashed ${OR}`, borderRadius: 6, padding: '2px 6px',
-                background: COUL.surface, width: 160,
-              }} />
+            {/* ⚠️ LE NUMÉRO N'EST PLUS MODIFIABLE (14/11/2026).
+                Il l'était depuis le 13/11, le temps que Ludovic remette ses
+                chantiers en ordre : « puis on rebloquera le système ». C'est
+                fait — les dossiers ont été ramenés à 001 et 002, le compteur
+                recalé à 2. Un numéro métier qui se modifie finit par être
+                porté deux fois, ou par trouer la séquence. */}
+            <span style={{
+              fontFamily: 'ui-monospace, Menlo, Consolas, monospace', fontSize: 12, fontWeight: 700,
+              color: OR, border: '1px solid #e2e8f0', borderRadius: 6, padding: '2px 6px',
+              background: COUL.fond,
+            }}>{numero}</span>
             <div style={{ fontSize: 15, fontWeight: 800, color: COUL.texteFort, marginTop: 2 }}>{dossier.client_nom || 'Sans client'}</div>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, lineHeight: 1, cursor: 'pointer', color: COUL.texteFaible }}>×</button>

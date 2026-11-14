@@ -940,16 +940,15 @@ function Editeur({ type, doc, onClose, onSaved }) {
                     de la portée est une erreur d'EXÉCUTION, pas de compilation, et Vite
                     ne la voit pas. Ce qui l'aurait vue, c'est ESLint (`no-undef`) ou
                     simplement l'ouverture de la page après le déploiement. */}
-                {isDevis && doc?.id ? (
-                  <input value={f.numero || ''} onChange={e => set('numero', e.target.value)}
-                    placeholder="n° du devis" title="Corrigeable"
-                    style={{ marginLeft: 10, color: NAVY, fontWeight: 700, fontSize: 'inherit',
-                      fontFamily: 'inherit', width: Math.max(9, String(f.numero || '').length + 1) + 'ch',
-                      border: 'none', borderBottom: `1px dashed ${COUL.bord}`, background: 'transparent',
-                      padding: '0 2px', outline: 'none' }} />
-                ) : (
+                {/* ⚠️ Le numéro n'est plus modifiable depuis le 14/11 : la
+                    reprise est terminée. Même raison que pour les chantiers —
+                    un numéro métier qui bouge finit porté deux fois, ou troue
+                    la séquence. Pour une FACTURE il ne l'a jamais été, et ne
+                    doit jamais l'être : la numérotation est une obligation
+                    légale, une facture mal numérotée se corrige par une note
+                    de crédit. */}
                   <span style={{ marginLeft: 10, color: f.numero ? NAVY : COUL.texteFaible, fontWeight: 700 }}>{f.numero || 'n° à l’enregistrement'}</span>
-                )}
+
               </div>
               <div style={{ minWidth: 212, display: 'flex', flexDirection: 'column', gap: 5 }}>
                 {(isDevis
