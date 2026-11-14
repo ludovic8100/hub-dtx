@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { sansExtraits } from '../lib/factures'
 import { COUL } from '../lib/theme'
 import PanneauAttribuer from './PanneauAttribuer'
+import { voile } from '../lib/voile'
 
 const FONT = "'Source Sans Pro', sans-serif"
 const fmt = (v) => v === null || v === undefined ? '—'
@@ -564,7 +565,7 @@ function PanneauLierPaiement({ facture, color, onClose, onLier, tousComptes = fa
   const ecartOk = montantCible > 0 && Math.abs(sommeSel - montantCible) < 0.01
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT }} onClick={onClose}>
+    <div {...voile()} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: '14px', width: 'min(620px, 94vw)', maxHeight: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: '12px' }}>
           {facture.fichier_id && (

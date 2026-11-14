@@ -5,6 +5,7 @@ import { COUL } from '../lib/theme'
 import { trierLignes } from '../lib/tri'
 import { preparerLeads } from '../lib/leadsImport'
 import { calculerRappel, ajouterJoursOuvrables } from '../lib/leadsRappel'
+import { voile } from '../lib/voile'
 
 /**
  * PROSPECTION — les leads à appeler, et ce qu'il en est sorti.
@@ -408,7 +409,7 @@ export default function ProspectionView() {
       )}
 
       {ouvert && (
-        <div onClick={() => setOuvert(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)',
+        <div {...voile()} onClick={() => setOuvert(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)',
           zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
           <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 12,
             maxWidth: 560, width: '100%', maxHeight: '90vh', overflow: 'auto', padding: 20 }}>

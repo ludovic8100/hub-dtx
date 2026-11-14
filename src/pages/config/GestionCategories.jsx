@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COUL } from '../../lib/theme'
+import { voile } from '../../lib/voile'
 
 const FONT = "'Source Sans Pro', sans-serif"
 const TYPES = [['depense', 'Dépense'], ['recette', 'Recette']]
@@ -168,7 +169,7 @@ export default function GestionCategories() {
       {flash && <div style={{ position: 'fixed', top: 16, right: 16, background: COUL.texte, color: COUL.blanc, padding: '10px 16px', borderRadius: 10, zIndex: 50, fontWeight: 600 }}>{flash}</div>}
 
       {reaff && (
-        <div onClick={() => setReaff(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+        <div {...voile()} onClick={() => setReaff(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
           <div onClick={e => e.stopPropagation()} style={{ background: COUL.surface, borderRadius: 14, padding: 22, width: 460, maxWidth: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.25)' }}>
             <div style={{ fontSize: 16, fontWeight: 800, color: COUL.texteFort, marginBottom: 8 }}>Réaffecter avant suppression</div>
             <div style={{ fontSize: 13, color: COUL.texteMoyen, marginBottom: 16, lineHeight: 1.5 }}>

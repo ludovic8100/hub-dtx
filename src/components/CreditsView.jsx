@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { COUL } from '../lib/theme'
+import { voile } from '../lib/voile'
 
 const C = { navy:COUL.marineClair, navyMid:"#1E5799", cyan:"#29ABE2", bg:"#F4F6F9", white:COUL.blanc, border:"#DDE3ED", textD:COUL.marineClair, textM:"#4A5568", textL:"#8A9BBE", ok:"#27AE60", warn:"#F39C12", danger:"#E74C3C" }
 const D = {
@@ -77,7 +78,7 @@ function CreditForm({ contrat, existingFin, onClose, onSave }) {
     setSaving(false)
   }
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+    <div {...voile()} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
       <div style={{background:COUL.surface,borderRadius:16,width:"100%",maxWidth:560,maxHeight:"90vh",overflowY:"auto"}}>
         <div style={{padding:"20px 24px 16px",borderBottom:`1px solid ${C.border}`,position:"sticky",top:0,background:COUL.surface}}>
           <div style={{fontSize:16,fontWeight:700,color:C.navy}}>Données financières du crédit</div>

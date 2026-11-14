@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { ENTITES } from '../../lib/entites'
 import { StatBanner } from '../../components/ui/AccountableUI'
 import { COUL } from '../../lib/theme'
+import { voile } from '../../lib/voile'
 
 const BLUE='#0080BD', NAVY='#0D2F5E', GREEN='#16a34a'
 const MOIS=['','Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc']
@@ -86,7 +87,7 @@ function DetailModal({ titre, rows, onClose }) {
   const show = sorted.slice(0,1000)
   const click = k => setSort(s => s.key===k ? { key:k, dir:s.dir==='asc'?'desc':'asc' } : { key:k, dir:'asc' })
   return (
-    <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(15,23,42,.55)', zIndex:1000, display:'flex', justifyContent:'flex-end' }}>
+    <div {...voile()} onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(15,23,42,.55)', zIndex:1000, display:'flex', justifyContent:'flex-end' }}>
       <div onClick={e=>e.stopPropagation()} style={{ width:'min(900px,96vw)', height:'100%', background:COUL.surface, display:'flex', flexDirection:'column', boxShadow:'-8px 0 30px rgba(0,0,0,.2)' }}>
         <div style={{ background:NAVY, padding:'14px 20px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
           <div>

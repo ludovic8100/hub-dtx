@@ -9,6 +9,7 @@ import { getCompagnies, resolveCie } from '../../lib/cie'
 import { trierLignes } from '../../lib/tri'
 import EnTetesTriables from '../../components/EnTetesTriables'
 import { COUL } from '../../lib/theme'
+import { voile } from '../../lib/voile'
 
 const BLUE  = COUL.bleu
 const NAVY  = COUL.marine
@@ -974,7 +975,7 @@ function ContratModal({ contrat, dossier, objets, onClose, preview, cies }) {
     </div>
   )
   return (
-    <div onClick={preview?undefined:onClose} style={{position:'fixed',inset:0,background:preview?'transparent':'rgba(15,23,42,0.55)',zIndex:1000,display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'40px 16px',overflowY:'auto',pointerEvents:preview?'none':'auto'}}>
+    <div {...voile()} onClick={preview?undefined:onClose} style={{position:'fixed',inset:0,background:preview?'transparent':'rgba(15,23,42,0.55)',zIndex:1000,display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'40px 16px',overflowY:'auto',pointerEvents:preview?'none':'auto'}}>
       <div onClick={e=>e.stopPropagation()} style={{background:COUL.surface,borderRadius:14,maxWidth:720,width:'100%',boxShadow:preview?'0 24px 70px rgba(15,23,42,0.28)':'0 20px 60px rgba(0,0,0,0.35)',overflow:'hidden',border:preview?`1px solid ${BLUE}55`:'none'}}>
         <div style={{background:`linear-gradient(135deg, ${BLUE} 0%, ${NAVY} 140%)`,padding:'16px 20px',display:'flex',alignItems:'flex-start',gap:12}}>
           <div style={{flex:1,minWidth:0}}>
@@ -1878,7 +1879,7 @@ export default function DynassurClients() {
         )}
 
         {kpiModal&&(
-          <div onClick={()=>setKpiModal(null)} style={{position:'fixed',inset:0,background:'rgba(15,23,42,.55)',zIndex:1000,display:'flex',justifyContent:'flex-end'}}>
+          <div {...voile()} onClick={()=>setKpiModal(null)} style={{position:'fixed',inset:0,background:'rgba(15,23,42,.55)',zIndex:1000,display:'flex',justifyContent:'flex-end'}}>
             <div onClick={e=>e.stopPropagation()} style={{width:'min(820px,96vw)',height:'100%',background:COUL.surface,display:'flex',flexDirection:'column',boxShadow:'-8px 0 30px rgba(0,0,0,.2)'}}>
               <div style={{background:NAVY,padding:'14px 20px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
                 <div style={{color:COUL.blanc,fontSize:15,fontWeight:800}}>{kpiModal==='loading'?'Calcul en cours…':kpiModal.titre}</div>

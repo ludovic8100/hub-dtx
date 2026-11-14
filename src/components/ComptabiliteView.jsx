@@ -9,6 +9,7 @@ import TraiterFactures from './TraiterFactures'
 import AnomaliesCompta from './AnomaliesCompta'
 import BordereauxView from './BordereauxView'
 import { COUL } from '../lib/theme'
+import { voile } from '../lib/voile'
 
 const fmt = (v) => v === null || v === undefined ? '—'
   : new Intl.NumberFormat('fr-BE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 }).format(v)
@@ -1339,7 +1340,7 @@ export default function ComptabiliteView({ societeCodes, color, colorDark, titre
           </div>
         )
         return (
-          <div onClick={()=>setTxSelection(null)} style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:'20px' }}>
+          <div {...voile()} onClick={()=>setTxSelection(null)} style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:'20px' }}>
             <div onClick={e=>e.stopPropagation()} style={{ background:COUL.surface, borderRadius:'16px', maxWidth:'560px', width:'100%', maxHeight:'85vh', overflow:'auto', boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }}>
               <div style={{ padding:'20px 24px', background:`linear-gradient(135deg, ${color}, ${colorDark||color})`, borderRadius:'16px 16px 0 0', display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
                 <div>
