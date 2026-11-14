@@ -232,7 +232,16 @@ export default function Sidebar() {
 
   return (
     <nav style={{ flex:1, padding:'8px 8px 16px', overflowY:'auto' }}>
-      {currentModules.map(m => <NavItem key={m.key} item={m} />)}
+      {/* ⚠️ LA CLÉ EST LE CHEMIN, PAS LA PERMISSION (14/11/2026).
+          Ludovic a vu QUATRE « Comptabilité » dans le menu LODE.
+          Cause : deux entrées partagent la même `key` de permission —
+          `lode_comptabilite` sert à la fois à « Dossiers » et à
+          « Comptabilité », `acc_holding` au tableau de bord du groupe et à sa
+          comptabilité. Donnée à React comme clé de liste, dans une liste que
+          `orderModules` RÉORDONNE, elle lui faisait réutiliser le mauvais
+          élément : des libellés dupliqués, et hors de l'ordre alphabétique.
+          Le chemin, lui, est unique par société — vérifié, aucun doublon. */}
+      {currentModules.map(m => <NavItem key={m.path} item={m} />)}
       {activeSociete === 'dynassur' && <ClientSearch accentLight={accentLight} />}
       <div style={{ marginTop:'8px', paddingTop:'8px', borderTop:'1px solid rgba(255,255,255,0.08)' }}>
         {(isAdmin || perms.acc_tools) && <NavItem item={{ key:'tools', label:'Outils', icon:'ti-tools', path:'/tools' }} />}
