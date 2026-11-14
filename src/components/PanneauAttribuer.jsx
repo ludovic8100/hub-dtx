@@ -38,7 +38,14 @@ const TABLE_TIERS = { LODE: 'lode_clients' }
 
 export default function PanneauAttribuer({ facture, dossiers, onClose, onChoisir }) {
   const tableTiers = TABLE_TIERS[facture.societe]
-  const [type, setType] = useState('dossier')
+  // ⚠️ Le type ouvert au départ dépend de CE QUI EXISTE, pas d'une valeur en
+  // dur. Sans chantier, « dossier » n'est plus proposé (voir TYPES) ; et
+  // `TABLE_TIERS` ne connaît que LODE, donc « tiers » n'est pas un repli
+  // universel non plus. Ouvrir sur un onglet invisible donnerait une fenêtre
+  // avec une zone de recherche qui ne trouve jamais rien — exactement ce que
+  // Ludovic a vu chez Dynassur le 14/11.
+  const [type, setType] = useState(
+    dossiers.length ? 'dossier' : (TABLE_TIERS[facture.societe] ? 'tiers' : null))
   const [q, setQ] = useState('')
   const [tiers, setTiers] = useState([])
   const [chargeTiers, setChargeTiers] = useState(false)
@@ -63,10 +70,28 @@ export default function PanneauAttribuer({ facture, dossiers, onClose, onChoisir
   const listeTiers = !terme ? tiers : tiers.filter(c =>
     `${nomTiers(c)} ${c.ville || ''}`.toLowerCase().includes(terme))
 
+  // ⚠️ « CHANTIER / DOSSIER » NE S'AFFICHE QUE LÀ OÙ DES CHANTIERS EXISTENT
+  // (14/11/2026).
+  //
+  // Ce panneau vit dans `VueFactures`, donc dans `ComptabiliteView`, donc dans
+  // la comptabilité des SIX sociétés. Chez Dynassur — un courtier en assurance
+  // qui n'a ni chantiers ni onglet Dossiers — on proposait quand même
+  // « Chantier / dossier », et on renvoyait vers « l'onglet Dossiers » qui
+  // n'existe pas pour elle. Signalé par Ludovic, à juste titre.
+  //
+  // La condition est le CONTENU, pas un nom de société : le projet interdit la
+  // règle métier en dur sur une entité. Aucun chantier → aucune raison de
+  // proposer d'en choisir un. Et c'est auto-correctif : le jour où une société
+  // ouvre des dossiers, l'option revient toute seule.
+  //
+  // (La liste est déjà filtrée par société côté requête — il n'y a donc jamais
+  // eu de fuite des chantiers LODE vers une autre entité, seulement une option
+  // qui ne menait nulle part.)
+  //
   // 'bien' est accepté par la base mais la table n'existe pas encore : le
-  // proposer donnerait un choix qui ne mène nulle part.
+  // proposer donnerait un choix qui ne mène nulle part — même raison.
   const TYPES = [
-    { code: 'dossier',     label: 'Chantier / dossier', icone: 'ti-folder',   aide: 'Pour un client, un chantier identifié' },
+    ...(dossiers.length ? [{ code: 'dossier', label: 'Chantier / dossier', icone: 'ti-folder', aide: 'Pour un client, un chantier identifié' }] : []),
     ...(tableTiers ? [{ code: 'tiers', label: 'Client direct', icone: 'ti-user', aide: 'Sans dossier ouvert' }] : []),
     { code: 'structure',   label: 'Structure',          icone: 'ti-building', aide: 'Loyer, énergie, téléphone, assurances' },
     { code: 'consommable', label: 'Consommable',        icone: 'ti-box',      aide: 'Visserie, petit matériel — jamais sur un chantier' },
