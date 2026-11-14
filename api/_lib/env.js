@@ -94,6 +94,38 @@ export const billit = entite => {
  */
 export const PEPPOL_AUTORISE = IS_PROD || env.BILLIT_AUTORISE_EN_TEST === '1'
 
+// ── SharePoint : le garde-fou qui manquait côté serveur (14/11/2026) ─────────
+//
+// ⚠️ `APP_ENV=test` N'ISOLE QUE SUPABASE. C'est écrit dans CLAUDE.md depuis le
+// 07/11 et c'est toujours vrai : `SHAREPOINT_SITE` vaut le même site dans les
+// deux environnements. Une préversion qui déposerait un document de chantier
+// écrirait donc dans les VRAIS documents de Ludovic.
+//
+// Le pendant Python existe (`refuser_ecriture_sharepoint` dans
+// `scripts/_env.py`), mais rien n'équivalait côté Vercel — et c'est justement
+// là que le module Documents de chantier va écrire.
+//
+// REFUSER plutôt que rediriger vers un dossier `_TEST`, pour la même raison
+// qu'en Python : un dossier de test à part se périme et donne une fausse
+// assurance, alors qu'un refus se voit. Ce qu'on vérifie en préversion, c'est
+// la lecture et les décisions — pas que Graph sait écrire.
+//
+// ⚠️ TOUT NOUVEAU CODE QUI ÉCRIT DANS SHAREPOINT DOIT APPELER CECI. Rien ne
+// l'impose automatiquement.
+export const SHAREPOINT_ECRITURE_AUTORISEE =
+  IS_PROD || env.SHAREPOINT_AUTORISE_EN_TEST === '1'
+
+export function refuserEcritureSharePoint(quoi = 'cette écriture') {
+  if (SHAREPOINT_ECRITURE_AUTORISEE) return null
+  const message =
+    `SharePoint en lecture seule hors production : ${quoi} refusée. ` +
+    `APP_ENV=${APP_ENV}, et le site SharePoint est le même qu'en production — ` +
+    `écrire ici modifierait de vrais documents. ` +
+    `Poser SHAREPOINT_AUTORISE_EN_TEST=1 pour lever ce garde-fou en connaissance de cause.`
+  console.warn('[Hub api] ' + message)
+  return message
+}
+
 // ── GitHub (relance des Actions de synchronisation) ───────────────────────────
 export const GITHUB_DISPATCH_TOKEN = env.GITHUB_DISPATCH_TOKEN || ''
 export const GITHUB_REPO = env.GITHUB_REPO || 'ludovic8100/hub-dtx'
@@ -107,5 +139,6 @@ export default {
   SHAREPOINT_SITE_ID, MAIL_EXPEDITEUR_ID, CBEAPI_KEY,
   AZURE, MAIL_REDIRECT_TO,
   billit, PEPPOL_AUTORISE,
+  SHAREPOINT_ECRITURE_AUTORISEE, refuserEcritureSharePoint,
   GITHUB_DISPATCH_TOKEN, GITHUB_REPO, GITHUB_SYNC_REF,
 }
