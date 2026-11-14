@@ -710,7 +710,24 @@ est l'instance n8n, lisible via le connecteur (option « Available in MCP » coc
 
 - Répondre et coder en **français** (UI, commits, commentaires).
 - Suivre le style existant : composants fonction + styles inline, helpers locaux dupliqués par fichier (`fmt`, `fmtDate`).
-- `npm run build` doit passer avant tout push.
+- `npm run build` **et** `npm run lint` doivent passer avant tout push.
+
+  ⚠️ **Le build seul ne suffit pas, et ça a cassé la production le 14/11/2026.**
+  `docId is not defined` a mis hors service toute la page Devis & Factures : une
+  variable locale à une fonction employée dans le JSX. Une variable absente de la
+  portée est une erreur d'**exécution**, pas de compilation — Vite ne la voit pas,
+  et le projet n'avait **aucune configuration ESLint**.
+
+  `eslint.config.mjs` ne porte qu'une règle, `no-undef`, et c'est délibéré : un
+  linteur bavard sur 155 fichiers écrits sans lui rendrait des centaines
+  d'avertissements, et un contrôle que personne ne lit ne protège de rien. Il a
+  trouvé dès sa pose une seconde bombe du même type, pas encore explosée
+  (`setTab` dans HexagroupCotisations).
+
+  Et la leçon de méthode, mesurée le même jour : mon premier scan a rendu
+  « 0 erreur » parce qu'ESLint plantait sur un paquet absent et que le `grep` ne
+  voyait aucune sortie. **Un détecteur se teste sur un cas fautif avant d'être
+  cru** — sinon il rassure sans protéger.
 - Déploiement = merge dans `main` (Vercel suit). Travailler sur une branche, PR, merge.
 - Ne jamais committer de secret (clé API, service_role). Le repo est public.
 - Toute écriture en base de prod (Supabase MCP) : lecture d'abord, écriture ciblée, jamais de delete massif sans validation humaine.
