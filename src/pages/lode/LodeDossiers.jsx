@@ -1283,7 +1283,8 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
                   + (a.societe && a.societe !== (dossier.societe || 'LODE') ? ` · payée par ${a.societe}` : '')}
                 droite={eur(a.montant)}
                 sousDroite={a.transaction_id ? 'payée' : 'non payée'}
-                tonDroite={a.transaction_id ? COUL.succes : COUL.danger} />
+                tonDroite={a.transaction_id ? COUL.succes : COUL.danger}
+                href={a.url || null} fid={a.fichier_id || null} />
             ))}
           </Section>
 
@@ -1488,9 +1489,32 @@ function Section({ titre, children, action }) {
 function Vide({ texte }) {
   return <div style={{ padding: '10px 20px 14px', fontSize: 12.5, color: COUL.texteFaible }}>{texte}</div>
 }
-function Ligne2({ gauche, sousGauche, droite, sousDroite, tonDroite }) {
-  return (
-    <div style={{ padding: '8px 20px', display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline' }}>
+// ⚠️ UNE LIGNE QUI MONTRE UN DOCUMENT DOIT POUVOIR L'OUVRIR (14/11/2026).
+//
+// Ludovic : « lorsque je passe sur Winsol, je ne vois pas la facture ». La
+// ligne n'était ni cliquable ni survolable : on lisait un montant et on ne
+// pouvait rien en faire. Un cul-de-sac.
+//
+// `href` ouvre le document dans SharePoint, `fid` affiche son aperçu au
+// survol — le même geste que dans le bloc Documents, pour qu'il n'y ait pas
+// deux façons de regarder une pièce dans le même écran.
+//
+// L'aperçu passe par `/api/apercu-facture`, qui existait déjà : il demande à
+// Graph la vignette que SharePoint génère lui-même. Mesuré avant d'écrire :
+// `factures_achat.thumb_url` est vide sur les 7 282 lignes — les vignettes
+// venaient de n8n, qui est arrêté. S'appuyer sur cette colonne n'aurait donc
+// rien affiché du tout.
+//
+// L'image n'est demandée QU'AU PREMIER SURVOL : la charger pour toute la
+// liste ferait autant d'appels Graph que de lignes, pour des aperçus que
+// personne n'ouvrira peut-être.
+function Ligne2({ gauche, sousGauche, droite, sousDroite, tonDroite, href, fid }) {
+  const [dessus, setDessus] = useState(false)
+  const [vue, setVue] = useState(false)
+  useEffect(() => { if (dessus && fid) setVue(true) }, [dessus, fid])
+
+  const contenu = (
+    <>
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: COUL.texteFort, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{gauche}</div>
         <div style={{ fontSize: 11.5, color: COUL.texteFaible }}>{sousGauche}</div>
@@ -1499,8 +1523,32 @@ function Ligne2({ gauche, sousGauche, droite, sousDroite, tonDroite }) {
         <div style={{ fontSize: 13, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{droite}</div>
         <div style={{ fontSize: 11, color: tonDroite, fontWeight: 600 }}>{sousDroite}</div>
       </div>
+    </>
+  )
+
+  const style = {
+    padding: '8px 20px', display: 'flex', justifyContent: 'space-between', gap: 12,
+    alignItems: 'baseline', position: 'relative', textDecoration: 'none', color: 'inherit',
+    background: dessus && href ? COUL.fond : 'transparent',
+    cursor: href ? 'pointer' : 'default', borderRadius: 6,
+  }
+
+  const apercu = dessus && vue && fid && (
+    <div style={{
+      position: 'absolute', left: '100%', top: -8, marginLeft: 10, zIndex: 50,
+      background: COUL.surface, border: '1px solid #e2e8f0', borderRadius: 10,
+      padding: 6, boxShadow: '0 12px 36px rgba(0,0,0,.18)', pointerEvents: 'none',
+    }}>
+      <img src={`/api/apercu-facture?fid=${encodeURIComponent(fid)}`} alt=""
+        style={{ display: 'block', width: 260, borderRadius: 6 }}
+        onError={e => { e.currentTarget.parentElement.style.display = 'none' }} />
     </div>
   )
+
+  const commun = { style, onMouseEnter: () => setDessus(true), onMouseLeave: () => setDessus(false) }
+  return href
+    ? <a href={href} target="_blank" rel="noreferrer" {...commun}>{contenu}{apercu}</a>
+    : <div {...commun}>{contenu}{apercu}</div>
 }
 
 // Après création, le numéro est montré en grand : c'est la seule chose que la
