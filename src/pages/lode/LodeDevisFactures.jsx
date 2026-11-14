@@ -235,6 +235,15 @@ function Editeur({ type, doc, onClose, onSaved }) {
       client_nom: f.client_nom || null,
       adresse: f.client_adresse || null, cp: f.client_cp || null, ville: f.client_ville || null,
       date_debut: todayISO(),
+      // ⚠️ LE COMMERCIAL DU DEVIS NAÎT AVEC LE CHANTIER (14/11/2026).
+      //
+      // `synchroniser_commercial` existait déjà, mais elle ne tourne qu'à
+      // l'ENREGISTREMENT du devis. Un chantier créé ici naissait donc sans
+      // commercial, et le restait tant que le devis n'était pas réenregistré.
+      // Mesuré : DOS-2026-077 et 078 sont vides alors que leurs devis portent
+      // tous deux un commercial. Le poser à la création ferme le trou à la
+      // source plutôt que de compter sur un geste ultérieur.
+      responsable: f.responsable || null,
     }).select('id,numero,titre,client_nom,client_id,statut').single()
     setCreationDossier(false)
     if (error) { alert(`Création du chantier refusée — ${error.message}`); return }

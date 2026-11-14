@@ -967,6 +967,33 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
     const e = employes.find(x => String(x.id) === String(id))
     if (e?.cout_horaire != null && !taux) setTaux(String(e.cout_horaire))
   }
+
+  // LE COMMERCIAL SE PROPOSE AUSSI COMME PRESTATAIRE — MAIS SEULEMENT S'IL
+  // PRESTE (14/11/2026).
+  //
+  // Ludovic : « si dans le devis le commercial est attribué, dans la logique
+  // c'est le même dans chantier, dans le tableau de prestation ». Vrai pour
+  // LDE et JCL, qui vendent ET posent.
+  //
+  // ⚠️ Mais FAUX pour LLO, et c'est lui qui l'a dit : elle est commerciale et
+  // « ne fera jamais de l'installation ou de la gestion de chantier ».
+  // Pré-remplir le prestataire avec le commercial sans condition inscrirait
+  // donc des heures au nom de quelqu'un qui n'a jamais mis les pieds sur le
+  // chantier — et une heure attribuée au mauvais nom fausse le coût de
+  // revient sans que rien ne le signale.
+  //
+  // La condition est exactement les rôles posés le même jour : on ne propose
+  // le commercial que s'il figure dans la liste des intervenants, c'est-à-dire
+  // s'il porte `gestion_chantier` ou `installation`. Sinon on laisse vide.
+  //
+  // Et uniquement en PROPOSITION, sur un chantier qui n'a pas encore de
+  // prestataire : ça ne remplace jamais une saisie existante.
+  useEffect(() => {
+    if (qui || !commercial || !employes.length) return
+    const e = employes.find(x => x.code === commercial)
+    if (e?.id != null) choisirQui(String(e.id))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [commercial, employes])
   const coutMo = (() => {
     const h = Number(String(heures).replace(',', '.'))
     const t = Number(String(taux).replace(',', '.'))
