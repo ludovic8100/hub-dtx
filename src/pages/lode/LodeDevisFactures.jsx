@@ -235,6 +235,15 @@ function Editeur({ type, doc, onClose, onSaved }) {
       client_nom: f.client_nom || null,
       adresse: f.client_adresse || null, cp: f.client_cp || null, ville: f.client_ville || null,
       date_debut: todayISO(),
+      // ⚠️ LE COMMERCIAL DU DEVIS NAÎT AVEC LE CHANTIER (14/11/2026).
+      //
+      // `synchroniser_commercial` existait déjà, mais elle ne tourne qu'à
+      // l'ENREGISTREMENT du devis. Un chantier créé ici naissait donc sans
+      // commercial, et le restait tant que le devis n'était pas réenregistré.
+      // Mesuré : DOS-2026-077 et 078 sont vides alors que leurs devis portent
+      // tous deux un commercial. Le poser à la création ferme le trou à la
+      // source plutôt que de compter sur un geste ultérieur.
+      responsable: f.responsable || null,
     }).select('id,numero,titre,client_nom,client_id,statut').single()
     setCreationDossier(false)
     if (error) { alert(`Création du chantier refusée — ${error.message}`); return }
@@ -900,8 +909,18 @@ function Editeur({ type, doc, onClose, onSaved }) {
                     séquentiel, continu et jamais modifié après émission : le rendre
                     corrigeable ouvrirait un trou dans la numérotation légale, et on ne
                     s'en aperçoit qu'au contrôle. Une facture mal numérotée se corrige par
-                    une note de crédit, pas par un champ de saisie. */}
-                {isDevis && docId ? (
+                    une note de crédit, pas par un champ de saisie.
+
+                    ⚠️ `doc?.id` et NON `docId` : `docId` est une variable LOCALE à la
+                    fonction d'enregistrement, pas une valeur du composant. L'employer
+                    ici levait « docId is not defined » au rendu et cassait toute la page
+                    Devis & Factures en production, le 14/11/2026.
+
+                    Le piège : `npm run build` passe sans rien dire. Une variable absente
+                    de la portée est une erreur d'EXÉCUTION, pas de compilation, et Vite
+                    ne la voit pas. Ce qui l'aurait vue, c'est ESLint (`no-undef`) ou
+                    simplement l'ouverture de la page après le déploiement. */}
+                {isDevis && doc?.id ? (
                   <input value={f.numero || ''} onChange={e => set('numero', e.target.value)}
                     placeholder="n° du devis" title="Corrigeable"
                     style={{ marginLeft: 10, color: NAVY, fontWeight: 700, fontSize: 'inherit',

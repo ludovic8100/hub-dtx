@@ -195,13 +195,32 @@ export default function LodeDossiers() {
   // Les devis et factures de vente du MÊME client qui ne sont rattachés à
   // aucun chantier. Filtrer par client est la même règle que dans l'éditeur :
   // un devis avait pu être attribué au chantier d'un autre client.
+  // ⚠️ TOUS les documents libres, pas seulement ceux du même client
+  // (14/11/2026).
+  //
+  // Ludovic : « je ne sais pas rattacher un devis s'il est déjà existant ».
+  // La cause n'était pas qu'il manquait un bouton : c'est qu'il était
+  // INVISIBLE. Il ne s'affichait que si un document libre du même client
+  // existait, et la liste était filtrée sur `client_id`.
+  //
+  // Mesuré : 11 devis sans chantier, répartis sur 6 clients — dont 4 n'ont
+  // aucun chantier. Résultat, **7 chantiers sur 9 ne voyaient aucun devis**,
+  // sans que rien n'explique pourquoi.
+  //
+  // Le filtre par client reste la bonne valeur par défaut — un devis attribué
+  // au chantier d'un autre client est presque toujours une erreur. Mais il ne
+  // doit pas être un cul-de-sac : les cas légitimes existent (devis au nom de
+  // Monsieur, chantier au nom de Madame ; fiche client en double). On rend
+  // donc tout, en marquant qui appartient à ce client, et c'est la fenêtre
+  // qui range et prévient.
   const documentsLibres = (d) => {
     if (!d) return []
     const memeClient = (x) => String(x.client_id ?? '') === String(d.client_id ?? '')
+    const marquer = (x, type) => ({ ...x, _doc: type, _memeClient: memeClient(x) })
     return [
-      ...devis.filter(x => !x.dossier_id && memeClient(x)).map(x => ({ ...x, _doc: 'devis' })),
-      ...ventes.filter(x => !x.dossier_id && memeClient(x)).map(x => ({ ...x, _doc: 'facture' })),
-    ]
+      ...devis.filter(x => !x.dossier_id).map(x => marquer(x, 'devis')),
+      ...ventes.filter(x => !x.dossier_id).map(x => marquer(x, 'facture')),
+    ].sort((a, b) => (b._memeClient ? 1 : 0) - (a._memeClient ? 1 : 0))
   }
 
   // Rattacher après coup. On RECHARGE au lieu de patcher l'état local : le
@@ -967,6 +986,17 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
     const e = employes.find(x => String(x.id) === String(id))
     if (e?.cout_horaire != null && !taux) setTaux(String(e.cout_horaire))
   }
+
+  // ⚠️ LE PRESTATAIRE NE SE PRÉ-REMPLIT PAS AVEC LE COMMERCIAL, et c'est une
+  // décision, pas un oubli (14/11/2026).
+  //
+  // J'avais ajouté cette proposition de moi-même en lisant « le commercial
+  // doit être pré-défini partout ». Ludovic parlait du COMMERCIAL, pas du
+  // prestataire — et les deux ne sont pas la même personne : LLO vend mais
+  // « ne fera jamais de l'installation ou de la gestion de chantier ».
+  //
+  // Une heure inscrite au mauvais nom fausse le coût de revient sans que rien
+  // ne le signale. Qui a presté se saisit, il ne se devine pas.
   const coutMo = (() => {
     const h = Number(String(heures).replace(',', '.'))
     const t = Number(String(taux).replace(',', '.'))
