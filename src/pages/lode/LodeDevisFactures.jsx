@@ -2,7 +2,7 @@ import { voile } from '../../lib/voile'
 import { n8nWebhook } from '../../config/env'
 import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
-import { chargerCollaborateurs, filtrerSociete } from '../../lib/collaborateurs'
+import { chargerCommerciaux } from '../../lib/collaborateurs'
 import { PEPPOL_ACTIF } from '../../lib/peppol'
 import Layout from '../../components/Layout'
 import { LODE, TVA_TAUX, CGV, DELAI_PAIEMENT_JOURS } from '../../lib/lodeConfig'
@@ -170,15 +170,14 @@ function Editeur({ type, doc, onClose, onSaved }) {
   const [tousCollabs, setTousCollabs] = useState([])
   useEffect(() => {
     let annule = false
-    chargerCollaborateurs('LODE').then(d => { if (!annule) setTousCollabs(d) })
+    // ⚠️ Le RATTACHEMENT à LODE, pas le droit d'ouvrir son module : les
+    // commerciaux LODE n'ont pas `acc_lode`, et cette liste ne montrait donc
+    // qu'eux-mêmes quand ils étaient déjà inscrits. Voir `collaborateurs.js`.
+    // Le code déjà enregistré reste toujours proposable.
+    chargerCommerciaux('LODE', f.responsable).then(d => { if (!annule) setTousCollabs(d) })
     return () => { annule = true }
-  }, [])
-  // Un commercial Dynassur n'a rien à faire dans un devis LODE. On garde
-  // cependant le code déjà enregistré, sinon un devis existant afficherait
-  // un responsable absent de sa propre liste.
-  const responsables = useMemo(
-    () => filtrerSociete(tousCollabs, 'LODE', f.responsable),
-    [tousCollabs, f.responsable])
+  }, [f.responsable])
+  const responsables = tousCollabs
 
   const [dossiersDispo, setDossiersDispo] = useState([])
   const [creationDossier, setCreationDossier] = useState(false)

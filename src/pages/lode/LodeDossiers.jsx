@@ -2,7 +2,7 @@ import { voile } from '../../lib/voile'
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { chargerCollaborateurs, filtrerSociete } from '../../lib/collaborateurs'
+import { chargerParSociete, chargerCommerciaux } from '../../lib/collaborateurs'
 import Layout from '../../components/Layout'
 import { COUL } from '../../lib/theme'
 import PanneauAttribuer from '../../components/PanneauAttribuer'
@@ -925,6 +925,7 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
   const [qui, setQui] = useState(dossier.mo_collaborateur_id || '')
   const [taux, setTaux] = useState(dossier.mo_taux_horaire == null ? '' : String(dossier.mo_taux_horaire))
   const [employes, setEmployes] = useState([])
+  const [commerciaux, setCommerciaux] = useState([])
   useEffect(() => {
     let annule = false
     // ⚠️ PAS de filtre sur `compte_hub_actif`.
@@ -935,16 +936,23 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
     // confondre « qui travaille ici » et « qui peut se connecter ».
     //
     // En revanche, un commercial Dynassur n'a rien à faire dans la liste d'un
-    // chantier LODE : le filtre par société est fait plus bas, en gardant le
-    // code déjà enregistré sur le dossier.
-    chargerCollaborateurs('LODE', 'id,code,nom_complet,cout_horaire')
-      .then(d => { if (!annule) setEmployes(d) })
+    // chantier LODE.
+    //
+    // ⚠️ LE RATTACHEMENT À LA SOCIÉTÉ, PAS LE DROIT D'ACCÈS (14/11/2026).
+    // Cette liste s'appuyait sur `acc_lode`, que 2 collaborateurs actifs sur
+    // 31 possèdent — et pas les commerciaux LODE. Ludovic ne voyait donc plus
+    // qu'une seule personne, et seulement sur les chantiers où elle était déjà
+    // inscrite. On lit maintenant `collaborateur_societes` par sa vue.
+    // DEUX LISTES, DEUX SENS. « Qui a vendu » n'est pas « qui a posé » :
+    // l'attribution va aux commerciaux (règle de Ludovic : c'est la fonction
+    // qui attribue, pas le statut), la saisie des heures à tout le monde —
+    // le poseur n'est pas commercial et doit pouvoir encoder ses heures.
+    Promise.all([
+      chargerCommerciaux('LODE', dossier.responsable),
+      chargerParSociete('LODE', null),
+    ]).then(([c, t]) => { if (!annule) { setCommerciaux(c); setEmployes(t) } })
     return () => { annule = true }
-  }, [])
-
-  const employesLode = useMemo(
-    () => filtrerSociete(employes, 'LODE', dossier.responsable),
-    [employes, dossier.responsable])
+  }, [dossier.responsable])
 
   // ⚠️ LE TAUX SE PROPOSE, IL NE SE LIT PAS.
   //
@@ -1093,8 +1101,8 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
               <label style={lbl}>Commercial</label>
               <select value={commercial} onChange={e => setCommercial(e.target.value)} style={{ ...inp, width: '100%' }}>
                 <option value="">—</option>
-                {employesLode.filter(e => e.code).map(e => (
-                  <option key={e.id} value={e.code}>{e.code} — {e.nom_complet}</option>
+                {commerciaux.filter(e => e.code).map(e => (
+                  <option key={e.code} value={e.code}>{e.code} — {e.nom_complet}</option>
                 ))}
               </select>
             </div>
@@ -1170,7 +1178,7 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
                     <label style={lbl}>Qui a presté</label>
                     <select value={qui} onChange={e => choisirQui(e.target.value)} style={{ ...inp, width: '100%' }}>
                       <option value="">—</option>
-                      {employesLode.map(e => (
+                      {employes.filter(e => e.id != null).map(e => (
                         <option key={e.id} value={e.id}>
                           {e.nom_complet}{e.cout_horaire != null ? ` · ${e.cout_horaire} €/h` : ' · taux non défini'}
                         </option>
