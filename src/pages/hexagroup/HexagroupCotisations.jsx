@@ -321,7 +321,7 @@ export default function HexagroupCotisations() {
       .insert({ membre_id: membre.id, annee, numero, date_facture: `${annee}-07-01`, statut: 'a_envoyer', total: 0 })
       .select('*, membre:hex_membres(*)').single()
     if (error) { alert('Création impossible : ' + error.message); return }
-    setPick(false); setTab('cotisations'); await charger()
+    setPick(false); await charger()
     ouvrirEdition({ ...data, lignes: [] })
   }
 
@@ -345,7 +345,7 @@ export default function HexagroupCotisations() {
       if (montant > 0) await supabase.from('hex_cotisations_lignes').insert({ cotisation_id: data.id, position: 0, libelle: lib, quantite: 1, prix_unitaire: montant })
       created++
     }
-    setBusy(false); setExc(null); setTab('cotisations'); await charger()
+    setBusy(false); setExc(null); await charger()
     alert(`${created} cotisation${created > 1 ? 's' : ''} exceptionnelle${created > 1 ? 's' : ''} créée${created > 1 ? 's' : ''}${errs ? ` — ${errs} en échec` : ''}.`)
   }
 

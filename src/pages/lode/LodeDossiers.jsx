@@ -195,13 +195,32 @@ export default function LodeDossiers() {
   // Les devis et factures de vente du MÊME client qui ne sont rattachés à
   // aucun chantier. Filtrer par client est la même règle que dans l'éditeur :
   // un devis avait pu être attribué au chantier d'un autre client.
+  // ⚠️ TOUS les documents libres, pas seulement ceux du même client
+  // (14/11/2026).
+  //
+  // Ludovic : « je ne sais pas rattacher un devis s'il est déjà existant ».
+  // La cause n'était pas qu'il manquait un bouton : c'est qu'il était
+  // INVISIBLE. Il ne s'affichait que si un document libre du même client
+  // existait, et la liste était filtrée sur `client_id`.
+  //
+  // Mesuré : 11 devis sans chantier, répartis sur 6 clients — dont 4 n'ont
+  // aucun chantier. Résultat, **7 chantiers sur 9 ne voyaient aucun devis**,
+  // sans que rien n'explique pourquoi.
+  //
+  // Le filtre par client reste la bonne valeur par défaut — un devis attribué
+  // au chantier d'un autre client est presque toujours une erreur. Mais il ne
+  // doit pas être un cul-de-sac : les cas légitimes existent (devis au nom de
+  // Monsieur, chantier au nom de Madame ; fiche client en double). On rend
+  // donc tout, en marquant qui appartient à ce client, et c'est la fenêtre
+  // qui range et prévient.
   const documentsLibres = (d) => {
     if (!d) return []
     const memeClient = (x) => String(x.client_id ?? '') === String(d.client_id ?? '')
+    const marquer = (x, type) => ({ ...x, _doc: type, _memeClient: memeClient(x) })
     return [
-      ...devis.filter(x => !x.dossier_id && memeClient(x)).map(x => ({ ...x, _doc: 'devis' })),
-      ...ventes.filter(x => !x.dossier_id && memeClient(x)).map(x => ({ ...x, _doc: 'facture' })),
-    ]
+      ...devis.filter(x => !x.dossier_id).map(x => marquer(x, 'devis')),
+      ...ventes.filter(x => !x.dossier_id).map(x => marquer(x, 'facture')),
+    ].sort((a, b) => (b._memeClient ? 1 : 0) - (a._memeClient ? 1 : 0))
   }
 
   // Rattacher après coup. On RECHARGE au lieu de patcher l'état local : le
@@ -968,32 +987,16 @@ function FicheDossier({ dossier, achats, achatsLibres = [], ventes, devis = [], 
     if (e?.cout_horaire != null && !taux) setTaux(String(e.cout_horaire))
   }
 
-  // LE COMMERCIAL SE PROPOSE AUSSI COMME PRESTATAIRE — MAIS SEULEMENT S'IL
-  // PRESTE (14/11/2026).
+  // ⚠️ LE PRESTATAIRE NE SE PRÉ-REMPLIT PAS AVEC LE COMMERCIAL, et c'est une
+  // décision, pas un oubli (14/11/2026).
   //
-  // Ludovic : « si dans le devis le commercial est attribué, dans la logique
-  // c'est le même dans chantier, dans le tableau de prestation ». Vrai pour
-  // LDE et JCL, qui vendent ET posent.
-  //
-  // ⚠️ Mais FAUX pour LLO, et c'est lui qui l'a dit : elle est commerciale et
+  // J'avais ajouté cette proposition de moi-même en lisant « le commercial
+  // doit être pré-défini partout ». Ludovic parlait du COMMERCIAL, pas du
+  // prestataire — et les deux ne sont pas la même personne : LLO vend mais
   // « ne fera jamais de l'installation ou de la gestion de chantier ».
-  // Pré-remplir le prestataire avec le commercial sans condition inscrirait
-  // donc des heures au nom de quelqu'un qui n'a jamais mis les pieds sur le
-  // chantier — et une heure attribuée au mauvais nom fausse le coût de
-  // revient sans que rien ne le signale.
   //
-  // La condition est exactement les rôles posés le même jour : on ne propose
-  // le commercial que s'il figure dans la liste des intervenants, c'est-à-dire
-  // s'il porte `gestion_chantier` ou `installation`. Sinon on laisse vide.
-  //
-  // Et uniquement en PROPOSITION, sur un chantier qui n'a pas encore de
-  // prestataire : ça ne remplace jamais une saisie existante.
-  useEffect(() => {
-    if (qui || !commercial || !employes.length) return
-    const e = employes.find(x => x.code === commercial)
-    if (e?.id != null) choisirQui(String(e.id))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [commercial, employes])
+  // Une heure inscrite au mauvais nom fausse le coût de revient sans que rien
+  // ne le signale. Qui a presté se saisit, il ne se devine pas.
   const coutMo = (() => {
     const h = Number(String(heures).replace(',', '.'))
     const t = Number(String(taux).replace(',', '.'))
