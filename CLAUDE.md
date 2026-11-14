@@ -459,6 +459,32 @@ deux sessions simultanées ne peuvent pas obtenir le même numéro, contrairemen
 un `max(numero)+1` lu puis écrit. Séquence indépendante par type, société et
 année (vérifié : LODE 001, 002 pendant que DTX repart à 001).
 
+⚠️ **`lpad(n, 3, '0')` TRONQUE au-delà de 999** — et ça a cassé la création de
+chantiers LODE le 14/11/2026. Ce n'est pas un remplissage conditionnel, c'est un
+calibrage à largeur fixe :
+
+```
+lpad('7',    3, '0')  →  '007'
+lpad('1008', 3, '0')  →  '100'   ← et DOS-2026-100 existait déjà
+```
+
+Un dossier numéroté `DOS-2026-999` à la main avait recalé le compteur à 999 ;
+passé 1000, chaque numéro était rogné et retombait sur la plage 100-107. L'écran
+affichait « duplicate key value violates unique constraint » — un message exact,
+qui accuse la table alors que la faute est dans la fonction.
+
+Corrigé par `greatest(3, length(...))`, qui remplit sans jamais raccourcir. **La
+même erreur dort dans tout code qui formate un rang** : `next_lode_numero`
+l'avait aussi, sur 4 chiffres pour les devis et 3 pour les factures.
+
+Et la leçon de fond : **un générateur de numéros ne doit jamais rendre un numéro
+déjà pris.** Le compteur et la table sont deux sources qui divergent dès qu'un
+numéro est saisi à la main. `prochain_numero` avance donc jusqu'à trouver un
+numéro libre dans `dossiers` — vérification écrite en dur, parce que du SQL
+dynamique dans une fonction `security definer` ouvrirait une injection. ⚠️ Un
+nouveau type de numéro n'héritera pas de cette protection : il doit ajouter sa
+branche.
+
 **L'affectation se fait depuis la banque autant que depuis la facture.** Sur
 les projets immobiliers (Tongres 120, Seraing), beaucoup d'achats n'ont
 aucune facture : le mouvement bancaire est alors le seul canal. Un modèle qui

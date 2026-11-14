@@ -277,14 +277,34 @@ export default function LodeDossiers() {
   // la fenêtre, et la valeur de retour pour la fenêtre elle-même.
   const echec = (message) => { setErreur(message); return { ok: false, message } }
 
-  async function creerDossier(titre, client, montant) {   // client = { id, nom } | null
+  // LE NUMÉRO EST VISIBLE ET MODIFIABLE À LA CRÉATION (14/11/2026).
+  //
+  // Demandé par Ludovic, le temps de remettre les numéros de chantier dans
+  // l'ordre. La fenêtre affiche le prochain numéro libre ; on peut le
+  // remplacer par celui qu'on veut.
+  //
+  // ⚠️ L'aperçu NE CONSOMME PAS de numéro — c'est tout l'intérêt de
+  // `apercu_numero` face à `prochain_numero`. Ouvrir la fenêtre puis annuler
+  // brûlait un numéro à chaque fois : c'est exactement ce qui a mené le
+  // compteur LODE à 1007 pour huit dossiers, et de là à la troncature de
+  // `lpad` qui a cassé la création (voir CLAUDE.md).
+  //
+  // Le compteur est recalé APRÈS l'insertion réussie, par `caler_numero`, qui
+  // ne le fait jamais reculer. Si le numéro saisi est déjà pris, on le dit
+  // avec le numéro en cause et on propose le prochain libre — plutôt que de
+  // renvoyer la violation de contrainte brute, qui accuse la table.
+  async function creerDossier(titre, client, montant, numeroSaisi) {   // client = { id, nom } | null
     setErreur('')
     try {
-      const { data: numero, error: e1 } = await supabase.rpc('prochain_numero', {
-        p_type: 'dossier', p_societe: 'LODE', p_prefixe: 'DOS',
-      })
-      if (e1) return echec(`Numérotation refusée — ${e1.message}`)
-      if (!numero) return echec('Numérotation : aucun numéro rendu.')
+      let numero = String(numeroSaisi || '').trim()
+      if (!numero) {
+        const { data, error: e1 } = await supabase.rpc('prochain_numero', {
+          p_type: 'dossier', p_societe: 'LODE', p_prefixe: 'DOS',
+        })
+        if (e1) return echec(`Numérotation refusée — ${e1.message}`)
+        if (!data) return echec('Numérotation : aucun numéro rendu.')
+        numero = data
+      }
 
       const montantNum = montant === '' || montant == null ? null : Number(String(montant).replace(',', '.'))
       if (montantNum != null && Number.isNaN(montantNum)) {
@@ -304,7 +324,24 @@ export default function LodeDossiers() {
         date_debut: new Date().toISOString().slice(0, 10),
       }).select('id,numero,titre,client_nom,client_type,client_id,statut,montant_a_facturer,date_debut,created_at,mo_heures,mo_visites,mo_collaborateur_id,mo_taux_horaire,responsable').single()
 
-      if (error) return echec(`Création refusée — ${error.message}`)
+      if (error) {
+        // 23505 = violation d'unicité. Le message brut de Postgres nomme la
+        // contrainte, pas le problème. Ici on nomme le numéro, et on donne
+        // celui qui est libre.
+        if (error.code === '23505') {
+          const { data: libre } = await supabase.rpc('apercu_numero', {
+            p_type: 'dossier', p_societe: 'LODE', p_prefixe: 'DOS',
+          })
+          const r = echec(`Le numéro ${numero} est déjà utilisé par un autre chantier.`
+            + (libre ? ` Le prochain libre est ${libre}.` : ''))
+          return { ...r, numeroLibre: libre || null }
+        }
+        return echec(`Création refusée — ${error.message}`)
+      }
+
+      // Le compteur suit le numéro réellement posé — jamais en arrière.
+      await supabase.rpc('caler_numero', { p_type: 'dossier', p_societe: 'LODE', p_numero: numero })
+
       setDossiers(p => [data, ...p])
       setNouveau(data)
       return { ok: true, message: '' }
@@ -487,8 +524,8 @@ export default function LodeDossiers() {
       {creation && (
         <PanneauNouveauDossier
           onClose={() => setCreation(false)}
-          onCreer={async (titre, client, montant) => {
-            const r = await creerDossier(titre, client, montant)
+          onCreer={async (titre, client, montant, numero) => {
+            const r = await creerDossier(titre, client, montant, numero)
             if (r.ok) setCreation(false)
             return r
           }} />
@@ -554,12 +591,27 @@ function PanneauNouveauDossier({ onClose, onCreer }) {
   const [client, setClient] = useState(null)     // { id, nom }
   const [titre, setTitre] = useState('')
   const [montant, setMontant] = useState('')
+  const [numero, setNumero] = useState('')
+  const [numeroPropose, setNumeroPropose] = useState('')
   const [occupe, setOccupe] = useState(false)
   const [erreur, setErreur] = useState('')
   const [fiche, setFiche] = useState({ type: 'particulier', nom: '', prenom: '', denomination: '',
                                        email: '', gsm: '', adresse: '', cp: '', ville: '', tva: '' })
 
   const nomClient = (c) => c.denomination || [c.prenom, c.nom].filter(Boolean).join(' ') || '(sans nom)'
+
+  // Le prochain numéro libre, dès l'ouverture de la fenêtre. Lecture seule :
+  // il n'est consommé qu'à la création, sinon annuler coûterait un numéro.
+  useEffect(() => {
+    let annule = false
+    supabase.rpc('apercu_numero', { p_type: 'dossier', p_societe: 'LODE', p_prefixe: 'DOS' })
+      .then(({ data }) => {
+        if (annule || !data) return
+        setNumeroPropose(data)
+        setNumero(n => n || data)
+      })
+    return () => { annule = true }
+  }, [])
 
   // Recherche à la frappe, sur le nom, le prénom, la dénomination et la ville.
   useEffect(() => {
@@ -605,11 +657,17 @@ function PanneauNouveauDossier({ onClose, onCreer }) {
 
   async function valider() {
     if (!titre.trim()) { setErreur("Donne un intitulé à l'intervention."); return }
+    if (!numero.trim()) { setErreur('Donne un numéro de dossier.'); return }
     setOccupe(true); setErreur('')
-    const r = await onCreer(titre.trim(), client, montant)
+    const r = await onCreer(titre.trim(), client, montant, numero.trim())
     setOccupe(false)
     // On affiche LA RAISON, jamais un renvoi vers un message qu'on ne voit pas.
-    if (!r?.ok) setErreur(r?.message || 'La création du dossier a échoué.')
+    if (!r?.ok) {
+      setErreur(r?.message || 'La création du dossier a échoué.')
+      // Numéro déjà pris : on met le champ sur le prochain libre, pour que
+      // le second essai soit un simple clic.
+      if (r?.numeroLibre) { setNumero(r.numeroLibre); setNumeroPropose(r.numeroLibre) }
+    }
   }
 
   // Le téléphone a son propre champ : il se met en forme pendant la frappe
@@ -720,6 +778,24 @@ function PanneauNouveauDossier({ onClose, onCreer }) {
 
         {etape === 'dossier' && (
           <div style={{ padding: '14px 20px', overflowY: 'auto', flex: 1 }}>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: 'block', fontSize: 10.5, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Numéro de dossier</label>
+              <input value={numero} onChange={e => setNumero(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && valider()}
+                placeholder={numeroPropose || 'DOS-2026-…'}
+                style={{ ...inp, width: '100%', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }} />
+              <div style={{ fontSize: 11.5, color: COUL.texteFaible, marginTop: 4 }}>
+                {numeroPropose && numero.trim() === numeroPropose
+                  ? 'Prochain numéro libre — modifiable.'
+                  : numeroPropose
+                    ? <>Le prochain libre est <strong>{numeroPropose}</strong>.{' '}
+                        <button type="button" onClick={() => setNumero(numeroPropose)}
+                          style={{ border: 'none', background: 'none', padding: 0, color: OR, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: FONT, textDecoration: 'underline' }}>
+                          le reprendre
+                        </button></>
+                    : 'Numéro modifiable.'}
+              </div>
+            </div>
             <div style={{ marginBottom: 12 }}>
               <label style={{ display: 'block', fontSize: 10.5, fontWeight: 700, color: COUL.texteFaible, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Intervention</label>
               <input value={titre} onChange={e => setTitre(e.target.value)} autoFocus
