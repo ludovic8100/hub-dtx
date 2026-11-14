@@ -383,10 +383,22 @@ export default function LodeDossiers() {
         // contrainte, pas le problème. Ici on nomme le numéro, et on donne
         // celui qui est libre.
         if (error.code === '23505') {
-          const { data: libre } = await supabase.rpc('apercu_numero', {
-            p_type: 'dossier', p_societe: 'LODE', p_prefixe: 'DOS',
-          })
-          const r = echec(`Le numéro ${numero} est déjà utilisé par un autre chantier.`
+          // ⚠️ DIRE LEQUEL, et surtout dire s'il est CLOS (14/11/2026).
+          //
+          // « déjà utilisé par un autre chantier » envoyait Ludovic chercher
+          // DOS-2026-002 dans une liste où il ne pouvait pas le trouver : les
+          // chantiers clos y sont masqués. Un message exact qui désigne
+          // l'invisible se lit comme un bug.
+          const [{ data: libre }, { data: occupant }] = await Promise.all([
+            supabase.rpc('apercu_numero', { p_type: 'dossier', p_societe: 'LODE', p_prefixe: 'DOS' }),
+            supabase.from('dossiers').select('titre,client_nom,statut')
+              .eq('societe', 'LODE').eq('numero', numero).maybeSingle(),
+          ])
+          const qui = occupant
+            ? ` — « ${occupant.titre || 'sans titre'} »${occupant.client_nom ? ' pour ' + occupant.client_nom : ''}`
+              + (occupant.statut === 'clos' ? ', qui est CLOS et n’apparaît donc pas dans la liste' : '')
+            : ''
+          const r = echec(`Le numéro ${numero} est déjà pris${qui}.`
             + (libre ? ` Le prochain libre est ${libre}.` : ''))
           return { ...r, numeroLibre: libre || null }
         }
@@ -451,6 +463,10 @@ export default function LodeDossiers() {
           ))}
         </div>
 
+        {/* Le message apparaît ici ET dans la fenêtre quand elle est ouverte.
+            J'allais supprimer ce doublon ; Ludovic a demandé de le laisser
+            (14/11/2026) — la bannière reste lisible quand la fenêtre est
+            déplacée ou refermée. */}
         {erreur && <div style={{ ...card, background: COUL.dangerFondDoux, color: COUL.dangerFonce, fontSize: 13 }}>{erreur}</div>}
         {loading && <div style={{ ...card, textAlign: 'center', color: COUL.texteFaible }}>Chargement…</div>}
 
