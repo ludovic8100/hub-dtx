@@ -196,7 +196,17 @@ export function AuthProvider({ children }) {
       if (m.colonne_acces) drapeaux[m.colonne_acces] = true
       for (const col of (m.colonnes_legacy || [])) drapeaux[col] = true
     }
-    return { ...data, ...drapeaux, acces_modules: acces || [] }
+    // ⚠️ On CONSERVE le catalogue société × module, au lieu de le jeter après
+    // en avoir tiré les drapeaux (14/11/2026).
+    //
+    // `acces_modules` dit ce à quoi CE collaborateur a droit. Le catalogue dit
+    // tout autre chose : quelles sociétés possèdent tel module. Les écrans en
+    // ont besoin — Ludovic a vu « Chantier / dossier » proposé chez Dynassur,
+    // qui est un courtier et n'aura jamais de chantiers.
+    //
+    // Il est déjà chargé ici : le garder coûte zéro requête, alors que chaque
+    // écran qui le relirait en paierait une.
+    return { ...data, ...drapeaux, acces_modules: acces || [], modules_societes: catalogue }
   }
 
   // Suivi de connexion — additif, ne bloque jamais le login (fire-and-forget)

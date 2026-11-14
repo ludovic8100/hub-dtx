@@ -1,5 +1,6 @@
 import { voile } from '../lib/voile'
 import { useState, useEffect } from 'react'
+import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
 import { COUL } from '../lib/theme'
 
@@ -37,15 +38,42 @@ const inp = { padding: '8px 10px', borderRadius: 8, border: '1px solid #cbd5e1',
 const TABLE_TIERS = { LODE: 'lode_clients' }
 
 export default function PanneauAttribuer({ facture, dossiers, onClose, onChoisir }) {
+  const { perms } = useAuth() || {}
   const tableTiers = TABLE_TIERS[facture.societe]
-  // ⚠️ Le type ouvert au départ dépend de CE QUI EXISTE, pas d'une valeur en
-  // dur. Sans chantier, « dossier » n'est plus proposé (voir TYPES) ; et
-  // `TABLE_TIERS` ne connaît que LODE, donc « tiers » n'est pas un repli
-  // universel non plus. Ouvrir sur un onglet invisible donnerait une fenêtre
-  // avec une zone de recherche qui ne trouve jamais rien — exactement ce que
-  // Ludovic a vu chez Dynassur le 14/11.
+  // ⚠️ « CHANTIER / DOSSIER » NE S'AFFICHE QUE DANS LES SOCIÉTÉS QUI EN ONT
+  // (14/11/2026).
+  //
+  // Ce panneau vit dans `VueFactures`, donc dans `ComptabiliteView`, donc dans
+  // la comptabilité des SIX sociétés. Chez Dynassur — un courtier qui n'a ni
+  // chantiers ni onglet Dossiers — on proposait quand même « Chantier /
+  // dossier », puis on renvoyait vers « l'onglet Dossiers », qui n'existe pas
+  // pour elle. Signalé par Ludovic, à juste titre.
+  //
+  // ⚠️ LA SOURCE EST LE RÉFÉRENTIEL, PAS LE CONTENU. J'avais d'abord écrit
+  // « s'il existe au moins un chantier ». C'est plus faible : un dossier créé
+  // par erreur chez Dynassur aurait fait réapparaître l'option. Ludovic a
+  // tranché — « les chantiers sont réservés à DTX et LODE » — et cette règle
+  // a sa place dans `ref_modules_societes`, comme les dix-huit autres modules,
+  // donc modifiable sans déploiement et sans un seul nom de société en dur.
+  //
+  // Repli en cascade : si le catalogue n'a pas pu être lu, on retombe sur
+  // l'existence d'un chantier plutôt que de tout masquer — une option
+  // manquante bloque le travail, une option en trop ne fait que gêner.
+  //
+  // (La liste des chantiers est déjà filtrée par société côté requête : il n'y
+  // a donc jamais eu de fuite d'une entité vers une autre, seulement une
+  // option qui ne menait nulle part.)
+  const modulesSocietes = perms?.modules_societes
+  const aDesChantiers = Array.isArray(modulesSocietes)
+    ? modulesSocietes.some(m => m.module_code === 'dossiers' && m.societe === facture.societe)
+    : dossiers.length > 0
+
+  // Le type ouvert au départ suit la même logique : ouvrir sur un onglet qui
+  // n'est pas proposé donnerait une fenêtre avec une recherche qui ne trouve
+  // jamais rien. Et `TABLE_TIERS` ne connaît que LODE, donc « tiers » n'est
+  // pas un repli universel non plus.
   const [type, setType] = useState(
-    dossiers.length ? 'dossier' : (TABLE_TIERS[facture.societe] ? 'tiers' : null))
+    aDesChantiers ? 'dossier' : (TABLE_TIERS[facture.societe] ? 'tiers' : null))
   const [q, setQ] = useState('')
   const [tiers, setTiers] = useState([])
   const [chargeTiers, setChargeTiers] = useState(false)
@@ -70,28 +98,11 @@ export default function PanneauAttribuer({ facture, dossiers, onClose, onChoisir
   const listeTiers = !terme ? tiers : tiers.filter(c =>
     `${nomTiers(c)} ${c.ville || ''}`.toLowerCase().includes(terme))
 
-  // ⚠️ « CHANTIER / DOSSIER » NE S'AFFICHE QUE LÀ OÙ DES CHANTIERS EXISTENT
-  // (14/11/2026).
-  //
-  // Ce panneau vit dans `VueFactures`, donc dans `ComptabiliteView`, donc dans
-  // la comptabilité des SIX sociétés. Chez Dynassur — un courtier en assurance
-  // qui n'a ni chantiers ni onglet Dossiers — on proposait quand même
-  // « Chantier / dossier », et on renvoyait vers « l'onglet Dossiers » qui
-  // n'existe pas pour elle. Signalé par Ludovic, à juste titre.
-  //
-  // La condition est le CONTENU, pas un nom de société : le projet interdit la
-  // règle métier en dur sur une entité. Aucun chantier → aucune raison de
-  // proposer d'en choisir un. Et c'est auto-correctif : le jour où une société
-  // ouvre des dossiers, l'option revient toute seule.
-  //
-  // (La liste est déjà filtrée par société côté requête — il n'y a donc jamais
-  // eu de fuite des chantiers LODE vers une autre entité, seulement une option
-  // qui ne menait nulle part.)
-  //
   // 'bien' est accepté par la base mais la table n'existe pas encore : le
-  // proposer donnerait un choix qui ne mène nulle part — même raison.
+  // proposer donnerait un choix qui ne mène nulle part — même raison que
+  // « dossier » ci-dessus.
   const TYPES = [
-    ...(dossiers.length ? [{ code: 'dossier', label: 'Chantier / dossier', icone: 'ti-folder', aide: 'Pour un client, un chantier identifié' }] : []),
+    ...(aDesChantiers ? [{ code: 'dossier', label: 'Chantier / dossier', icone: 'ti-folder', aide: 'Pour un client, un chantier identifié' }] : []),
     ...(tableTiers ? [{ code: 'tiers', label: 'Client direct', icone: 'ti-user', aide: 'Sans dossier ouvert' }] : []),
     { code: 'structure',   label: 'Structure',          icone: 'ti-building', aide: 'Loyer, énergie, téléphone, assurances' },
     { code: 'consommable', label: 'Consommable',        icone: 'ti-box',      aide: 'Visserie, petit matériel — jamais sur un chantier' },
