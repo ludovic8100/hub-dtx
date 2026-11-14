@@ -234,3 +234,40 @@ begin
   where has_table_privilege('anon', 'public.'||t, 'SELECT');
   if reste is not null then raise exception 'anon garde SELECT sur : %', reste; end if;
 end $$;
+
+-- ── LA RÈGLE DE RAPPEL (ajoutée le 14/11/2026) ───────────────────────────
+--
+-- Défaut de la première version, et il était sérieux : le drapeau `termine`
+-- existait sur chaque issue, et la vue l'IGNORAIT. Un lead marqué « pas de
+-- réponse » passait donc en « traité » et disparaissait de la file, alors
+-- que personne n'avait parlé à personne. La moitié du mécanisme était posée,
+-- l'autre manquait.
+--
+-- Règle donnée par Ludovic le 14/11 : après un « pas de réponse », on
+-- rappelle à +1, puis +4, puis +7 jours ouvrables, et on s'arrête au
+-- quatrième essai.
+--
+-- ⚠️ LE PLAFOND EST LA PARTIE QU'ON OUBLIE, ET LA PLUS IMPORTANTE. Sans lui,
+-- un mauvais numéro revient chaque semaine jusqu'à la fin de l'année. Au bout
+-- d'un mois la file est pleine de fantômes, le commercial cesse de la
+-- regarder, et il rate les vrais leads au passage. Une file de travail ne
+-- survit qu'à la condition que tout ce qui y entre finisse par en sortir.
+--
+-- Les délais vivent dans la base et non dans le code : une règle de relance
+-- se règle, elle ne se redéploie pas.
+
+alter table lead_issues add column if not exists delais_rappel  integer[];
+alter table lead_issues add column if not exists max_tentatives integer;
+alter table leads       add column if not exists rappeler_le date;
+alter table leads       add column if not exists tentatives  integer not null default 0;
+create index if not exists leads_rappel on leads (rappeler_le) where rappeler_le is not null;
+
+update lead_issues set delais_rappel = '{1,4,7}', max_tentatives = 4 where code = 'pas_de_reponse';
+-- « À rappeler » n'a pas de délai automatique : la date vient de ce que le
+-- client a dit. Aucune valeur calculée ne vaut « rappelez-moi mardi ».
+update lead_issues set delais_rappel = null, max_tentatives = null where code = 'a_rappeler';
+
+comment on column lead_issues.delais_rappel is
+  'Délais de rappel en jours ouvrables, un par tentative. Vide = la date est saisie à la main.';
+comment on column lead_issues.max_tentatives is
+  'Au-delà, le lead sort de la file : sans plafond, un mauvais numéro revient indéfiniment.';

@@ -4,6 +4,7 @@ import { useAuth } from '../lib/auth'
 import { COUL } from '../lib/theme'
 import { trierLignes } from '../lib/tri'
 import { preparerLeads } from '../lib/leadsImport'
+import { calculerRappel, ajouterJoursOuvrables } from '../lib/leadsRappel'
 
 /**
  * PROSPECTION — les leads à appeler, et ce qu'il en est sorti.
@@ -38,11 +39,14 @@ const eur = n => n == null ? '—'
 // Les états que la vue calcule. L'ordre est celui dans lequel on veut les
 // traiter : le retard d'abord, parce qu'un lead en retard le reste.
 const ETATS = {
+  a_rappeler:        { label: 'À rappeler',      fond: '#fee2e2', trait: '#b91c1c', rang: 0 },
   en_retard:         { label: 'En retard',       fond: '#fee2e2', trait: '#b91c1c', rang: 1 },
   du_jour:           { label: "Aujourd'hui",     fond: '#dbeafe', trait: '#1d4ed8', rang: 2 },
   appele_sans_issue: { label: 'Appelé, issue à donner', fond: '#fef3c7', trait: '#b45309', rang: 3 },
   a_venir:           { label: 'À venir',         fond: '#f1f5f9', trait: '#64748b', rang: 4 },
   traite:            { label: 'Traité',          fond: '#dcfce7', trait: '#15803d', rang: 5 },
+  rappel_prevu:      { label: 'Rappel prévu',   fond: '#eef2ff', trait: '#4338ca', rang: 4.5 },
+  epuise:            { label: 'Injoignable (4 essais)', fond: '#f1f5f9', trait: '#64748b', rang: 5.5 },
   injoignable:       { label: 'Sans téléphone',  fond: '#f1f5f9', trait: '#64748b', rang: 6 },
 }
 
@@ -64,7 +68,7 @@ export default function ProspectionView() {
   const [qui, setQui] = useState('moi')
   const [vue, setVue] = useState('a_faire')
   const [ouvert, setOuvert] = useState(null)
-  const [brouillon, setBrouillon] = useState({ issue: '', remarques: '' })
+  const [brouillon, setBrouillon] = useState({ issue: '', remarques: '', rappeler_le: '' })
   const [enregistre, setEnregistre] = useState(false)
   const [imp, setImp] = useState(null)      // { lignes, rapport, nom } avant écriture
   const [impEnCours, setImpEnCours] = useState(false)
@@ -91,7 +95,9 @@ export default function ProspectionView() {
     if (qui === 'moi' && monCode) v = v.filter(x => x.attribue_code === monCode)
     else if (qui !== 'moi' && qui !== 'tous') v = v.filter(x => x.attribue_code === qui)
 
-    if (vue === 'a_faire') v = v.filter(x => ['en_retard', 'du_jour', 'appele_sans_issue'].includes(x.etat))
+    // UN RAPPEL ÉCHU EST DU TRAVAIL DU JOUR. C'est tout l'objet de la règle :
+    // « pas de réponse » ne clôt rien, le lead revient à sa date.
+    if (vue === 'a_faire') v = v.filter(x => ['a_rappeler', 'en_retard', 'du_jour', 'appele_sans_issue'].includes(x.etat))
     else if (vue === 'traite') v = v.filter(x => x.etat === 'traite')
     else if (vue === 'probleme') v = v.filter(x => x.attribution_inconnue || x.sans_telephone)
 
@@ -107,6 +113,7 @@ export default function ProspectionView() {
   const compte = useMemo(() => {
     const base = (lignes || []).filter(x => qui === 'tous' || x.attribue_code === (qui === 'moi' ? monCode : qui))
     return {
+      rappels: base.filter(x => x.etat === 'a_rappeler').length,
       retard: base.filter(x => x.etat === 'en_retard').length,
       jour: base.filter(x => x.etat === 'du_jour').length,
       sansIssue: base.filter(x => x.etat === 'appele_sans_issue').length,
@@ -173,7 +180,7 @@ export default function ProspectionView() {
 
   const ouvrir = (l) => {
     setOuvert(l)
-    setBrouillon({ issue: l.issue || '', remarques: l.remarques || '' })
+    setBrouillon({ issue: l.issue || '', remarques: l.remarques || '', rappeler_le: l.rappeler_le || '' })
     setEnregistre(false)
   }
 
@@ -183,11 +190,21 @@ export default function ProspectionView() {
     // QUI donne l'issue est enregistré, et ce n'est pas forcément celui à qui
     // le lead est attribué : règle de Ludovic, « un appel passé par un autre
     // commercial compte, mais on doit savoir qui a pris le rendez-vous ».
+    const issueChoisie = issues.find(i => i.code === brouillon.issue) || null
+    const r = calculerRappel(ouvert, issueChoisie, brouillon.rappeler_le || null)
+    // « À rappeler » sans date : on refuse plutôt que de poser une date au
+    // hasard. Un rappel à une date inventée est un rendez-vous manqué.
+    if (r.message && !r.rappeler_le && !r.epuise && issueChoisie && !issueChoisie.termine
+        && !(issueChoisie.delais_rappel || []).length) {
+      setErreur(r.message); return
+    }
     const { error } = await supabase.from('leads').update({
       issue: brouillon.issue || null,
       issue_le: brouillon.issue ? new Date().toISOString() : null,
       issue_par: brouillon.issue ? (perms?.id ?? null) : null,
       remarques: brouillon.remarques || null,
+      rappeler_le: r.rappeler_le,
+      tentatives: r.tentatives,
       updated_at: new Date().toISOString(),
     }).eq('id', ouvert.id)
     if (error) { setErreur(error.message); return }
@@ -285,6 +302,7 @@ export default function ProspectionView() {
           rouge, plus rien ne l'est. */}
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
         {[
+          ['À rappeler', compte.rappels, compte.rappels > 0 ? '#b91c1c' : COUL.texteDoux],
           ['En retard', compte.retard, compte.retard > 0 ? '#b91c1c' : COUL.texteDoux],
           ["Aujourd'hui", compte.jour, '#1d4ed8'],
           ['Issue à donner', compte.sansIssue, '#b45309'],
@@ -412,6 +430,40 @@ export default function ProspectionView() {
                 </button>
               ))}
             </div>
+
+            {/* LA DATE DE RAPPEL, et ce qu'elle devient selon l'issue.
+                « À rappeler » l'exige : elle vient de ce que le client a dit.
+                « Pas de réponse » la propose : +1, +4, +7 jours ouvrables,
+                quatre essais au maximum — les délais viennent de la base, pas
+                du code. */}
+            {(() => {
+              const i = issues.find(x => x.code === brouillon.issue)
+              if (!i || i.termine) return null
+              const auto = Array.isArray(i.delais_rappel) && i.delais_rappel.length
+              const apercu = calculerRappel(ouvert, i, brouillon.rappeler_le || null)
+              return (
+                <div style={{ marginBottom: 14, padding: '10px 12px', borderRadius: 8,
+                  background: COUL.fondDoux, border: `1px solid ${COUL.bord}` }}>
+                  <label style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase',
+                    letterSpacing: '.04em', color: COUL.texteDoux, display: 'block', marginBottom: 6 }}>
+                    Rappeler le {auto ? '' : '(obligatoire)'}
+                  </label>
+                  <input type="date" value={brouillon.rappeler_le || (auto ? (apercu.rappeler_le || '') : '')}
+                    onChange={e => setBrouillon(b => ({ ...b, rappeler_le: e.target.value }))}
+                    style={{ padding: '7px 10px', borderRadius: 7, border: `1px solid ${COUL.bord}`,
+                      fontSize: 14, fontFamily: 'inherit' }} />
+                  {apercu.message && (
+                    <div style={{ fontSize: 12.5, marginTop: 6,
+                      color: apercu.epuise ? '#b45309' : COUL.texteDoux }}>{apercu.message}</div>
+                  )}
+                  {ouvert.tentatives > 0 && (
+                    <div style={{ fontSize: 12.5, color: COUL.texteDoux, marginTop: 3 }}>
+                      déjà {ouvert.tentatives} essai(s) sans réponse
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
 
             {/* Champ libre demandé par Ludovic le 13/11. Il reste quoi qu'il
                 arrive : un réimport du fichier ne touche jamais aux colonnes
